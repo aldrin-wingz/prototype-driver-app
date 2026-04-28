@@ -33,6 +33,40 @@ export interface TripPill {
 // Mock request trips (available to claim)
 export const mockRequestTrips: Trip[] = [
   {
+    id: "58391230462",
+    date: "Sun, Nov 1, 2026",
+    rider: "WINDY PRECISE",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "8881.2 mi away",
+    totalRevenue: 45.25,
+    notes: "FOR TESTING PURPOSES ONLY - CH...",
+    legs: [
+      {
+        id: "58391230462",
+        type: "wait-for-call",
+        label: "Est Pick-up Time - Wait For Call",
+        time: "1:30 PM",
+        address: "CHOA- Marcus Autism Center, 1920 Briarcliff Rd NE, Atlanta, GA 30329",
+        county: "DeKalb County",
+        revenue: 45.25,
+      },
+      {
+        id: "58391230462-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:16 PM",
+        address: "33 Golden Eagle Pkwy, Braselton, GA 30517",
+        county: "Jackson County",
+        revenue: 0,
+      },
+    ],
+    status: "request",
+    pills: [
+      { label: "Expires in 185 days", variant: "neutral" },
+    ],
+  },
+  {
     id: "REQ-001",
     date: "Thu, Apr 30, 2026",
     rider: "Andrew Test",
@@ -118,40 +152,6 @@ export const mockRequestTrips: Trip[] = [
       { label: "Expires in 185 days", variant: "neutral" },
     ],
   },
-  {
-    id: "REQ-004",
-    date: "Sun, Nov 1, 2026",
-    rider: "WINDY PRECISE",
-    client: "Verida",
-    passengerCount: 1,
-    distance: "8881.2 mi away",
-    totalRevenue: 45.25,
-    notes: "FOR TESTING PURPOSES ONLY -...",
-    legs: [
-      {
-        id: "leg-1",
-        type: "est-pickup",
-        label: "Est Pick-up Time - Wait For Call",
-        time: "1:30 PM",
-        address: "555 Maple Dr, Decatur, GA",
-        county: "DeKalb County",
-        revenue: 45.25,
-      },
-      {
-        id: "leg-2",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "1:50 PM",
-        address: "777 Cedar Ln, Covington, GA",
-        county: "Jackson County",
-        revenue: 0,
-      },
-    ],
-    status: "request",
-    pills: [
-      { label: "Expires in 185 days", variant: "neutral" },
-    ],
-  },
 ];
 
 // Mock upcoming trips (accepted but not started)
@@ -184,30 +184,30 @@ export const mockUpcomingTrips: Trip[] = [
 // Mock needs action trips
 export const mockNeedsActionTrips: Trip[] = [
   {
-    id: "NA-001",
+    id: "1000883298451",
     date: "Sun, Mar 15, 2026",
     rider: "WINDY PRECISE",
     client: "Verida",
     passengerCount: 1,
     distance: "",
     totalRevenue: 45.25,
-    notes: "",
+    notes: "FOR TESTING PURPOSES ONLY",
     legs: [
       {
-        id: "leg-1",
+        id: "1000883298451",
         type: "est-pickup",
         label: "Est Pick-up Time",
         time: "10:00 PM",
-        address: "999 Action Ave, Covington, GA",
+        address: "Braselton Return, 33 Golden Eagle Pkwy, Braselton, GA 30517",
         county: "Jackson County",
         revenue: 45.25,
       },
       {
-        id: "leg-2",
+        id: "1000883298451-b",
         type: "appointment",
         label: "Appointment Time",
         time: "10:46 PM",
-        address: "888 Response Rd, Decatur, GA",
+        address: "1920 Briarcliff Rd NE, Atlanta, GA 30329",
         county: "DeKalb County",
         revenue: 0,
       },

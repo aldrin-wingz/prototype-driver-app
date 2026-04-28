@@ -106,10 +106,7 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
   return (
     <Card 
       className="cursor-pointer rounded-xl bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-      onClick={() => {
-        console.log("[v0] RideCard clicked:", trip.id);
-        onClick?.();
-      }}
+      onClick={onClick}
     >
       {/* Header section */}
       <div className="mb-3 flex items-start justify-between">

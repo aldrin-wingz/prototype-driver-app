@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
@@ -20,6 +21,7 @@ interface TabConfig {
 }
 
 export default function MyRidesPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabValue>("needs-action");
   
   const tabs: TabConfig[] = [
@@ -88,7 +90,7 @@ export default function MyRidesPage() {
               trip={trip}
               revenueColor="green"
               showDistance={false}
-              onClick={() => console.log("[v0] Navigate to ride detail:", trip.id)}
+              onClick={() => router.push(`/my-rides/${trip.id}`)}
             />
           ))
         )}

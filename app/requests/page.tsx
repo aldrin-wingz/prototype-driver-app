@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
@@ -7,6 +8,7 @@ import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RequestsPage() {
+  const router = useRouter();
   const { toast } = useToast();
   
   const handleFilterClick = () => {
@@ -39,7 +41,7 @@ export default function RequestsPage() {
             key={trip.id}
             trip={trip}
             revenueColor="green"
-            onClick={() => console.log("[v0] Navigate to request detail:", trip.id)}
+            onClick={() => router.push(`/requests/${trip.id}`)}
           />
         ))}
       </main>

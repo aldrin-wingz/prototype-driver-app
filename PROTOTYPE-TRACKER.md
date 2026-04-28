@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-0a — Active
-## Last Completed: Step 0 (Setup)
+## Current Step: I-0b — Active
+## Last Completed: I-0a (Shell Replication - List Surfaces)
 
 ---
 
@@ -29,8 +29,8 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | #     | Screen                                                        | Status    | Key Deliverable                                                                                                                                                                                                                                                                                  |
 | ----- | ------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0     | Setup                                                         | ✅ Done    | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
-| I-0a  | Shell Replication — Scaffold + List Surfaces                  | 🔄 Active  | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
-| I-0b  | Shell Replication — Ride Details (both states merged)         | ⬜ Planned | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
+| I-0a  | Shell Replication — Scaffold + List Surfaces                  | ✅ Done    | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
+| I-0b  | Shell Replication — Ride Details (both states merged)         | 🔄 Active  | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
 | I-0.5 | Schema + Seed Data                                            | ⬜ Planned | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
 | I-1   | Variant Toggle Infrastructure                                 | ⬜ Planned | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
@@ -149,16 +149,16 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 - Apply observed styling from BIBLE (pill family colors, time-anchor circles, blue-revenue for history, etc.).
 
 **Test Flows After This Step:**
-- [ ] Header + BottomNav present on Home / Requests / My Rides; absent on Ride History
-- [ ] Bottom nav tabs in correct order (Home / Requests / Planner / My Rides / Options)
-- [ ] Active tab visually distinct (teal icon + label)
-- [ ] Home renders Earnings card (with chevron toggle), prompt, New Requests, Next Accepted Ride sections
-- [ ] Earnings chevrons toggle between This Month / Last Month
-- [ ] Requests list renders ride cards with mixed pill colors (green Single Legs, yellow Wait For Call, orange/gray expiration pills)
-- [ ] My Rides has 3-tab row with Needs Action default; cards show red `Not Confirmed` pill on that tab
-- [ ] Ride History renders with **blue** revenue color and no bottom pills
-- [ ] Mobile portrait 375×812 viewport, no horizontal overflow
-- [ ] No incentive UI, no action buttons, no detail screens
+- [x] Header + BottomNav present on Home / Requests / My Rides; absent on Ride History
+- [x] Bottom nav tabs in correct order (Home / Requests / Planner / My Rides / Options)
+- [x] Active tab visually distinct (teal icon + label)
+- [x] Home renders Earnings card (with chevron toggle), prompt, New Requests, Next Accepted Ride sections
+- [x] Earnings chevrons toggle between This Month / Last Month
+- [x] Requests list renders ride cards with mixed pill colors (green Single Legs, yellow Wait For Call, orange/gray expiration pills)
+- [x] My Rides has 3-tab row with Needs Action default; cards show red `Not Confirmed` pill on that tab
+- [x] Ride History renders with **blue** revenue color and no bottom pills
+- [x] Mobile portrait 375×812 viewport, no horizontal overflow
+- [x] No incentive UI, no action buttons, no detail screens
 
 ---
 
