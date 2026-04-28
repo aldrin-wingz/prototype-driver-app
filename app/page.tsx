@@ -1,189 +1,174 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+"use client";
 
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/\s*–\s*/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
-}
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Info, ClipboardCheck } from "lucide-react";
+import { Header } from "@/components/driver/header";
+import { BottomNav } from "@/components/driver/bottom-nav";
+import { RideCard } from "@/components/driver/ride-card";
+import { Card } from "@/components/ui/card";
+import { 
+  mockRequestTrips, 
+  mockNeedsActionTrips,
+  mockEarningsThisMonth, 
+  mockEarningsLastMonth,
+  type EarningsData 
+} from "@/lib/driver-data/mock-trips";
 
-export default function Home() {
+function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext }: {
+  data: EarningsData;
+  onPrevious: () => void;
+  onNext: () => void;
+  showPrevious: boolean;
+  showNext: boolean;
+}) {
   return (
-    <main className="min-h-screen p-8">
-      <div className="mx-auto max-w-4xl space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Wingz Component Registry</h1>
-          <p className="mt-2 text-muted-foreground">
-            Design system and reusable React components for driver portal, agent portal, dispatch tool, and new prototypes.
-          </p>
+    <Card className="relative mx-4 mb-4 overflow-hidden rounded-xl bg-white p-6 shadow-sm">
+      {/* Period navigation */}
+      <div className="mb-2 flex items-center justify-center">
+        <h2 className="text-center text-lg font-semibold text-gray-900">{data.label}</h2>
+      </div>
+      
+      {/* Earnings amount */}
+      <div className="mb-1 flex items-center justify-center gap-1">
+        <p className="text-4xl font-bold text-gray-900">${data.earnings.toFixed(2)}</p>
+      </div>
+      <div className="mb-4 flex items-center justify-center gap-1">
+        <span className="text-xs font-medium tracking-wide text-gray-500">EARNINGS</span>
+        <Info className="h-3 w-3 text-gray-400" />
+      </div>
+      
+      {/* Chevron navigation */}
+      {showPrevious && (
+        <button 
+          onClick={onPrevious}
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-gray-800 hover:text-gray-600"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
+      {showNext && (
+        <button 
+          onClick={onNext}
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-gray-800 hover:text-gray-600"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
+      
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-4 border-t border-gray-100 pt-4">
+        <div className="text-center">
+          <p className="text-2xl font-bold text-gray-900">{data.trips}</p>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xs font-medium tracking-wide text-gray-500">
+              {data.period === "this-month" ? "TRIPS" : "COMPLETED"}
+            </span>
+            <Info className="h-3 w-3 text-gray-400" />
+          </div>
         </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Link href="/components#accordion" className="block transition-opacity hover:opacity-90">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  UI Components
-                  <Badge variant="secondary">shadcn/ui</Badge>
-                </CardTitle>
-                <CardDescription>
-                  Primitives (Accordion, Alert, Badge, Button, Card, Input, etc.), overlays (Dialog, Sheet, Tooltip), layout (Table, ScrollArea), forms (DatePicker, PhoneNumberInput, TimeInput). 50+ components.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1 py-0.5">components/ui/</code>
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href={`/components#${slugify("Agent Portal – DriverTable")}`} className="block transition-opacity hover:opacity-90">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Agent Portal
-                  <Badge>5 components</Badge>
-                </CardTitle>
-                <CardDescription>
-                  DriverTable, CommsHistory, ComposeMessageModal, SortableHeader, SubmittedFieldsDisplay. TablePagination is the design system standard for tables.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1 py-0.5">components/agent/</code>
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href={`/components#${slugify("Dispatch Tool – DateSelector")}`} className="block transition-opacity hover:opacity-90">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Dispatch Tool
-                  <Badge>4 components</Badge>
-                </CardTitle>
-                <CardDescription>
-                  DateSelector, TopNavTabs, ColorLegendModal, RidePreviewCard. Shared nav and date picker across dispatch and post-hire compliance.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1 py-0.5">components/dispatch-tool/</code>, <code className="rounded bg-muted px-1 py-0.5">components/ui/ride-preview-card.tsx</code>
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href={`/components#${slugify("Post-Hire Compliance – EmptyState")}`} className="block transition-opacity hover:opacity-90">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Post-Hire Compliance
-                  <Badge>3 components</Badge>
-                </CardTitle>
-                <CardDescription>
-                  PostHireComplianceHeader, PostHireComplianceNavigation, PostHireComplianceEmptyState. Uses ColorLegendModal from dispatch-tool.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1 py-0.5">components/post-hire-compliance/</code>
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href={`/components#${slugify("In-App Announcements – CollapsibleContent")}`} className="block transition-opacity hover:opacity-90">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  In-App Announcements
-                  <Badge>2 components</Badge>
-                </CardTitle>
-                <CardDescription>
-                  PhonePreview (iPhone-style announcement preview), CollapsibleContent (expandable content with &quot;Show more&quot;).
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1 py-0.5">components/in-app-announcements/</code>
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href={`/components#${slugify("Onboarding – InterviewScheduler")}`} className="block transition-opacity hover:opacity-90">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Onboarding (Driver Portal)
-                  <Badge>2 components</Badge>
-                </CardTitle>
-                <CardDescription>
-                  InterviewScheduler, RejectionScreen. Full onboarding flow in wingz-driver-portal.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <code className="rounded bg-muted px-1 py-0.5">components/onboarding/</code>
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Design System</CardTitle>
-              <CardDescription>
-                Wingz brand colors (primary green #16CFA9, destructive red, warning yellow), tokens, typography (DM Sans). Tailwind config.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                <code className="rounded bg-muted px-1 py-0.5">app/globals.css</code>,{" "}
-                <code className="rounded bg-muted px-1 py-0.5">tailwind.config.ts</code>. See{" "}
-                <Link href="https://github.com/wingz-inc/wingz-react-component-registry/blob/main/docs/DESIGN-SYSTEM.md" className="underline hover:no-underline">docs/DESIGN-SYSTEM.md</Link>
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Utilities & Hooks</CardTitle>
-              <CardDescription>
-                Shared utilities (phone formatting, dayjs), types, constants. Theme provider, view-only banner. use-mobile, use-toast hooks.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                <code className="rounded bg-muted px-1 py-0.5">lib/</code>, <code className="rounded bg-muted px-1 py-0.5">hooks/</code>, <code className="rounded bg-muted px-1 py-0.5">components/theme-provider.tsx</code>
-              </p>
-            </CardContent>
-          </Card>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-gray-900">{data.onTimePerformance}</p>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xs font-medium tracking-wide text-gray-500">ON-TIME</span>
+          </div>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xs font-medium tracking-wide text-gray-500">PERFORMANCE</span>
+            <Info className="h-3 w-3 text-gray-400" />
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-4">
-          <Button asChild>
-            <Link href="/components">View component showcase</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="https://github.com/wingz-inc/wingz-react-component-registry">
-              GitHub
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="https://github.com/wingz-inc/wingz-react-component-registry/blob/main/docs/HOW-TO-USE.md">
-              How to use
-            </Link>
-          </Button>
+        <div className="text-center">
+          <p className="text-2xl font-bold text-gray-900">{data.sendBacks}</p>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xs font-medium tracking-wide text-gray-500">SEND BACKS</span>
+            <Info className="h-3 w-3 text-gray-400" />
+          </div>
         </div>
       </div>
-    </main>
+      
+      {/* Pagination dots */}
+      <div className="mt-4 flex justify-center gap-2">
+        <div className={`h-2 w-2 rounded-full ${data.period === "this-month" ? "bg-gray-400" : "bg-gray-800"}`} />
+        <div className={`h-2 w-2 rounded-full ${data.period === "last-month" ? "bg-gray-400" : "bg-gray-800"}`} />
+      </div>
+    </Card>
+  );
+}
+
+function ConfirmTripPrompt() {
+  return (
+    <Card className="mx-4 mb-4 flex items-center gap-3 rounded-xl bg-[#10B981] p-4 text-white">
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+        <ClipboardCheck className="h-6 w-6 text-white" />
+      </div>
+      <div className="flex-1">
+        <p className="font-semibold">Confirm Your Upcoming Trip</p>
+        <p className="text-sm text-white/90">
+          Your next trip requires action. Tap to view rides awaiting confirmation.
+        </p>
+      </div>
+      <ChevronRight className="h-6 w-6 text-white" />
+    </Card>
+  );
+}
+
+export default function HomePage() {
+  const [period, setPeriod] = useState<"this-month" | "last-month">("this-month");
+  
+  const earningsData = period === "this-month" ? mockEarningsThisMonth : mockEarningsLastMonth;
+  const previewRequest = mockRequestTrips[0];
+  const needsActionTrip = mockNeedsActionTrips[0];
+  
+  return (
+    <div className="flex min-h-screen flex-col bg-[#F9FAFB] pb-20">
+      <Header title="Home" />
+      
+      <main className="flex-1 pt-4">
+        {/* Earnings Card */}
+        <EarningsCard
+          data={earningsData}
+          onPrevious={() => setPeriod("this-month")}
+          onNext={() => setPeriod("last-month")}
+          showPrevious={period === "last-month"}
+          showNext={period === "this-month"}
+        />
+        
+        {/* Confirm Trip Prompt */}
+        <ConfirmTripPrompt />
+        
+        {/* New Requests Section */}
+        <div className="px-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900">New Requests</h3>
+            <button className="text-sm text-gray-500 hover:text-gray-700">View All</button>
+          </div>
+          {previewRequest && (
+            <RideCard 
+              trip={previewRequest} 
+              revenueColor="green"
+            />
+          )}
+        </div>
+        
+        {/* Next Accepted Ride Section */}
+        {needsActionTrip && (
+          <div className="mt-6 px-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Next Accepted Ride</h3>
+              <button className="text-sm text-gray-500 hover:text-gray-700">View All</button>
+            </div>
+            <RideCard 
+              trip={{
+                ...needsActionTrip,
+                pills: [{ label: "Not Confirmed", variant: "danger" }]
+              }} 
+              revenueColor="green"
+              showDistance={false}
+            />
+          </div>
+        )}
+      </main>
+      
+      <BottomNav />
+    </div>
   );
 }

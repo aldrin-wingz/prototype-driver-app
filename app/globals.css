@@ -239,3 +239,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
 .scroll-viewport > div {
   display: block !important;
 }
+
+/* Driver app specific utilities */
+.driver-app-bg {
+  background-color: #F9FAFB;
+}
