@@ -27,6 +27,10 @@ import {
   PillRowVariant,
   CornerFlagVariant,
   BannerHeroVariant,
+  StreakFlameVariant,
+  ProgressRingVariant,
+  BonusPreviewVariant,
+  AchievementBadgeVariant,
 } from "./incentive-badge-renderer";
 
 // -----------------------------------------------------------------------------
@@ -163,17 +167,33 @@ export function ProgramContributionIndicator({
 
   const activeVariant = variants.pill;
 
-  // For badge-corner-flag, use Tooltip (hover) on desktop
-  if (activeVariant === "badge-corner-flag") {
+  // For absolute-positioned variants (badge, flame, ring, bonus, achievement), use Tooltip (hover) on desktop
+  const absoluteVariants = ["badge-corner-flag", "streak-flame", "progress-ring", "bonus-preview", "achievement-badge"] as const;
+  
+  if (absoluteVariants.includes(activeVariant as typeof absoluteVariants[number])) {
+    const renderAbsoluteBadge = () => {
+      switch (activeVariant) {
+        case "badge-corner-flag":
+          return <CornerFlagVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
+        case "streak-flame":
+          return <StreakFlameVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
+        case "progress-ring":
+          return <ProgressRingVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
+        case "bonus-preview":
+          return <BonusPreviewVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
+        case "achievement-badge":
+          return <AchievementBadgeVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
+        default:
+          return null;
+      }
+    };
+
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="cursor-pointer">
-              <CornerFlagVariant
-                incentiveTypes={incentiveTypes}
-                isCompleted={isCompleted}
-              />
+              {renderAbsoluteBadge()}
             </div>
           </TooltipTrigger>
           <TooltipContent

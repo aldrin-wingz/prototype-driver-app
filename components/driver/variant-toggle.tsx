@@ -70,6 +70,7 @@ export function VariantToggle() {
               <p className="mb-3 text-xs text-muted-foreground">
                 How incentive eligibility appears on ride cards in list views.
               </p>
+
               <RadioGroup
                 value={variants.pill}
                 onValueChange={(value) => setPillVariant(value as PillVariant)}
