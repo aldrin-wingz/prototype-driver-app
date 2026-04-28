@@ -6,6 +6,9 @@ import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
 import { Card } from "@/components/ui/card";
+import { DashboardIncentiveSection } from "@/components/driver/dashboard-incentive-section";
+import { UpcomingPayoutWidget } from "@/components/driver/upcoming-payout-widget";
+import { useVariants } from "@/lib/variants-context";
 import { 
   mockRequestTrips, 
   mockNeedsActionTrips,
@@ -14,12 +17,13 @@ import {
   type EarningsData 
 } from "@/lib/driver-data/mock-trips";
 
-function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext }: {
+function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIntegratedWidget }: {
   data: EarningsData;
   onPrevious: () => void;
   onNext: () => void;
   showPrevious: boolean;
   showNext: boolean;
+  showIntegratedWidget?: boolean;
 }) {
   return (
     <Card className="relative mx-4 mb-4 overflow-hidden rounded-xl bg-white p-6 shadow-sm">
@@ -90,6 +94,14 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext }: {
         <div className={`h-2 w-2 rounded-full ${data.period === "this-month" ? "bg-gray-400" : "bg-gray-800"}`} />
         <div className={`h-2 w-2 rounded-full ${data.period === "last-month" ? "bg-gray-400" : "bg-gray-800"}`} />
       </div>
+      
+      {/* Integrated widget variant */}
+      {showIntegratedWidget && (
+        <DashboardIncentiveSection 
+          currentEarnings={data.earnings} 
+          placement="widget" 
+        />
+      )}
     </Card>
   );
 }
@@ -113,16 +125,27 @@ function ConfirmTripPrompt() {
 
 export default function HomePage() {
   const [period, setPeriod] = useState<"this-month" | "last-month">("this-month");
+  const { variants, isLoaded } = useVariants();
   
   const earningsData = period === "this-month" ? mockEarningsThisMonth : mockEarningsLastMonth;
   const previewRequest = mockRequestTrips[0];
   const needsActionTrip = mockNeedsActionTrips[0];
+  
+  // Determine which variant is active for conditional rendering
+  const isDashboardBanner = isLoaded && variants.dashboard === "dashboard-banner";
+  const isDashboardCardSection = isLoaded && variants.dashboard === "dashboard-card-section";
+  const isDashboardWidgetIntegrated = isLoaded && variants.dashboard === "dashboard-widget-integrated";
   
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB] pb-20">
       <Header title="Home" />
       
       <main className="flex-1 pt-4">
+        {/* VARIANT: Dashboard Banner - TOP position */}
+        {isDashboardBanner && (
+          <DashboardIncentiveSection placement="top" />
+        )}
+        
         {/* Earnings Card */}
         <EarningsCard
           data={earningsData}
@@ -130,10 +153,19 @@ export default function HomePage() {
           onNext={() => setPeriod("last-month")}
           showPrevious={period === "last-month"}
           showNext={period === "this-month"}
+          showIntegratedWidget={isDashboardWidgetIntegrated}
         />
+        
+        {/* Upcoming Payout Widget */}
+        <UpcomingPayoutWidget />
         
         {/* Confirm Trip Prompt */}
         <ConfirmTripPrompt />
+        
+        {/* VARIANT: Dashboard Card Section - MIDDLE position */}
+        {isDashboardCardSection && (
+          <DashboardIncentiveSection placement="middle" />
+        )}
         
         {/* New Requests Section */}
         <div className="px-4">

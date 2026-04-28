@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-3 — Pending
-## Last Completed: I-2 (IncentiveBadgeRenderer + ProgramContributionIndicator)
+## Current Step: I-4 — Pending
+## Last Completed: I-3 (DashboardIncentiveSection + UpcomingPayoutWidget)
 
 ---
 
@@ -34,7 +34,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-0.5 | Schema + Seed Data                                            | ✅ Done    | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
 | I-1   | Variant Toggle Infrastructure                                 | ✅ Done    | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ✅ Done    | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
-| I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
+| I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ✅ Done    | 3 dashboard surfacing variants (`dashboard-banner`, `dashboard-card-section`, `dashboard-widget-integrated`) + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                             |
 | I-4   | Ride Details Incentive Callout — Variant Set                  | ⬜ Planned | 3 callout variants (`detail-inline-badge`, `detail-section-pill`, `detail-map-banner`) on Ride Details (before-taken + needs-action / in-progress).                                                                                                                                              |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
 | I-6   | Tier System + Tier-Based Bonus Boost                          | ⬜ Planned | Tier visualization (Bronze/Silver/Gold/Platinum), finalized `TierBadge`, multiplier display, path-to-next-tier; multiplier wires into dashboard projected bonus.                                                                                                                                 |
@@ -557,16 +557,16 @@ A new dashboard section, rendered below the existing earnings card and above the
 - Driver App reads computed values; never recomputes locally.
 
 **Test Flows After This Step:**
-- [ ] All 3 dashboard surfacing variants render correctly via the toggle
-- [ ] Tapping an incentive card/chip navigates to `/requests?incentive=<type>`
-- [ ] Each variant clearly shows program progress + program-level bonus amount (one bonus number per program, NOT per trip)
-- [ ] No-incentive states (none active) show "No active incentives this period."
-- [ ] Existing dashboard widgets unchanged in `dashboard-banner` and `dashboard-card-section`
-- [ ] In `dashboard-widget-integrated`, the existing earnings widget shows the integration cleanly
-- [ ] `UpcomingPayoutWidget` renders below the earnings card with bold $ amount + base/bonus breakdown; anchor id `#upcoming-payout` set
-- [ ] Tapping `UpcomingPayoutWidget` opens the per-PROGRAM breakdown sheet (only completed programs contribute to total)
-- [ ] Empty state (no completed programs) shows the placeholder copy
-- [ ] No payout-action buttons present on the widget
+  - [x] All 3 dashboard surfacing variants render correctly via the toggle
+  - [x] Tapping an incentive card/chip navigates to `/requests?incentive=<type>`
+  - [x] Each variant clearly shows program progress + program-level bonus amount (one bonus number per program, NOT per trip)
+  - [ ] No-incentive states (none active) show "No active incentives this period." — Deferred (seed data always has programs)
+  - [x] Existing dashboard widgets unchanged in `dashboard-banner` and `dashboard-card-section`
+  - [x] In `dashboard-widget-integrated`, the existing earnings widget shows the integration cleanly
+  - [x] `UpcomingPayoutWidget` renders below the earnings card with bold $ amount + base/bonus breakdown; anchor id `#upcoming-payout` set
+  - [x] Tapping `UpcomingPayoutWidget` opens the per-PROGRAM breakdown sheet (only completed programs contribute to total)
+  - [x] Empty state (no completed programs) shows the placeholder copy
+  - [x] No payout-action buttons present on the widget
 
 ---
 
