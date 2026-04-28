@@ -93,9 +93,12 @@ function BannerHeroVariant({ incentiveTypes, isCompleted }: BannerHeroVariantPro
   const labels = incentiveTypes.map((type) => getIncentiveTripLabel(type));
   const combinedLabel = labels.join(" · ");
   
-  // Progress percentage
-  const progressPercent = primaryProgress 
-    ? Math.round((primaryProgress.currentCount / primaryProgress.targetCount) * 100) 
+  // Calculate segment widths for segmented progress bar
+  const completedPercent = primaryProgress 
+    ? (primaryProgress.currentCount / primaryProgress.targetCount) * 100 
+    : 0;
+  const scheduledPercent = primaryProgress 
+    ? (primaryProgress.scheduledCount / primaryProgress.targetCount) * 100 
     : 0;
 
   return (
@@ -139,27 +142,48 @@ function BannerHeroVariant({ incentiveTypes, isCompleted }: BannerHeroVariantPro
         </span>
       </div>
 
-      {/* Progress bar row */}
+      {/* Segmented progress bar row */}
       {primaryProgress && (
         <div className="flex items-center gap-2">
-          {/* Progress bar */}
-          <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-gray-700">
+          {/* Progress bar with 3 segments: completed | scheduled | remaining */}
+          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-gray-700">
+            {/* Completed segment (solid green) */}
             <div
               className={cn(
-                "absolute inset-y-0 left-0 rounded-full transition-all",
+                "absolute inset-y-0 left-0 transition-all",
                 isCompleted ? "bg-gray-500" : "bg-[#10B981]"
               )}
-              style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              style={{ width: `${Math.min(completedPercent, 100)}%` }}
             />
+            {/* Scheduled segment (striped/lighter green) */}
+            {primaryProgress.scheduledCount > 0 && (
+              <div
+                className={cn(
+                  "absolute inset-y-0 transition-all",
+                  isCompleted ? "bg-gray-400" : "bg-[#10B981]/40"
+                )}
+                style={{ 
+                  left: `${completedPercent}%`,
+                  width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
+                  backgroundImage: isCompleted ? 'none' : 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px)'
+                }}
+              />
+            )}
           </div>
-          {/* Progress text */}
+          {/* Progress text showing breakdown */}
           <span
             className={cn(
-              "text-xs font-medium tabular-nums",
+              "text-xs font-medium tabular-nums whitespace-nowrap",
               isCompleted ? "text-gray-400" : "text-gray-300"
             )}
           >
-            {primaryProgress.currentCount}/{primaryProgress.targetCount} trips
+            {primaryProgress.currentCount} done
+            {primaryProgress.scheduledCount > 0 && (
+              <span className="text-[#10B981]/70"> +{primaryProgress.scheduledCount} taken</span>
+            )}
+            {primaryProgress.remainingCount > 0 && (
+              <span className="text-gray-500"> · {primaryProgress.remainingCount} to go</span>
+            )}
           </span>
         </div>
       )}
@@ -188,9 +212,12 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
   const labels = incentiveTypes.map((type) => getIncentiveTripLabel(type));
   const combinedLabel = labels.join(" · ");
   
-  // Progress percentage
-  const progressPercent = primaryProgress 
-    ? Math.round((primaryProgress.currentCount / primaryProgress.targetCount) * 100) 
+  // Calculate segment widths for segmented progress bar
+  const completedPercent = primaryProgress 
+    ? (primaryProgress.currentCount / primaryProgress.targetCount) * 100 
+    : 0;
+  const scheduledPercent = primaryProgress 
+    ? (primaryProgress.scheduledCount / primaryProgress.targetCount) * 100 
     : 0;
 
   // Determine tier colors based on bonus amount
@@ -202,7 +229,10 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
         subtext: "text-gray-200",
         progressBg: "bg-gray-400",
         progressFill: "bg-gray-300",
+        scheduledFill: "bg-gray-200",
         bonusText: "text-gray-200",
+        takenText: "text-gray-300",
+        toGoText: "text-gray-400",
       };
     }
     if (totalBonus >= 100) {
@@ -211,9 +241,12 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
         bg: "bg-gradient-to-r from-amber-500 to-yellow-500",
         text: "text-amber-950",
         subtext: "text-amber-900",
-        progressBg: "bg-amber-300",
+        progressBg: "bg-amber-200",
         progressFill: "bg-amber-700",
+        scheduledFill: "bg-amber-500",
         bonusText: "text-amber-950",
+        takenText: "text-amber-800",
+        toGoText: "text-amber-700",
       };
     }
     if (totalBonus >= 75) {
@@ -222,9 +255,12 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
         bg: "bg-gradient-to-r from-gray-300 to-slate-400",
         text: "text-gray-900",
         subtext: "text-gray-700",
-        progressBg: "bg-gray-200",
-        progressFill: "bg-gray-600",
+        progressBg: "bg-white/50",
+        progressFill: "bg-gray-700",
+        scheduledFill: "bg-gray-500",
         bonusText: "text-gray-900",
+        takenText: "text-gray-600",
+        toGoText: "text-gray-500",
       };
     }
     // Bronze tier
@@ -233,8 +269,11 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
       text: "text-orange-950",
       subtext: "text-orange-900",
       progressBg: "bg-orange-200",
-      progressFill: "bg-orange-700",
+      progressFill: "bg-orange-800",
+      scheduledFill: "bg-orange-600",
       bonusText: "text-orange-950",
+      takenText: "text-orange-800",
+      toGoText: "text-orange-700",
     };
   };
 
@@ -266,19 +305,37 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
         </span>
       </div>
 
-      {/* Progress bar row */}
+      {/* Segmented progress bar row */}
       {primaryProgress && (
         <div className="flex items-center gap-2">
-          {/* Progress bar */}
-          <div className={cn("relative h-1.5 flex-1 overflow-hidden rounded-full", styles.progressBg)}>
+          {/* Progress bar with 3 segments: completed | scheduled | remaining */}
+          <div className={cn("relative h-2 flex-1 overflow-hidden rounded-full", styles.progressBg)}>
+            {/* Completed segment (solid fill) */}
             <div
-              className={cn("absolute inset-y-0 left-0 rounded-full transition-all", styles.progressFill)}
-              style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              className={cn("absolute inset-y-0 left-0 transition-all", styles.progressFill)}
+              style={{ width: `${Math.min(completedPercent, 100)}%` }}
             />
+            {/* Scheduled segment (striped) */}
+            {primaryProgress.scheduledCount > 0 && (
+              <div
+                className={cn("absolute inset-y-0 transition-all", styles.scheduledFill)}
+                style={{ 
+                  left: `${completedPercent}%`,
+                  width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
+                  backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)'
+                }}
+              />
+            )}
           </div>
-          {/* Progress text */}
-          <span className={cn("text-xs font-medium tabular-nums", styles.subtext)}>
-            {primaryProgress.currentCount}/{primaryProgress.targetCount} trips
+          {/* Progress text showing breakdown */}
+          <span className={cn("text-xs font-medium tabular-nums whitespace-nowrap", styles.subtext)}>
+            {primaryProgress.currentCount} done
+            {primaryProgress.scheduledCount > 0 && (
+              <span className={styles.takenText}> +{primaryProgress.scheduledCount} taken</span>
+            )}
+            {primaryProgress.remainingCount > 0 && (
+              <span className={styles.toGoText}> · {primaryProgress.remainingCount} to go</span>
+            )}
           </span>
         </div>
       )}

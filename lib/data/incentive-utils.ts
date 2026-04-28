@@ -64,8 +64,10 @@ export const INCENTIVE_PILL_COLORS_MUTED: Record<IncentiveType, { bg: string; te
 export interface IncentiveProgressInfo {
   incentiveType: IncentiveType;
   name: string;
-  currentCount: number;
-  targetCount: number;
+  currentCount: number;       // Completed trips
+  scheduledCount: number;     // Scheduled/accepted trips (not yet completed)
+  targetCount: number;        // Total trips needed
+  remainingCount: number;     // Trips still needed to take (target - current - scheduled)
   bonusAmount: number;
   isComplete: boolean;
   description: string;
@@ -79,11 +81,18 @@ export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgress
   // Find the progress
   const progress = driverIncentiveProgress.find(p => p.incentiveId === definition.id);
   
+  const currentCount = progress?.currentCount ?? 0;
+  const scheduledCount = progress?.scheduledCount ?? 0;
+  const targetCount = definition.targetCount;
+  const remainingCount = Math.max(0, targetCount - currentCount - scheduledCount);
+  
   return {
     incentiveType: type,
     name: definition.name,
-    currentCount: progress?.currentCount ?? 0,
-    targetCount: definition.targetCount,
+    currentCount,
+    scheduledCount,
+    targetCount,
+    remainingCount,
     bonusAmount: definition.bonusAmount,
     isComplete: progress?.isComplete ?? false,
     description: definition.description,
