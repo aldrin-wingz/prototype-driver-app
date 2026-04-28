@@ -9,12 +9,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { IncentiveType } from "@/lib/data/incentives";
 import {
   getMultipleIncentiveProgressInfo,
@@ -23,14 +17,9 @@ import {
   type IncentiveProgressInfo,
 } from "@/lib/data/incentive-utils";
 import {
-  IncentiveBadgeRenderer,
   PillRowVariant,
-  CornerFlagVariant,
   BannerHeroVariant,
-  StreakFlameVariant,
-  ProgressRingVariant,
-  BonusPreviewVariant,
-  AchievementBadgeVariant,
+  AchievementBannerVariant,
 } from "./incentive-badge-renderer";
 
 // -----------------------------------------------------------------------------
@@ -92,55 +81,6 @@ function PopoverInnerContent({ progressItems }: PopoverInnerContentProps) {
 }
 
 // -----------------------------------------------------------------------------
-// TOOLTIP CONTENT (for badge-corner-flag)
-// -----------------------------------------------------------------------------
-
-interface TooltipInnerContentProps {
-  progressItems: IncentiveProgressInfo[];
-}
-
-function TooltipInnerContent({ progressItems }: TooltipInnerContentProps) {
-  if (progressItems.length === 0) return null;
-
-  // Single incentive: "Counts toward Early Bird — 6/10 trips · Earn $75 when complete"
-  // Multi incentive: List each on its own line
-  if (progressItems.length === 1) {
-    const item = progressItems[0];
-    if (item.isComplete) {
-      return (
-        <span>
-          {item.name} — {formatProgressString(item.currentCount, item.targetCount)} · Earned {formatBonusString(item.bonusAmount)}
-        </span>
-      );
-    }
-    return (
-      <span>
-        Counts toward {item.name} — {formatProgressString(item.currentCount, item.targetCount)} · Earn {formatBonusString(item.bonusAmount)} when complete
-      </span>
-    );
-  }
-
-  // Multi-incentive
-  return (
-    <div className="space-y-1">
-      {progressItems.map((item) => (
-        <div key={item.incentiveType}>
-          {item.isComplete ? (
-            <span>
-              {item.name} — {formatProgressString(item.currentCount, item.targetCount)} · Earned {formatBonusString(item.bonusAmount)}
-            </span>
-          ) : (
-            <span>
-              {item.name} — {formatProgressString(item.currentCount, item.targetCount)} · Earn {formatBonusString(item.bonusAmount)}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
 // MAIN COMPONENT
 // -----------------------------------------------------------------------------
 
@@ -167,47 +107,7 @@ export function ProgramContributionIndicator({
 
   const activeVariant = variants.pill;
 
-  // For absolute-positioned variants (badge, flame, ring, bonus, achievement), use Tooltip (hover) on desktop
-  const absoluteVariants = ["badge-corner-flag", "streak-flame", "progress-ring", "bonus-preview", "achievement-badge"] as const;
-  
-  if (absoluteVariants.includes(activeVariant as typeof absoluteVariants[number])) {
-    const renderAbsoluteBadge = () => {
-      switch (activeVariant) {
-        case "badge-corner-flag":
-          return <CornerFlagVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
-        case "streak-flame":
-          return <StreakFlameVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
-        case "progress-ring":
-          return <ProgressRingVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
-        case "bonus-preview":
-          return <BonusPreviewVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
-        case "achievement-badge":
-          return <AchievementBadgeVariant incentiveTypes={incentiveTypes} isCompleted={isCompleted} />;
-        default:
-          return null;
-      }
-    };
-
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="cursor-pointer">
-              {renderAbsoluteBadge()}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent
-            side="left"
-            className="max-w-xs bg-gray-900 text-white"
-          >
-            <TooltipInnerContent progressItems={progressItems} />
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  // For pill-named-bottom and banner-wingz-hero, use Popover (tap/click)
+  // Render the badge based on variant
   const renderBadge = () => {
     switch (activeVariant) {
       case "pill-named-bottom":
@@ -224,11 +124,19 @@ export function ProgramContributionIndicator({
             isCompleted={isCompleted}
           />
         );
+      case "achievement-banner":
+        return (
+          <AchievementBannerVariant
+            incentiveTypes={incentiveTypes}
+            isCompleted={isCompleted}
+          />
+        );
       default:
         return null;
     }
   };
 
+  // All variants use Popover for detailed progress on tap
   return (
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger asChild>

@@ -12,16 +12,12 @@
 
 /**
  * Pill/Badge/Banner variants for ride cards (I-2)
- * Seven visual treatments for surfacing incentive eligibility on list views.
+ * Three visual treatments for surfacing incentive eligibility on list views.
  */
 export type PillVariant = 
   | 'pill-named-bottom'      // Named pill row below card content
-  | 'badge-corner-flag'      // Corner flag badge with Wingz logo
-  | 'banner-wingz-hero'      // Full-width banner with hero styling
-  | 'streak-flame'           // Animated flame icon showing streak progress
-  | 'progress-ring'          // Circular gradient progress indicator
-  | 'bonus-preview'          // Stacked bonus preview showing potential earnings
-  | 'achievement-badge';     // Gold/silver/bronze achievement-style badge
+  | 'banner-wingz-hero'      // Full-width banner with hero styling (black/green)
+  | 'achievement-banner';    // Full-width tiered banner (gold/silver/bronze)
 
 /**
  * Dashboard incentive surfacing variants (I-3)
@@ -71,12 +67,8 @@ export const DEFAULT_VARIANTS: VariantSelection = {
 
 export const PILL_VARIANT_LABELS: Record<PillVariant, string> = {
   'pill-named-bottom': 'Pill Row (Bottom)',
-  'badge-corner-flag': 'Corner Flag Badge',
   'banner-wingz-hero': 'Hero Banner',
-  'streak-flame': 'Streak Flame',
-  'progress-ring': 'Progress Ring',
-  'bonus-preview': 'Bonus Preview',
-  'achievement-badge': 'Achievement Badge',
+  'achievement-banner': 'Achievement Banner',
 };
 
 export const DASHBOARD_VARIANT_LABELS: Record<DashboardVariant, string> = {
@@ -117,34 +109,14 @@ export const PILL_VARIANT_OPTIONS: VariantOption<PillVariant>[] = [
     description: 'Incentive pills appear in the existing pill row below card content',
   },
   {
-    value: 'badge-corner-flag',
-    label: 'Corner Flag Badge',
-    description: 'Wingz logo badge in the top-left corner of qualifying cards',
-  },
-  {
     value: 'banner-wingz-hero',
     label: 'Hero Banner',
-    description: 'Full-width gradient banner with Wingz branding above card',
+    description: 'Full-width black banner with progress bar and bonus earnings',
   },
   {
-    value: 'streak-flame',
-    label: 'Streak Flame',
-    description: 'Animated flame icon that grows as you get closer to bonus completion',
-  },
-  {
-    value: 'progress-ring',
-    label: 'Progress Ring',
-    description: 'Circular progress indicator showing completion percentage',
-  },
-  {
-    value: 'bonus-preview',
-    label: 'Bonus Preview',
-    description: 'Shows potential bonus earnings directly on the card',
-  },
-  {
-    value: 'achievement-badge',
-    label: 'Achievement Badge',
-    description: 'Gold/silver/bronze style badges based on incentive value',
+    value: 'achievement-banner',
+    label: 'Achievement Banner',
+    description: 'Full-width tiered banner (gold/silver/bronze) with progress and earnings',
   },
 ];
 
@@ -291,12 +263,8 @@ export function clearVariantsFromStorage(): void {
 
 const VALID_PILL_VARIANTS: PillVariant[] = [
   'pill-named-bottom', 
-  'badge-corner-flag', 
   'banner-wingz-hero',
-  'streak-flame',
-  'progress-ring',
-  'bonus-preview',
-  'achievement-badge',
+  'achievement-banner',
 ];
 const VALID_DASHBOARD_VARIANTS: DashboardVariant[] = ['dashboard-banner', 'dashboard-card-section', 'dashboard-widget-integrated'];
 const VALID_DETAIL_VARIANTS: DetailVariant[] = ['detail-inline-badge', 'detail-section-pill', 'detail-map-banner'];

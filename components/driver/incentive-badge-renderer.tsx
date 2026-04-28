@@ -1,17 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVariants } from "@/lib/variants-context";
 import type { PillVariant } from "@/lib/variants";
 import type { IncentiveType } from "@/lib/data/incentives";
 import {
   getIncentiveTripLabel,
-  getIncentiveProgressInfo,
+  getMultipleIncentiveProgressInfo,
   INCENTIVE_PILL_COLORS,
   INCENTIVE_PILL_COLORS_MUTED,
-  INCENTIVE_DISPLAY_NAMES,
 } from "@/lib/data/incentive-utils";
 
 // -----------------------------------------------------------------------------
@@ -75,43 +73,7 @@ function PillRowVariant({ incentiveTypes, isCompleted }: PillRowVariantProps) {
 }
 
 // -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Corner Flag Badge Variant
-// -----------------------------------------------------------------------------
-
-interface CornerFlagVariantProps {
-  incentiveTypes: IncentiveType[];
-  isCompleted: boolean;
-}
-
-function CornerFlagVariant({ incentiveTypes, isCompleted }: CornerFlagVariantProps) {
-  const count = incentiveTypes.length;
-
-  return (
-    <div
-      className={cn(
-        "absolute left-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded",
-        isCompleted ? "bg-gray-600" : "bg-gray-900"
-      )}
-    >
-      <Image
-        src="/WINGZLOGO2.png"
-        alt="Incentive eligible"
-        width={16}
-        height={16}
-        className={cn("object-contain", isCompleted && "opacity-60")}
-      />
-      {/* Multi-incentive count overlay */}
-      {count > 1 && (
-        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#10B981] text-[10px] font-bold text-white">
-          {count}
-        </span>
-      )}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Banner Hero Variant
+// SUB-COMPONENTS: Banner Hero Variant (with progress bar + earnings)
 // -----------------------------------------------------------------------------
 
 interface BannerHeroVariantProps {
@@ -120,249 +82,205 @@ interface BannerHeroVariantProps {
 }
 
 function BannerHeroVariant({ incentiveTypes, isCompleted }: BannerHeroVariantProps) {
+  // Get progress info for the primary incentive
+  const progressItems = getMultipleIncentiveProgressInfo(incentiveTypes);
+  const primaryProgress = progressItems[0];
+  
+  // Calculate combined bonus
+  const totalBonus = progressItems.reduce((sum, item) => sum + item.bonusAmount, 0);
+  
   // Build the label: join names with " · " separator
   const labels = incentiveTypes.map((type) => getIncentiveTripLabel(type));
   const combinedLabel = labels.join(" · ");
+  
+  // Progress percentage
+  const progressPercent = primaryProgress 
+    ? Math.round((primaryProgress.currentCount / primaryProgress.targetCount) * 100) 
+    : 0;
 
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-t-xl px-4 py-2.5",
+        "flex flex-col gap-2 rounded-t-xl px-4 py-3",
         isCompleted ? "bg-gray-700" : "bg-gray-900"
       )}
     >
-      {/* Wingz logo on left */}
-      <div className="flex h-6 w-6 items-center justify-center">
-        <Image
-          src="/WINGZLOGO2.png"
-          alt=""
-          width={20}
-          height={20}
-          className={cn("object-contain", isCompleted && "opacity-60")}
-        />
-      </div>
+      {/* Top row: Logo + Label + Bonus */}
+      <div className="flex items-center gap-3">
+        {/* Wingz logo on left */}
+        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center">
+          <Image
+            src="/WINGZLOGO2.png"
+            alt=""
+            width={20}
+            height={20}
+            className={cn("object-contain", isCompleted && "opacity-60")}
+          />
+        </div>
 
-      {/* Incentive label */}
-      <span
-        className={cn(
-          "flex-1 text-sm font-medium",
-          isCompleted ? "text-gray-300" : "text-white"
-        )}
-      >
-        {combinedLabel}
-      </span>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Streak Flame Variant
-// -----------------------------------------------------------------------------
-
-interface StreakFlameVariantProps {
-  incentiveTypes: IncentiveType[];
-  isCompleted: boolean;
-}
-
-function StreakFlameVariant({ incentiveTypes, isCompleted }: StreakFlameVariantProps) {
-  // Get progress of first incentive to determine flame intensity
-  const primaryType = incentiveTypes[0];
-  const progress = getIncentiveProgressInfo(primaryType);
-  const progressPercent = progress ? (progress.currentCount / progress.targetCount) * 100 : 0;
-  
-  // Flame size increases with progress (from 20px to 32px)
-  const flameSize = Math.round(20 + (progressPercent / 100) * 12);
-  
-  // Color intensity based on progress
-  const getFlameColor = () => {
-    if (isCompleted) return "text-gray-400";
-    if (progressPercent >= 80) return "text-orange-500";
-    if (progressPercent >= 50) return "text-amber-500";
-    return "text-amber-400";
-  };
-
-  return (
-    <div
-      className={cn(
-        "absolute left-3 top-3 z-10 flex items-center justify-center",
-        !isCompleted && progressPercent >= 50 && "animate-pulse"
-      )}
-    >
-      <Flame 
-        className={cn(getFlameColor(), "drop-shadow-md")}
-        style={{ width: flameSize, height: flameSize }}
-      />
-      {/* Multi-incentive count */}
-      {incentiveTypes.length > 1 && (
-        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
-          {incentiveTypes.length}
+        {/* Incentive label */}
+        <span
+          className={cn(
+            "flex-1 text-sm font-medium",
+            isCompleted ? "text-gray-300" : "text-white"
+          )}
+        >
+          {combinedLabel}
         </span>
-      )}
-    </div>
-  );
-}
 
-// -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Progress Ring Variant
-// -----------------------------------------------------------------------------
-
-interface ProgressRingVariantProps {
-  incentiveTypes: IncentiveType[];
-  isCompleted: boolean;
-}
-
-function ProgressRingVariant({ incentiveTypes, isCompleted }: ProgressRingVariantProps) {
-  const primaryType = incentiveTypes[0];
-  const progress = getIncentiveProgressInfo(primaryType);
-  const progressPercent = progress ? (progress.currentCount / progress.targetCount) * 100 : 0;
-  
-  // SVG circle parameters
-  const size = 36;
-  const strokeWidth = 3;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
-
-  return (
-    <div className="absolute left-3 top-3 z-10">
-      <svg width={size} height={size} className="rotate-[-90deg]">
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="white"
-          stroke={isCompleted ? "#D1D5DB" : "#E5E7EB"}
-          strokeWidth={strokeWidth}
-        />
-        {/* Progress circle with gradient */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="transparent"
-          stroke={isCompleted ? "#9CA3AF" : "#10B981"}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-500"
-        />
-      </svg>
-      {/* Center text */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className={cn(
-          "text-[10px] font-bold",
-          isCompleted ? "text-gray-500" : "text-[#10B981]"
-        )}>
-          {progress ? `${progress.currentCount}/${progress.targetCount}` : "0"}
+        {/* Bonus amount */}
+        <span
+          className={cn(
+            "text-sm font-bold",
+            isCompleted ? "text-gray-400" : "text-[#10B981]"
+          )}
+        >
+          {isCompleted ? "Earned" : "Earn"} ${totalBonus}
         </span>
       </div>
-      {/* Multi-incentive count */}
-      {incentiveTypes.length > 1 && (
-        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#10B981] text-[10px] font-bold text-white">
-          {incentiveTypes.length}
-        </span>
-      )}
-    </div>
-  );
-}
 
-// -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Bonus Preview Variant
-// -----------------------------------------------------------------------------
-
-interface BonusPreviewVariantProps {
-  incentiveTypes: IncentiveType[];
-  isCompleted: boolean;
-}
-
-function BonusPreviewVariant({ incentiveTypes, isCompleted }: BonusPreviewVariantProps) {
-  // Get total potential bonus from all incentives
-  const progressInfos = incentiveTypes.map(type => getIncentiveProgressInfo(type)).filter(Boolean);
-  const totalBonus = progressInfos.reduce((sum, info) => sum + (info?.bonusAmount ?? 0), 0);
-  const primaryProgress = progressInfos[0];
-
-  return (
-    <div
-      className={cn(
-        "absolute left-3 top-3 z-10 rounded-lg px-2 py-1 shadow-md",
-        isCompleted ? "bg-gray-100" : "bg-gradient-to-r from-emerald-500 to-teal-500"
-      )}
-    >
-      <div className="flex items-center gap-1">
-        <span className={cn(
-          "text-xs font-bold",
-          isCompleted ? "text-gray-500" : "text-white"
-        )}>
-          +${totalBonus}
-        </span>
-        {primaryProgress && !primaryProgress.isComplete && (
-          <span className={cn(
-            "text-[10px]",
-            isCompleted ? "text-gray-400" : "text-white/80"
-          )}>
-            @ {primaryProgress.targetCount} trips
+      {/* Progress bar row */}
+      {primaryProgress && (
+        <div className="flex items-center gap-2">
+          {/* Progress bar */}
+          <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-gray-700">
+            <div
+              className={cn(
+                "absolute inset-y-0 left-0 rounded-full transition-all",
+                isCompleted ? "bg-gray-500" : "bg-[#10B981]"
+              )}
+              style={{ width: `${Math.min(progressPercent, 100)}%` }}
+            />
+          </div>
+          {/* Progress text */}
+          <span
+            className={cn(
+              "text-xs font-medium tabular-nums",
+              isCompleted ? "text-gray-400" : "text-gray-300"
+            )}
+          >
+            {primaryProgress.currentCount}/{primaryProgress.targetCount} trips
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Achievement Badge Variant
+// SUB-COMPONENTS: Achievement Banner Variant (tiered colors with progress)
 // -----------------------------------------------------------------------------
 
-interface AchievementBadgeVariantProps {
+interface AchievementBannerVariantProps {
   incentiveTypes: IncentiveType[];
   isCompleted: boolean;
 }
 
-function AchievementBadgeVariant({ incentiveTypes, isCompleted }: AchievementBadgeVariantProps) {
-  // Get highest bonus to determine badge tier
-  const progressInfos = incentiveTypes.map(type => getIncentiveProgressInfo(type)).filter(Boolean);
-  const maxBonus = Math.max(...progressInfos.map(info => info?.bonusAmount ?? 0));
+function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBannerVariantProps) {
+  // Get progress info
+  const progressItems = getMultipleIncentiveProgressInfo(incentiveTypes);
+  const primaryProgress = progressItems[0];
   
-  // Determine tier based on bonus amount
-  const getTierColors = () => {
-    if (isCompleted) return { bg: "bg-gray-200", border: "border-gray-400", text: "text-gray-500" };
-    if (maxBonus >= 100) return { bg: "bg-gradient-to-br from-yellow-300 to-amber-500", border: "border-yellow-600", text: "text-yellow-900" };
-    if (maxBonus >= 75) return { bg: "bg-gradient-to-br from-gray-200 to-gray-400", border: "border-gray-500", text: "text-gray-700" };
-    return { bg: "bg-gradient-to-br from-orange-300 to-orange-500", border: "border-orange-600", text: "text-orange-900" };
+  // Calculate combined bonus to determine tier
+  const totalBonus = progressItems.reduce((sum, item) => sum + item.bonusAmount, 0);
+  
+  // Build the label
+  const labels = incentiveTypes.map((type) => getIncentiveTripLabel(type));
+  const combinedLabel = labels.join(" · ");
+  
+  // Progress percentage
+  const progressPercent = primaryProgress 
+    ? Math.round((primaryProgress.currentCount / primaryProgress.targetCount) * 100) 
+    : 0;
+
+  // Determine tier colors based on bonus amount
+  const getTierStyles = () => {
+    if (isCompleted) {
+      return {
+        bg: "bg-gradient-to-r from-gray-500 to-gray-600",
+        text: "text-white",
+        subtext: "text-gray-200",
+        progressBg: "bg-gray-400",
+        progressFill: "bg-gray-300",
+        bonusText: "text-gray-200",
+      };
+    }
+    if (totalBonus >= 100) {
+      // Gold tier
+      return {
+        bg: "bg-gradient-to-r from-amber-500 to-yellow-500",
+        text: "text-amber-950",
+        subtext: "text-amber-900",
+        progressBg: "bg-amber-300",
+        progressFill: "bg-amber-700",
+        bonusText: "text-amber-950",
+      };
+    }
+    if (totalBonus >= 75) {
+      // Silver tier
+      return {
+        bg: "bg-gradient-to-r from-gray-300 to-slate-400",
+        text: "text-gray-900",
+        subtext: "text-gray-700",
+        progressBg: "bg-gray-200",
+        progressFill: "bg-gray-600",
+        bonusText: "text-gray-900",
+      };
+    }
+    // Bronze tier
+    return {
+      bg: "bg-gradient-to-r from-orange-400 to-amber-500",
+      text: "text-orange-950",
+      subtext: "text-orange-900",
+      progressBg: "bg-orange-200",
+      progressFill: "bg-orange-700",
+      bonusText: "text-orange-950",
+    };
   };
-  
-  const tier = getTierColors();
-  const primaryName = INCENTIVE_DISPLAY_NAMES[incentiveTypes[0]];
+
+  const styles = getTierStyles();
 
   return (
-    <div
-      className={cn(
-        "absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 shadow-lg",
-        tier.bg,
-        tier.border
-      )}
-    >
-      <Image
-        src="/WINGZLOGO2.png"
-        alt=""
-        width={20}
-        height={20}
-        className={cn("object-contain", isCompleted && "opacity-50")}
-      />
-      {/* Badge label */}
-      <div className={cn(
-        "absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[8px] font-bold shadow-sm",
-        tier.bg,
-        tier.text
-      )}>
-        {primaryName.split(' ')[0]}
-      </div>
-      {/* Multi-incentive count */}
-      {incentiveTypes.length > 1 && (
-        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#10B981] text-[10px] font-bold text-white">
-          {incentiveTypes.length}
+    <div className={cn("flex flex-col gap-2 rounded-t-xl px-4 py-3", styles.bg)}>
+      {/* Top row: Logo + Label + Bonus */}
+      <div className="flex items-center gap-3">
+        {/* Wingz logo on left */}
+        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-white/20">
+          <Image
+            src="/WINGZLOGO2.png"
+            alt=""
+            width={16}
+            height={16}
+            className={cn("object-contain", isCompleted && "opacity-60")}
+          />
+        </div>
+
+        {/* Incentive label */}
+        <span className={cn("flex-1 text-sm font-semibold", styles.text)}>
+          {combinedLabel}
         </span>
+
+        {/* Bonus amount */}
+        <span className={cn("text-sm font-bold", styles.bonusText)}>
+          {isCompleted ? "Earned" : "Earn"} ${totalBonus}
+        </span>
+      </div>
+
+      {/* Progress bar row */}
+      {primaryProgress && (
+        <div className="flex items-center gap-2">
+          {/* Progress bar */}
+          <div className={cn("relative h-1.5 flex-1 overflow-hidden rounded-full", styles.progressBg)}>
+            <div
+              className={cn("absolute inset-y-0 left-0 rounded-full transition-all", styles.progressFill)}
+              style={{ width: `${Math.min(progressPercent, 100)}%` }}
+            />
+          </div>
+          {/* Progress text */}
+          <span className={cn("text-xs font-medium tabular-nums", styles.subtext)}>
+            {primaryProgress.currentCount}/{primaryProgress.targetCount} trips
+          </span>
+        </div>
       )}
     </div>
   );
@@ -401,14 +319,6 @@ export function IncentiveBadgeRenderer({
         />
       );
 
-    case "badge-corner-flag":
-      return (
-        <CornerFlagVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
-
     case "banner-wingz-hero":
       return (
         <BannerHeroVariant
@@ -417,33 +327,9 @@ export function IncentiveBadgeRenderer({
         />
       );
 
-    case "streak-flame":
+    case "achievement-banner":
       return (
-        <StreakFlameVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
-
-    case "progress-ring":
-      return (
-        <ProgressRingVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
-
-    case "bonus-preview":
-      return (
-        <BonusPreviewVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
-
-    case "achievement-badge":
-      return (
-        <AchievementBadgeVariant
+        <AchievementBannerVariant
           incentiveTypes={incentiveTypes}
           isCompleted={isCompleted}
         />
@@ -457,10 +343,6 @@ export function IncentiveBadgeRenderer({
 // Export sub-components for direct use if needed
 export { 
   PillRowVariant, 
-  CornerFlagVariant, 
   BannerHeroVariant,
-  StreakFlameVariant,
-  ProgressRingVariant,
-  BonusPreviewVariant,
-  AchievementBadgeVariant,
+  AchievementBannerVariant,
 };
