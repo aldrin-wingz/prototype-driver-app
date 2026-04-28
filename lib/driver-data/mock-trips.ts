@@ -1,3 +1,5 @@
+import type { IncentiveType } from "@/lib/data/incentives";
+
 export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress" | "completed";
 export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "scheduled";
 
@@ -23,6 +25,8 @@ export interface Trip {
   legs: TripLeg[];
   status: TripStatus;
   pills: TripPill[];
+  /** Incentive programs this trip qualifies for (empty if none) */
+  incentiveTypes?: IncentiveType[];
 }
 
 export interface TripPill {
@@ -65,6 +69,7 @@ export const mockRequestTrips: Trip[] = [
     pills: [
       { label: "Expires in 185 days", variant: "neutral" },
     ],
+    incentiveTypes: ["weekend-warrior", "peak-hours"], // Multi-incentive trip
   },
   {
     id: "REQ-001",
@@ -91,6 +96,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Single Legs Allowed", variant: "success" },
       { label: "Expires in 4 hours", variant: "warning" },
     ],
+    incentiveTypes: ["early-bird"], // Single incentive trip
   },
   {
     id: "REQ-002",
@@ -117,6 +123,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Single Legs Allowed", variant: "success" },
       { label: "Expires in 4 hours", variant: "warning" },
     ],
+    // No incentives - client not enrolled
   },
   {
     id: "REQ-003",
@@ -216,6 +223,7 @@ export const mockNeedsActionTrips: Trip[] = [
     pills: [
       { label: "Not Confirmed", variant: "danger" },
     ],
+    incentiveTypes: ["weekend-warrior", "early-bird"], // Multi-incentive
   },
   {
     id: "NA-002",
@@ -296,6 +304,7 @@ export const mockCompletedTrips: Trip[] = [
     ],
     status: "completed",
     pills: [],
+    incentiveTypes: ["peak-hours"], // Single incentive - completed
   },
   {
     id: "COMP-002",
@@ -378,6 +387,7 @@ export const mockCompletedTrips: Trip[] = [
     ],
     status: "completed",
     pills: [],
+    incentiveTypes: ["early-bird", "loyalty-streak"], // Multi-incentive - completed
   },
 ];
 

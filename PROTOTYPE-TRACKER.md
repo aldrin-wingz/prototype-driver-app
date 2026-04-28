@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-2 — Pending
-## Last Completed: I-1 (Variant Toggle Infrastructure)
+## Current Step: I-3 — Pending
+## Last Completed: I-2 (IncentiveBadgeRenderer + ProgramContributionIndicator)
 
 ---
 
@@ -33,7 +33,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-0b  | Shell Replication — Ride Details (both states merged)         | ✅ Done    | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
 | I-0.5 | Schema + Seed Data                                            | ✅ Done    | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
 | I-1   | Variant Toggle Infrastructure                                 | ✅ Done    | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
-| I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
+| I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ✅ Done    | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
 | I-4   | Ride Details Incentive Callout — Variant Set                  | ⬜ Planned | 3 callout variants (`detail-inline-badge`, `detail-section-pill`, `detail-map-banner`) on Ride Details (before-taken + needs-action / in-progress).                                                                                                                                              |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |

@@ -3,7 +3,9 @@
 import { Expand, Users, Info, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useVariants } from "@/lib/variants-context";
 import type { Trip, TripLeg, TripPill, TimeAnchorType } from "@/lib/driver-data/mock-trips";
+import { ProgramContributionIndicator } from "./program-contribution-indicator";
 
 interface RideCardProps {
   trip: Trip;
@@ -101,14 +103,38 @@ function LegBlock({ leg, isLast, revenueColor, isCompleted }: {
 }
 
 export function RideCard({ trip, revenueColor = "green", onClick, showDistance = true }: RideCardProps) {
+  const { variants, isLoaded } = useVariants();
   const isCompleted = trip.status === "completed";
-  
+  const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0;
+  const isBannerVariant = isLoaded && variants.pill === "banner-wingz-hero";
+
   return (
     <Card 
-      className="cursor-pointer rounded-xl bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      className={cn(
+        "relative cursor-pointer bg-white shadow-sm transition-shadow hover:shadow-md",
+        isBannerVariant && hasIncentives ? "rounded-xl overflow-hidden" : "rounded-xl p-4"
+      )}
       onClick={onClick}
     >
-      {/* Header section */}
+      {/* Banner Hero Variant - renders at top of card */}
+      {isBannerVariant && hasIncentives && (
+        <ProgramContributionIndicator
+          incentiveTypes={trip.incentiveTypes!}
+          isCompleted={isCompleted}
+        />
+      )}
+
+      {/* Corner Flag Variant - renders absolute positioned */}
+      {isLoaded && variants.pill === "badge-corner-flag" && hasIncentives && (
+        <ProgramContributionIndicator
+          incentiveTypes={trip.incentiveTypes!}
+          isCompleted={isCompleted}
+        />
+      )}
+
+      {/* Card content wrapper - adds padding when banner is present */}
+      <div className={cn(isBannerVariant && hasIncentives && "p-4")}>
+        {/* Header section */}
       <div className="mb-3 flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-600">
@@ -163,22 +189,30 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
         </p>
       )}
 
-      {/* Pills row */}
-      {trip.pills.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {trip.pills.map((pill, index) => (
-            <span
-              key={index}
-              className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium",
-                getPillStyles(pill.variant)
-              )}
-            >
-              {pill.label}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Pills row (existing pills + incentive pills for pill-named-bottom variant) */}
+      <div className="flex flex-wrap gap-2">
+        {/* Existing pills (Single Legs Allowed, Expires in X, Not Confirmed, etc.) */}
+        {trip.pills.map((pill, index) => (
+          <span
+            key={index}
+            className={cn(
+              "rounded-full px-3 py-1 text-xs font-medium",
+              getPillStyles(pill.variant)
+            )}
+          >
+            {pill.label}
+          </span>
+        ))}
+
+        {/* Incentive pills (pill-named-bottom variant only) */}
+        {isLoaded && variants.pill === "pill-named-bottom" && hasIncentives && (
+          <ProgramContributionIndicator
+            incentiveTypes={trip.incentiveTypes!}
+            isCompleted={isCompleted}
+          />
+        )}
+      </div>
+      </div>
     </Card>
   );
 }
