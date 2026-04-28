@@ -1,0 +1,241 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* Hide scrollbar for phone preview and similar UI */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Cards - Agent portal / CS tool style */
+  .cs-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+  }
+
+  .cs-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .cs-card-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #212529;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cs-card-title::before {
+    content: "";
+    width: 4px;
+    height: 20px;
+    background-color: #398bf7;
+    border-radius: 2px;
+  }
+
+  .cs-card-body {
+    padding: 20px;
+  }
+}
+
+@layer base {
+  :root {
+    /* Wingz brand tokens - shared by driver-portal and agent-portal */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 6.7%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 6.7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 6.7%;
+
+    /* Primary: Wingz green #16CFA9 → hsl(164, 81%, 45%) */
+    --primary: 164 81% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: light gray surface */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 0 0% 6.7%;
+
+    /* Muted: soft gray */
+    --muted: 240 5% 96%;
+    --muted-foreground: 0 0% 46.7%;
+
+    /* Accent: Wingz green muted bg #EEFBF5 → hsl(155, 76%, 96%) */
+    --accent: 155 76% 96%;
+    --accent-foreground: 0 0% 6.7%;
+
+    /* Destructive: Wingz red #E73536 → hsl(0, 78%, 55%) */
+    --destructive: 0 78% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Warning: Wingz yellow #FBA711 → hsl(38, 96%, 52%) */
+    --warning: 38 96% 52%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 0 0% 87.8%;
+    --input: 240 6% 90%;
+    /* Ring: Wingz green */
+    --ring: 164 81% 45%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 164 81% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 155 76% 96%;
+    --sidebar-accent-foreground: 0 0% 6.7%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 164 81% 45%;
+
+    /* Chart colors for data viz */
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 164 81% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 155 40% 18%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 78% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 164 81% 45%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 164 81% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 164 81% 45%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+/* ── Native date/datetime-local input styling ────────────────── */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"] {
+  color-scheme: light;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Calendar picker icon */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 4px;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: hsl(var(--accent));
+}
+
+/* Remove inner spin buttons on date parts */
+input[type="date"]::-webkit-inner-spin-button,
+input[type="datetime-local"]::-webkit-inner-spin-button {
+  display: none;
+}
+
+/* Date segments styling */
+input[type="date"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit {
+  padding: 0;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="datetime-local"]::-webkit-datetime-edit-text {
+  color: hsl(var(--muted-foreground));
+  padding: 0 2px;
+}
+
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field,
+input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
+input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
+  padding: 2px 1px;
+  border-radius: 2px;
+}
+
+input[type="date"]::-webkit-datetime-edit-month-field:focus,
+input[type="date"]::-webkit-datetime-edit-day-field:focus,
+input[type="date"]::-webkit-datetime-edit-year-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-hour-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
+input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  outline: none;
+}
+
+.scroll-viewport > div {
+  display: block !important;
+}

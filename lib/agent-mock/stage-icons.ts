@@ -1,0 +1,30 @@
+import {
+  Phone,
+  FileText,
+  Play,
+  UserCheck,
+  ClipboardList,
+  Calendar,
+  Shield,
+  Search,
+  TestTube,
+  GraduationCap,
+  Wallet,
+  CheckCircle,
+  type LucideIcon,
+} from "lucide-react";
+
+export const STAGE_ICON_MAP: Record<string, LucideIcon> = {
+  "contact-info": Phone,
+  "terms-conditions": FileText,
+  "intro-video": Play,
+  "initial-screening": UserCheck,
+  "profile-docs": ClipboardList,
+  "nemt-interview": Calendar,
+  "inspections-certs": Shield,
+  "background-check": Search,
+  "drug-screening": TestTube,
+  "final-training": GraduationCap,
+  "payment-tax": Wallet,
+  "final-review": CheckCircle,
+};
