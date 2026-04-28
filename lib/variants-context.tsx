@@ -138,6 +138,29 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
 }
 
 // -----------------------------------------------------------------------------
+// FALLBACK PROVIDER (for Suspense fallback - no useSearchParams)
+// -----------------------------------------------------------------------------
+
+export function VariantsFallbackProvider({ children }: { children: React.ReactNode }) {
+  // Provide default variants with isLoaded=false during suspense
+  const fallbackValue: VariantsContextValue = {
+    variants: DEFAULT_VARIANTS,
+    setVariants: () => {},
+    setPillVariant: () => {},
+    setDashboardVariant: () => {},
+    setDetailVariant: () => {},
+    resetToDefaults: () => {},
+    isLoaded: false,
+  };
+
+  return (
+    <VariantsContext.Provider value={fallbackValue}>
+      {children}
+    </VariantsContext.Provider>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // HOOK
 // -----------------------------------------------------------------------------
 

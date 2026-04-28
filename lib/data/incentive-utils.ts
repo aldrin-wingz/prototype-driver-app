@@ -121,3 +121,106 @@ export function formatProgressString(current: number, target: number): string {
 export function formatBonusString(amount: number): string {
   return `$${amount}`;
 }
+
+// -----------------------------------------------------------------------------
+// PAYOUT HELPERS
+// -----------------------------------------------------------------------------
+
+/**
+ * Weekly payout data structure.
+ */
+export interface WeeklyPayoutData {
+  baseEarnings: number;
+  bonusesEarned: number;
+  totalPayout: number;
+  nextPayoutDate: string;
+  nextPayoutDateFormatted: string;
+}
+
+/**
+ * Get all incentive progress items (for dashboard display).
+ */
+export function getAllIncentiveProgress(): IncentiveProgressInfo[] {
+  const allTypes: IncentiveType[] = [
+    'weekend-warrior',
+    'early-bird', 
+    'peak-hours',
+    'loyalty-streak',
+  ];
+  
+  const progressItems = allTypes
+    .map(type => getIncentiveProgressInfo(type))
+    .filter((info): info is IncentiveProgressInfo => info !== null);
+  
+  return progressItems.sort((a, b) => {
+    if (a.isComplete === b.isComplete) return 0;
+    return a.isComplete ? 1 : -1;
+  });
+}
+
+/**
+ * Get weekly payout data for the current driver.
+ */
+export function getWeeklyPayoutData(): WeeklyPayoutData {
+  const baseEarnings = 342.50;
+  
+  const completedBonuses = driverIncentiveProgress
+    .filter(p => p.isComplete)
+    .reduce((sum, p) => sum + p.bonusEarned, 0);
+  
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysUntilMonday);
+  
+  const payoutDateFormatted = nextMonday.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  
+  return {
+    baseEarnings,
+    bonusesEarned: completedBonuses,
+    totalPayout: baseEarnings + completedBonuses,
+    nextPayoutDate: nextMonday.toISOString(),
+    nextPayoutDateFormatted: payoutDateFormatted,
+  };
+}
+
+/**
+ * Payout breakdown item.
+ */
+export interface PayoutBreakdownItem {
+  name: string;
+  incentiveType: IncentiveType;
+  currentCount: number;
+  targetCount: number;
+  bonusAmount: number;
+  isComplete: boolean;
+}
+
+/**
+ * Get completed program details for payout breakdown.
+ */
+export function getPayoutBreakdown(): PayoutBreakdownItem[] {
+  const allProgress = getAllIncentiveProgress();
+  
+  return allProgress.map(item => ({
+    name: item.name,
+    incentiveType: item.incentiveType,
+    currentCount: item.currentCount,
+    targetCount: item.targetCount,
+    bonusAmount: item.bonusAmount,
+    isComplete: item.isComplete,
+  }));
+}
+
+/**
+ * Get total projected bonus if all in-progress programs complete.
+ */
+export function getProjectedTotalBonus(): number {
+  const allProgress = getAllIncentiveProgress();
+  return allProgress.reduce((sum, item) => sum + item.bonusAmount, 0);
+}
