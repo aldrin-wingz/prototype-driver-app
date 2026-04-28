@@ -107,6 +107,15 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
   const isCompleted = trip.status === "completed";
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0;
   const isBannerVariant = isLoaded && variants.pill === "banner-wingz-hero";
+  
+  // These variants render as absolute-positioned elements
+  const isAbsoluteVariant = isLoaded && [
+    "badge-corner-flag",
+    "streak-flame",
+    "progress-ring",
+    "bonus-preview",
+    "achievement-badge",
+  ].includes(variants.pill);
 
   return (
     <Card 
@@ -124,8 +133,8 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
         />
       )}
 
-      {/* Corner Flag Variant - renders absolute positioned */}
-      {isLoaded && variants.pill === "badge-corner-flag" && hasIncentives && (
+      {/* Absolute positioned variants (corner flag, flame, ring, bonus, achievement) */}
+      {isAbsoluteVariant && hasIncentives && (
         <ProgramContributionIndicator
           incentiveTypes={trip.incentiveTypes!}
           isCompleted={isCompleted}
