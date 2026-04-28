@@ -68,6 +68,7 @@ export interface IncentiveDefinition {
 export interface DriverIncentiveProgress {
   incentiveId: string;             // References IncentiveDefinition.id
   currentCount: number;            // Trips completed toward this incentive
+  scheduledCount: number;          // Trips scheduled/accepted that will count when completed
   targetCount: number;             // Copied from definition for convenience
   isComplete: boolean;             // Has the driver hit the target?
   bonusEarned: number;             // 0 if not complete, bonusAmount if complete
@@ -251,8 +252,9 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
 export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   {
     incentiveId: 'inc-weekend-warrior-apr26',
-    currentCount: 6,
-    targetCount: 8,
+    currentCount: 5,              // 5 trips completed
+    scheduledCount: 2,            // 2 trips already scheduled/taken
+    targetCount: 8,               // Need 8 total, so 1 more to take
     isComplete: false,
     bonusEarned: 0,
     lastQualifyingTripId: 'trip-req-003',
@@ -260,6 +262,7 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   {
     incentiveId: 'inc-early-bird-apr26',
     currentCount: 10,
+    scheduledCount: 0,
     targetCount: 10,
     isComplete: true,
     bonusEarned: 75,
@@ -267,8 +270,9 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   },
   {
     incentiveId: 'inc-peak-hours-apr26',
-    currentCount: 12,
-    targetCount: 15,
+    currentCount: 9,              // 9 completed
+    scheduledCount: 3,            // 3 scheduled
+    targetCount: 15,              // Need 15, so 3 more to take
     isComplete: false,
     bonusEarned: 0,
     lastQualifyingTripId: 'trip-upcoming-002',
@@ -276,6 +280,7 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   {
     incentiveId: 'inc-loyalty-streak-apr26',
     currentCount: 5,
+    scheduledCount: 0,
     targetCount: 5,
     isComplete: true,
     bonusEarned: 85,
