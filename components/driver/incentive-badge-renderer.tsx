@@ -86,7 +86,7 @@ function CornerFlagVariant({ incentiveTypes, isCompleted }: CornerFlagVariantPro
   return (
     <div
       className={cn(
-        "absolute right-10 top-4 z-10 flex h-7 w-7 items-center justify-center rounded",
+        "absolute left-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded",
         isCompleted ? "bg-gray-600" : "bg-gray-900"
       )}
     >
