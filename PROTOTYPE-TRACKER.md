@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-0b — Active
-## Last Completed: I-0a (Shell Replication - List Surfaces)
+## Current Step: I-1 — Pending
+## Last Completed: I-0.5 (Data Schema + Seed Data)
 
 ---
 
@@ -30,8 +30,8 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | ----- | ------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0     | Setup                                                         | ✅ Done    | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
 | I-0a  | Shell Replication — Scaffold + List Surfaces                  | ✅ Done    | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
-| I-0b  | Shell Replication — Ride Details (both states merged)         | 🔄 Active  | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
-| I-0.5 | Schema + Seed Data                                            | ⬜ Planned | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
+| I-0b  | Shell Replication — Ride Details (both states merged)         | ✅ Done    | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
+| I-0.5 | Schema + Seed Data                                            | ✅ Done    | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
 | I-1   | Variant Toggle Infrastructure                                 | ⬜ Planned | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
@@ -199,15 +199,15 @@ Bottom nav is HIDDEN on detail screens (sticky footer overlays).
 - Apply observed styling from BIBLE.
 
 **Test Flows After This Step:**
-- [ ] Tapping a Requests card → Ride Details with Before Taken state (swipe footer rendered)
-- [ ] Tapping a My Rides Needs Action card → Ride Details with Needs Action state (amber alert + action toolbar + sticky red CTA)
-- [ ] Both states share the trip-detail body (map + metadata card + leg cards)
-- [ ] Bottom nav HIDDEN on both detail states; sticky footers overlay
-- [ ] Back chevron returns to the originating list (Requests vs My Rides)
-- [ ] Time anchors render with correct color circles (yellow / blue / green / black per BIBLE)
-- [ ] Notes line + expiration pill / Not Confirmed pill render per state
-- [ ] No incentive UI, no functional accept/decline/start/end actions
-- [ ] Swipe footer and red CTA are visually rendered but DO NOT trigger any flow
+- [x] Tapping a Requests card → Ride Details with Before Taken state (swipe footer rendered)
+- [x] Tapping a My Rides Needs Action card → Ride Details with Needs Action state (amber alert + action toolbar + sticky red CTA)
+- [x] Both states share the trip-detail body (map + metadata card + leg cards)
+- [x] Bottom nav HIDDEN on both detail states; sticky footers overlay
+- [x] Back chevron returns to the originating list (Requests vs My Rides)
+- [x] Time anchors render with correct color circles (yellow / blue / green / black per BIBLE)
+- [x] Notes line + expiration pill / Not Confirmed pill render per state
+- [x] No incentive UI, no functional accept/decline/start/end actions
+- [x] Swipe footer and red CTA are visually rendered but DO NOT trigger any flow
 
 ---
 
