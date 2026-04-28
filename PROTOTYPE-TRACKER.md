@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-0a
-## Last Completed: —
+## Current Step: I-0a — Active
+## Last Completed: Step 0 (Setup)
 
 ---
 
@@ -28,8 +28,8 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | #     | Screen                                                        | Status    | Key Deliverable                                                                                                                                                                                                                                                                                  |
 | ----- | ------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0     | Setup                                                         | ⬜ Planned | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
-| I-0a  | Shell Replication — Scaffold + List Surfaces                  | ⬜ Planned | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
+| 0     | Setup                                                         | ✅ Done    | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
+| I-0a  | Shell Replication — Scaffold + List Surfaces                  | 🔄 Active  | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
 | I-0b  | Shell Replication — Ride Details (both states merged)         | ⬜ Planned | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
 | I-0.5 | Schema + Seed Data                                            | ⬜ Planned | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
 | I-1   | Variant Toggle Infrastructure                                 | ⬜ Planned | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
@@ -99,9 +99,9 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 **Goal:** v0 reads `PROTOTYPE-BIBLE.md` and this file, confirms understanding of scope, build plan, component inventory, data schema, the variant-toggle pattern, and the program-level bonus model.
 
 **Test Flows After This Step:**
-- [ ] v0 returns a confirmation summarizing scope, plan, components, schema, variant pattern, and the program-level bonus rule
-- [ ] v0 confirms it has read `references/screenshots/README.md` and knows the by-step folder convention
-- [ ] No code generated yet
+- [x] v0 returns a confirmation summarizing scope, plan, components, schema, variant pattern, and the program-level bonus rule
+- [x] v0 confirms it has read `references/screenshots/README.md` and knows the by-step folder convention
+- [x] No code generated yet
 
 ---
 

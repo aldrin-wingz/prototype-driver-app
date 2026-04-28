@@ -3,7 +3,6 @@ import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import { ViewOnlyBanner } from "@/components/view-only-banner";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -11,8 +10,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Wingz Component Registry",
-  description: "Design system and reusable components for Wingz projects. View only—do not use as context.",
+  title: "Wingz Driver",
+  description: "Wingz NEMT Driver App - Driver Incentives Prototype",
 };
 
 export default function RootLayout({
@@ -21,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="bg-[#F9FAFB]">
       <body className={`${dmSans.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
@@ -29,7 +28,6 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ViewOnlyBanner />
           {children}
           <Toaster />
         </ThemeProvider>
