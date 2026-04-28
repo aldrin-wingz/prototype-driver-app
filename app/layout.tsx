@@ -3,6 +3,7 @@ import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { VariantsWrapper } from "@/components/driver/variants-wrapper";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -28,7 +29,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <VariantsWrapper>
+            {children}
+          </VariantsWrapper>
           <Toaster />
         </ThemeProvider>
       </body>
