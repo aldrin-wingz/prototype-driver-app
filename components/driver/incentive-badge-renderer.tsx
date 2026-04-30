@@ -7,9 +7,11 @@ import type { PillVariant } from "@/lib/variants";
 import type { IncentiveType } from "@/lib/data/incentives";
 import {
   getIncentiveTripLabel,
-  getMultipleIncentiveProgressInfo,
+  getIncentiveProgressInfo,
   INCENTIVE_PILL_COLORS,
   INCENTIVE_PILL_COLORS_MUTED,
+  INCENTIVE_TIER_COLORS,
+  type IncentiveProgressInfo,
 } from "@/lib/data/incentive-utils";
 
 // -----------------------------------------------------------------------------
@@ -17,328 +19,256 @@ import {
 // -----------------------------------------------------------------------------
 
 interface IncentiveBadgeRendererProps {
-  /** Array of incentive types this trip qualifies for */
-  incentiveTypes: IncentiveType[];
+  /** Single incentive type this trip qualifies for (null = no banner) */
+  incentiveType: IncentiveType | null;
   /** Whether this is a completed trip (use muted colors) */
   isCompleted?: boolean;
-  /** Whether to show (renders nothing if false or empty incentiveTypes) */
+  /** Whether to show (renders nothing if false or incentiveType is null) */
   show?: boolean;
   /** Override variant (for testing) */
   variantOverride?: PillVariant;
 }
 
 // -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Pill Row Variant
+// SUB-COMPONENTS: Pill Row Variant (single program)
 // -----------------------------------------------------------------------------
 
 interface PillRowVariantProps {
-  incentiveTypes: IncentiveType[];
+  incentiveType: IncentiveType;
   isCompleted: boolean;
 }
 
-function PillRowVariant({ incentiveTypes, isCompleted }: PillRowVariantProps) {
+function PillRowVariant({ incentiveType, isCompleted }: PillRowVariantProps) {
   const colorMap = isCompleted ? INCENTIVE_PILL_COLORS_MUTED : INCENTIVE_PILL_COLORS;
+  const colors = colorMap[incentiveType];
+  const label = getIncentiveTripLabel(incentiveType);
 
   return (
     <div className="flex flex-wrap gap-2">
-      {incentiveTypes.map((type) => {
-        const colors = colorMap[type];
-        const label = getIncentiveTripLabel(type);
-
-        return (
-          <span
-            key={type}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
-              colors.bg,
-              colors.text
-            )}
-          >
-            {/* Wingz mark - small black/green logo */}
-            <span className="relative flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-gray-900">
-              <Image
-                src="/WINGZLOGO2.png"
-                alt=""
-                width={10}
-                height={10}
-                className="object-contain"
-              />
-            </span>
-            {label}
-          </span>
-        );
-      })}
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+          colors.bg,
+          colors.text
+        )}
+      >
+        {/* Wingz mark - small dark logo backdrop */}
+        <span className="relative flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-gray-900">
+          <Image
+            src="/WINGZLOGO2.png"
+            alt=""
+            width={10}
+            height={10}
+            className="object-contain"
+          />
+        </span>
+        {label}
+      </span>
     </div>
   );
 }
 
 // -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Banner Hero Variant (with progress bar + earnings)
+// SHARED: Verbose progress labels under banners
+// -----------------------------------------------------------------------------
+
+interface VerboseProgressProps {
+  progress: IncentiveProgressInfo;
+  /** classes for the track (background bar) */
+  trackClass: string;
+  /** classes for the completed segment fill */
+  fillClass: string;
+  /** classes for the scheduled (striped) segment */
+  scheduledFillClass: string;
+  /** color of "X done" text */
+  doneTextClass: string;
+  /** color of "+N taken" text */
+  takenTextClass: string;
+  /** color of "· N to go" text */
+  toGoTextClass: string;
+  /** stripe overlay color rgba — should contrast with scheduledFill */
+  stripeRgba: string;
+}
+
+function VerboseProgress({
+  progress,
+  trackClass,
+  fillClass,
+  scheduledFillClass,
+  doneTextClass,
+  takenTextClass,
+  toGoTextClass,
+  stripeRgba,
+}: VerboseProgressProps) {
+  const completedPercent = (progress.currentCount / progress.targetCount) * 100;
+  const scheduledPercent = (progress.scheduledCount / progress.targetCount) * 100;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className={cn("relative h-2 flex-1 overflow-hidden rounded-full", trackClass)}>
+        <div
+          className={cn("absolute inset-y-0 left-0 transition-all", fillClass)}
+          style={{ width: `${Math.min(completedPercent, 100)}%` }}
+        />
+        {progress.scheduledCount > 0 && (
+          <div
+            className={cn("absolute inset-y-0 transition-all", scheduledFillClass)}
+            style={{
+              left: `${completedPercent}%`,
+              width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
+              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 2px, ${stripeRgba} 2px, ${stripeRgba} 4px)`,
+            }}
+          />
+        )}
+      </div>
+      <span className={cn("text-xs font-medium tabular-nums whitespace-nowrap", doneTextClass)}>
+        {progress.currentCount} done
+        {progress.scheduledCount > 0 && (
+          <span className={takenTextClass}> +{progress.scheduledCount} taken</span>
+        )}
+        {progress.remainingCount > 0 && (
+          <span className={toGoTextClass}> · {progress.remainingCount} to go</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// SUB-COMPONENTS: Banner Hero Variant — black banner, tier-tinted Wingz backdrop
 // -----------------------------------------------------------------------------
 
 interface BannerHeroVariantProps {
-  incentiveTypes: IncentiveType[];
+  incentiveType: IncentiveType;
   isCompleted: boolean;
 }
 
-function BannerHeroVariant({ incentiveTypes, isCompleted }: BannerHeroVariantProps) {
-  // Get progress info for the primary incentive
-  const progressItems = getMultipleIncentiveProgressInfo(incentiveTypes);
-  const primaryProgress = progressItems[0];
-  
-  // Calculate combined bonus
-  const totalBonus = progressItems.reduce((sum, item) => sum + item.bonusAmount, 0);
-  
-  // Build the label: join names with " · " separator
-  const labels = incentiveTypes.map((type) => getIncentiveTripLabel(type));
-  const combinedLabel = labels.join(" · ");
-  
-  // Calculate segment widths for segmented progress bar
-  const completedPercent = primaryProgress 
-    ? (primaryProgress.currentCount / primaryProgress.targetCount) * 100 
-    : 0;
-  const scheduledPercent = primaryProgress 
-    ? (primaryProgress.scheduledCount / primaryProgress.targetCount) * 100 
-    : 0;
+function BannerHeroVariant({ incentiveType, isCompleted }: BannerHeroVariantProps) {
+  const progress = getIncentiveProgressInfo(incentiveType);
+  if (!progress) return null;
+
+  const tier = INCENTIVE_TIER_COLORS[progress.tierLevel];
+  const label = getIncentiveTripLabel(incentiveType);
 
   return (
     <div
       className={cn(
         "flex flex-col gap-2 rounded-t-xl px-4 py-3",
-        isCompleted ? "bg-gray-700" : "bg-gray-900"
+        // Black background; muted shade for completed
+        isCompleted ? "bg-gray-700" : "bg-[#1F2937]"
       )}
     >
-      {/* Top row: Logo + Label + Bonus */}
+      {/* Top row: tier-tinted Wingz backdrop + Label + Bonus */}
       <div className="flex items-center gap-3">
-        {/* Wingz logo on left */}
-        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center">
+        <div
+          className={cn(
+            "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md",
+            isCompleted ? "bg-gray-600" : tier.bgClass
+          )}
+          aria-hidden="true"
+        >
           <Image
             src="/WINGZLOGO2.png"
             alt=""
-            width={20}
-            height={20}
+            width={14}
+            height={14}
             className={cn("object-contain", isCompleted && "opacity-60")}
           />
         </div>
 
-        {/* Incentive label */}
         <span
           className={cn(
             "flex-1 text-sm font-medium",
             isCompleted ? "text-gray-300" : "text-white"
           )}
         >
-          {combinedLabel}
+          {label}
         </span>
 
-        {/* Bonus amount */}
         <span
           className={cn(
             "text-sm font-bold",
             isCompleted ? "text-gray-400" : "text-[#10B981]"
           )}
         >
-          {isCompleted ? "Earned" : "Earn"} ${totalBonus}
+          {isCompleted ? "Earned" : "Earn"} ${progress.bonusAmount}
         </span>
       </div>
 
-      {/* Segmented progress bar row */}
-      {primaryProgress && (
-        <div className="flex items-center gap-2">
-          {/* Progress bar with 3 segments: completed | scheduled | remaining */}
-          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-gray-700">
-            {/* Completed segment (solid green) */}
-            <div
-              className={cn(
-                "absolute inset-y-0 left-0 transition-all",
-                isCompleted ? "bg-gray-500" : "bg-[#10B981]"
-              )}
-              style={{ width: `${Math.min(completedPercent, 100)}%` }}
-            />
-            {/* Scheduled segment (striped/lighter green) */}
-            {primaryProgress.scheduledCount > 0 && (
-              <div
-                className={cn(
-                  "absolute inset-y-0 transition-all",
-                  isCompleted ? "bg-gray-400" : "bg-[#10B981]/40"
-                )}
-                style={{ 
-                  left: `${completedPercent}%`,
-                  width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
-                  backgroundImage: isCompleted ? 'none' : 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px)'
-                }}
-              />
-            )}
-          </div>
-          {/* Progress text showing breakdown */}
-          <span
-            className={cn(
-              "text-xs font-medium tabular-nums whitespace-nowrap",
-              isCompleted ? "text-gray-400" : "text-gray-300"
-            )}
-          >
-            {primaryProgress.currentCount} done
-            {primaryProgress.scheduledCount > 0 && (
-              <span className="text-[#10B981]/70"> +{primaryProgress.scheduledCount} taken</span>
-            )}
-            {primaryProgress.remainingCount > 0 && (
-              <span className="text-gray-500"> · {primaryProgress.remainingCount} to go</span>
-            )}
-          </span>
-        </div>
-      )}
+      <VerboseProgress
+        progress={progress}
+        trackClass={isCompleted ? "bg-gray-600" : "bg-gray-700"}
+        fillClass={isCompleted ? "bg-gray-500" : "bg-[#10B981]"}
+        scheduledFillClass={isCompleted ? "bg-gray-400" : "bg-[#10B981]/40"}
+        doneTextClass={isCompleted ? "text-gray-400" : "text-gray-300"}
+        takenTextClass={isCompleted ? "text-gray-300" : "text-[#10B981]/70"}
+        toGoTextClass="text-gray-500"
+        stripeRgba="rgba(255,255,255,0.3)"
+      />
     </div>
   );
 }
 
 // -----------------------------------------------------------------------------
-// SUB-COMPONENTS: Achievement Banner Variant (tiered colors with progress)
+// SUB-COMPONENTS: Achievement Banner Variant — full-width tier-colored banner
 // -----------------------------------------------------------------------------
 
 interface AchievementBannerVariantProps {
-  incentiveTypes: IncentiveType[];
+  incentiveType: IncentiveType;
   isCompleted: boolean;
 }
 
-function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBannerVariantProps) {
-  // Get progress info
-  const progressItems = getMultipleIncentiveProgressInfo(incentiveTypes);
-  const primaryProgress = progressItems[0];
-  
-  // Calculate combined bonus to determine tier
-  const totalBonus = progressItems.reduce((sum, item) => sum + item.bonusAmount, 0);
-  
-  // Build the label
-  const labels = incentiveTypes.map((type) => getIncentiveTripLabel(type));
-  const combinedLabel = labels.join(" · ");
-  
-  // Calculate segment widths for segmented progress bar
-  const completedPercent = primaryProgress 
-    ? (primaryProgress.currentCount / primaryProgress.targetCount) * 100 
-    : 0;
-  const scheduledPercent = primaryProgress 
-    ? (primaryProgress.scheduledCount / primaryProgress.targetCount) * 100 
-    : 0;
+function AchievementBannerVariant({ incentiveType, isCompleted }: AchievementBannerVariantProps) {
+  const progress = getIncentiveProgressInfo(incentiveType);
+  if (!progress) return null;
 
-  // Determine tier colors based on bonus amount
-  const getTierStyles = () => {
-    if (isCompleted) {
-      return {
-        bg: "bg-gradient-to-r from-gray-500 to-gray-600",
-        text: "text-white",
-        subtext: "text-gray-200",
-        progressBg: "bg-gray-400",
-        progressFill: "bg-gray-300",
-        scheduledFill: "bg-gray-200",
-        bonusText: "text-gray-200",
-        takenText: "text-gray-300",
-        toGoText: "text-gray-400",
-      };
-    }
-    if (totalBonus >= 100) {
-      // Gold tier
-      return {
-        bg: "bg-gradient-to-r from-amber-500 to-yellow-500",
-        text: "text-amber-950",
-        subtext: "text-amber-900",
-        progressBg: "bg-amber-200",
-        progressFill: "bg-amber-700",
-        scheduledFill: "bg-amber-500",
-        bonusText: "text-amber-950",
-        takenText: "text-amber-800",
-        toGoText: "text-amber-700",
-      };
-    }
-    if (totalBonus >= 75) {
-      // Silver tier
-      return {
-        bg: "bg-gradient-to-r from-gray-300 to-slate-400",
-        text: "text-gray-900",
-        subtext: "text-gray-700",
-        progressBg: "bg-white/50",
-        progressFill: "bg-gray-700",
-        scheduledFill: "bg-gray-500",
-        bonusText: "text-gray-900",
-        takenText: "text-gray-600",
-        toGoText: "text-gray-500",
-      };
-    }
-    // Bronze tier
-    return {
-      bg: "bg-gradient-to-r from-orange-400 to-amber-500",
-      text: "text-orange-950",
-      subtext: "text-orange-900",
-      progressBg: "bg-orange-200",
-      progressFill: "bg-orange-800",
-      scheduledFill: "bg-orange-600",
-      bonusText: "text-orange-950",
-      takenText: "text-orange-800",
-      toGoText: "text-orange-700",
-    };
-  };
+  const tier = INCENTIVE_TIER_COLORS[progress.tierLevel];
+  const label = getIncentiveTripLabel(incentiveType);
 
-  const styles = getTierStyles();
+  // For completed trips, use muted gray bg
+  const bgClass = isCompleted ? "bg-gray-500" : tier.bgClass;
+  const textClass = isCompleted ? "text-white" : tier.textClass;
+  const mutedTextClass = isCompleted ? "text-gray-200" : tier.mutedTextClass;
+  const markBackdropClass = isCompleted ? "bg-white/30" : tier.markBackdropClass;
+  const trackClass = isCompleted ? "bg-gray-400" : tier.progressTrackClass;
+  const fillClass = isCompleted ? "bg-gray-200" : tier.progressFillClass;
 
   return (
-    <div className={cn("flex flex-col gap-2 rounded-t-xl px-4 py-3", styles.bg)}>
-      {/* Top row: Logo + Label + Bonus */}
+    <div className={cn("flex flex-col gap-2 rounded-t-xl px-4 py-3", bgClass)}>
       <div className="flex items-center gap-3">
-        {/* Wingz logo on left */}
-        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-white/20">
+        <div
+          className={cn(
+            "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md",
+            markBackdropClass
+          )}
+          aria-hidden="true"
+        >
           <Image
             src="/WINGZLOGO2.png"
             alt=""
-            width={16}
-            height={16}
-            className={cn("object-contain", isCompleted && "opacity-60")}
+            width={14}
+            height={14}
+            className="object-contain"
           />
         </div>
 
-        {/* Incentive label */}
-        <span className={cn("flex-1 text-sm font-semibold", styles.text)}>
-          {combinedLabel}
-        </span>
+        <span className={cn("flex-1 text-sm font-semibold", textClass)}>{label}</span>
 
-        {/* Bonus amount */}
-        <span className={cn("text-sm font-bold", styles.bonusText)}>
-          {isCompleted ? "Earned" : "Earn"} ${totalBonus}
+        <span className={cn("text-sm font-bold", textClass)}>
+          {isCompleted ? "Earned" : "Earn"} ${progress.bonusAmount}
         </span>
       </div>
 
-      {/* Segmented progress bar row */}
-      {primaryProgress && (
-        <div className="flex items-center gap-2">
-          {/* Progress bar with 3 segments: completed | scheduled | remaining */}
-          <div className={cn("relative h-2 flex-1 overflow-hidden rounded-full", styles.progressBg)}>
-            {/* Completed segment (solid fill) */}
-            <div
-              className={cn("absolute inset-y-0 left-0 transition-all", styles.progressFill)}
-              style={{ width: `${Math.min(completedPercent, 100)}%` }}
-            />
-            {/* Scheduled segment (striped) */}
-            {primaryProgress.scheduledCount > 0 && (
-              <div
-                className={cn("absolute inset-y-0 transition-all", styles.scheduledFill)}
-                style={{ 
-                  left: `${completedPercent}%`,
-                  width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
-                  backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)'
-                }}
-              />
-            )}
-          </div>
-          {/* Progress text showing breakdown */}
-          <span className={cn("text-xs font-medium tabular-nums whitespace-nowrap", styles.subtext)}>
-            {primaryProgress.currentCount} done
-            {primaryProgress.scheduledCount > 0 && (
-              <span className={styles.takenText}> +{primaryProgress.scheduledCount} taken</span>
-            )}
-            {primaryProgress.remainingCount > 0 && (
-              <span className={styles.toGoText}> · {primaryProgress.remainingCount} to go</span>
-            )}
-          </span>
-        </div>
-      )}
+      <VerboseProgress
+        progress={progress}
+        trackClass={trackClass}
+        fillClass={fillClass}
+        scheduledFillClass={fillClass}
+        doneTextClass={mutedTextClass}
+        takenTextClass={mutedTextClass}
+        toGoTextClass={mutedTextClass}
+        stripeRgba="rgba(255,255,255,0.4)"
+      />
     </div>
   );
 }
@@ -348,15 +278,15 @@ function AchievementBannerVariant({ incentiveTypes, isCompleted }: AchievementBa
 // -----------------------------------------------------------------------------
 
 export function IncentiveBadgeRenderer({
-  incentiveTypes,
+  incentiveType,
   isCompleted = false,
   show = true,
   variantOverride,
 }: IncentiveBadgeRendererProps) {
   const { variants, isLoaded } = useVariants();
 
-  // Don't render if no incentives or show is false
-  if (!show || incentiveTypes.length === 0) {
+  // Don't render if no incentive or show is false
+  if (!show || incentiveType === null) {
     return null;
   }
 
@@ -369,28 +299,13 @@ export function IncentiveBadgeRenderer({
 
   switch (activeVariant) {
     case "pill-named-bottom":
-      return (
-        <PillRowVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
+      return <PillRowVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
 
     case "banner-wingz-hero":
-      return (
-        <BannerHeroVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
+      return <BannerHeroVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
 
     case "achievement-banner":
-      return (
-        <AchievementBannerVariant
-          incentiveTypes={incentiveTypes}
-          isCompleted={isCompleted}
-        />
-      );
+      return <AchievementBannerVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
 
     default:
       return null;
@@ -398,8 +313,8 @@ export function IncentiveBadgeRenderer({
 }
 
 // Export sub-components for direct use if needed
-export { 
-  PillRowVariant, 
+export {
+  PillRowVariant,
   BannerHeroVariant,
   AchievementBannerVariant,
 };

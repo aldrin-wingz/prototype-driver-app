@@ -100,9 +100,9 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
   const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
   const hasWaitForCall = trip.legs.some(leg => leg.type === "wait-for-call");
   
-  // Determine incentive eligibility
-  const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
-  const incentiveTypes = hasIncentives ? trip.incentiveTypes! : [];
+  // Determine incentive eligibility (single program per trip)
+  const hasIncentives = !!trip.incentiveType && trip.clientEnrolledInIncentives !== false;
+  const activeIncentiveType = hasIncentives ? trip.incentiveType! : null;
   
   // Determine if banner variant is active (banner renders ABOVE the metadata card)
   const isBannerVariant = isLoaded && (variants.pill === 'banner-wingz-hero' || variants.pill === 'achievement-banner');
@@ -168,7 +168,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
         {hasIncentives && isBannerVariant && (
           <div className="mx-4 mt-4">
             <ProgramContributionIndicator
-              incentiveTypes={incentiveTypes}
+              incentiveType={activeIncentiveType}
               isCompleted={false}
               context="detail"
             />
@@ -240,7 +240,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               </span>
               {hasIncentives && isPillVariant && (
                 <ProgramContributionIndicator
-                  incentiveTypes={incentiveTypes}
+                  incentiveType={activeIncentiveType}
                   isCompleted={false}
                   context="detail"
                 />
@@ -255,7 +255,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               </span>
               {hasIncentives && isPillVariant && (
                 <ProgramContributionIndicator
-                  incentiveTypes={incentiveTypes}
+                  incentiveType={activeIncentiveType}
                   isCompleted={false}
                   context="detail"
                 />

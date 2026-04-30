@@ -105,7 +105,7 @@ function LegBlock({ leg, isLast, revenueColor, isCompleted }: {
 export function RideCard({ trip, revenueColor = "green", onClick, showDistance = true }: RideCardProps) {
   const { variants, isLoaded } = useVariants();
   const isCompleted = trip.status === "completed";
-  const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0;
+  const hasIncentives = !!trip.incentiveType;
   
   // Banner variants render at the top of the card (banner-wingz-hero, achievement-banner)
   const isBannerVariant = isLoaded && (variants.pill === "banner-wingz-hero" || variants.pill === "achievement-banner");
@@ -121,7 +121,7 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
       {/* Banner Variants - render at top of card */}
       {isBannerVariant && hasIncentives && (
         <ProgramContributionIndicator
-          incentiveTypes={trip.incentiveTypes!}
+          incentiveType={trip.incentiveType!}
           isCompleted={isCompleted}
         />
       )}
@@ -201,7 +201,7 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
         {/* Incentive pills (pill-named-bottom variant only) */}
         {isLoaded && variants.pill === "pill-named-bottom" && hasIncentives && (
           <ProgramContributionIndicator
-            incentiveTypes={trip.incentiveTypes!}
+            incentiveType={trip.incentiveType!}
             isCompleted={isCompleted}
           />
         )}

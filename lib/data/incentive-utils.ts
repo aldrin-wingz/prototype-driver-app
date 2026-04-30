@@ -4,7 +4,11 @@
 // Helper functions for mapping incentive types to display values.
 // =============================================================================
 
-import type { IncentiveType, DriverIncentiveProgress } from "./incentives";
+import type {
+  IncentiveType,
+  IncentiveTierLevel,
+  DriverIncentiveProgress,
+} from "./incentives";
 import { incentiveDefinitions, driverIncentiveProgress } from "./incentives";
 
 // -----------------------------------------------------------------------------
@@ -54,12 +58,61 @@ export const INCENTIVE_PILL_COLORS_MUTED: Record<IncentiveType, { bg: string; te
 };
 
 // -----------------------------------------------------------------------------
+// TIER COLORS (per IncentiveTierLevel — drives banner/card theming)
+// -----------------------------------------------------------------------------
+
+export interface TierColorTheme {
+  hex: string;            // raw color value
+  bgClass: string;        // Tailwind bg class
+  textClass: string;      // primary text class with adequate contrast on bg
+  mutedTextClass: string; // muted/secondary text class on bg
+  markBackdropClass: string; // backdrop behind the small Wingz mark
+  progressTrackClass: string; // progress bar track on this bg
+  progressFillClass: string;  // progress bar completed-fill on this bg
+}
+
+export const INCENTIVE_TIER_COLORS: Record<IncentiveTierLevel, TierColorTheme> = {
+  gold: {
+    hex: '#EAB308',
+    bgClass: 'bg-[#EAB308]',
+    textClass: 'text-gray-900',
+    mutedTextClass: 'text-gray-800/80',
+    markBackdropClass: 'bg-white/40',
+    progressTrackClass: 'bg-white/40',
+    progressFillClass: 'bg-gray-900',
+  },
+  silver: {
+    hex: '#94A3B8',
+    bgClass: 'bg-[#94A3B8]',
+    textClass: 'text-gray-900',
+    mutedTextClass: 'text-gray-800/80',
+    markBackdropClass: 'bg-white/50',
+    progressTrackClass: 'bg-white/40',
+    progressFillClass: 'bg-gray-900',
+  },
+  bronze: {
+    hex: '#B45309',
+    bgClass: 'bg-[#B45309]',
+    textClass: 'text-white',
+    mutedTextClass: 'text-amber-100',
+    markBackdropClass: 'bg-white/25',
+    progressTrackClass: 'bg-black/30',
+    progressFillClass: 'bg-white',
+  },
+};
+
+/** Get the tierLevel for a given incentive type, or null if unknown. */
+export function getIncentiveTierLevel(type: IncentiveType): IncentiveTierLevel | null {
+  return incentiveDefinitions.find(d => d.type === type)?.tierLevel ?? null;
+}
+
+// -----------------------------------------------------------------------------
 // PROGRESS HELPERS
 // -----------------------------------------------------------------------------
 
 /**
  * Get progress info for an incentive type.
- * Returns current/target count, bonus amount, and completion status.
+ * Returns current/target count, bonus amount, completion status, and tier.
  */
 export interface IncentiveProgressInfo {
   incentiveType: IncentiveType;
@@ -71,6 +124,7 @@ export interface IncentiveProgressInfo {
   bonusAmount: number;
   isComplete: boolean;
   description: string;
+  tierLevel: IncentiveTierLevel;
 }
 
 export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgressInfo | null {
@@ -96,6 +150,7 @@ export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgress
     bonusAmount: definition.bonusAmount,
     isComplete: progress?.isComplete ?? false,
     description: definition.description,
+    tierLevel: definition.tierLevel,
   };
 }
 

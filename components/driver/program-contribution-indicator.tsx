@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { useVariants } from "@/lib/variants-context";
-import { Progress } from "@/components/ui/progress";
 import {
   Popover,
   PopoverContent,
@@ -11,10 +9,9 @@ import {
 } from "@/components/ui/popover";
 import type { IncentiveType } from "@/lib/data/incentives";
 import {
-  getMultipleIncentiveProgressInfo,
+  getIncentiveProgressInfo,
   formatProgressString,
   formatBonusString,
-  type IncentiveProgressInfo,
 } from "@/lib/data/incentive-utils";
 import {
   PillRowVariant,
@@ -27,8 +24,8 @@ import {
 // -----------------------------------------------------------------------------
 
 interface ProgramContributionIndicatorProps {
-  /** Array of incentive types this trip qualifies for */
-  incentiveTypes: IncentiveType[];
+  /** Single incentive type this trip qualifies for (null/undefined = render nothing) */
+  incentiveType: IncentiveType | null | undefined;
   /** Whether this is a completed trip (use muted colors) */
   isCompleted?: boolean;
   /** Position context - affects Popover vs Tooltip behavior */
@@ -36,47 +33,47 @@ interface ProgramContributionIndicatorProps {
 }
 
 // -----------------------------------------------------------------------------
-// POPOVER CONTENT
+// POPOVER CONTENT (single program)
 // -----------------------------------------------------------------------------
 
 interface PopoverInnerContentProps {
-  progressItems: IncentiveProgressInfo[];
+  incentiveType: IncentiveType;
 }
 
-function PopoverInnerContent({ progressItems }: PopoverInnerContentProps) {
-  if (progressItems.length === 0) return null;
+function PopoverInnerContent({ incentiveType }: PopoverInnerContentProps) {
+  const progress = getIncentiveProgressInfo(incentiveType);
+  if (!progress) return null;
+
+  if (progress.isComplete) {
+    return (
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 text-[#10B981]" aria-hidden="true">
+          ✓
+        </span>
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold text-gray-900">{progress.name}</span>
+          <span> — Completed · </span>
+          <span className="font-semibold text-[#10B981]">
+            {formatBonusString(progress.bonusAmount)} added to next payout
+          </span>
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {progressItems.map((item) => (
-        <div key={item.incentiveType} className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-gray-900">{item.name}</span>
-            {item.isComplete ? (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                Complete!
-              </span>
-            ) : (
-              <span className="text-sm text-gray-600">
-                {formatProgressString(item.currentCount, item.targetCount)}
-              </span>
-            )}
-          </div>
-          
-          <Progress
-            value={(item.currentCount / item.targetCount) * 100}
-            className="h-2"
-          />
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">{item.description}</span>
-            <span className="font-semibold text-[#10B981]">
-              {item.isComplete ? "Earned" : "Earn"} {formatBonusString(item.bonusAmount)}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
+    <p className="text-sm text-gray-700">
+      <span>Counts toward </span>
+      <span className="font-semibold text-gray-900">{progress.name}</span>
+      <span> — </span>
+      <span className="font-medium text-gray-900">
+        {formatProgressString(progress.currentCount, progress.targetCount)}
+      </span>
+      <span> · </span>
+      <span className="font-semibold text-[#10B981]">
+        Earn {formatBonusString(progress.bonusAmount)} when complete
+      </span>
+    </p>
   );
 }
 
@@ -85,15 +82,14 @@ function PopoverInnerContent({ progressItems }: PopoverInnerContentProps) {
 // -----------------------------------------------------------------------------
 
 export function ProgramContributionIndicator({
-  incentiveTypes,
+  incentiveType,
   isCompleted = false,
-  context = "card",
 }: ProgramContributionIndicatorProps) {
   const { variants, isLoaded } = useVariants();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
-  // Don't render if no incentives
-  if (incentiveTypes.length === 0) {
+  // Don't render if no incentive or null
+  if (!incentiveType) {
     return null;
   }
 
@@ -102,35 +98,17 @@ export function ProgramContributionIndicator({
     return null;
   }
 
-  // Get progress info for all incentive types
-  const progressItems = getMultipleIncentiveProgressInfo(incentiveTypes);
-
   const activeVariant = variants.pill;
 
   // Render the badge based on variant
   const renderBadge = () => {
     switch (activeVariant) {
       case "pill-named-bottom":
-        return (
-          <PillRowVariant
-            incentiveTypes={incentiveTypes}
-            isCompleted={isCompleted}
-          />
-        );
+        return <PillRowVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
       case "banner-wingz-hero":
-        return (
-          <BannerHeroVariant
-            incentiveTypes={incentiveTypes}
-            isCompleted={isCompleted}
-          />
-        );
+        return <BannerHeroVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
       case "achievement-banner":
-        return (
-          <AchievementBannerVariant
-            incentiveTypes={incentiveTypes}
-            isCompleted={isCompleted}
-          />
-        );
+        return <AchievementBannerVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
       default:
         return null;
     }
@@ -156,7 +134,7 @@ export function ProgramContributionIndicator({
         className="w-80"
         onClick={(e) => e.stopPropagation()}
       >
-        <PopoverInnerContent progressItems={progressItems} />
+        <PopoverInnerContent incentiveType={incentiveType} />
       </PopoverContent>
     </Popover>
   );

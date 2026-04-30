@@ -19,9 +19,11 @@ import {
   getAllIncentiveProgress,
   getProjectedTotalBonus,
   INCENTIVE_PILL_COLORS,
+  INCENTIVE_TIER_COLORS,
   type IncentiveProgressInfo,
 } from "@/lib/data/incentive-utils";
 import type { IncentiveType } from "@/lib/data/incentives";
+import type { PillVariant } from "@/lib/variants";
 
 // -----------------------------------------------------------------------------
 // SHARED: View All Link
@@ -113,9 +115,143 @@ interface IncentiveCardProps {
   variant?: "mini" | "full";
 }
 
+/**
+ * Compute themed classes for the full IncentiveCard based on the active pill variant.
+ * - pill-named-bottom: white card (existing default)
+ * - banner-wingz-hero: black card with tier-tinted Wingz mark backdrop
+ * - achievement-banner: card body = program's tierLevel color
+ */
+function getCardTheme(progress: IncentiveProgressInfo, pillVariant: PillVariant) {
+  const tier = INCENTIVE_TIER_COLORS[progress.tierLevel];
+
+  if (pillVariant === "banner-wingz-hero") {
+    return {
+      cardBg: "bg-[#1F2937] border-[#1F2937]",
+      titleText: "text-white",
+      descText: "text-gray-300",
+      bonusText: progress.isComplete ? "text-[#10B981]" : "text-[#10B981]",
+      chevronText: "text-gray-400",
+      completedLabel: "text-[#10B981]",
+      progressTrack: "bg-gray-700",
+      progressFill: "bg-[#10B981]",
+      progressScheduled: "bg-[#10B981]/40",
+      progressDoneText: "text-gray-300",
+      progressTakenText: "text-[#10B981]/80",
+      progressToGoText: "text-gray-500",
+      stripeRgba: "rgba(255,255,255,0.3)",
+      markBackdrop: tier.bgClass, // tier-tinted backdrop on dark bg
+      showWingz: true,
+      useTierBadge: false,
+    };
+  }
+
+  if (pillVariant === "achievement-banner") {
+    return {
+      cardBg: cn(tier.bgClass, "border-transparent"),
+      titleText: tier.textClass,
+      descText: tier.mutedTextClass,
+      bonusText: tier.textClass,
+      chevronText: tier.mutedTextClass,
+      completedLabel: tier.textClass,
+      progressTrack: tier.progressTrackClass,
+      progressFill: tier.progressFillClass,
+      progressScheduled: tier.progressFillClass,
+      progressDoneText: tier.mutedTextClass,
+      progressTakenText: tier.mutedTextClass,
+      progressToGoText: tier.mutedTextClass,
+      stripeRgba: "rgba(255,255,255,0.4)",
+      markBackdrop: tier.markBackdropClass,
+      showWingz: true,
+      useTierBadge: false,
+    };
+  }
+
+  // pill-named-bottom (default): white card with named pill
+  return {
+    cardBg: "bg-white border",
+    titleText: "text-gray-900",
+    descText: "text-gray-600",
+    bonusText: progress.isComplete ? "text-[#10B981]" : "text-gray-900",
+    chevronText: "text-gray-400",
+    completedLabel: "text-[#10B981]",
+    progressTrack: "bg-gray-200",
+    progressFill: "bg-[#10B981]",
+    progressScheduled: "bg-[#10B981]/40",
+    progressDoneText: "text-gray-700",
+    progressTakenText: "text-[#10B981]",
+    progressToGoText: "text-gray-400",
+    stripeRgba: "rgba(255,255,255,0.4)",
+    markBackdrop: "",
+    showWingz: false,
+    useTierBadge: true,
+  };
+}
+
+interface ThemedProgressMeterProps {
+  currentCount: number;
+  scheduledCount: number;
+  targetCount: number;
+  trackClass: string;
+  fillClass: string;
+  scheduledClass: string;
+  doneTextClass: string;
+  takenTextClass: string;
+  toGoTextClass: string;
+  stripeRgba: string;
+}
+
+function ThemedProgressMeter({
+  currentCount,
+  scheduledCount,
+  targetCount,
+  trackClass,
+  fillClass,
+  scheduledClass,
+  doneTextClass,
+  takenTextClass,
+  toGoTextClass,
+  stripeRgba,
+}: ThemedProgressMeterProps) {
+  const completedPercent = (currentCount / targetCount) * 100;
+  const scheduledPercent = (scheduledCount / targetCount) * 100;
+  const remainingCount = Math.max(0, targetCount - currentCount - scheduledCount);
+
+  return (
+    <div className="w-full space-y-1.5">
+      <div className={cn("relative h-2 w-full overflow-hidden rounded-full", trackClass)}>
+        <div
+          className={cn("absolute inset-y-0 left-0 transition-all", fillClass)}
+          style={{ width: `${Math.min(completedPercent, 100)}%` }}
+        />
+        {scheduledCount > 0 && (
+          <div
+            className={cn("absolute inset-y-0", scheduledClass)}
+            style={{
+              left: `${completedPercent}%`,
+              width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
+              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 2px, ${stripeRgba} 2px, ${stripeRgba} 4px)`,
+            }}
+          />
+        )}
+      </div>
+      <div className="flex items-center gap-1 text-xs">
+        <span className={cn("font-medium", doneTextClass)}>{currentCount} done</span>
+        {scheduledCount > 0 && (
+          <span className={takenTextClass}>+{scheduledCount} taken</span>
+        )}
+        {remainingCount > 0 && (
+          <span className={toGoTextClass}>· {remainingCount} to go</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function IncentiveCard({ progress, onTap, variant = "full" }: IncentiveCardProps) {
+  const { variants, isLoaded } = useVariants();
   const colors = INCENTIVE_PILL_COLORS[progress.incentiveType];
 
+  // mini variant always uses the white card (used inside dashboard-banner horizontal scroll)
   if (variant === "mini") {
     return (
       <button
@@ -148,35 +284,76 @@ function IncentiveCard({ progress, onTap, variant = "full" }: IncentiveCardProps
     );
   }
 
+  // Full variant — themed by active pill variant
+  const pillVariant: PillVariant = isLoaded ? variants.pill : "pill-named-bottom";
+  const theme = getCardTheme(progress, pillVariant);
+
   return (
     <button
       onClick={() => onTap(progress.incentiveType)}
       className={cn(
-        "w-full rounded-xl border bg-white p-4 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]",
+        "w-full rounded-xl p-4 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]",
+        theme.cardBg,
         progress.isComplete && "opacity-80"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className={cn("text-xs font-medium", colors.bg, colors.text, colors.border)}>
-              {progress.name}
-            </Badge>
-            {progress.isComplete && <span className="text-xs text-[#10B981] font-medium">Completed</span>}
+            {/* Wingz mark backdrop on banner/achievement variants */}
+            {theme.showWingz && (
+              <span
+                className={cn(
+                  "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md",
+                  theme.markBackdrop
+                )}
+                aria-hidden="true"
+              >
+                <Image
+                  src="/WINGZLOGO2.png"
+                  alt=""
+                  width={14}
+                  height={14}
+                  className="object-contain"
+                />
+              </span>
+            )}
+            {/* Named pill on pill-named-bottom (existing) */}
+            {theme.useTierBadge ? (
+              <Badge
+                variant="outline"
+                className={cn("text-xs font-medium", colors.bg, colors.text, colors.border)}
+              >
+                {progress.name}
+              </Badge>
+            ) : (
+              <span className={cn("text-sm font-semibold", theme.titleText)}>
+                {progress.name}
+              </span>
+            )}
+            {progress.isComplete && (
+              <span className={cn("text-xs font-medium", theme.completedLabel)}>Completed</span>
+            )}
           </div>
-          <p className="text-sm text-gray-600 mb-3">{progress.description}</p>
-          <ProgressMeter
+          <p className={cn("text-sm mb-3", theme.descText)}>{progress.description}</p>
+          <ThemedProgressMeter
             currentCount={progress.currentCount}
             scheduledCount={progress.scheduledCount}
             targetCount={progress.targetCount}
-            isComplete={progress.isComplete}
+            trackClass={theme.progressTrack}
+            fillClass={theme.progressFill}
+            scheduledClass={theme.progressScheduled}
+            doneTextClass={theme.progressDoneText}
+            takenTextClass={theme.progressTakenText}
+            toGoTextClass={theme.progressToGoText}
+            stripeRgba={theme.stripeRgba}
           />
         </div>
         <div className="flex flex-col items-end justify-between self-stretch">
-          <span className={cn("text-lg font-bold", progress.isComplete ? "text-[#10B981]" : "text-gray-900")}>
+          <span className={cn("text-lg font-bold", theme.bonusText)}>
             ${progress.bonusAmount}
           </span>
-          <ChevronRight className="h-5 w-5 text-gray-400" />
+          <ChevronRight className={cn("h-5 w-5", theme.chevronText)} />
         </div>
       </div>
     </button>

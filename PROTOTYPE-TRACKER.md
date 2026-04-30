@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-0a
-## Last Completed: —
+## Current Step: I-4.3
+## Last Completed: I-4.2 (Single-Incentive Schema + Achievement Banner + Points System)
 
 ---
 
