@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-5
-## Last Completed: I-4.3 (`/payout` Page + Sheet Retired)
+## Current Step: I-0a
+## Last Completed: —
 
 ---
 
@@ -41,8 +41,10 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
 | I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
 | I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ⬜ Planned | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard`), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel. Add "View All" link to all dashboard variants. **`UpcomingPayoutWidget` STAYS on dashboard** (does NOT move). |
-| I-4.2 | Component Unification + Single-Incentive Schema + Achievement Banner Variant + Points System | ✅ Done    | **Schema renamed** `Trip.incentiveTypes: IncentiveType[]` → `Trip.incentiveType: IncentiveType \| null` (singular). Added `IncentiveDefinition.tierLevel` ('bronze' \| 'silver' \| 'gold' \| 'platinum') + `INCENTIVE_TIER_POINTS = { platinum: 4, gold: 3, silver: 2, bronze: 1 }`. `LeaderboardEntry` simplified to `{ rank, fullName, points, bonusesEarned, isCurrentDriver }`. `CurrentDriver` now exposes `pointsTotal` + `pointsToNextTier`. `TierConfig.threshold` is points-based (Bronze 0 / Silver 5 / Gold 12 / Platinum 24). **Variant set unchanged at 3** (`pill-named-bottom` / `banner-wingz-hero` / `achievement-banner`); `badge-corner-flag` already retired. **Hero Banner** refined to black background + Wingz mark backdrop tinted by program's `tierLevel`. **Achievement Banner** body now adopts the program's tier color (bronze=amber-tinted, silver=slate-tinted, gold=yellow-tinted, platinum=indigo-tinted). **`IncentiveCard` (full variant)** themed by active pill variant via `getCardTheme()` — used by Dashboard carousel, `/incentives` Incentives tab, and `/payout` Completed Incentives tab (I-4.3). `IncentiveBadgeRenderer` + `ProgramContributionIndicator` accept singular `incentiveType` prop; multi-program rendering dropped. **Seed updated:** every trip carries one or zero programs; programs for already-completed incentives carry `incentiveType: null` so completed callouts naturally vanish (no runtime filter). |
-| I-4.3 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ✅ Done    | New stack-pushed `/payout` page (white header + back chevron + "Upcoming Payout" title, `#F9FAFB` body, NO bottom nav). Summary card surfaces `Next payout: <date>`, large green total = base + bonuses, breakdown row "Base $X · Bonuses +$Y", empty-state copy when bonuses are zero. Two tabs: **Rides Completed** (default) renders `RideCard` (Ride History styling: blue revenue, blue county, no bottom pill, `showDistance={false}`) filtered to `mockCompletedTrips`; **Completed Incentives** renders `IncentiveCard` (full variant) filtered to `progress.isComplete === true`. Tap on a completed RideCard logs to console (read-only receipts); tap on a completed IncentiveCard preserves the deep-link contract `/requests?incentive=<type>`. Empty states centered in dashed gray cards. **`UpcomingPayoutWidget`** stripped of Sheet + per-program breakdown; tap target now `router.push('/payout')`; `id="upcoming-payout"` anchor removed; visual treatment otherwise unchanged. |
+| I-4.2 | Component Unification + Single-Incentive Schema + Achievement Banner Variant + Points System | ✅ Approved | **Schema:** `Trip.incentiveType: IncentiveType \| null` (singular, was array); add `IncentiveDefinition.tierLevel` + `INCENTIVE_TIER_POINTS`; add `LeaderboardEntry.pointsEarnedThisPeriod`; `CurrentDriver.incentivesAccomplishedThisPeriod` → `pointsAccumulatedThisPeriod`; `TierConfig.threshold` shifts to points-based (Bronze 0 / Silver 5 / Gold 12 / Platinum 24). **Variant set:** drop `badge-corner-flag`, add `achievement-banner`. Hero Banner refined (black + Wingz mark backdrop tinted by tierLevel). **`IncentiveCard` themed by active variant** (Dashboard carousel, `/incentives` Incentives tab, `/payout` Completed Incentives tab). Drop multi-program rendering everywhere. **Seed updates:** assign tierLevels to programs; trips become single-program; trips for completed programs get `incentiveType: null` (data-driven suppression — NO runtime filter). |
+| I-4.3 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ✅ Approved (v1) | (Renumbered from I-4.2 on 2026-05-01.) New stack-pushed `/payout` page with summary header + 2 tabs: **Rides Completed** (completed-rides filter using existing `RideCard` from Ride History, scoped to current pay period) and **Completed Incentives** (reuses unified `IncentiveCard` filtered to completed-this-period). Remove Sheet popup from `UpcomingPayoutWidget` on dashboard; tap → `router.push('/payout')`. **Note:** Replaced/extended in I-4.4 (3 tabs + period nav + summary tri-state with new variant set). |
+| I-4.4 | `/payout` Period-Aware: 3 Tabs + Period Nav + Summary Tri-State + 2 Variants | ⬜ Planned | Add **Rides Upcoming** tab (3rd, sourced from My Rides accepted; trip drops out on completion). Add **period selector** with `< >` chevrons (forward + back; 2 prior + 1 future periods seeded). Rename "Completed Incentives" tab → **"Incentives"** (shows earned + in-progress programs for the period). Summary becomes tri-state: **Earned** (base from completed) + **Upcoming** (base from accepted) + **Incentives** (period bonus total — earned + projected) — sum = **Projected** hero (becomes "Final" headline on past periods). Two layout variants behind new toggle Section 3 "Payout Summary": **`mini-cards`** (default — Projected hero + 3 mini-cards row + label-only tabs) / **`tabs-as-metrics`** (Projected hero + tabs themselves carry the value/subtitle, no separate mini-card row). Tab switch highlights the active mini-card (Variant A) or relies on tab indicator (Variant B). |
+| I-4.5 | Per-Trip Revenue Add-Ons (`Trip.revenueAddons`)               | ⬜ Planned | Single optional schema field `Trip.revenueAddons?: { label: string; amount: number }[]` (no `kind` enum — display only). `trip.revenue` STAYS the total (base + addons baked in) so all existing sum-totals work unchanged. Seed 4–5 trips with addons (mix of "Sent-back bonus +$25.00" and "Door-to-Door bump +$2.50"). RideCard revenue cell renders `$<base> +$<addons>` when addons present (`+$X` in `#10B981` accent), tap opens popover with labeled breakdown. Applies to all RideCard usages (Requests / My Rides / Ride History / `/payout` Rides Completed + Rides Upcoming tabs / Dashboard previews) and to ride detail revenue display. NO change to dashboard `UpcomingPayoutWidget` math. NO change to leaderboard $ (incentive-only). |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
 | I-6   | Tier Progress (tab content on `/incentives`)                  | ⬜ Planned | Build `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + threshold copy ("Earn N points to reach <Tier>") + path-to-next-tier progress. **Points-based** — driver's tier from `pointsAccumulatedThisPeriod`. NO multiplier wiring into Dashboard projected bonus. |
 | I-7   | Leaderboard (tab content on `/incentives`)                    | ⬜ Planned | Anonymized handles, period selector, current driver highlighted, consumes finalized `TierBadge` from I-6. **Ranked by `pointsEarnedThisPeriod`**; `bonusesEarned` shown per row as a secondary $ figure. |
@@ -54,8 +56,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Step | Decision | Date | Delta Notes |
 |------|----------|------|-------------|
-| I-4.2 | Complete | 2026-05-01 | Schema rename `incentiveTypes[]` → `incentiveType` propagated through `Trip`, `IncentiveBadgeRenderer`, `ProgramContributionIndicator`, `RideCard`, `RideDetailLayout`. Added `tierLevel` to programs + `INCENTIVE_TIER_POINTS`. Achievement banner now themed by tierLevel. `IncentiveCard` (full) themed by active pill variant — `pill-named-bottom` keeps existing white card, `banner-wingz-hero` uses dark card with tier-tinted Wingz backdrop, `achievement-banner` adopts full tier color body. `LeaderboardEntry` / `CurrentDriver` / `TierConfig` reseeded for I-6/I-7. Completed-program trips carry `incentiveType: null` so no runtime filtering needed. |
-| I-4.3 | Complete | 2026-05-01 | Created `/payout` page (`app/payout/page.tsx`) with white header, sticky `<` back, summary card (next payout date + green total + base/bonuses breakdown + empty-state copy), and 2 tabs: **Rides Completed** reuses `RideCard` (blue revenue, no distance) filtered to `mockCompletedTrips`; **Completed Incentives** reuses `IncentiveCard` (full variant) filtered to `progress.isComplete`. Empty states centered in dashed gray cards. Stripped `<Sheet>` import + `PayoutBreakdownSheet` component + `useState` from `UpcomingPayoutWidget`; tap now `router.push('/payout')`; `id="upcoming-payout"` anchor removed (Achievement Unlock CTA in I-8 will route directly). Widget visual otherwise unchanged. Deep-link contract `/requests?incentive=<type>` preserved. |
+| | | | |
 
 ---
 
@@ -63,7 +64,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Component | Import Path | Used In |
 |-----------|-------------|---------|
-| Tabs | `@/components/ui/tabs` | I-0a (My Rides 3-tab row: In Progress / Needs Action / Upcoming), I-4.1 (`/incentives` 3-tab interface: Incentives / Leaderboard / Tier Progress), I-4.2 (`/payout` 2-tab interface: Rides Completed / Completed Incentives) |
+| Tabs | `@/components/ui/tabs` | I-0a (My Rides 3-tab row: In Progress / Needs Action / Upcoming), I-4.1 (`/incentives` 3-tab interface: Incentives / Leaderboard / Tier Progress), I-4.3 (`/payout` 2-tab interface: Rides Completed / Completed Incentives — superseded in I-4.4), I-4.4 (`/payout` 3-tab interface: Rides Completed / Rides Upcoming / Incentives — both layout variants) |
 | Card | `@/components/ui/card` | I-0a, I-0b, I-3, I-4, I-6, I-7 |
 | Button | `@/components/ui/button` | All steps |
 | Avatar | `@/components/ui/avatar` | I-0a, I-6, I-7 |
@@ -87,16 +88,18 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 |-----------|----------|-----------|
 | Header | I-0a | All screens |
 | BottomNav | I-0a | All screens with bottom nav (Home / Requests / My Rides) |
-| RideCard | I-0a | I-0a list surfaces, plus I-2 (incentive surfaces layered on top), I-3 (dashboard previews), I-5 (filtered list) |
+| RideCard | I-0a | I-0a list surfaces, plus I-2 (incentive surfaces layered on top), I-3 (dashboard previews), I-5 (filtered list), **I-4.5** (revenue cell renders `$<base> +$<addons>` when `trip.revenueAddons` present, with tap-popover breakdown). |
 | RideDetailLayout | I-0b | I-0b detail routes, plus I-4 (incentive surface placement on the detail layout) |
-| VariantToggle | I-1 | All variant-set steps (I-2, I-3). Sheet has 2 sections: pill, dashboard. |
+| VariantToggle | I-1 | All variant-set steps (I-2, I-3, **I-4.4**). Sheet has 3 sections post-I-4.4: pill (Ride Card Indicator), dashboard (Dashboard Incentives), payoutSummary (Payout Summary — added in I-4.4). |
 | IncentiveBadgeRenderer | I-2 (built) → I-4.2 (refined) | I-3 (dashboard cards), I-4 (Ride Details placement), I-5 (filter chips). Switches between `pill-named-bottom` / `banner-wingz-hero` / `achievement-banner` based on `useVariants().pill` (post I-4.2; `badge-corner-flag` retired in I-4.2). Renders ONE program per surface (multi-program rendering dropped in I-4.2). |
 | ProgramContributionIndicator | I-2 (built) → I-4.2 (refined) | I-4 (ride detail surfaces inherit the same wrapper). Tooltip + Popover wrapper around `IncentiveBadgeRenderer`. Single design (no toggle). Single-program rendering only (multi-program dropped in I-4.2). |
-| IncentiveCard | I-3 (built as white card) → I-4.2 (themed by active variant) | Dashboard `dashboard-card-section` carousel (I-4.1), `/incentives` Incentives tab (I-4.1), `/payout` Completed Incentives tab (I-4.3). Reads `useVariants().pill`: `pill-named-bottom` = white card; `banner-wingz-hero` = black with tier-tinted Wingz mark backdrop; `achievement-banner` = full `tierLevel` color. |
+| IncentiveCard | I-3 (built as white card) → I-4.2 (themed by active variant) | Dashboard `dashboard-card-section` carousel (I-4.1), `/incentives` Incentives tab (I-4.1), `/payout` Incentives tab (I-4.3 originally "Completed Incentives" → I-4.4 broadened to "Incentives" showing earned + in-progress). Reads `useVariants().pill`: `pill-named-bottom` = white card; `banner-wingz-hero` = black with tier-tinted Wingz mark backdrop; `achievement-banner` = full `tierLevel` color. |
 | DashboardIncentiveSection | I-3 | Dashboard. `dashboard-card-section` variant reworked into IncentiveCarousel in I-4.1. Every variant gains a "View All" link in I-4.1 that opens `/incentives`. |
 | IncentiveCarousel | I-4.1 | Dashboard `dashboard-card-section` variant — replaces the 4-stacked-cards layout. One card at a time, swipe left/right, page dots. |
 | IncentivesPage | I-4.1 | New `/incentives` route — Driver Incentives Hub. Composed from header (back chevron + "Driver Incentives" title + Variants pill) + Tabs (Incentives default / Leaderboard / Tier Progress). Tabs are placeholder shells in I-4.1; Leaderboard tab filled in I-7, Tier Progress tab filled in I-6. |
-| PayoutPage | I-4.3 (renumbered from I-4.2 on 2026-05-01) | New `/payout` route — Upcoming Payout breakdown. Composed from header (back chevron + "Upcoming Payout" title + Variants pill) + summary section (total payout / payout date / base + bonus split) + Tabs (Rides Completed default / Completed Incentives). Reuses existing `RideCard` (Rides Completed tab) and the unified `IncentiveCard` (Completed Incentives tab — themed by active variant per I-4.2). |
+| PayoutPage | I-4.3 (built) → I-4.4 (extended: 3 tabs + period nav + summary tri-state + 2 layout variants) | New `/payout` route — Upcoming Payout breakdown. Composed from header (back chevron + "Upcoming Payout" title + Variants pill) + **PayoutSummary** composite (period-aware) + Tabs row (3 tabs post-I-4.4: Rides Completed default / Rides Upcoming / Incentives). Reuses existing `RideCard` (Rides Completed + Rides Upcoming tabs) and the unified `IncentiveCard` (Incentives tab — themed by active variant per I-4.2). |
+| PayoutSummary | I-4.4 | `/payout` summary section. Reads `useVariants().payoutSummary`: `mini-cards` (default — Projected/Final hero + 3 mini-cards row Earned/Upcoming/Incentives + label-only tabs) / `tabs-as-metrics` (Projected/Final hero + tabs themselves carry value + subtitle). Period-aware — past period changes hero label to "Final" and Upcoming card → em-dash; future period → Earned card em-dash. Tab switch on Variant A puts ring on the matching mini-card; Variant B relies on tab indicator. |
+| PeriodSelector | I-4.4 | `/payout` only. `< Apr 28 – May 4 >` chevron pair with status pill ("Current" / "Closed" / "Upcoming"). Steps backward 2 periods + forward 1 period from current; clamps at boundaries (chevron disabled at edge). Drives `PayPeriod` selection state on the page. |
 | UpcomingPayoutWidget | I-3 (built on dashboard with Sheet) → I-4.2 (Sheet retired, tap navigates to `/payout`) | Stays on dashboard for at-a-glance context. Originally tapped to open a Sheet for breakdown — Sheet REMOVED in I-4.2 because the new `/payout` page is the richer review surface. Tap target swaps to `router.push('/payout')`. |
 | ProgressMeter | I-3 | I-4 (banner-wingz-hero on detail when applicable), I-6 |
 | TierBadge | I-6 | I-7 (leaderboard rows), I-3 (dashboard tier badge) |
@@ -117,7 +120,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 ---
 
-### Step I-0a: Shell Replication ��� Scaffold + List Surfaces
+### Step I-0a: Shell Replication — Scaffold + List Surfaces
 
 **Goal:** Stand up the app layout (Header + BottomNav + routing) AND replicate the four list/dashboard surfaces (Dashboard, Requests, My Rides, Ride History). Build the shared `RideCard` component once and reuse it across all four. NO incentive UI yet, NO ride detail screens yet (those come in I-0b).
 
@@ -1085,6 +1088,294 @@ Behavior:
 - [ ] Card visuals (`RideCard` and `IncentiveCard`) unchanged from prior steps — reused as-is
 - [ ] Mobile portrait 375×812 viewport, no horizontal overflow
 - [ ] Zero TypeScript errors
+
+---
+
+### Step I-4.4: `/payout` Period-Aware — 3 Tabs + Period Nav + Summary Tri-State + 2 Variants
+
+**Why this step exists:** I-4.3 shipped `/payout` with a static 2-tab layout and a single-period summary. Drivers don't see (a) what they could still earn, (b) prior period results, or (c) future-period accepted trips. I-4.4 makes the page period-aware, splits earnings into "what's locked vs what's projected," and gives drivers a way to flip through periods. **Intent:** make drivers excited about doing more incentives + clear about future + expected payouts. Keep visual treatment minimal — the existing `RideCard` and `IncentiveCard` visuals stay as-is; this step is structural.
+
+**Goal:** Extend the `/payout` page with a 3rd tab, a period selector, a tri-state summary (Earned + Upcoming + Incentives = Projected), and TWO summary layout variants behind a new Variant Toggle section.
+
+**Reference screenshots:** None (composition + state changes only — reuses existing card visuals).
+
+**This step has FIVE parts in one v0 generation pass.**
+
+---
+
+#### Part 1 — Schema additions in `lib/data/incentives.ts`
+
+```ts
+// NEW: PayPeriod
+export interface PayPeriod {
+  id: string;                         // 'period-2026-04-28' etc.
+  startDate: string;                  // 'Apr 28'
+  endDate: string;                    // 'May 4'
+  payoutDate: string;                 // 'Mon, May 4'
+  status: 'closed' | 'current' | 'upcoming';
+}
+
+// NEW: PayoutPeriodSummary — period-keyed payout record
+export interface PayoutPeriodSummary {
+  periodId: string;
+  // Mini-card 1: completed rides this period
+  earnedFromCompletedRides: number;
+  completedRidesCount: number;
+  // Mini-card 2: accepted/upcoming rides this period
+  upcomingFromAcceptedRides: number;
+  upcomingRidesCount: number;
+  // Mini-card 3: incentive bonuses (earned + projected)
+  incentivesTotal: number;            // sum of earned + projected
+  incentivesEarnedCount: number;      // programs already triggered
+  incentivesTotalCount: number;       // earned + in-progress contributing
+  // The trip lists for each tab — by reference
+  completedTripIds: string[];
+  upcomingTripIds: string[];
+  programIdsContributing: IncentiveType[];   // earned + in-progress
+}
+```
+
+`Projected` (current/future) or `Final` (closed) total = `earnedFromCompletedRides + upcomingFromAcceptedRides + incentivesTotal`.
+
+---
+
+#### Part 2 — Variant set additions in `lib/variants.ts`
+
+```ts
+// NEW
+export type PayoutSummaryVariant = 'mini-cards' | 'tabs-as-metrics';
+
+// CHANGED: VariantSelection gains payoutSummary
+export interface VariantSelection {
+  pill: PillVariant;
+  dashboard: DashboardVariant;
+  payoutSummary: PayoutSummaryVariant;
+}
+
+export const DEFAULT_VARIANTS: VariantSelection = {
+  pill: 'pill-named-bottom',
+  dashboard: 'dashboard-top-banner',
+  payoutSummary: 'mini-cards',          // default
+};
+
+export const VARIANT_LABELS = {
+  pill: { /* unchanged */ },
+  dashboard: { /* unchanged */ },
+  payoutSummary: {
+    'mini-cards': 'Mini-Cards Below',
+    'tabs-as-metrics': 'Tabs as Metrics',
+  },
+} as const;
+```
+
+URL param key: `?payoutSummary=mini-cards|tabs-as-metrics`. localStorage key follows existing pattern.
+
+Variant Toggle Sheet gains **Section 3 — "Payout Summary"** with sub-copy "How the payout breakdown is laid out on the Upcoming Payout page." Radio with the 2 options. Identical chrome to Sections 1 + 2.
+
+---
+
+#### Part 3 — Seed updates
+
+**`PAY_PERIODS` array — 4 periods seeded:**
+- `period-2026-04-14` — startDate "Apr 14", endDate "Apr 20", status: `'closed'`
+- `period-2026-04-21` — startDate "Apr 21", endDate "Apr 27", status: `'closed'`
+- `period-2026-04-28` — startDate "Apr 28", endDate "May 4", status: `'current'` (today is May 1)
+- `period-2026-05-05` — startDate "May 5", endDate "May 11", status: `'upcoming'`
+
+**`PAYOUT_PERIOD_SUMMARIES` array — one record per period.** Numbers should feel realistic (drawn from existing seed trips/programs); current period example:
+- `earnedFromCompletedRides: 342.50` (3 completed trips this period)
+- `upcomingFromAcceptedRides: 160.00` (2 accepted trips this period)
+- `incentivesTotal: 80.00` (one earned program $20 + projected from in-progress program $60)
+- `incentivesEarnedCount: 1`, `incentivesTotalCount: 4`
+- Projected = $582.50
+
+**Past period (Apr 21–Apr 27)** — populate with prior earnings; `upcomingFromAcceptedRides: 0`, `upcomingRidesCount: 0`.
+
+**Future period (May 5–May 11)** — `earnedFromCompletedRides: 0`, `completedRidesCount: 0`; populate `upcomingFromAcceptedRides` from any seed trips with pickup in that window.
+
+**Trip seed**: assign each trip a `periodId` (or compute lazily from `pickupTime` — implementation choice, but `periodId` denormalized makes the filter trivial). Seed at least 1 accepted trip with pickup in May 5–May 11 so future-period Upcoming tab is non-empty.
+
+---
+
+#### Part 4 — `PayoutPage` extension
+
+Page state: `selectedPeriodId: string` (initialized to `period-2026-04-28`).
+
+**Header — `PeriodSelector` composite:**
+- Below the page title, before the summary section.
+- `<` `Apr 28 – May 4` `>` with right-aligned status pill: `Current` (green tint) / `Closed` (gray) / `Upcoming` (blue tint).
+- Chevron tap → step `selectedPeriodId` to prev/next period in `PAY_PERIODS`. Disable chevron at boundary (e.g., gray-out the back chevron when on the earliest seeded period).
+
+**Summary section — `PayoutSummary` composite, reads `useVariants().payoutSummary`:**
+
+**Variant `mini-cards` (default):**
+- Headline label: `"Projected"` for current/upcoming periods, `"Final"` for closed.
+- Big green hero number = period total.
+- Row of 3 equal-width mini-cards below the hero:
+  - **Earned** — `$<earnedFromCompletedRides>`, subtitle `<n> ✓` (or "Pending" if zero on a future period).
+  - **Upcoming** — `$<upcomingFromAcceptedRides>`, subtitle `<n> ↑` (or em-dash + "Period closed" on past periods).
+  - **Incentives** — `$<incentivesTotal>`, subtitle `<earned> of <totalContributing>`.
+- Tab switch puts a ring + slight bg tint on the matching mini-card.
+
+**Variant `tabs-as-metrics`:**
+- Headline label + hero number unchanged (always at top).
+- The tab row directly below the hero becomes the metric row — each tab carries the metric.
+- Tab cell layout (each of 3 tabs): small gray label (top, e.g. "Earned") / medium green number (middle, e.g. "$342.50") / small gray subtitle (bottom, e.g. "3 ✓").
+- Active tab = standard tab indicator (underline / accent border) plus subtle bg tint to reinforce selection.
+- No separate mini-cards row — the tabs are the metrics row.
+
+**Tabs row — 3 tabs (both variants):**
+- **Rides Completed** (default if current/closed period) — `RideCard` list filtered to `completedTripIds`. Tap → `console.log` only.
+- **Rides Upcoming** (default if upcoming period) — `RideCard` list filtered to `upcomingTripIds`. Trip drops out once status flips to completed (data-driven; no event). Empty state on closed periods: "Pay period closed — no upcoming rides."
+- **Incentives** — `IncentiveCard` list filtered to `programIdsContributing` (earned + in-progress for the period). Reuses the unified `IncentiveCard` (themed by active `useVariants().pill` per I-4.2).
+
+**Empty / state copy:**
+- Past period "Earned" tab: existing list (rides completed in that period).
+- Past period "Rides Upcoming" tab: empty-state "Pay period closed."
+- Future period "Earned" tab: empty-state "Period not yet started — no rides completed."
+- Future period "Incentives" tab: empty list or program previews if backend would seed projections — current seed leaves it as a simple empty list for the future period.
+
+---
+
+#### Part 5 — Default tab logic
+
+When the user navigates between periods:
+- Current period → default to "Rides Completed" tab.
+- Closed period → default to "Rides Completed" tab (final view).
+- Upcoming period → default to "Rides Upcoming" tab (the only meaningful list).
+
+Implementation: derive default from `period.status` on period change.
+
+---
+
+**Constraints:**
+- DO NOT add a new "Other Bonuses" concept here — that's I-4.5.
+- DO NOT change the dashboard `UpcomingPayoutWidget` math.
+- DO NOT change the leaderboard $ math.
+- DO NOT redesign `RideCard` or `IncentiveCard` — visuals reused as-is.
+- DO NOT add a 3rd `payoutSummary` variant — exactly 2.
+- DO NOT collapse the "Incentives" tab back into "Completed Incentives" — the broader scope (earned + in-progress) is intentional so it matches the mini-card math.
+- DO NOT introduce flow / events. Period nav is page-state only; status comes from seed.
+
+**Test Flows After This Step:**
+- [ ] Period selector renders with current period default; both chevrons functional within seeded range; status pill reflects period.status
+- [ ] Mini-Cards Below variant: hero + 3 mini-cards render; tab switch puts ring on matching mini-card
+- [ ] Tabs as Metrics variant: hero + tab cells carry value/subtitle; active tab has underline + bg tint
+- [ ] All 3 tabs render the right list per period (current period populated all; past has empty Upcoming; future has empty Earned)
+- [ ] Variant Toggle Sheet shows 3 sections; Section 3 "Payout Summary" radio toggles between the 2 variants
+- [ ] URL param `?payoutSummary=tabs-as-metrics` initializes the variant correctly
+- [ ] localStorage persists the selection across page reloads
+- [ ] Headline label = "Projected" for current/upcoming, "Final" for closed
+- [ ] Sum of 3 mini-card values === hero number for every seeded period
+- [ ] Chevron at earliest/latest seeded period is disabled (gray-out, no-op tap)
+- [ ] No layout shift when switching variants
+- [ ] Mobile portrait 375×812 viewport, no horizontal overflow
+- [ ] Zero TypeScript errors
+
+**Backend Implications (capture only):**
+- Production: backend pre-computes `PayoutPeriodSummary` per (driver, period). Frontend reads.
+- `incentivesTotal` = sum of bonuses for completed programs + sum of `bonusAmount` for in-progress programs whose target the upcoming-rides projection would land. Production may surface this differently (e.g., probability-weighted) — prototype shows nominal $.
+- Period boundaries are authoritative on backend (Mon–Sun assumed for prototype).
+- `selectedPeriodId` is client UI state; navigation between periods doesn't hit a different endpoint in production.
+
+---
+
+### Step I-4.5: Per-Trip Revenue Add-Ons (`Trip.revenueAddons`)
+
+**Why this step exists:** Drivers occasionally earn ad-hoc bonuses that aren't tied to incentive programs — sent-back trips (when another driver cancels and the trip is reassigned with a +$25 bump), Door-to-Door bumps (+$2.50), and other backend-applied credits. These should be visible on the trip cards themselves so drivers can see "I got an extra $25 on this one." Single optional schema field — display only.
+
+**Goal:** Add the `revenueAddons` field to `Trip`, seed sample addons, and update `RideCard` revenue cell to show the breakdown when present.
+
+**Reference screenshots:** None (display-only field on existing `RideCard`).
+
+**This step has THREE parts in one v0 generation pass.**
+
+---
+
+#### Part 1 — Schema in `lib/data/incentives.ts`
+
+```ts
+// CHANGED: Trip gains optional revenueAddons (NO `kind` enum — display only)
+export interface Trip {
+  // ...all existing fields
+  revenue: number;                                          // unchanged: TOTAL (base + addons)
+  revenueAddons?: { label: string; amount: number }[];     // NEW: optional, display only
+}
+```
+
+**Critical rule:** `trip.revenue` STAYS the total (base + sum of addons baked in). Every existing `sum(trip.revenue)` call works unchanged. The card derives base by subtraction:
+```ts
+const addonTotal = trip.revenueAddons?.reduce((s, a) => s + a.amount, 0) ?? 0;
+const baseRevenue = trip.revenue - addonTotal;
+```
+
+---
+
+#### Part 2 — Seed updates
+
+Tag 4–5 trips with addons. Mix of:
+- Sent-back: `{ label: 'Sent-back bonus', amount: 25.00 }` — apply to 2 trips.
+- Door-to-Door: `{ label: 'Door-to-Door bump', amount: 2.50 }` — apply to 2 trips.
+- One trip with BOTH (e.g., a sent-back D2D trip): `[{ label: 'Sent-back bonus', amount: 25.00 }, { label: 'Door-to-Door bump', amount: 2.50 }]`.
+
+**Important:** `trip.revenue` for tagged trips MUST equal base + sum(addons). E.g., if base would have been $50 and trip has +$25 sentback + $2.50 D2D, `trip.revenue = 77.50`.
+
+---
+
+#### Part 3 — `RideCard` revenue cell update
+
+When `trip.revenueAddons` is present + non-empty:
+- Render the revenue cell as `$<base>` (existing visual) with `+$<addonTotal>` directly below it (smaller, in `#10B981` accent).
+  - Example: `$50.00` (top) / `+$25.00` (bottom, green accent).
+  - Inline alternative if vertical space is tight: `$50.00 +$25.00` with `+$25.00` in green.
+- Tap the revenue cell (or a small info icon next to it) → `Popover` with the breakdown:
+  ```
+  $50.00 base
+  +$25.00 Sent-back bonus
+  +$2.50 Door-to-Door bump
+  ─────────────────────────
+  $77.50 total
+  ```
+- Color rule: `+$X` always uses revenue green (`#10B981`) — applies on Requests/My Rides (green-revenue surfaces) AND Ride History (where base is blue but `+$X` stays green to signal "bonus add-on").
+
+When `trip.revenueAddons` is absent / empty: render exactly as today (single `$<revenue>` figure).
+
+**Apply to all RideCard usages:**
+- Requests (green revenue)
+- My Rides (Needs Action / In Progress / Upcoming) (green revenue)
+- Ride History (blue revenue + green addon accent)
+- `/payout` Rides Completed tab (blue revenue + green addon accent — uses Ride History styling)
+- `/payout` Rides Upcoming tab (green revenue) — added in I-4.4
+- Dashboard preview cards (New Requests + Next Accepted Ride sections)
+
+**Apply to ride detail revenue display** (`RideDetailLayout`) using the same pattern.
+
+---
+
+**Constraints:**
+- DO NOT add a `kind` enum — labels are free-form strings.
+- DO NOT modify `trip.revenue` semantics — it remains the TOTAL.
+- DO NOT change leaderboard $ — addons don't affect ranking (incentive-only).
+- DO NOT change dashboard `UpcomingPayoutWidget` math (already correct since it uses `trip.revenue` totals).
+- DO NOT add a separate "Other Bonuses" tab on `/payout` — addons are per-trip, not period-summed.
+- DO NOT introduce flow / events.
+
+**Test Flows After This Step:**
+- [ ] `Trip` type has `revenueAddons?: { label: string; amount: number }[]`
+- [ ] At least 4 seed trips have addons (mix of sentback / D2D / both)
+- [ ] For every seed trip with addons, `trip.revenue === base + sum(addons.amount)`
+- [ ] RideCard renders `$<base>` + `+$<addonTotal>` (in green) on tagged trips across Requests / My Rides / Ride History / Dashboard previews / `/payout` Rides Completed + Rides Upcoming
+- [ ] RideCard renders unchanged `$<revenue>` on trips with no addons
+- [ ] Tap on revenue cell opens Popover with labeled breakdown ending in total
+- [ ] `+$X` always green even on Ride History (where base is blue)
+- [ ] Earned + Upcoming totals on `/payout` summary still match sum of trip.revenue (i.e., addons are baked in)
+- [ ] Mobile portrait 375×812 viewport, no horizontal overflow
+- [ ] Zero TypeScript errors
+
+**Backend Implications (capture only):**
+- Production: backend tags `Trip.revenueAddons` based on event sources (sentback event, D2D classification, surge applied, manager bonus applied). Frontend reads.
+- Backend may want a typed `kind` enum for analytics — prototype skips this since labels are sufficient for display.
+- `trip.revenue` should be the authoritative total in production too, with addons as a parallel breakdown — Driver App should never sum on device.
 
 ---
 
