@@ -44,23 +44,6 @@ function PopoverInnerContent({ incentiveType }: PopoverInnerContentProps) {
   const progress = getIncentiveProgressInfo(incentiveType);
   if (!progress) return null;
 
-  if (progress.isComplete) {
-    return (
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 text-[#10B981]" aria-hidden="true">
-          ✓
-        </span>
-        <p className="text-sm text-gray-700">
-          <span className="font-semibold text-gray-900">{progress.name}</span>
-          <span> — Completed · </span>
-          <span className="font-semibold text-[#10B981]">
-            {formatBonusString(progress.bonusAmount)} added to next payout
-          </span>
-        </p>
-      </div>
-    );
-  }
-
   return (
     <p className="text-sm text-gray-700">
       <span>Counts toward </span>
@@ -71,7 +54,7 @@ function PopoverInnerContent({ incentiveType }: PopoverInnerContentProps) {
       </span>
       <span> · </span>
       <span className="font-semibold text-[#10B981]">
-        Earn {formatBonusString(progress.bonusAmount)} when complete
+        Earn {formatBonusString(progress.bonusAmount)}
       </span>
     </p>
   );
