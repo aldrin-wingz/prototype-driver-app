@@ -30,12 +30,13 @@ export type DashboardVariant =
 
 /**
  * `/payout` summary section variants (I-4.4)
- * Two layouts for the period summary: a 3 mini-card row below the hero,
- * or tabs that themselves carry the metric.
+ * Two layouts for the merged summary card whose 3 metric cells double
+ * as the tab triggers (Earned / Upcoming / Incentives). The variant
+ * difference is the OUTER card's relationship to the viewport.
  */
 export type PayoutSummaryVariant = 
-  | 'mini-cards'           // Hero + 3 mini-cards row + standard tabs
-  | 'tabs-as-metrics';     // Hero + tab cells that double as metric cards
+  | 'boxed-tabs'             // Outer card sits inside standard horizontal page padding
+  | 'edge-to-edge-tabs';     // Outer card extends flush to viewport horizontal edges
 
 // -----------------------------------------------------------------------------
 // VARIANT SELECTION
@@ -59,7 +60,7 @@ export interface VariantSelection {
 export const DEFAULT_VARIANTS: VariantSelection = {
   pill: 'pill-named-bottom',
   dashboard: 'dashboard-card-section',
-  payoutSummary: 'mini-cards',
+  payoutSummary: 'boxed-tabs',
 };
 
 // -----------------------------------------------------------------------------
@@ -79,8 +80,8 @@ export const DASHBOARD_VARIANT_LABELS: Record<DashboardVariant, string> = {
 };
 
 export const PAYOUT_SUMMARY_VARIANT_LABELS: Record<PayoutSummaryVariant, string> = {
-  'mini-cards': 'Mini-Cards Below',
-  'tabs-as-metrics': 'Tabs as Metrics',
+  'boxed-tabs': 'Boxed Tabs',
+  'edge-to-edge-tabs': 'Edge-to-Edge Tabs',
 };
 
 /**
@@ -140,14 +141,14 @@ export const DASHBOARD_VARIANT_OPTIONS: VariantOption<DashboardVariant>[] = [
 
 export const PAYOUT_SUMMARY_VARIANT_OPTIONS: VariantOption<PayoutSummaryVariant>[] = [
   {
-    value: 'mini-cards',
-    label: 'Mini-Cards Below',
-    description: 'Hero total followed by a row of 3 mini-cards (Earned / Upcoming / Incentives), then standard tabs.',
+    value: 'boxed-tabs',
+    label: 'Boxed Tabs',
+    description: 'Summary card sits inside standard horizontal page padding. Active cell uses full Wingz green bg with white text.',
   },
   {
-    value: 'tabs-as-metrics',
-    label: 'Tabs as Metrics',
-    description: 'Hero total, then 3 tabs that themselves carry the metric label, value, and subtitle.',
+    value: 'edge-to-edge-tabs',
+    label: 'Edge-to-Edge Tabs',
+    description: 'Summary card extends flush to the viewport edges. Active cell uses a subtle green tint with a green underline.',
   },
 ];
 
@@ -262,7 +263,7 @@ const VALID_PILL_VARIANTS: PillVariant[] = [
   'achievement-banner',
 ];
 const VALID_DASHBOARD_VARIANTS: DashboardVariant[] = ['dashboard-banner', 'dashboard-card-section', 'dashboard-widget-integrated'];
-const VALID_PAYOUT_SUMMARY_VARIANTS: PayoutSummaryVariant[] = ['mini-cards', 'tabs-as-metrics'];
+const VALID_PAYOUT_SUMMARY_VARIANTS: PayoutSummaryVariant[] = ['boxed-tabs', 'edge-to-edge-tabs'];
 
 export function isValidPillVariant(value: string): value is PillVariant {
   return VALID_PILL_VARIANTS.includes(value as PillVariant);
