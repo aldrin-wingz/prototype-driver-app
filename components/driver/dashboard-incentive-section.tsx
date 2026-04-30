@@ -1,11 +1,18 @@
 "use client";
 
+import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 import { useVariants } from "@/lib/variants-context";
 import { cn } from "@/lib/utils";
 import {
@@ -160,8 +167,11 @@ function DashboardBannerVariant() {
   const projectedTotal = getProjectedTotalBonus();
 
   const handleTap = (type: IncentiveType) => {
-    console.log(`[v0] Deep-link to /requests?incentive=${type}`);
     router.push(`/requests?incentive=${type}`);
+  };
+
+  const handleViewAll = () => {
+    router.push("/incentives");
   };
 
   return (
@@ -171,7 +181,16 @@ function DashboardBannerVariant() {
           <Image src="/WINGZLOGO2.png" alt="" width={20} height={20} className="object-contain" />
           <span className="text-sm font-semibold text-white">Driver Incentives</span>
         </div>
-        <span className="text-sm font-bold text-[#10B981]">${projectedTotal} projected</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold text-[#10B981]">${projectedTotal} projected</span>
+          <button
+            onClick={handleViewAll}
+            className="flex items-center gap-0.5 text-sm text-[#10B981] hover:underline"
+          >
+            View All
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <ScrollArea className="w-full pb-4">
         <div className="flex gap-3 px-4 py-2">
@@ -192,22 +211,67 @@ function DashboardBannerVariant() {
 function DashboardCardSectionVariant() {
   const router = useRouter();
   const progressItems = getAllIncentiveProgress();
+  const [api, setApi] = React.useState<CarouselApi>();
+  const [current, setCurrent] = React.useState(0);
+  const [count, setCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!api) return;
+
+    setCount(api.scrollSnapList().length);
+    setCurrent(api.selectedScrollSnap());
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap());
+    });
+  }, [api]);
 
   const handleTap = (type: IncentiveType) => {
-    console.log(`[v0] Deep-link to /requests?incentive=${type}`);
     router.push(`/requests?incentive=${type}`);
+  };
+
+  const handleViewAll = () => {
+    router.push("/incentives");
   };
 
   return (
     <div className="px-4 mb-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-900">Driver Incentives</h3>
+        <button
+          onClick={handleViewAll}
+          className="flex items-center gap-0.5 text-sm text-[#10B981] hover:underline"
+        >
+          View All
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
-      <div className="space-y-3">
-        {progressItems.map((item) => (
-          <IncentiveCard key={item.incentiveType} progress={item} onTap={handleTap} variant="full" />
-        ))}
-      </div>
+      
+      {/* Carousel with one card visible at a time */}
+      <Carousel setApi={setApi} className="w-full">
+        <CarouselContent>
+          {progressItems.map((item) => (
+            <CarouselItem key={item.incentiveType}>
+              <IncentiveCard progress={item} onTap={handleTap} variant="full" />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+      
+      {/* Page indicator dots */}
+      {count > 1 && (
+        <div className="flex justify-center gap-1.5 mt-3">
+          {Array.from({ length: count }).map((_, index) => (
+            <div
+              key={index}
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                index === current ? "bg-[#10B981]" : "bg-[#E5E7EB]"
+              )}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
