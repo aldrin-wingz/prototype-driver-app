@@ -78,7 +78,7 @@ function statusPillLabel(status: PayPeriod["status"]): string {
 }
 
 // -----------------------------------------------------------------------------
-// PERIOD SELECTOR
+// PERIOD SELECTOR (date range + Pays <date> stacked in the center)
 // -----------------------------------------------------------------------------
 
 interface PeriodSelectorProps {
@@ -91,7 +91,7 @@ interface PeriodSelectorProps {
 
 function PeriodSelector({ period, hasPrev, hasNext, onPrev, onNext }: PeriodSelectorProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-2.5">
       <button
         onClick={onPrev}
         disabled={!hasPrev}
@@ -106,8 +106,13 @@ function PeriodSelector({ period, hasPrev, hasNext, onPrev, onNext }: PeriodSele
         <ChevronLeft className="h-4 w-4" />
       </button>
 
-      <div className="flex-1 text-center text-sm font-semibold text-gray-900">
-        {periodLabel(period)}
+      <div className="flex-1 text-center">
+        <div className="text-sm font-semibold leading-tight text-gray-900">
+          {periodLabel(period)}
+        </div>
+        <div className="mt-0.5 text-[11px] text-gray-500">
+          Pays {period.payoutDate}
+        </div>
       </div>
 
       <button
@@ -135,7 +140,7 @@ function PeriodSelector({ period, hasPrev, hasNext, onPrev, onNext }: PeriodSele
 }
 
 // -----------------------------------------------------------------------------
-// MINI-CARDS VARIANT
+// MINI-CARDS VARIANT — merged Hero + 3 mini-cells inside ONE card
 // -----------------------------------------------------------------------------
 
 interface MiniCardsSummaryProps {
@@ -150,75 +155,70 @@ function MiniCardsSummary({ period, summary, total, activeTab }: MiniCardsSummar
   const isFuture = period.status === "upcoming";
   const headlineLabel = isClosed ? "Final" : "Projected";
 
-  const earnedSubtitle = isFuture ? "— Pending" : `${summary.completedRidesCount} ✓`;
-  const upcomingSubtitle = isClosed
-    ? "— Period closed"
-    : `${summary.upcomingRidesCount} ↑`;
+  // Empty-state subtitles collapse to a single em-dash.
+  const earnedSubtitle = isFuture ? "—" : `${summary.completedRidesCount} ✓`;
+  const upcomingSubtitle = isClosed ? "—" : `${summary.upcomingRidesCount} ↑`;
   const incentivesSubtitle = `${summary.incentivesEarnedCount} of ${summary.incentivesTotalCount}`;
 
   return (
     <section className="px-4 pt-2">
-      <Card className="rounded-xl bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-gray-500">
-          {headlineLabel}{" "}
-          <span className="text-gray-400">·</span>{" "}
-          <span className="text-gray-500">Pays {period.payoutDate}</span>
-        </p>
-        <p className="mt-1 text-3xl font-bold text-[#10B981]">${total.toFixed(2)}</p>
+      <Card className="overflow-hidden rounded-xl bg-white p-0 shadow-sm">
+        {/* Hero */}
+        <div className="px-3.5 py-3.5">
+          <p className="text-xs font-medium text-gray-500">{headlineLabel}</p>
+          <p className="mt-0.5 text-4xl font-bold leading-tight text-[#10B981]">
+            ${total.toFixed(2)}
+          </p>
+        </div>
+        {/* Hairline divider — no gap between hero and mini-cells */}
+        <div className="h-px bg-gray-200" />
+        {/* Mini-cells row — 3 cells separated by vertical hairlines */}
+        <div className="grid grid-cols-3 divide-x divide-gray-200">
+          <MiniCell
+            label="Earned"
+            value={`$${summary.earnedFromCompletedRides.toFixed(2)}`}
+            subtitle={earnedSubtitle}
+            active={activeTab === "rides-completed"}
+          />
+          <MiniCell
+            label="Upcoming"
+            value={`$${summary.upcomingFromAcceptedRides.toFixed(2)}`}
+            subtitle={upcomingSubtitle}
+            active={activeTab === "rides-upcoming"}
+          />
+          <MiniCell
+            label="Incentives"
+            value={`$${summary.incentivesTotal.toFixed(2)}`}
+            subtitle={incentivesSubtitle}
+            active={activeTab === "incentives"}
+          />
+        </div>
       </Card>
-
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <MiniCard
-          label="Earned"
-          value={`$${summary.earnedFromCompletedRides.toFixed(2)}`}
-          subtitle={earnedSubtitle}
-          active={activeTab === "rides-completed"}
-        />
-        <MiniCard
-          label="Upcoming"
-          value={`$${summary.upcomingFromAcceptedRides.toFixed(2)}`}
-          subtitle={upcomingSubtitle}
-          active={activeTab === "rides-upcoming"}
-        />
-        <MiniCard
-          label="Incentives"
-          value={`$${summary.incentivesTotal.toFixed(2)}`}
-          subtitle={incentivesSubtitle}
-          active={activeTab === "incentives"}
-        />
-      </div>
     </section>
   );
 }
 
-interface MiniCardProps {
+interface MiniCellProps {
   label: string;
   value: string;
   subtitle: string;
   active: boolean;
 }
 
-function MiniCard({ label, value, subtitle, active }: MiniCardProps) {
+function MiniCell({ label, value, subtitle, active }: MiniCellProps) {
   return (
-    <div
-      className={cn(
-        "rounded-xl border p-3 transition-all",
-        active
-          ? "border-[#10B981] bg-[#10B981]/5 ring-2 ring-[#10B981]/40"
-          : "border-gray-200 bg-white"
-      )}
-    >
+    <div className={cn("p-3", active && "bg-[#10B981]/5")}>
       <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
         {label}
       </p>
-      <p className="mt-1 text-base font-bold text-gray-900">{value}</p>
+      <p className="mt-0.5 text-base font-bold text-gray-900">{value}</p>
       <p className="mt-0.5 text-[11px] text-gray-500">{subtitle}</p>
     </div>
   );
 }
 
 // -----------------------------------------------------------------------------
-// TABS-AS-METRICS VARIANT — renders the tab list itself with metric cells
+// TABS-AS-METRICS VARIANT — metric cells live inside the TabsList
 // -----------------------------------------------------------------------------
 
 interface MetricTabCellProps {
@@ -229,7 +229,7 @@ interface MetricTabCellProps {
 
 function MetricTabCell({ label, value, subtitle }: MetricTabCellProps) {
   return (
-    <div className="flex w-full flex-col items-start gap-0.5 py-2">
+    <div className="flex w-full flex-col items-start gap-0.5 py-1.5">
       <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
         {label}
       </span>
@@ -255,6 +255,8 @@ function EmptyState({ message }: { message: string }) {
 
 // -----------------------------------------------------------------------------
 // PAYOUT PAGE
+// Flex column at viewport height. Sticky region (header + period selector +
+// summary card + tabs) does NOT scroll; only the active tab's list scrolls.
 // -----------------------------------------------------------------------------
 
 export default function PayoutPage() {
@@ -329,9 +331,9 @@ export default function PayoutPage() {
   const isMiniCards = variants.payoutSummary === "mini-cards";
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F9FAFB]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-white px-4 shadow-sm">
+    <div className="flex h-[100dvh] flex-col bg-[#F9FAFB]">
+      {/* Header (sticky region — does not scroll) */}
+      <header className="relative z-50 flex h-14 shrink-0 items-center justify-between bg-white px-4 shadow-sm">
         <button
           onClick={() => router.back()}
           className="flex h-10 w-10 items-center justify-center text-gray-700"
@@ -345,30 +347,44 @@ export default function PayoutPage() {
         <div className="w-10" />
       </header>
 
-      {/* Period Selector */}
-      <PeriodSelector
-        period={period}
-        hasPrev={periodIndex > 0}
-        hasNext={periodIndex < PAY_PERIODS.length - 1}
-        onPrev={handlePrev}
-        onNext={handleNext}
-      />
-
-      {/* Summary Section + Tabs (driven by payoutSummary variant) */}
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as TabValue)}
-        className="flex-1"
+        className="flex flex-1 flex-col overflow-hidden"
       >
-        {isMiniCards ? (
-          <>
+        {/* STICKY REGION: period selector + summary card + tabs row */}
+        <div className="shrink-0">
+          <PeriodSelector
+            period={period}
+            hasPrev={periodIndex > 0}
+            hasNext={periodIndex < PAY_PERIODS.length - 1}
+            onPrev={handlePrev}
+            onNext={handleNext}
+          />
+
+          {isMiniCards ? (
             <MiniCardsSummary
               period={period}
               summary={summary}
               total={total}
               activeTab={tab}
             />
-            <TabsList className="mt-4 h-12 w-full justify-start rounded-none border-b bg-white px-4">
+          ) : (
+            <section className="px-4 pt-2">
+              <Card className="rounded-xl bg-white p-3.5 shadow-sm">
+                <p className="text-xs font-medium text-gray-500">
+                  {period.status === "closed" ? "Final" : "Projected"}
+                </p>
+                <p className="mt-0.5 text-4xl font-bold leading-tight text-[#10B981]">
+                  ${total.toFixed(2)}
+                </p>
+              </Card>
+            </section>
+          )}
+
+          {/* Tabs hug the summary's bottom (mt-2 ~= 8px below the card) */}
+          {isMiniCards ? (
+            <TabsList className="mt-2 h-12 w-full justify-start rounded-none border-b bg-white px-4">
               <TabsTrigger
                 value="rides-completed"
                 className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:text-[#10B981] data-[state=active]:shadow-none"
@@ -388,24 +404,8 @@ export default function PayoutPage() {
                 Incentives
               </TabsTrigger>
             </TabsList>
-          </>
-        ) : (
-          <>
-            {/* Hero only — tabs carry the metric cells */}
-            <section className="px-4 pt-2">
-              <Card className="rounded-xl bg-white p-4 shadow-sm">
-                <p className="text-xs font-medium text-gray-500">
-                  {period.status === "closed" ? "Final" : "Projected"}{" "}
-                  <span className="text-gray-400">·</span>{" "}
-                  <span className="text-gray-500">Pays {period.payoutDate}</span>
-                </p>
-                <p className="mt-1 text-3xl font-bold text-[#10B981]">
-                  ${total.toFixed(2)}
-                </p>
-              </Card>
-            </section>
-
-            <TabsList className="mt-3 grid h-auto w-full grid-cols-3 gap-0 rounded-none border-b bg-white px-2">
+          ) : (
+            <TabsList className="mt-2 grid h-auto w-full grid-cols-3 gap-0 rounded-none border-b bg-white px-2">
               <TabsTrigger
                 value="rides-completed"
                 className="rounded-none px-2 data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:bg-[#10B981]/5 data-[state=active]:shadow-none"
@@ -414,9 +414,7 @@ export default function PayoutPage() {
                   label="Earned"
                   value={`$${summary.earnedFromCompletedRides.toFixed(2)}`}
                   subtitle={
-                    period.status === "upcoming"
-                      ? "— Pending"
-                      : `${summary.completedRidesCount} ✓`
+                    period.status === "upcoming" ? "—" : `${summary.completedRidesCount} ✓`
                   }
                 />
               </TabsTrigger>
@@ -428,9 +426,7 @@ export default function PayoutPage() {
                   label="Upcoming"
                   value={`$${summary.upcomingFromAcceptedRides.toFixed(2)}`}
                   subtitle={
-                    period.status === "closed"
-                      ? "— Period closed"
-                      : `${summary.upcomingRidesCount} ↑`
+                    period.status === "closed" ? "—" : `${summary.upcomingRidesCount} ↑`
                   }
                 />
               </TabsTrigger>
@@ -445,76 +441,76 @@ export default function PayoutPage() {
                 />
               </TabsTrigger>
             </TabsList>
-          </>
-        )}
+          )}
+        </div>
 
-        {/* Rides Completed Tab */}
-        <TabsContent value="rides-completed" className="mt-0">
-          {completedTrips.length === 0 ? (
-            <EmptyState message={completedEmpty} />
-          ) : (
-            <div className="px-4 py-4">
-              <p className="mb-3 text-xs font-medium text-gray-500">
-                {completedTrips.length} ride
-                {completedTrips.length === 1 ? "" : "s"} this pay period
-              </p>
-              <div className="space-y-3">
-                {completedTrips.map((trip) => (
-                  <RideCard
-                    key={trip.id}
-                    trip={trip}
-                    revenueColor="blue"
-                    onClick={handleRideTap}
-                    showDistance={false}
+        {/* SCROLLABLE REGION — only the list scrolls */}
+        <div className="flex-1 overflow-y-auto">
+          <TabsContent value="rides-completed" className="mt-0">
+            {completedTrips.length === 0 ? (
+              <EmptyState message={completedEmpty} />
+            ) : (
+              <div className="px-4 pt-2 pb-4">
+                <p className="mb-3 text-xs font-medium text-gray-500">
+                  {completedTrips.length} ride
+                  {completedTrips.length === 1 ? "" : "s"} this pay period
+                </p>
+                <div className="space-y-3">
+                  {completedTrips.map((trip) => (
+                    <RideCard
+                      key={trip.id}
+                      trip={trip}
+                      revenueColor="blue"
+                      onClick={handleRideTap}
+                      showDistance={false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="rides-upcoming" className="mt-0">
+            {upcomingTrips.length === 0 ? (
+              <EmptyState message={upcomingEmpty} />
+            ) : (
+              <div className="px-4 pt-2 pb-4">
+                <p className="mb-3 text-xs font-medium text-gray-500">
+                  {upcomingTrips.length} accepted ride
+                  {upcomingTrips.length === 1 ? "" : "s"} for this period
+                </p>
+                <div className="space-y-3">
+                  {upcomingTrips.map((trip) => (
+                    <RideCard
+                      key={trip.id}
+                      trip={trip}
+                      revenueColor="blue"
+                      onClick={handleRideTap}
+                      showDistance={false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="incentives" className="mt-0">
+            {periodIncentives.length === 0 ? (
+              <EmptyState message={incentivesEmpty} />
+            ) : (
+              <div className="space-y-3 px-4 pt-2 pb-4">
+                {periodIncentives.map((item) => (
+                  <IncentiveCard
+                    key={item.incentiveType}
+                    progress={item}
+                    onTap={handleIncentiveTap}
+                    variant="full"
                   />
                 ))}
               </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Rides Upcoming Tab */}
-        <TabsContent value="rides-upcoming" className="mt-0">
-          {upcomingTrips.length === 0 ? (
-            <EmptyState message={upcomingEmpty} />
-          ) : (
-            <div className="px-4 py-4">
-              <p className="mb-3 text-xs font-medium text-gray-500">
-                {upcomingTrips.length} accepted ride
-                {upcomingTrips.length === 1 ? "" : "s"} for this period
-              </p>
-              <div className="space-y-3">
-                {upcomingTrips.map((trip) => (
-                  <RideCard
-                    key={trip.id}
-                    trip={trip}
-                    revenueColor="blue"
-                    onClick={handleRideTap}
-                    showDistance={false}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Incentives Tab — earned + in-progress contributing for this period */}
-        <TabsContent value="incentives" className="mt-0">
-          {periodIncentives.length === 0 ? (
-            <EmptyState message={incentivesEmpty} />
-          ) : (
-            <div className="space-y-3 p-4">
-              {periodIncentives.map((item) => (
-                <IncentiveCard
-                  key={item.incentiveType}
-                  progress={item}
-                  onTap={handleIncentiveTap}
-                  variant="full"
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+            )}
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

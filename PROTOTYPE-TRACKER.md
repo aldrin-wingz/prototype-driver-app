@@ -56,7 +56,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Step | Decision | Date | Delta Notes |
 |------|----------|------|-------------|
-| | | | |
+| I-4.4 | Refinement (pre-approval) | 2026-05-01 | (1) **Compressed summary section** — merged Hero + 3 mini-cards into a SINGLE card (one border/shadow) separated by a hairline divider, no inner gap. Hero font reduced to `text-4xl` (~36px). Internal padding tightened to `p-3.5` (14px). "Pays Mon, May 4" sublabel removed from inside the hero card and relocated under the date range in the **PeriodSelector** (`text-[11px] text-gray-500`, second line). Mini-cell empty-state subtitles collapsed to a single em-dash ("— Pending" → "—", "— Period closed" → "—"); "X ✓" / "X ↑" / "X of Y" forms unchanged. Tabs row hugs the summary card bottom (`mt-2`, no large gap). Gap between tabs and the list reduced to ~8px via `pt-2` on tab content. Net height savings ~80–100px. (2) **Sticky summary + tabs** — page is now `flex h-[100dvh] flex-col`; header + period selector + summary card + tabs row sit in a `shrink-0` region; the active tab's list is the only scrollable area (`flex-1 overflow-y-auto`). Applied to both `mini-cards` and `tabs-as-metrics` variants and on every period status. No change to math, schema, seed, or tab content. |
 
 ---
 
