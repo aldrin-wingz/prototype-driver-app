@@ -60,14 +60,14 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
   // Update URL query params when variants change
   const updateUrl = useCallback(
     (newVariants: VariantSelection) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams();
       params.set(VARIANT_QUERY_PARAMS.pill, newVariants.pill);
       params.set(VARIANT_QUERY_PARAMS.dashboard, newVariants.dashboard);
       
       // Use replace to avoid adding to history stack
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [searchParams, router, pathname]
+    [router, pathname]
   );
 
   // Set all variants at once
@@ -100,14 +100,9 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
     clearVariantsFromStorage();
     setVariantsState(DEFAULT_VARIANTS);
     
-    // Clear URL params
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete(VARIANT_QUERY_PARAMS.pill);
-    params.delete(VARIANT_QUERY_PARAMS.dashboard);
-    
-    const newSearch = params.toString();
-    router.replace(newSearch ? `${pathname}?${newSearch}` : pathname, { scroll: false });
-  }, [searchParams, router, pathname]);
+    // Clear URL and go to base path
+    router.replace(pathname, { scroll: false });
+  }, [router, pathname]);
 
   return (
     <VariantsContext.Provider
