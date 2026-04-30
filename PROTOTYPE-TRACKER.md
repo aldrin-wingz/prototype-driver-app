@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-4 — Pending
-## Last Completed: I-3 (DashboardIncentiveSection + UpcomingPayoutWidget)
+## Current Step: I-0a
+## Last Completed: —
 
 ---
 
@@ -28,14 +28,14 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | #     | Screen                                                        | Status    | Key Deliverable                                                                                                                                                                                                                                                                                  |
 | ----- | ------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0     | Setup                                                         | ✅ Done    | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
-| I-0a  | Shell Replication — Scaffold + List Surfaces                  | ✅ Done    | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
-| I-0b  | Shell Replication — Ride Details (both states merged)         | ✅ Done    | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
-| I-0.5 | Schema + Seed Data                                            | ✅ Done    | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
-| I-1   | Variant Toggle Infrastructure                                 | ✅ Done    | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
-| I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ✅ Done    | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
-| I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ✅ Done    | 3 dashboard surfacing variants (`dashboard-banner`, `dashboard-card-section`, `dashboard-widget-integrated`) + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                             |
-| I-4   | Ride Details Incentive Callout — Variant Set                  | ⬜ Planned | 3 callout variants (`detail-inline-badge`, `detail-section-pill`, `detail-map-banner`) on Ride Details (before-taken + needs-action / in-progress).                                                                                                                                              |
+| 0     | Setup                                                         | ⬜ Planned | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
+| I-0a  | Shell Replication — Scaffold + List Surfaces                  | ⬜ Planned | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
+| I-0b  | Shell Replication — Ride Details (both states merged)         | ⬜ Planned | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
+| I-0.5 | Schema + Seed Data                                            | ⬜ Planned | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
+| I-1   | Variant Toggle Infrastructure                                 | ⬜ Planned | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
+| I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
+| I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
+| I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
 | I-6   | Tier System + Tier-Based Bonus Boost                          | ⬜ Planned | Tier visualization (Bronze/Silver/Gold/Platinum), finalized `TierBadge`, multiplier display, path-to-next-tier; multiplier wires into dashboard projected bonus.                                                                                                                                 |
 | I-7   | Leaderboard                                                   | ⬜ Planned | Single-design leaderboard ranked by bonuses earned with anonymized handles + period selector. Consumes finalized `TierBadge` from I-6.                                                                                                                                                           |
@@ -63,7 +63,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | Progress | `@/components/ui/progress` | I-3 (ProgressMeter), I-6 (tier progress) |
 | ToggleGroup | `@/components/ui/toggle-group` | I-3 (period selector if used), I-5 (filter), I-7 |
 | Select | `@/components/ui/select` | I-5 (sub-filter by incentive type) |
-| Sheet | `@/components/ui/sheet` | I-1 (Variant Toggle picker), I-3 (UpcomingPayoutWidget breakdown), I-4 (`detail-map-banner` expand) |
+| Sheet | `@/components/ui/sheet` | I-1 (Variant Toggle picker), I-3 (UpcomingPayoutWidget breakdown) |
 | RadioGroup | `@/components/ui/radio-group` | I-1 (variant pickers) |
 | Tooltip | `@/components/ui/tooltip` | I-2 (`badge-corner-flag` reveal + ProgramContributionIndicator on hover/tap), I-6 |
 | Popover | `@/components/ui/popover` | I-2 (ProgramContributionIndicator on tap for `pill-named-bottom` / `banner-wingz-hero`) |
@@ -79,14 +79,13 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | Header | I-0a | All screens |
 | BottomNav | I-0a | All screens with bottom nav (Home / Requests / My Rides) |
 | RideCard | I-0a | I-0a list surfaces, plus I-2 (incentive surfaces layered on top), I-3 (dashboard previews), I-5 (filtered list) |
-| RideDetailLayout | I-0b | I-0b detail routes, plus I-4 (incentive callout layered on top) |
-| VariantToggle | I-1 | All variant-set steps (I-2, I-3, I-4) |
-| IncentiveBadgeRenderer | I-2 | I-3 (dashboard cards), I-4 (callout), I-5 (filter chips). Switches between `pill-named-bottom` / `badge-corner-flag` / `banner-wingz-hero` based on `useVariants().pill`. |
-| ProgramContributionIndicator | I-2 | I-4 (ride detail) — Tooltip + Popover wrapper around the `IncentiveBadgeRenderer` output. Single design (no toggle). |
+| RideDetailLayout | I-0b | I-0b detail routes, plus I-4 (incentive surface placement on the detail layout) |
+| VariantToggle | I-1 | All variant-set steps (I-2, I-3). Sheet has 2 sections: pill, dashboard. |
+| IncentiveBadgeRenderer | I-2 | I-3 (dashboard cards), I-4 (Ride Details placement), I-5 (filter chips). Switches between `pill-named-bottom` / `badge-corner-flag` / `banner-wingz-hero` based on `useVariants().pill`. |
+| ProgramContributionIndicator | I-2 | I-4 (ride detail surfaces inherit the same wrapper). Tooltip + Popover wrapper around `IncentiveBadgeRenderer`. Single design (no toggle). |
 | DashboardIncentiveSection | I-3 | (Dashboard only) |
 | UpcomingPayoutWidget | I-3 | (Dashboard only — anchor `#upcoming-payout`) |
-| ProgressMeter | I-3 | I-4, I-6 |
-| RideDetailIncentiveCallout | I-4 | (Ride Details only) |
+| ProgressMeter | I-3 | I-4 (banner-wingz-hero on detail when applicable), I-6 |
 | TierBadge | I-6 | I-7 (leaderboard rows), I-3 (dashboard tier badge) |
 | AchievementUnlockDialog | I-8 | (Dashboard) |
 
@@ -99,9 +98,9 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 **Goal:** v0 reads `PROTOTYPE-BIBLE.md` and this file, confirms understanding of scope, build plan, component inventory, data schema, the variant-toggle pattern, and the program-level bonus model.
 
 **Test Flows After This Step:**
-- [x] v0 returns a confirmation summarizing scope, plan, components, schema, variant pattern, and the program-level bonus rule
-- [x] v0 confirms it has read `references/screenshots/README.md` and knows the by-step folder convention
-- [x] No code generated yet
+- [ ] v0 returns a confirmation summarizing scope, plan, components, schema, variant pattern, and the program-level bonus rule
+- [ ] v0 confirms it has read `references/screenshots/README.md` and knows the by-step folder convention
+- [ ] No code generated yet
 
 ---
 
@@ -122,8 +121,8 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 **Scaffold:**
 - Mobile-first portrait layout (375×812 viewport baseline).
-- `Header` composite (sticky top, dark slate `~#1F2937` bg, white centered title, top-left red Wingz "W" tile, top-right icons per surface — see BIBLE Header section).
-- `BottomNav` composite (sticky bottom, 5 tabs in order: `Home` / `Requests` / `Planner` / `My Rides` / `Options`. Active tab = teal-filled icon + green label; inactive = dark gray icon, no label color shift).
+- `Header` composite (sticky top, **WHITE background `#FFFFFF`**, **dark text title** `~#1F2937` centered, top-left red Wingz "W" tile, top-right icons per surface in dark gray — see BIBLE Header section. **Do NOT render the header with a dark/navy background — that's a known v0 regression.**).
+- `BottomNav` composite (sticky bottom, **WHITE background `#FFFFFF`** with faint top hairline border `~#E5E7EB`, 5 tabs in order: `Home` / `Requests` / `Planner` / `My Rides` / `Options`. Active tab = teal/green icon + green label; inactive = dark gray icon, no label color shift. **Do NOT render the nav with a dark/navy background — that's a known v0 regression.**).
 - Routing (Next.js App Router): `/` (Home) → `/requests` → `/my-rides` → `/planner` (placeholder shell — title only) → `/options` (placeholder shell — title only) → `/ride-history` (stack-pushed; no bottom nav).
 
 **Shared `RideCard` composite (built ONCE, reused 4× across list surfaces):**
@@ -149,16 +148,18 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 - Apply observed styling from BIBLE (pill family colors, time-anchor circles, blue-revenue for history, etc.).
 
 **Test Flows After This Step:**
-- [x] Header + BottomNav present on Home / Requests / My Rides; absent on Ride History
-- [x] Bottom nav tabs in correct order (Home / Requests / Planner / My Rides / Options)
-- [x] Active tab visually distinct (teal icon + label)
-- [x] Home renders Earnings card (with chevron toggle), prompt, New Requests, Next Accepted Ride sections
-- [x] Earnings chevrons toggle between This Month / Last Month
-- [x] Requests list renders ride cards with mixed pill colors (green Single Legs, yellow Wait For Call, orange/gray expiration pills)
-- [x] My Rides has 3-tab row with Needs Action default; cards show red `Not Confirmed` pill on that tab
-- [x] Ride History renders with **blue** revenue color and no bottom pills
-- [x] Mobile portrait 375×812 viewport, no horizontal overflow
-- [x] No incentive UI, no action buttons, no detail screens
+- [ ] Header + BottomNav present on Home / Requests / My Rides; absent on Ride History
+- [ ] **Header has WHITE background with dark title** (NOT dark/navy background)
+- [ ] **Bottom nav has WHITE background** with faint top border (NOT dark/navy background)
+- [ ] Bottom nav tabs in correct order (Home / Requests / Planner / My Rides / Options)
+- [ ] Active tab visually distinct (teal/green icon + green label on white bg)
+- [ ] Home renders Earnings card (with chevron toggle), prompt, New Requests, Next Accepted Ride sections
+- [ ] Earnings chevrons toggle between This Month / Last Month
+- [ ] Requests list renders ride cards with mixed pill colors (green Single Legs, yellow Wait For Call, orange/gray expiration pills)
+- [ ] My Rides has 3-tab row with Needs Action default; cards show red `Not Confirmed` pill on that tab
+- [ ] Ride History renders with **blue** revenue color and no bottom pills
+- [ ] Mobile portrait 375×812 viewport, no horizontal overflow
+- [ ] No incentive UI, no action buttons, no detail screens
 
 ---
 
@@ -175,11 +176,17 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 **What to build:**
 
 **Shared `RideDetailLayout` composite:**
-- Header: `<` back chevron + bold ride ID + state subtitle (`Will-Call Ride` for Before Taken; `- Accepted Ride` for Needs Action).
+- Header: WHITE background, `<` back chevron + bold ride ID (dark text) + state subtitle (`Will-Call Ride` for Before Taken; `- Accepted Ride` for Needs Action). Top-right `Variants` pill button per I-1 (added in I-1, not here — but leave header room).
 - Optional alert region (only renders when `state="needs-action"`): amber soft-fill card with ⚠️ icon, "Confirmation required" title, body "This ride has not been confirmed yet. Please call the ride client first." Use observed amber tokens from BIBLE.
 - Map preview region (~30% screen height; OSM iframe or static placeholder image — NO live map SDK).
-- Trip metadata card: When / Rider / Client / Leg.
-- Leg cards (one per leg, stacked): time anchor circle (per BIBLE palette), bold time, per-leg revenue, addresses, county/city line.
+- **Trip metadata card** — single white rounded card (~12px radius, ~16px padding) sitting **CLEANLY BELOW** the map with vertical gap. The card MUST NOT overlap the map's bottom edge or float over it. Card contents stacked vertically:
+  - `When: <full date>` line (bold value)
+  - `Rider: <NAME>` line (bold value)
+  - `Client: <Client>` line with the small leaf/branding icon on the right
+  - `Leg: <leg-id>` line — **the Leg ID lives INSIDE this metadata card** (NOT extracted out as a heading above the leg cards)
+  - Top-right of card: passenger count icon + revenue dollar amount in green + small `(i)` info icon
+  - **v0 regression guard:** Earlier output rendered this card as a small floating element overlapping the map bottom and pulled "Leg:" out of the card. Both are wrong. Card sits cleanly below map; Leg ID stays inside.
+- Leg cards (one per leg, stacked below the metadata card): time anchor circle (per BIBLE palette), bold time, per-leg revenue, addresses, county/city line.
 - Notes line + expiration pill (gray "Expires in N days") OR red `Not Confirmed` pill (only on Needs Action).
 - Bottom region (swapped by state):
   - `state="before-taken"`: sticky two-action swipe footer — pink/coral "Swipe to Reject" ↔ green "Swipe to Accept". Visually rendered, NOT functional.
@@ -199,15 +206,17 @@ Bottom nav is HIDDEN on detail screens (sticky footer overlays).
 - Apply observed styling from BIBLE.
 
 **Test Flows After This Step:**
-- [x] Tapping a Requests card → Ride Details with Before Taken state (swipe footer rendered)
-- [x] Tapping a My Rides Needs Action card → Ride Details with Needs Action state (amber alert + action toolbar + sticky red CTA)
-- [x] Both states share the trip-detail body (map + metadata card + leg cards)
-- [x] Bottom nav HIDDEN on both detail states; sticky footers overlay
-- [x] Back chevron returns to the originating list (Requests vs My Rides)
-- [x] Time anchors render with correct color circles (yellow / blue / green / black per BIBLE)
-- [x] Notes line + expiration pill / Not Confirmed pill render per state
-- [x] No incentive UI, no functional accept/decline/start/end actions
-- [x] Swipe footer and red CTA are visually rendered but DO NOT trigger any flow
+- [ ] Tapping a Requests card → Ride Details with Before Taken state (swipe footer rendered)
+- [ ] Tapping a My Rides Needs Action card → Ride Details with Needs Action state (amber alert + action toolbar + sticky red CTA)
+- [ ] Both states share the trip-detail body (map + metadata card + leg cards)
+- [ ] **Header on detail screens has WHITE background with dark ride ID + subtitle** (NOT dark/navy)
+- [ ] **Trip metadata card sits cleanly BELOW the map with gap (no overlap), and contains all four lines including `Leg:` INSIDE the card** (NOT extracted as a separate heading)
+- [ ] Bottom nav HIDDEN on both detail states; sticky footers overlay
+- [ ] Back chevron returns to the originating list (Requests vs My Rides)
+- [ ] Time anchors render with correct color circles (yellow / blue / green / black per BIBLE)
+- [ ] Notes line + expiration pill / Not Confirmed pill render per state
+- [ ] No incentive UI, no functional accept/decline/start/end actions
+- [ ] Swipe footer and red CTA are visually rendered but DO NOT trigger any flow
 
 ---
 
@@ -315,18 +324,17 @@ export interface DashboardData {
 ```ts
 export type PillVariant = 'pill-named-bottom' | 'badge-corner-flag' | 'banner-wingz-hero';
 export type DashboardVariant = 'dashboard-banner' | 'dashboard-card-section' | 'dashboard-widget-integrated';
-export type DetailVariant = 'detail-inline-badge' | 'detail-section-pill' | 'detail-map-banner';
+// NOTE: There is NO DetailVariant. Ride Details inherits the active PillVariant from useVariants().pill —
+// the same surface treatment renders on the ride card AND the ride detail screen, with placement adapted per surface.
 
 export interface VariantSelection {
   pill: PillVariant;
   dashboard: DashboardVariant;
-  detail: DetailVariant;
 }
 
 export const DEFAULT_VARIANTS: VariantSelection = {
   pill: 'pill-named-bottom',
   dashboard: 'dashboard-card-section',
-  detail: 'detail-section-pill',
 };
 
 export const VARIANT_LABELS = {
@@ -340,11 +348,6 @@ export const VARIANT_LABELS = {
     'dashboard-card-section': 'Dedicated card section',
     'dashboard-widget-integrated': 'Integrated into existing earnings widget',
   },
-  detail: {
-    'detail-inline-badge': 'Inline badge (small marker near revenue)',
-    'detail-section-pill': 'Dedicated section with pill + progress',
-    'detail-map-banner': 'Banner overlay on the map',
-  },
 } as const;
 ```
 
@@ -356,7 +359,8 @@ export const VARIANT_LABELS = {
 
 **Test Flows After This Step:**
 - [ ] `lib/data/incentives.ts` exports all types and arrays
-- [ ] `lib/variants.ts` exports variant types + DEFAULT_VARIANTS + VARIANT_LABELS
+- [ ] `lib/variants.ts` exports `PillVariant`, `DashboardVariant`, `VariantSelection` (only `pill` + `dashboard`), `DEFAULT_VARIANTS`, `VARIANT_LABELS`
+- [ ] **NO `DetailVariant` type** — Ride Details inherits `useVariants().pill`
 - [ ] Trip type does NOT carry per-trip bonus fields (no `incentiveBonus`, no `bonusReason`)
 - [ ] Zero TypeScript errors
 
@@ -369,10 +373,10 @@ export const VARIANT_LABELS = {
 **What to build:**
 - Floating "Variants" pill button fixed top-right of every screen, primary `#10B981` background, white text, small.
 - Tap → `Sheet` (right slide-in on tablet, bottom sheet on mobile) titled "Compare Variants".
-- Sheet contents: 3 sections (Pill / Badge / Banner, Dashboard, Ride Detail Callout) — each with a `RadioGroup` of variants from `VARIANT_LABELS`.
+- Sheet contents: **2 sections** (Pill / Badge / Banner, Dashboard) — each with a `RadioGroup` of variants from `VARIANT_LABELS`. NO Ride Detail Callout section — ride details inherit the active pill variant.
 - Selection persists to:
   - `localStorage` (key `driver-incentives-variants`)
-  - URL query params (e.g., `?pill=banner-wingz-hero&dashboard=banner&detail=detail-section-pill`)
+  - URL query params (e.g., `?pill=banner-wingz-hero&dashboard=banner`)
 - URL params take precedence over localStorage on initial load.
 - Default values come from `DEFAULT_VARIANTS`.
 - "Reset to Defaults" button clears URL + localStorage.
@@ -384,10 +388,11 @@ export const VARIANT_LABELS = {
 - The toggle is dev-mode-visible (always shown in this prototype). Production wiring is OUT OF SCOPE.
 - Variant changes do NOT trigger URL navigation; they only update query params on the current URL.
 - The Variants Sheet must NOT break the underlying screen layout — pure overlay.
+- The Sheet has exactly TWO sections — do NOT add a third "detail" section.
 
 **Test Flows After This Step:**
 - [ ] Variants pill is visible on every screen
-- [ ] Tap → Sheet opens with 3 variant sections (Pill/Badge/Banner, Dashboard, Ride Detail Callout)
+- [ ] Tap → Sheet opens with **2 variant sections** (Pill/Badge/Banner, Dashboard) — NO ride detail section
 - [ ] Selecting a variant updates URL and localStorage
 - [ ] Reload preserves selection
 - [ ] Pasting a URL with `?pill=banner-wingz-hero` initializes with that variant
@@ -413,7 +418,12 @@ Renders ONE of three variants per the active `pill` variant selection:
 
 - **`badge-corner-flag`** — top-right corner of the ride card. Square (~28×28px) with **black background (`#1F2937`) + green Wingz logo (~`#10B981`)**. Icon-only, no label. Tap/hover triggers the contribution Tooltip (see Part 2). Designed as a "flag" — high contrast against the white card. Position carefully so it does NOT obscure the existing top-right ↗ expand arrow.
 
-- **`banner-wingz-hero`** — full-width banner at the **top of the card**. **Black background + green Wingz logo (LEFT) + "<Incentive Name> Trip" in white** (≈14px). Most prominent variant — celebratory, NOT a warning. Compact (~32–40px tall) so it doesn't push the date row off-screen. Tap reveals the contribution Popover (see Part 2). Optional inline progress micro-text (e.g., "3/5") on the right side of the banner if it doesn't crowd the layout.
+- **`banner-wingz-hero`** — full-width banner at the **top of the card**. **Black background + green Wingz mark (LEFT) + "<Incentive Name> Trip" in white** (≈14px). Most prominent variant — celebratory, NOT a warning. The banner is taller than the other variants (~64–80px) because it carries:
+  - Top row: program name(s) on the LEFT (multi-program: `<Name A> Trip · <Name B> Trip`); right-aligned **program-level total reward** in green (e.g., `Earn $50` for single, `Earn $150` for combined multi-program). This dollar figure is the program-level reward at completion — NOT a per-trip bonus — and is paired with the progress bar below to make the framing unambiguous.
+  - Bottom row: a thin progress bar with verbose labels (e.g., `5 done +2 taken · 1 to go`).
+  - Color states: black (default / available), amber tint (in-progress), gray-tint (completed/historical on Ride History).
+  - Tap reveals the contribution Popover (Part 2) for full per-program breakdown.
+  - Must NOT push the date row off-screen on a 375×812 viewport — banner has a hard upper bound (~80px).
 
 Apply the active variant to ride cards in:
 - Requests tab
@@ -435,7 +445,7 @@ Wraps `IncentiveBadgeRenderer` so all 3 variants surface program-contribution co
 
 - **For `pill-named-bottom`**: pill is tappable → opens a `Popover` (Tooltip on hover for tablet) showing program progress + program-level bonus.
 - **For `badge-corner-flag`**: the Tooltip shows program progress + bonus value (richer than a basic "Counts toward X" label).
-- **For `banner-wingz-hero`**: tap reveals the same Popover, OR the inline "3/5" micro-text inside the banner — pick the option that doesn't crowd the banner.
+- **For `banner-wingz-hero`**: the verbose progress bar in the banner already shows the high-level state (`5 done +2 taken · 1 to go`); tap reveals the Popover for the full per-program breakdown (one line per applicable program with progress + program-level bonus).
 
 Source progress data from `DriverIncentiveProgress` (matched by `IncentiveType` to the trip's `incentiveTypes`).
 
@@ -458,7 +468,8 @@ Counts toward Short Notice — 3/5 trips · Earn $8 when complete
 **Ineligible client** (`clientEnrolledInIncentives === false`): NO contribution indicator renders even if the trip has `incentiveTypes`. Full state polished in I-8.
 
 **Constraints:**
-- **NO dollar amount on the pill/badge/banner surface itself.** Bonuses are program-level — surfacing "$X" on a per-trip surface is misleading and forbidden. Dollar values appear ONLY inside the popover/tooltip.
+- **NO dollar amount on `pill-named-bottom` (the pill itself) or `badge-corner-flag` (the badge itself).** Per-trip dollar framing is misleading and forbidden on those two surfaces — dollar values appear ONLY inside the popover/tooltip for them.
+- **`banner-wingz-hero` IS allowed to show a program-level total** (e.g., `Earn $150`) on the banner — but ONLY when paired with the progress bar (`N done +M taken · K to go`) so the framing is unambiguously program-level, not per-trip.
 - Do NOT replace the existing bottom pill row (Single Legs Allowed / Expires in N / Wait For Call / Not Confirmed). The new surfaces are ADDED, never replacing existing pills.
 - Do NOT redesign the ride card.
 - Do NOT introduce a new pill data model. Surfaces derive from `trip.incentiveTypes: IncentiveType[]`.
@@ -488,13 +499,14 @@ Counts toward Short Notice — 3/5 trips · Earn $8 when complete
 - [ ] All 3 variants render correctly via the toggle
 - [ ] `pill-named-bottom`: pill sits inline with existing bottom pills; small black/green Wingz mark visible inside; tap opens Popover with progress + program-level bonus
 - [ ] `badge-corner-flag`: green Wingz on black square top-right; doesn't obscure existing card content; hover/tap shows Tooltip with progress + bonus value
-- [ ] `banner-wingz-hero`: black + green banner top of card with white "<Incentive Name> Trip" label; doesn't push date row off-screen; shows progress (inline "3/5" OR Popover on tap)
+- [ ] `banner-wingz-hero`: black + green banner top of card with white "<Incentive Name> Trip" label, right-aligned program-level "Earn $X", and progress bar with `N done +M taken · K to go` labels. Doesn't push date row off-screen. Tap opens Popover with per-program breakdown.
 - [ ] Single-incentive trips show 1 surface in each variant
 - [ ] Multi-incentive trips: multiple pills (named-bottom), numeric overlay (corner-flag), name-list separator (banner-hero); popover lists each program independently
 - [ ] No-incentive trips show no surface in any variant
 - [ ] Completed-program line reads "✓ <Name> — Completed · $X added to next payout"
 - [ ] Ineligible-client trips don't render the contribution indicator
-- [ ] NO dollar amount visible on any pill/badge/banner surface itself (only inside popover/tooltip)
+- [ ] NO dollar amount on `pill-named-bottom` pill itself or `badge-corner-flag` badge itself (only inside popover/tooltip for those two)
+- [ ] `banner-wingz-hero` IS allowed to show program-level "Earn $X" alongside the progress bar (program-level framing, unambiguous)
 - [ ] Existing trip status pills (Single Legs Allowed, Expires in N, Wait For Call, Not Confirmed) unchanged
 - [ ] Surfaces persist correctly across Requests, My Rides, Ride History (muted on completed)
 
@@ -557,58 +569,88 @@ A new dashboard section, rendered below the existing earnings card and above the
 - Driver App reads computed values; never recomputes locally.
 
 **Test Flows After This Step:**
-  - [x] All 3 dashboard surfacing variants render correctly via the toggle
-  - [x] Tapping an incentive card/chip navigates to `/requests?incentive=<type>`
-  - [x] Each variant clearly shows program progress + program-level bonus amount (one bonus number per program, NOT per trip)
-  - [ ] No-incentive states (none active) show "No active incentives this period." — Deferred (seed data always has programs)
-  - [x] Existing dashboard widgets unchanged in `dashboard-banner` and `dashboard-card-section`
-  - [x] In `dashboard-widget-integrated`, the existing earnings widget shows the integration cleanly
-  - [x] `UpcomingPayoutWidget` renders below the earnings card with bold $ amount + base/bonus breakdown; anchor id `#upcoming-payout` set
-  - [x] Tapping `UpcomingPayoutWidget` opens the per-PROGRAM breakdown sheet (only completed programs contribute to total)
-  - [x] Empty state (no completed programs) shows the placeholder copy
-  - [x] No payout-action buttons present on the widget
+- [ ] All 3 dashboard surfacing variants render correctly via the toggle
+- [ ] Tapping an incentive card/chip navigates to `/requests?incentive=<type>`
+- [ ] Each variant clearly shows program progress + program-level bonus amount (one bonus number per program, NOT per trip)
+- [ ] No-incentive states (none active) show "No active incentives this period."
+- [ ] Existing dashboard widgets unchanged in `dashboard-banner` and `dashboard-card-section`
+- [ ] In `dashboard-widget-integrated`, the existing earnings widget shows the integration cleanly
+- [ ] `UpcomingPayoutWidget` renders below the earnings card with bold $ amount + base/bonus breakdown; anchor id `#upcoming-payout` set
+- [ ] Tapping `UpcomingPayoutWidget` opens the per-PROGRAM breakdown sheet (only completed programs contribute to total)
+- [ ] Empty state (no completed programs) shows the placeholder copy
+- [ ] No payout-action buttons present on the widget
 
 ---
 
-### Step I-4: Ride Details Incentive Callout — Variant Set
+### Step I-4: Ride Details Incentive Surfacing — Single-Design Extension of I-2 + Regression Fixes
 
-**Goal:** Add 3 named callout variants on Ride Details screens (both Before Taken and Needs Action / In Progress states) that surface applicable incentives + program progress.
+**Goal:** Extend the active I-2 surface (whichever pill/badge/banner variant is selected via `useVariants().pill`) to the Ride Details screens — Before Taken AND Needs Action / In Progress. **Single design — NO separate variant set, NO `RideDetailIncentiveCallout` composite, NO `useVariants().detail`.** Same visual treatment used on the ride card, with placement adapted per surface.
+
+**Plus: fix three inherited regressions from earlier steps that v0 got wrong on the first pass:** (1) Header background on detail (and all screens) should be WHITE, not dark/navy. (2) Bottom nav background should be WHITE, not dark/navy. (3) Trip metadata card on Ride Details must sit cleanly BELOW the map (no overlap), and contain `When / Rider / Client / Leg` all four lines INSIDE the card.
 
 **Reference screenshots:** `references/screenshots/by-step/i-4/` (04a, 04b, 05a, 05b — both detail states with their distinct footers).
 
 **What to build:**
 
-The `RideDetailIncentiveCallout` composite renders ONE of three variants per the active `detail` variant selection:
+#### Part 1 — Regression Fixes (do this BEFORE the incentive work)
 
-- **`detail-inline-badge`** — small badge inline near per-leg revenue, e.g., a "Short Notice" chip placed adjacent to revenue text. Subtle.
-- **`detail-section-pill`** — dedicated section card titled "Driver Incentives" sitting between the trip metadata card and the leg list. Contains one `IncentiveBadgeRenderer` pill per applicable program + ProgressMeter "<completed>/<target>" + program-level bonus shown ONCE per program (e.g., "Earn $8 when complete"). Highest information density.
-- **`detail-map-banner`** — banner overlay on the bottom edge of the map preview region (above trip metadata card). Compact strip: incentive icon + "<Incentive Name> Trip" + tap target to expand into a Sheet with full breakdown. Highest visual prominence with minimum vertical space cost.
+1. **Header background** on every screen → WHITE (`#FFFFFF`), title text dark (`~#1F2937`). Currently rendered as dark navy on all screens — this is wrong per the canonical references. See BIBLE → Header section.
+2. **Bottom nav background** → WHITE (`#FFFFFF`) with faint top hairline border. Currently rendered as dark navy. Active tab uses green icon + green label on white bg. See BIBLE → Bottom Nav section.
+3. **Trip metadata card** on Ride Details → must sit cleanly BELOW the map preview with vertical gap (no overlap, no floating). Card contents stacked: `When` / `Rider` / `Client` / `Leg` (Leg ID lives INSIDE the card, NOT extracted as a heading above the leg cards). See BIBLE → Ride Details — Before Taken section.
 
-Apply to both:
-- Ride Details — Before Taken (reachable from Requests, slot 04a/04b — sticky pink/green swipe footer must remain visible)
-- Ride Details — Needs Action / In Progress (reachable from My Rides, slot 05a/05b — canonical "after-taken" state; sticky red "I REACHED OUT TO CONFIRM" CTA must remain visible)
+#### Part 2 — Extend I-2 surfaces to Ride Details
 
-For multi-incentive trips, the callout lists each applicable program independently (no combined number — same rule as I-2).
+Use the same `IncentiveBadgeRenderer` and `ProgramContributionIndicator` from I-2. Read `useVariants().pill` and render the matching surface on the detail screen with placement adapted per variant:
 
-For trips where `clientEnrolledInIncentives === false`, all variants show "This client is not enrolled in driver incentives." instead of the incentive blocks (this state is fully built in I-8 polish).
+- **`pill-named-bottom` active** → render the named pill(s) **below the trip metadata card**, in a horizontal row (mirrors how the bottom pill row sits on a ride card). Multi-incentive trips render multiple pills, one per program. Tap → opens the contribution Popover (same component as I-2).
+
+- **`badge-corner-flag` active** → render the badge in the **top-right corner of the trip metadata card** (same anatomy as on the ride card, just on the metadata card instead of the ride card). Multi-incentive trips: numeric overlay on the badge ("2"). Hover/tap → contribution Tooltip with progress + bonus.
+
+- **`banner-wingz-hero` active** → render the full banner **above the trip metadata card** (between the map and the metadata card on Before Taken; between the amber "Confirmation required" alert and the metadata card on Needs Action). Same anatomy as the ride card banner: program name(s) on left + "Earn $X" right-aligned + progress bar with verbose labels below. Tap → contribution Popover.
+
+Apply to BOTH detail states:
+- Ride Details — Before Taken (slot 04a/04b — sticky pink/green swipe footer must remain visible)
+- Ride Details — Needs Action / In Progress (slot 05a/05b — canonical "after-taken" state; amber alert above + sticky red "I REACHED OUT TO CONFIRM" CTA must remain visible)
+
+For multi-incentive trips, treat each program independently (same rule as I-2).
+
+For trips where `clientEnrolledInIncentives === false`, render NO surface on detail (full polish state in I-8).
 
 **Constraints:**
-- Do NOT add accept/decline/start/end-trip buttons. Detail screens are read-only.
-- The existing sticky bottom CTA (pink/green swipe on Before-Taken; red "I REACHED OUT TO CONFIRM" on Needs Action) MUST remain visible. Variants must NOT push it off-screen.
-- For `detail-map-banner`: the banner overlays the map area, NOT the trip metadata card. Map preview retains visibility above the banner.
-- Do NOT modify the existing detail screen layout — the callout is ADDED, not replacing existing sections.
-- Read variant from `useVariants().detail`.
-- Reuse `ProgressMeter` from I-3.
-- NO per-trip bonus dollar amounts. Bonus shown ONCE per program in the callout.
+
+- **Single design — NO variant set.** Do NOT introduce a `useVariants().detail` field. Do NOT create a new `RideDetailIncentiveCallout` composite. Reuse `IncentiveBadgeRenderer` + `ProgramContributionIndicator` from I-2 with detail-specific placement.
+- The Variant Toggle Sheet still has exactly TWO sections (pill, dashboard). Do NOT add a detail section.
+- Sticky bottom CTAs MUST remain visible across all 3 placement variants on both detail states. The banner-wingz-hero placement adds vertical content — verify on 375×812 that scrolling still reaches the leg cards and the sticky CTA stays sticky.
+- Do NOT modify the existing detail screen layout beyond adding the surface in the right spot (and the regression fixes above).
+- Do NOT add accept/decline/start/end-trip buttons. Detail screens remain read-only.
+- The amber "Confirmation required" alert on Needs Action sits BETWEEN the header and the banner (when banner-wingz-hero is active) — alert always renders first.
+- NO per-trip bonus framing anywhere. Same rules as I-2 apply: `pill-named-bottom` and `badge-corner-flag` show no $ on the surface itself; `banner-wingz-hero` is allowed to show program-level "Earn $X" alongside the progress bar.
+
+**Backend Implications (capture only):**
+- Trip detail endpoint must include `applicableIncentives` array with progress contribution per incentive.
+- `clientEnrolledInIncentives` filters which incentives apply on this specific trip — backend enforces.
+- Stacking math (combined multi-program bonus on the banner) — for prototype, sum program-level bonus amounts across the trip's `incentiveTypes`. Backend formalization out of scope here.
 
 **Test Flows After This Step:**
-- [ ] All 3 variants render correctly via the toggle on both detail states
-- [ ] Sticky bottom CTAs remain visible across all variants (pink/green swipe; red "I REACHED OUT TO CONFIRM")
-- [ ] Single-incentive trip shows 1 callout block per variant
-- [ ] Multi-incentive trip shows multiple blocks (one per program) — NOT combined
-- [ ] No-incentive trip shows no callout (or "Not eligible" if `clientEnrolledInIncentives === false`)
-- [ ] Detail screen still shows existing trip info unchanged
-- [ ] NO per-trip "+$Y" bonus surface anywhere on the detail screen
+
+Regression fixes:
+- [ ] Header on all screens (Home, Requests, My Rides, Ride History, Ride Details) has WHITE background with dark title text — NOT dark/navy
+- [ ] Bottom nav has WHITE background with faint top border — NOT dark/navy
+- [ ] Active bottom-nav tab is green icon + green label on white bg
+- [ ] Trip metadata card on Ride Details sits cleanly below the map (no overlap), with vertical gap
+- [ ] Trip metadata card contains all four lines: When / Rider / Client / Leg (Leg ID INSIDE the card, NOT a separate heading)
+
+Incentive surface extension:
+- [ ] When `pill-named-bottom` is active in the toggle: detail shows named pills below the trip metadata card; tap opens contribution Popover
+- [ ] When `badge-corner-flag` is active: detail shows badge at top-right of trip metadata card; multi-incentive trip shows numeric overlay; hover/tap shows Tooltip
+- [ ] When `banner-wingz-hero` is active: detail shows full banner above the trip metadata card with program names + "Earn $X" + progress bar; tap opens Popover
+- [ ] Variant Toggle Sheet still shows ONLY 2 sections (pill, dashboard) — NO detail section
+- [ ] Sticky bottom CTAs (pink/green swipe on Before-Taken; red "I REACHED OUT TO CONFIRM" on Needs Action) remain visible across all 3 placements on both states
+- [ ] Multi-incentive trips show all programs (multiple pills, badge with numeric overlay, or banner with `·` separator + summed total)
+- [ ] No-incentive trips show no surface on detail
+- [ ] Ineligible-client trips show no surface on detail (full polish in I-8)
+- [ ] No `useVariants().detail` field exists in code
+- [ ] No `RideDetailIncentiveCallout` composite exists in code
 
 ---
 
