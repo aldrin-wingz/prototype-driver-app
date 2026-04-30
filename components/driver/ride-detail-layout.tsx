@@ -209,17 +209,6 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
           </div>
         </Card>
         
-        {/* Pill variant: Incentive pills BELOW the metadata card */}
-        {hasIncentives && isPillVariant && (
-          <div className="mx-4 mt-3">
-            <ProgramContributionIndicator
-              incentiveTypes={incentiveTypes}
-              isCompleted={false}
-              context="detail"
-            />
-          </div>
-        )}
-        
         {/* Leg details section */}
         <div className="p-4">
           
@@ -243,20 +232,34 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </p>
           )}
           
-          {/* Status pill */}
+          {/* Chips row: status pill + incentive pills side by side */}
           {state === "before-taken" && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#F3F4F6] px-3 py-1 text-xs font-medium text-[#6B7280]">
                 Expires in 185 days
               </span>
+              {hasIncentives && isPillVariant && (
+                <ProgramContributionIndicator
+                  incentiveTypes={incentiveTypes}
+                  isCompleted={false}
+                  context="detail"
+                />
+              )}
             </div>
           )}
           
           {state === "needs-action" && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
                 Not Confirmed
               </span>
+              {hasIncentives && isPillVariant && (
+                <ProgramContributionIndicator
+                  incentiveTypes={incentiveTypes}
+                  isCompleted={false}
+                  context="detail"
+                />
+              )}
             </div>
           )}
         </div>
