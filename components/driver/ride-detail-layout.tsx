@@ -3,7 +3,6 @@
 import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, Info, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { RideDetailIncentiveCallout } from "./ride-detail-incentive-callout";
 import { cn } from "@/lib/utils";
 import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
 
@@ -152,11 +151,6 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               </div>
             </div>
           )}
-          
-          {/* Map banner variant - overlays bottom of map */}
-          <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-auto">
-            <RideDetailIncentiveCallout trip={trip} state={state} />
-          </div>
         </div>
         
         {/* Trip metadata card */}
@@ -174,25 +168,16 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
                 {trip.client === "Verida" && <span className="ml-1">🌿</span>}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-1 text-gray-500">
-                <span className="text-sm">{trip.passengerCount}</span>
-                <Users className="h-4 w-4" />
-                <span className="font-semibold text-[#10B981]">
-                  ${trip.totalRevenue.toFixed(2)}
-                </span>
-                <Info className="h-4 w-4 text-gray-400" />
-              </div>
-              {/* Inline badge variant - appears next to revenue */}
-              <RideDetailIncentiveCallout trip={trip} state={state} />
+            <div className="flex items-center gap-1 text-gray-500">
+              <span className="text-sm">{trip.passengerCount}</span>
+              <Users className="h-4 w-4" />
+              <span className="font-semibold text-[#10B981]">
+                ${trip.totalRevenue.toFixed(2)}
+              </span>
+              <Info className="h-4 w-4 text-gray-400" />
             </div>
           </div>
         </Card>
-        
-        {/* Section pill variant - dedicated section */}
-        <div className="mt-4">
-          <RideDetailIncentiveCallout trip={trip} state={state} />
-        </div>
         
         {/* Leg details section */}
         <div className="p-4">

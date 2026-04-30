@@ -27,8 +27,6 @@ export interface Trip {
   pills: TripPill[];
   /** Incentive programs this trip qualifies for (empty if none) */
   incentiveTypes?: IncentiveType[];
-  /** Whether this client/trip is enrolled in the incentive program */
-  clientEnrolledInIncentives?: boolean;
 }
 
 export interface TripPill {
@@ -72,7 +70,6 @@ export const mockRequestTrips: Trip[] = [
       { label: "Expires in 185 days", variant: "neutral" },
     ],
     incentiveTypes: ["weekend-warrior", "peak-hours"], // Multi-incentive trip
-    clientEnrolledInIncentives: true,
   },
   {
     id: "REQ-001",
@@ -100,7 +97,6 @@ export const mockRequestTrips: Trip[] = [
       { label: "Expires in 4 hours", variant: "warning" },
     ],
     incentiveTypes: ["early-bird"], // Single incentive trip
-    clientEnrolledInIncentives: true,
   },
   {
     id: "REQ-002",
@@ -228,7 +224,6 @@ export const mockNeedsActionTrips: Trip[] = [
       { label: "Not Confirmed", variant: "danger" },
     ],
     incentiveTypes: ["weekend-warrior", "early-bird"], // Multi-incentive
-    clientEnrolledInIncentives: true,
   },
   {
     id: "NA-002",
@@ -261,7 +256,6 @@ export const mockNeedsActionTrips: Trip[] = [
     ],
     status: "needs-action",
     pills: [],
-    clientEnrolledInIncentives: false, // Ineligible for incentives
   },
 ];
 

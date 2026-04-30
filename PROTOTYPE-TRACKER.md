@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-5 — Pending
-## Last Completed: I-4 (RideDetailIncentiveCallout with 3 variants)
+## Current Step: I-4 — Pending
+## Last Completed: I-3 (DashboardIncentiveSection + UpcomingPayoutWidget)
 
 ---
 
@@ -35,7 +35,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-1   | Variant Toggle Infrastructure                                 | ✅ Done    | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ✅ Done    | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ✅ Done    | 3 dashboard surfacing variants (`dashboard-banner`, `dashboard-card-section`, `dashboard-widget-integrated`) + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                             |
-| I-4   | Ride Details Incentive Callout — Variant Set                  | ✅ Done    | 3 callout variants (`detail-inline-badge`, `detail-section-pill`, `detail-map-banner`) on Ride Details (before-taken + needs-action states). Inline badge next to revenue, section pill between metadata and legs, map banner on map bottom edge with expandable Sheet. All 3 handle multi-incentive trips independently + ineligible-client state.|
+| I-4   | Ride Details Incentive Callout — Variant Set                  | ⬜ Planned | 3 callout variants (`detail-inline-badge`, `detail-section-pill`, `detail-map-banner`) on Ride Details (before-taken + needs-action / in-progress).                                                                                                                                              |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
 | I-6   | Tier System + Tier-Based Bonus Boost                          | ⬜ Planned | Tier visualization (Bronze/Silver/Gold/Platinum), finalized `TierBadge`, multiplier display, path-to-next-tier; multiplier wires into dashboard projected bonus.                                                                                                                                 |
 | I-7   | Leaderboard                                                   | ⬜ Planned | Single-design leaderboard ranked by bonuses earned with anonymized handles + period selector. Consumes finalized `TierBadge` from I-6.                                                                                                                                                           |
