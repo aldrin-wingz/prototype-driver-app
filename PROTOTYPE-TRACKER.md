@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-0a
-## Last Completed: —
+## Current Step: I-4.2
+## Last Completed: I-4.1 (`/incentives` Hub + Dashboard Carousel + View All)
 
 ---
 
@@ -36,7 +36,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
 | I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
-| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ⬜ Planned | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard`), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel. Add "View All" link to all dashboard variants. **`UpcomingPayoutWidget` STAYS on dashboard** (does NOT move). |
+| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ✅ Done    | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard` from I-3), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Reworked `dashboard-card-section` variant from 4 stacked cards → `IncentiveCarousel` (swipe with page dots). Added "View All" link to all 3 dashboard variants → `router.push('/incentives')`. `UpcomingPayoutWidget` UNTOUCHED (stays on dashboard with Sheet popup intact for now). |
 | I-4.2 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ⬜ Planned | New stack-pushed `/payout` page with summary header + 2 tabs: **Rides Completed** (completed-rides filter using existing `RideCard` from Ride History, scoped to current pay period) and **Completed Incentives** (reuses `IncentiveCard` filtered to completed-this-period). Remove Sheet popup from `UpcomingPayoutWidget` on dashboard; tap → `router.push('/payout')`. |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
 | I-6   | Tier Progress (tab content on `/incentives`)                  | ⬜ Planned | Build `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + thresholds + path-to-next-tier progress. Pure status badges based on incentive count — **NO multiplier wiring into Dashboard projected bonus**. |
@@ -49,7 +49,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Step | Decision | Date | Delta Notes |
 |------|----------|------|-------------|
-| | | | |
+| I-4.1 | Complete | 2026-05-01 | Reversed earlier "no Incentives Catalog" decision — added `/incentives` tabbed hub. Reworked `dashboard-card-section` variant into `IncentiveCarousel` (one card visible + page dots, non-interactive). Added "View All" link to all 3 dashboard variants. `UpcomingPayoutWidget` left untouched on dashboard (Sheet popup retired in I-4.2). |
 
 ---
 

@@ -24,6 +24,31 @@ import {
 import type { IncentiveType } from "@/lib/data/incentives";
 
 // -----------------------------------------------------------------------------
+// SHARED: View All Link
+// -----------------------------------------------------------------------------
+
+interface ViewAllLinkProps {
+  onTap: () => void;
+  /** When true, renders white text for use on dark backgrounds (banner variant). */
+  light?: boolean;
+}
+
+function ViewAllLink({ onTap, light = false }: ViewAllLinkProps) {
+  return (
+    <button
+      onClick={onTap}
+      className={cn(
+        "flex items-center gap-0.5 text-sm font-medium transition-opacity hover:opacity-80",
+        light ? "text-[#10B981]" : "text-[#10B981]"
+      )}
+    >
+      View All
+      <ChevronRight className="h-4 w-4" />
+    </button>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // SHARED: Progress Meter Component
 // -----------------------------------------------------------------------------
 
@@ -35,10 +60,10 @@ interface ProgressMeterProps {
   compact?: boolean;
 }
 
-function ProgressMeter({ 
-  currentCount, 
-  scheduledCount, 
-  targetCount, 
+function ProgressMeter({
+  currentCount,
+  scheduledCount,
+  targetCount,
   isComplete,
   compact = false,
 }: ProgressMeterProps) {
@@ -56,10 +81,11 @@ function ProgressMeter({
         {scheduledCount > 0 && (
           <div
             className="absolute inset-y-0 bg-[#10B981]/40"
-            style={{ 
+            style={{
               left: `${completedPercent}%`,
               width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
-              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)'
+              backgroundImage:
+                "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)",
             }}
           />
         )}
@@ -89,7 +115,7 @@ interface IncentiveCardProps {
 
 function IncentiveCard({ progress, onTap, variant = "full" }: IncentiveCardProps) {
   const colors = INCENTIVE_PILL_COLORS[progress.incentiveType];
-  
+
   if (variant === "mini") {
     return (
       <button
@@ -176,20 +202,14 @@ function DashboardBannerVariant() {
 
   return (
     <Card className="mx-4 mb-4 overflow-hidden rounded-xl bg-gray-900 shadow-sm">
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2">
-          <Image src="/WINGZLOGO2.png" alt="" width={20} height={20} className="object-contain" />
-          <span className="text-sm font-semibold text-white">Driver Incentives</span>
+      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Image src="/WINGZLOGO2.png" alt="" width={20} height={20} className="object-contain flex-shrink-0" />
+          <span className="text-sm font-semibold text-white truncate">Driver Incentives</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
           <span className="text-sm font-bold text-[#10B981]">${projectedTotal} projected</span>
-          <button
-            onClick={handleViewAll}
-            className="flex items-center gap-0.5 text-sm text-[#10B981] hover:underline"
-          >
-            View All
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <ViewAllLink onTap={handleViewAll} light />
         </div>
       </div>
       <ScrollArea className="w-full pb-4">
@@ -205,26 +225,69 @@ function DashboardBannerVariant() {
 }
 
 // -----------------------------------------------------------------------------
-// VARIANT 2: Dashboard Card Section
+// VARIANT 2: Dashboard Card Section (now IncentiveCarousel)
 // -----------------------------------------------------------------------------
 
-function DashboardCardSectionVariant() {
-  const router = useRouter();
-  const progressItems = getAllIncentiveProgress();
+function IncentiveCarousel({
+  items,
+  onTap,
+}: {
+  items: IncentiveProgressInfo[];
+  onTap: (type: IncentiveType) => void;
+}) {
   const [api, setApi] = React.useState<CarouselApi>();
   const [current, setCurrent] = React.useState(0);
   const [count, setCount] = React.useState(0);
 
   React.useEffect(() => {
     if (!api) return;
-
     setCount(api.scrollSnapList().length);
     setCurrent(api.selectedScrollSnap());
 
-    api.on("select", () => {
-      setCurrent(api.selectedScrollSnap());
-    });
+    const onSelect = () => setCurrent(api.selectedScrollSnap());
+    api.on("select", onSelect);
+    api.on("reInit", onSelect);
+
+    return () => {
+      api.off("select", onSelect);
+      api.off("reInit", onSelect);
+    };
   }, [api]);
+
+  return (
+    <div className="w-full">
+      <Carousel setApi={setApi} opts={{ align: "start", loop: false }} className="w-full">
+        <CarouselContent>
+          {items.map((item) => (
+            <CarouselItem key={item.incentiveType} className="basis-full">
+              <IncentiveCard progress={item} onTap={onTap} variant="full" />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+
+      {/* Page indicator dots — visual only, non-interactive */}
+      {count > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-1.5" role="tablist" aria-label="Incentive carousel position">
+          {Array.from({ length: count }).map((_, i) => (
+            <span
+              key={i}
+              aria-hidden="true"
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                i === current ? "bg-[#10B981]" : "bg-[#E5E7EB]"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DashboardCardSectionVariant() {
+  const router = useRouter();
+  const progressItems = getAllIncentiveProgress();
 
   const handleTap = (type: IncentiveType) => {
     router.push(`/requests?incentive=${type}`);
@@ -238,40 +301,9 @@ function DashboardCardSectionVariant() {
     <div className="px-4 mb-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-900">Driver Incentives</h3>
-        <button
-          onClick={handleViewAll}
-          className="flex items-center gap-0.5 text-sm text-[#10B981] hover:underline"
-        >
-          View All
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        <ViewAllLink onTap={handleViewAll} />
       </div>
-      
-      {/* Carousel with one card visible at a time */}
-      <Carousel setApi={setApi} className="w-full">
-        <CarouselContent>
-          {progressItems.map((item) => (
-            <CarouselItem key={item.incentiveType}>
-              <IncentiveCard progress={item} onTap={handleTap} variant="full" />
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-      </Carousel>
-      
-      {/* Page indicator dots */}
-      {count > 1 && (
-        <div className="flex justify-center gap-1.5 mt-3">
-          {Array.from({ length: count }).map((_, index) => (
-            <div
-              key={index}
-              className={cn(
-                "h-2 w-2 rounded-full transition-colors",
-                index === current ? "bg-[#10B981]" : "bg-[#E5E7EB]"
-              )}
-            />
-          ))}
-        </div>
-      )}
+      <IncentiveCarousel items={progressItems} onTap={handleTap} />
     </div>
   );
 }
@@ -287,23 +319,29 @@ interface DashboardWidgetIntegratedVariantProps {
 function DashboardWidgetIntegratedVariant({ earnings }: DashboardWidgetIntegratedVariantProps) {
   const router = useRouter();
   const progressItems = getAllIncentiveProgress();
-  const completedBonuses = progressItems.filter(p => p.isComplete).reduce((sum, p) => sum + p.bonusAmount, 0);
+  const completedBonuses = progressItems.filter((p) => p.isComplete).reduce((sum, p) => sum + p.bonusAmount, 0);
   const projectedTotal = getProjectedTotalBonus();
-  const inProgressItems = progressItems.filter(p => !p.isComplete);
+  const inProgressItems = progressItems.filter((p) => !p.isComplete);
 
   const handleTap = (type: IncentiveType) => {
-    console.log(`[v0] Deep-link to /requests?incentive=${type}`);
     router.push(`/requests?incentive=${type}`);
+  };
+
+  const handleViewAll = () => {
+    router.push("/incentives");
   };
 
   return (
     <div className="border-t border-gray-100 pt-3 mt-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-gray-500">Projected with Bonuses</span>
-        <span className="text-sm font-bold text-gray-900">
-          ${(earnings + projectedTotal).toFixed(2)}
-          {completedBonuses > 0 && <span className="text-[#10B981] ml-1">(+${completedBonuses} earned)</span>}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold text-gray-900">
+            ${(earnings + projectedTotal).toFixed(2)}
+            {completedBonuses > 0 && <span className="text-[#10B981] ml-1">(+${completedBonuses} earned)</span>}
+          </span>
+          <ViewAllLink onTap={handleViewAll} />
+        </div>
       </div>
       {inProgressItems.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -313,10 +351,16 @@ function DashboardWidgetIntegratedVariant({ earnings }: DashboardWidgetIntegrate
               <button
                 key={item.incentiveType}
                 onClick={() => handleTap(item.incentiveType)}
-                className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all hover:opacity-80 active:scale-95", colors.bg, colors.text)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all hover:opacity-80 active:scale-95",
+                  colors.bg,
+                  colors.text
+                )}
               >
                 <span>{item.name}</span>
-                <span className="text-[10px] opacity-70">{item.currentCount}/{item.targetCount}</span>
+                <span className="text-[10px] opacity-70">
+                  {item.currentCount}/{item.targetCount}
+                </span>
               </button>
             );
           })}
@@ -354,4 +398,11 @@ export function DashboardIncentiveSection({ currentEarnings = 0, placement }: Da
   }
 }
 
-export { ProgressMeter, IncentiveCard, DashboardBannerVariant, DashboardCardSectionVariant, DashboardWidgetIntegratedVariant };
+export {
+  ProgressMeter,
+  IncentiveCard,
+  IncentiveCarousel,
+  DashboardBannerVariant,
+  DashboardCardSectionVariant,
+  DashboardWidgetIntegratedVariant,
+};
