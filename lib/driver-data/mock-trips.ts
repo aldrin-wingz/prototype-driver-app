@@ -171,7 +171,86 @@ export const mockRequestTrips: Trip[] = [
 ];
 
 // Mock upcoming trips (accepted but not started)
+// `UP-CURRENT-*` are within the current pay period (Apr 28–May 4, 2026).
+// `UP-FUTURE-*` are within the upcoming pay period (May 5–11, 2026).
 export const mockUpcomingTrips: Trip[] = [
+  {
+    id: "UP-CURRENT-001",
+    date: "Wed, Apr 29, 2026",
+    rider: "Jordan S.",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 35.00,
+    notes: "",
+    legs: [
+      {
+        id: "leg-1",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "5:00 PM",
+        address: "789 Corporate Blvd, Sandy Springs, GA 30328",
+        county: "Fulton County",
+        revenue: 35.00,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    incentiveType: "peak-hours",
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "UP-CURRENT-002",
+    date: "Fri, May 1, 2026",
+    rider: "Morgan K.",
+    client: "CareSource",
+    passengerCount: 1,
+    distance: "15.2 mi away",
+    totalRevenue: 52.00,
+    notes: "",
+    legs: [
+      {
+        id: "leg-1",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "11:30 AM",
+        address: "234 Elm Drive, Alpharetta, GA 30009",
+        county: "Fulton County",
+        revenue: 52.00,
+      },
+    ],
+    status: "upcoming",
+    pills: [
+      { label: "Single Legs Allowed", variant: "success" },
+    ],
+    incentiveType: null,
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "UP-FUTURE-001",
+    date: "Thu, May 7, 2026",
+    rider: "Riley T.",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "9.1 mi away",
+    totalRevenue: 38.00,
+    notes: "Early morning standing appointment",
+    legs: [
+      {
+        id: "leg-1",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "6:45 AM",
+        address: "456 Morning Glory Ln, Smyrna, GA 30080",
+        county: "Cobb County",
+        revenue: 38.00,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    incentiveType: "peak-hours",
+    clientEnrolledInIncentives: true,
+  },
   {
     id: "UP-001",
     date: "Wed, Feb 25, 2026",
@@ -277,8 +356,114 @@ export const mockNeedsActionTrips: Trip[] = [
 // Mock in-progress trips
 export const mockInProgressTrips: Trip[] = [];
 
-// Mock completed trips (ride history)
+// Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);
+// `CURRENT-COMP-*` are dated within the current pay period (Apr 28–May 4, 2026)
+// so the `/payout` page can render the current period's Rides Completed tab.
 export const mockCompletedTrips: Trip[] = [
+  // === CURRENT PERIOD (Apr 28–May 4, 2026): 3 trips totaling $342.50 ===
+  {
+    id: "CURRENT-COMP-001",
+    date: "Tue, Apr 28, 2026",
+    rider: "Casey P.",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 124.50,
+    notes: "Standing weekly transport",
+    legs: [
+      {
+        id: "leg-1",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "8:00 AM",
+        address: "456 Morning Glory Ln, Smyrna, GA 30080",
+        county: "Cobb County",
+        revenue: 62.25,
+      },
+      {
+        id: "leg-2",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "2:30 PM",
+        address: "DaVita Dialysis, 2100 W Paces Ferry Rd, Atlanta, GA 30327",
+        county: "Fulton County",
+        revenue: 62.25,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveType: "peak-hours",
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "CURRENT-COMP-002",
+    date: "Wed, Apr 29, 2026",
+    rider: "Jordan S.",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 95.00,
+    notes: "",
+    legs: [
+      {
+        id: "leg-1",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:15 AM",
+        address: "789 Corporate Blvd, Sandy Springs, GA 30328",
+        county: "Fulton County",
+        revenue: 47.50,
+      },
+      {
+        id: "leg-2",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "4:30 PM",
+        address: "Return: 789 Corporate Blvd, Sandy Springs, GA 30328",
+        county: "Fulton County",
+        revenue: 47.50,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveType: "peak-hours",
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "CURRENT-COMP-003",
+    date: "Sat, May 2, 2026",
+    rider: "Jamie L.",
+    client: "MTM",
+    passengerCount: 2,
+    distance: "",
+    totalRevenue: 123.00,
+    notes: "Weekend appointment",
+    legs: [
+      {
+        id: "leg-1",
+        type: "wait-for-call",
+        label: "Est Pick-up Time - Wait For Call",
+        time: "10:00 AM",
+        address: "567 Oak Street, Decatur, GA 30030",
+        county: "DeKalb County",
+        revenue: 61.50,
+      },
+      {
+        id: "leg-2",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "1:30 PM",
+        address: "Return: 567 Oak Street, Decatur, GA 30030",
+        county: "DeKalb County",
+        revenue: 61.50,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveType: "weekend-warrior",
+    clientEnrolledInIncentives: true,
+  },
+  // === HISTORICAL (Dec 2023) — referenced from past pay periods ===
   {
     id: "COMP-001",
     date: "Fri, Dec 29, 2023",

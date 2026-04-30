@@ -6,6 +6,7 @@ import {
   type VariantSelection,
   type PillVariant,
   type DashboardVariant,
+  type PayoutSummaryVariant,
   DEFAULT_VARIANTS,
   VARIANT_QUERY_PARAMS,
   parseVariantsFromUrl,
@@ -23,6 +24,7 @@ interface VariantsContextValue {
   setVariants: (variants: VariantSelection) => void;
   setPillVariant: (variant: PillVariant) => void;
   setDashboardVariant: (variant: DashboardVariant) => void;
+  setPayoutSummaryVariant: (variant: PayoutSummaryVariant) => void;
   resetToDefaults: () => void;
   isLoaded: boolean;
 }
@@ -63,6 +65,7 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
       const params = new URLSearchParams();
       params.set(VARIANT_QUERY_PARAMS.pill, newVariants.pill);
       params.set(VARIANT_QUERY_PARAMS.dashboard, newVariants.dashboard);
+      params.set(VARIANT_QUERY_PARAMS.payoutSummary, newVariants.payoutSummary);
       
       // Use replace to avoid adding to history stack
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -95,6 +98,13 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
     [variants, setVariants]
   );
 
+  const setPayoutSummaryVariant = useCallback(
+    (variant: PayoutSummaryVariant) => {
+      setVariants({ ...variants, payoutSummary: variant });
+    },
+    [variants, setVariants]
+  );
+
   // Reset to defaults
   const resetToDefaults = useCallback(() => {
     clearVariantsFromStorage();
@@ -111,6 +121,7 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
         setVariants,
         setPillVariant,
         setDashboardVariant,
+        setPayoutSummaryVariant,
         resetToDefaults,
         isLoaded,
       }}
@@ -131,6 +142,7 @@ export function VariantsFallbackProvider({ children }: { children: React.ReactNo
     setVariants: () => {},
     setPillVariant: () => {},
     setDashboardVariant: () => {},
+    setPayoutSummaryVariant: () => {},
     resetToDefaults: () => {},
     isLoaded: false,
   };

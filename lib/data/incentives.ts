@@ -175,6 +175,43 @@ export interface CurrentDriver {
 }
 
 /**
+ * A pay period (Mon–Sun). Drivers are paid weekly.
+ * id is also used as the denormalized period key on trips.
+ */
+export interface PayPeriod {
+  id: string;                 // 'period-2026-04-28'
+  startDate: string;          // 'Apr 28'
+  endDate: string;            // 'May 4'
+  payoutDate: string;         // 'Mon, May 4'
+  status: 'closed' | 'current' | 'upcoming';
+}
+
+/**
+ * Pre-computed payout summary per (driver, period).
+ * Frontend reads this to render `/payout`.
+ *
+ * `Projected` (current/upcoming) or `Final` (closed) total =
+ *   earnedFromCompletedRides + upcomingFromAcceptedRides + incentivesTotal
+ */
+export interface PayoutPeriodSummary {
+  periodId: string;
+  // Mini-card 1: completed rides this period
+  earnedFromCompletedRides: number;
+  completedRidesCount: number;
+  // Mini-card 2: accepted/upcoming rides this period
+  upcomingFromAcceptedRides: number;
+  upcomingRidesCount: number;
+  // Mini-card 3: incentive bonuses (earned + projected)
+  incentivesTotal: number;            // sum of earned + projected
+  incentivesEarnedCount: number;      // programs already triggered
+  incentivesTotalCount: number;       // earned + in-progress contributing
+  // The trip lists for each tab — by reference
+  completedTripIds: string[];
+  upcomingTripIds: string[];
+  programIdsContributing: IncentiveType[];   // earned + in-progress
+}
+
+/**
  * Dashboard summary data.
  */
 export interface DashboardData {
@@ -794,6 +831,110 @@ export const dashboardData: DashboardData = {
   incentivesInProgress: 2, // weekend-warrior, peak-hours
   incentivesCompleted: 2,  // early-bird, loyalty-streak
 };
+
+// -----------------------------------------------------------------------------
+// PAY PERIODS (4 entries: 2 closed, 1 current, 1 upcoming)
+// -----------------------------------------------------------------------------
+
+export const PAY_PERIODS: PayPeriod[] = [
+  {
+    id: 'period-2026-04-14',
+    startDate: 'Apr 14',
+    endDate: 'Apr 20',
+    payoutDate: 'Mon, Apr 20',
+    status: 'closed',
+  },
+  {
+    id: 'period-2026-04-21',
+    startDate: 'Apr 21',
+    endDate: 'Apr 27',
+    payoutDate: 'Mon, Apr 27',
+    status: 'closed',
+  },
+  {
+    id: 'period-2026-04-28',
+    startDate: 'Apr 28',
+    endDate: 'May 4',
+    payoutDate: 'Mon, May 4',
+    status: 'current',
+  },
+  {
+    id: 'period-2026-05-05',
+    startDate: 'May 5',
+    endDate: 'May 11',
+    payoutDate: 'Mon, May 11',
+    status: 'upcoming',
+  },
+];
+
+// -----------------------------------------------------------------------------
+// PAYOUT PERIOD SUMMARIES (one record per period)
+// Sum check (per period): earnedFromCompletedRides + upcomingFromAcceptedRides
+//   + incentivesTotal === Projected/Final hero shown
+// -----------------------------------------------------------------------------
+
+export const PAYOUT_PERIOD_SUMMARIES: PayoutPeriodSummary[] = [
+  // CLOSED — Apr 14–20: 1 completed ride + early-bird program triggered
+  // Final = 109.80 + 0 + 75 = 184.80
+  {
+    periodId: 'period-2026-04-14',
+    earnedFromCompletedRides: 109.80,
+    completedRidesCount: 1,
+    upcomingFromAcceptedRides: 0,
+    upcomingRidesCount: 0,
+    incentivesTotal: 75,
+    incentivesEarnedCount: 1,
+    incentivesTotalCount: 1,
+    completedTripIds: ['COMP-002'],
+    upcomingTripIds: [],
+    programIdsContributing: ['early-bird'],
+  },
+  // CLOSED — Apr 21–27: 2 completed rides + loyalty-streak triggered
+  // Final = 268.22 + 0 + 85 = 353.22
+  {
+    periodId: 'period-2026-04-21',
+    earnedFromCompletedRides: 268.22,
+    completedRidesCount: 2,
+    upcomingFromAcceptedRides: 0,
+    upcomingRidesCount: 0,
+    incentivesTotal: 85,
+    incentivesEarnedCount: 1,
+    incentivesTotalCount: 1,
+    completedTripIds: ['COMP-001', 'COMP-003'],
+    upcomingTripIds: [],
+    programIdsContributing: ['loyalty-streak'],
+  },
+  // CURRENT — Apr 28–May 4: 3 completed + 2 upcoming + 2 in-progress programs
+  // Projected = 342.50 + 87 + 150 = 579.50
+  {
+    periodId: 'period-2026-04-28',
+    earnedFromCompletedRides: 342.50,
+    completedRidesCount: 3,
+    upcomingFromAcceptedRides: 87,
+    upcomingRidesCount: 2,
+    incentivesTotal: 150,            // weekend-warrior $50 + peak-hours $100 (both projected)
+    incentivesEarnedCount: 0,
+    incentivesTotalCount: 2,
+    completedTripIds: ['CURRENT-COMP-001', 'CURRENT-COMP-002', 'CURRENT-COMP-003'],
+    upcomingTripIds: ['UP-CURRENT-001', 'UP-CURRENT-002'],
+    programIdsContributing: ['weekend-warrior', 'peak-hours'],
+  },
+  // UPCOMING — May 5–11: 1 accepted ride scheduled, no programs yet
+  // Projected = 0 + 38 + 0 = 38
+  {
+    periodId: 'period-2026-05-05',
+    earnedFromCompletedRides: 0,
+    completedRidesCount: 0,
+    upcomingFromAcceptedRides: 38,
+    upcomingRidesCount: 1,
+    incentivesTotal: 0,
+    incentivesEarnedCount: 0,
+    incentivesTotalCount: 0,
+    completedTripIds: [],
+    upcomingTripIds: ['UP-FUTURE-001'],
+    programIdsContributing: [],
+  },
+];
 
 // -----------------------------------------------------------------------------
 // HELPER FUNCTIONS

@@ -28,6 +28,15 @@ export type DashboardVariant =
   | 'dashboard-card-section'     // Dedicated card section for incentives
   | 'dashboard-widget-integrated'; // Integrated into existing earnings widget
 
+/**
+ * `/payout` summary section variants (I-4.4)
+ * Two layouts for the period summary: a 3 mini-card row below the hero,
+ * or tabs that themselves carry the metric.
+ */
+export type PayoutSummaryVariant = 
+  | 'mini-cards'           // Hero + 3 mini-cards row + standard tabs
+  | 'tabs-as-metrics';     // Hero + tab cells that double as metric cards
+
 // -----------------------------------------------------------------------------
 // VARIANT SELECTION
 // -----------------------------------------------------------------------------
@@ -40,6 +49,7 @@ export type DashboardVariant =
 export interface VariantSelection {
   pill: PillVariant;
   dashboard: DashboardVariant;
+  payoutSummary: PayoutSummaryVariant;
 }
 
 /**
@@ -49,6 +59,7 @@ export interface VariantSelection {
 export const DEFAULT_VARIANTS: VariantSelection = {
   pill: 'pill-named-bottom',
   dashboard: 'dashboard-card-section',
+  payoutSummary: 'mini-cards',
 };
 
 // -----------------------------------------------------------------------------
@@ -67,12 +78,18 @@ export const DASHBOARD_VARIANT_LABELS: Record<DashboardVariant, string> = {
   'dashboard-widget-integrated': 'Integrated Widget',
 };
 
+export const PAYOUT_SUMMARY_VARIANT_LABELS: Record<PayoutSummaryVariant, string> = {
+  'mini-cards': 'Mini-Cards Below',
+  'tabs-as-metrics': 'Tabs as Metrics',
+};
+
 /**
  * Combined labels map for programmatic access.
  */
 export const VARIANT_LABELS = {
   pill: PILL_VARIANT_LABELS,
   dashboard: DASHBOARD_VARIANT_LABELS,
+  payoutSummary: PAYOUT_SUMMARY_VARIANT_LABELS,
 } as const;
 
 // -----------------------------------------------------------------------------
@@ -121,6 +138,19 @@ export const DASHBOARD_VARIANT_OPTIONS: VariantOption<DashboardVariant>[] = [
   },
 ];
 
+export const PAYOUT_SUMMARY_VARIANT_OPTIONS: VariantOption<PayoutSummaryVariant>[] = [
+  {
+    value: 'mini-cards',
+    label: 'Mini-Cards Below',
+    description: 'Hero total followed by a row of 3 mini-cards (Earned / Upcoming / Incentives), then standard tabs.',
+  },
+  {
+    value: 'tabs-as-metrics',
+    label: 'Tabs as Metrics',
+    description: 'Hero total, then 3 tabs that themselves carry the metric label, value, and subtitle.',
+  },
+];
+
 // -----------------------------------------------------------------------------
 // STORAGE KEYS
 // -----------------------------------------------------------------------------
@@ -132,6 +162,7 @@ export const VARIANTS_STORAGE_KEY = 'driver-incentives-variants';
 export const VARIANT_QUERY_PARAMS = {
   pill: 'v_pill',
   dashboard: 'v_dash',
+  payoutSummary: 'payoutSummary',
 } as const;
 
 // -----------------------------------------------------------------------------
@@ -155,6 +186,11 @@ export function parseVariantsFromUrl(searchParams: URLSearchParams): Partial<Var
     result.dashboard = dashParam;
   }
   
+  const payoutSummaryParam = searchParams.get(VARIANT_QUERY_PARAMS.payoutSummary);
+  if (payoutSummaryParam && isValidPayoutSummaryVariant(payoutSummaryParam)) {
+    result.payoutSummary = payoutSummaryParam;
+  }
+  
   return result;
 }
 
@@ -165,6 +201,7 @@ export function serializeVariantsToUrl(variants: VariantSelection): string {
   const params = new URLSearchParams();
   params.set(VARIANT_QUERY_PARAMS.pill, variants.pill);
   params.set(VARIANT_QUERY_PARAMS.dashboard, variants.dashboard);
+  params.set(VARIANT_QUERY_PARAMS.payoutSummary, variants.payoutSummary);
   return params.toString();
 }
 
@@ -225,6 +262,7 @@ const VALID_PILL_VARIANTS: PillVariant[] = [
   'achievement-banner',
 ];
 const VALID_DASHBOARD_VARIANTS: DashboardVariant[] = ['dashboard-banner', 'dashboard-card-section', 'dashboard-widget-integrated'];
+const VALID_PAYOUT_SUMMARY_VARIANTS: PayoutSummaryVariant[] = ['mini-cards', 'tabs-as-metrics'];
 
 export function isValidPillVariant(value: string): value is PillVariant {
   return VALID_PILL_VARIANTS.includes(value as PillVariant);
@@ -234,6 +272,10 @@ export function isValidDashboardVariant(value: string): value is DashboardVarian
   return VALID_DASHBOARD_VARIANTS.includes(value as DashboardVariant);
 }
 
+export function isValidPayoutSummaryVariant(value: string): value is PayoutSummaryVariant {
+  return VALID_PAYOUT_SUMMARY_VARIANTS.includes(value as PayoutSummaryVariant);
+}
+
 export function isValidVariantSelection(obj: unknown): obj is VariantSelection {
   if (typeof obj !== 'object' || obj === null) return false;
   
@@ -241,6 +283,7 @@ export function isValidVariantSelection(obj: unknown): obj is VariantSelection {
   
   return (
     typeof selection.pill === 'string' && isValidPillVariant(selection.pill) &&
-    typeof selection.dashboard === 'string' && isValidDashboardVariant(selection.dashboard)
+    typeof selection.dashboard === 'string' && isValidDashboardVariant(selection.dashboard) &&
+    typeof selection.payoutSummary === 'string' && isValidPayoutSummaryVariant(selection.payoutSummary)
   );
 }
