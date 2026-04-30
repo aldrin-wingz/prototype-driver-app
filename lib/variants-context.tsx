@@ -6,7 +6,6 @@ import {
   type VariantSelection,
   type PillVariant,
   type DashboardVariant,
-  type DetailVariant,
   DEFAULT_VARIANTS,
   VARIANT_QUERY_PARAMS,
   parseVariantsFromUrl,
@@ -24,7 +23,6 @@ interface VariantsContextValue {
   setVariants: (variants: VariantSelection) => void;
   setPillVariant: (variant: PillVariant) => void;
   setDashboardVariant: (variant: DashboardVariant) => void;
-  setDetailVariant: (variant: DetailVariant) => void;
   resetToDefaults: () => void;
   isLoaded: boolean;
 }
@@ -65,7 +63,6 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
       const params = new URLSearchParams(searchParams.toString());
       params.set(VARIANT_QUERY_PARAMS.pill, newVariants.pill);
       params.set(VARIANT_QUERY_PARAMS.dashboard, newVariants.dashboard);
-      params.set(VARIANT_QUERY_PARAMS.detail, newVariants.detail);
       
       // Use replace to avoid adding to history stack
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -98,13 +95,6 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
     [variants, setVariants]
   );
 
-  const setDetailVariant = useCallback(
-    (variant: DetailVariant) => {
-      setVariants({ ...variants, detail: variant });
-    },
-    [variants, setVariants]
-  );
-
   // Reset to defaults
   const resetToDefaults = useCallback(() => {
     clearVariantsFromStorage();
@@ -114,7 +104,6 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete(VARIANT_QUERY_PARAMS.pill);
     params.delete(VARIANT_QUERY_PARAMS.dashboard);
-    params.delete(VARIANT_QUERY_PARAMS.detail);
     
     const newSearch = params.toString();
     router.replace(newSearch ? `${pathname}?${newSearch}` : pathname, { scroll: false });
@@ -127,7 +116,6 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
         setVariants,
         setPillVariant,
         setDashboardVariant,
-        setDetailVariant,
         resetToDefaults,
         isLoaded,
       }}
@@ -148,7 +136,6 @@ export function VariantsFallbackProvider({ children }: { children: React.ReactNo
     setVariants: () => {},
     setPillVariant: () => {},
     setDashboardVariant: () => {},
-    setDetailVariant: () => {},
     resetToDefaults: () => {},
     isLoaded: false,
   };

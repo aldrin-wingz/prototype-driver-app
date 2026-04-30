@@ -27,19 +27,19 @@ export function Header({
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-[#1F2937] px-4">
+    <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-white px-4 shadow-sm">
       {/* Left side */}
       <div className="flex items-center gap-3">
         {showBack ? (
           <button
             onClick={() => router.back()}
-            className="flex h-10 w-10 items-center justify-center text-white"
+            className="flex h-10 w-10 items-center justify-center text-gray-700"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
         ) : showMessages ? (
           <button className="relative flex h-10 w-10 items-center justify-center">
-            <MessageCircle className="h-6 w-6 text-white" />
+            <MessageCircle className="h-6 w-6 text-gray-700" />
             {messageCount > 0 && (
               <span className="absolute -right-0.5 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-[#EF4444] text-[10px] font-bold text-white">
                 {messageCount}
@@ -52,7 +52,7 @@ export function Header({
       </div>
 
       {/* Center title */}
-      <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-white">
+      <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900">
         {title}
       </h1>
 
@@ -61,7 +61,7 @@ export function Header({
         {showFilter && (
           <button
             onClick={onFilterClick}
-            className="flex h-10 w-10 items-center justify-center text-white"
+            className="flex h-10 w-10 items-center justify-center text-gray-700"
           >
             <SlidersHorizontal className="h-5 w-5" />
           </button>
@@ -69,7 +69,7 @@ export function Header({
         {showRefresh && (
           <button
             onClick={onRefreshClick}
-            className="flex h-10 w-10 items-center justify-center text-white"
+            className="flex h-10 w-10 items-center justify-center text-gray-700"
           >
             <RefreshCw className="h-5 w-5" />
           </button>

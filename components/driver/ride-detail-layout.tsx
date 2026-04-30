@@ -3,6 +3,8 @@
 import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, Info, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
+import { ProgramContributionIndicator } from "./program-contribution-indicator";
+import { useVariants } from "@/lib/variants-context";
 import { cn } from "@/lib/utils";
 import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
 
@@ -93,9 +95,18 @@ function LegCard({ leg, isFirst, isLast, state }: {
 
 export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
   const router = useRouter();
+  const { variants, isLoaded } = useVariants();
   
   const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
   const hasWaitForCall = trip.legs.some(leg => leg.type === "wait-for-call");
+  
+  // Determine incentive eligibility
+  const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
+  const incentiveTypes = hasIncentives ? trip.incentiveTypes! : [];
+  
+  // Determine if banner variant is active (banner renders ABOVE the metadata card)
+  const isBannerVariant = isLoaded && (variants.pill === 'banner-wingz-hero' || variants.pill === 'achievement-banner');
+  const isPillVariant = isLoaded && variants.pill === 'pill-named-bottom';
   
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB]">
@@ -153,10 +164,25 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
           )}
         </div>
         
-        {/* Trip metadata card */}
-        <Card className="mx-4 -mt-4 relative z-10 rounded-xl bg-white p-4 shadow-md">
+        {/* Banner variant: Incentive banner ABOVE the metadata card */}
+        {hasIncentives && isBannerVariant && (
+          <div className="mx-4 mt-4">
+            <ProgramContributionIndicator
+              incentiveTypes={incentiveTypes}
+              isCompleted={false}
+              context="detail"
+            />
+          </div>
+        )}
+        
+        {/* Trip metadata card - sits cleanly below map with gap */}
+        <Card className={cn(
+          "mx-4 rounded-xl bg-white p-4 shadow-md",
+          // Reduce top margin when banner is present above
+          hasIncentives && isBannerVariant ? "mt-2" : "mt-4"
+        )}>
           <div className="flex items-start justify-between">
-            <div>
+            <div className="space-y-1">
               <p className="text-sm text-gray-600">
                 When: <span className="font-semibold text-gray-900">{trip.date}</span>
               </p>
@@ -166,6 +192,10 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               <p className="text-sm text-gray-600">
                 Client: <span className="font-semibold text-gray-900">{trip.client}</span>
                 {trip.client === "Verida" && <span className="ml-1">🌿</span>}
+              </p>
+              {/* Leg ID inside the metadata card */}
+              <p className="text-sm text-gray-600">
+                Leg: <span className="font-semibold text-gray-900">{trip.legs[0]?.id || trip.id}</span>
               </p>
             </div>
             <div className="flex items-center gap-1 text-gray-500">
@@ -179,11 +209,19 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
           </div>
         </Card>
         
+        {/* Pill variant: Incentive pills BELOW the metadata card */}
+        {hasIncentives && isPillVariant && (
+          <div className="mx-4 mt-3">
+            <ProgramContributionIndicator
+              incentiveTypes={incentiveTypes}
+              isCompleted={false}
+              context="detail"
+            />
+          </div>
+        )}
+        
         {/* Leg details section */}
         <div className="p-4">
-          <p className="mb-3 text-sm font-medium text-gray-700">
-            Leg: <span className="font-semibold text-gray-900">{trip.legs[0]?.id || trip.id}</span>
-          </p>
           
           {/* Leg cards with timeline */}
           <div className="ml-1">

@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-0a
-## Last Completed: —
+## Current Step: I-5
+## Last Completed: I-4 (Ride Details Incentive Surfacing + Regression Fixes)
 
 ---
 
@@ -35,7 +35,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-1   | Variant Toggle Infrastructure                                 | ⬜ Planned | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
-| I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
+| I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ✅ Done    | Extended I-2 surfaces to Ride Details (both states). Fixed regressions: white header/nav bg, metadata card layout. Removed orphan `detail` variant scaffolding. Pill variant renders below metadata card; banner variants render above. Two sections remain in Variant Toggle Sheet (pill + dashboard). |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
 | I-6   | Tier System + Tier-Based Bonus Boost                          | ⬜ Planned | Tier visualization (Bronze/Silver/Gold/Platinum), finalized `TierBadge`, multiplier display, path-to-next-tier; multiplier wires into dashboard projected bonus.                                                                                                                                 |
 | I-7   | Leaderboard                                                   | ⬜ Planned | Single-design leaderboard ranked by bonuses earned with anonymized handles + period selector. Consumes finalized `TierBadge` from I-6.                                                                                                                                                           |
@@ -47,7 +47,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Step | Decision | Date | Delta Notes |
 |------|----------|------|-------------|
-| | | | |
+| I-4  | Complete | 2026-04-30 | Fixed regressions (white header/nav bg, metadata card layout). Removed orphan `detail` variant scaffolding. Extended I-2 surfaces to Ride Details with variant-adaptive placement. |
 
 ---
 

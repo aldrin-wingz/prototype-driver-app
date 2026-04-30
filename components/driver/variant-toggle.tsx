@@ -18,10 +18,8 @@ import { useVariants } from "@/lib/variants-context";
 import {
   PILL_VARIANT_OPTIONS,
   DASHBOARD_VARIANT_OPTIONS,
-  DETAIL_VARIANT_OPTIONS,
   type PillVariant,
   type DashboardVariant,
-  type DetailVariant,
 } from "@/lib/variants";
 
 export function VariantToggle() {
@@ -30,7 +28,6 @@ export function VariantToggle() {
     variants,
     setPillVariant,
     setDashboardVariant,
-    setDetailVariant,
     resetToDefaults,
     isLoaded,
   } = useVariants();
@@ -143,46 +140,6 @@ export function VariantToggle() {
               </RadioGroup>
             </div>
 
-            <Separator />
-
-            {/* Ride Detail Section */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-foreground">
-                Ride Detail Callout
-              </h3>
-              <p className="mb-3 text-xs text-muted-foreground">
-                How incentive eligibility is highlighted on ride detail screens.
-              </p>
-              <RadioGroup
-                value={variants.detail}
-                onValueChange={(value) => setDetailVariant(value as DetailVariant)}
-                className="space-y-2"
-              >
-                {DETAIL_VARIANT_OPTIONS.map((option) => (
-                  <div
-                    key={option.value}
-                    className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-[#10B981] has-[[data-state=checked]]:bg-[#10B981]/5"
-                  >
-                    <RadioGroupItem
-                      value={option.value}
-                      id={`detail-${option.value}`}
-                      className="mt-0.5 border-[#10B981] text-[#10B981]"
-                    />
-                    <div className="flex-1">
-                      <Label
-                        htmlFor={`detail-${option.value}`}
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        {option.label}
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {option.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
           </div>
 
           <SheetFooter className="mt-6">
