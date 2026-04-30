@@ -36,11 +36,12 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
 | I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
-| I-4.1 | Driver Incentives Page + Dashboard Carousel Rework            | ⬜ Planned | New stack-pushed `/incentives` page (full stacked card list + Upcoming Payout widget at top, anchor `#upcoming-payout`). Move `UpcomingPayoutWidget` from dashboard → `/incentives` page. Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel (one card at a time, page dots, "View All" link top-right opens `/incentives`). Add "View All" link to all dashboard variants. Achievement Unlock CTA path updated to `/incentives#upcoming-payout`. |
+| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ⬜ Planned | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard`), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel. Add "View All" link to all dashboard variants. **`UpcomingPayoutWidget` STAYS on dashboard** (does NOT move). |
+| I-4.2 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ⬜ Planned | New stack-pushed `/payout` page with summary header + 2 tabs: **Rides Completed** (completed-rides filter using existing `RideCard` from Ride History, scoped to current pay period) and **Completed Incentives** (reuses `IncentiveCard` filtered to completed-this-period). Remove Sheet popup from `UpcomingPayoutWidget` on dashboard; tap → `router.push('/payout')`. |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
-| I-6   | Tier System + Tier-Based Bonus Boost                          | ⬜ Planned | Tier visualization (Bronze/Silver/Gold/Platinum), finalized `TierBadge`, multiplier display, path-to-next-tier; multiplier wires into dashboard projected bonus.                                                                                                                                 |
-| I-7   | Leaderboard                                                   | ⬜ Planned | Single-design leaderboard ranked by bonuses earned with anonymized handles + period selector. Consumes finalized `TierBadge` from I-6.                                                                                                                                                           |
-| I-8   | Polish + Edge States + Achievement Unlock Dialog              | ⬜ Planned | Empty / period-ended / payout-pending / ineligible states + Achievement Unlock Dialog ("Bonus Earned!" → scrolls to Upcoming Payout) + Tier Unlock Dialog.                                                                                                                                       |
+| I-6   | Tier Progress (tab content on `/incentives`)                  | ⬜ Planned | Build `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + thresholds + path-to-next-tier progress. Pure status badges based on incentive count — **NO multiplier wiring into Dashboard projected bonus**. |
+| I-7   | Leaderboard (tab content on `/incentives`)                    | ⬜ Planned | Anonymized handles, period selector, current driver highlighted, consumes finalized `TierBadge` from I-6.                                                                                                                                                                                        |
+| I-8   | Polish + Edge States + Achievement Unlock Dialog              | ⬜ Planned | Empty / period-ended / payout-pending / ineligible states + Achievement Unlock Dialog with **3 CTAs** ("View Earnings" → `/payout`, "View Achievements" → `/incentives`, "Dismiss") + Tier Unlock Dialog.                                                                                        |
 
 ---
 
@@ -56,7 +57,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Component | Import Path | Used In |
 |-----------|-------------|---------|
-| Tabs | `@/components/ui/tabs` | I-0a (My Rides 3-tab row: In Progress / Needs Action / Upcoming) |
+| Tabs | `@/components/ui/tabs` | I-0a (My Rides 3-tab row: In Progress / Needs Action / Upcoming), I-4.1 (`/incentives` 3-tab interface: Incentives / Leaderboard / Tier Progress), I-4.2 (`/payout` 2-tab interface: Rides Completed / Completed Incentives) |
 | Card | `@/components/ui/card` | I-0a, I-0b, I-3, I-4, I-6, I-7 |
 | Button | `@/components/ui/button` | All steps |
 | Avatar | `@/components/ui/avatar` | I-0a, I-6, I-7 |
@@ -64,7 +65,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | Progress | `@/components/ui/progress` | I-3 (ProgressMeter), I-6 (tier progress) |
 | ToggleGroup | `@/components/ui/toggle-group` | I-3 (period selector if used), I-5 (filter), I-7 |
 | Select | `@/components/ui/select` | I-5 (sub-filter by incentive type) |
-| Sheet | `@/components/ui/sheet` | I-1 (Variant Toggle picker), I-3 (UpcomingPayoutWidget breakdown — widget moves to `/incentives` in I-4.1 but Sheet still used for the breakdown) |
+| Sheet | `@/components/ui/sheet` | I-1 (Variant Toggle picker), I-3 (UpcomingPayoutWidget breakdown — Sheet REMOVED in I-4.2; widget tap navigates to `/payout` instead) |
 | Carousel / ScrollArea (snap) | `@/components/ui/carousel` if available, else `@/components/ui/scroll-area` with snap-x | I-4.1 (IncentiveCarousel — the reworked `dashboard-card-section` variant) |
 | RadioGroup | `@/components/ui/radio-group` | I-1 (variant pickers) |
 | Tooltip | `@/components/ui/tooltip` | I-2 (`badge-corner-flag` reveal + ProgramContributionIndicator on hover/tap), I-6 |
@@ -87,8 +88,9 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | ProgramContributionIndicator | I-2 | I-4 (ride detail surfaces inherit the same wrapper). Tooltip + Popover wrapper around `IncentiveBadgeRenderer`. Single design (no toggle). |
 | DashboardIncentiveSection | I-3 | Dashboard. `dashboard-card-section` variant reworked into IncentiveCarousel in I-4.1. Every variant gains a "View All" link in I-4.1 that opens `/incentives`. |
 | IncentiveCarousel | I-4.1 | Dashboard `dashboard-card-section` variant — replaces the 4-stacked-cards layout. One card at a time, swipe left/right, page dots. |
-| IncentivesPage | I-4.1 | New `/incentives` route. Composed from header (back chevron + "Driver Incentives" title) + UpcomingPayoutWidget + "All Incentives" stacked list. |
-| UpcomingPayoutWidget | I-3 (built) → I-4.1 (relocated) | Originally on Dashboard in I-3; moved to top of `/incentives` page in I-4.1. Anchor `#upcoming-payout` preserved across the move. |
+| IncentivesPage | I-4.1 | New `/incentives` route — Driver Incentives Hub. Composed from header (back chevron + "Driver Incentives" title + Variants pill) + Tabs (Incentives default / Leaderboard / Tier Progress). Tabs are placeholder shells in I-4.1; Leaderboard tab filled in I-7, Tier Progress tab filled in I-6. |
+| PayoutPage | I-4.2 | New `/payout` route — Upcoming Payout breakdown. Composed from header (back chevron + "Upcoming Payout" title + Variants pill) + summary section (total payout / payout date / base + bonus split) + Tabs (Rides Completed default / Completed Incentives). Reuses existing `RideCard` (Rides Completed tab) and `IncentiveCard` (Completed Incentives tab). |
+| UpcomingPayoutWidget | I-3 (built on dashboard with Sheet) → I-4.2 (Sheet retired, tap navigates to `/payout`) | Stays on dashboard for at-a-glance context. Originally tapped to open a Sheet for breakdown — Sheet REMOVED in I-4.2 because the new `/payout` page is the richer review surface. Tap target swaps to `router.push('/payout')`. |
 | ProgressMeter | I-3 | I-4 (banner-wingz-hero on detail when applicable), I-6 |
 | TierBadge | I-6 | I-7 (leaderboard rows), I-3 (dashboard tier badge) |
 | AchievementUnlockDialog | I-8 | (Dashboard) |
@@ -520,7 +522,11 @@ Counts toward Short Notice — 3/5 trips · Earn $8 when complete
 
 **Goal:** Add (a) 2–3 named dashboard surfacing variants that show driver incentive progress on the existing Dashboard, with deep-link tap → Requests with filter pre-applied, AND (b) a single-design **Upcoming Payout widget** that displays projected weekly payout including completed-program bonuses.
 
-> **Forward-looking note (added 2026-05-01):** This step is approved as-is, but two pieces will be reworked in **I-4.1**: (1) the `dashboard-card-section` variant's 4-stacked-cards layout becomes a swipe carousel; (2) the `UpcomingPayoutWidget` MOVES from Dashboard to a new `/incentives` page (anchor `#upcoming-payout` preserved). Build I-3 normally; I-4.1 handles the rework on top.
+> **Forward-looking note (added 2026-05-01, refined later same day):** This step is approved as-is, but pieces will be reworked in later steps:
+> - **In I-4.1**: the `dashboard-card-section` variant's 4-stacked-cards layout becomes a swipe carousel; "View All" link added to all dashboard variants; new `/incentives` tabbed hub page added (Incentives / Leaderboard / Tier Progress).
+> - **In I-4.2**: the Sheet popup on `UpcomingPayoutWidget` is REMOVED. Widget stays on dashboard for at-a-glance context but tap target swaps from "open Sheet" to `router.push('/payout')`. New `/payout` page becomes the richer review surface.
+> - The widget DOES NOT move to `/incentives` (earlier 2026-05-01 plan reversed). It stays on Dashboard.
+> Build I-3 normally; I-4.1 + I-4.2 handle the reworks on top.
 
 **Reference screenshots:** `references/screenshots/by-step/i-3/` (01a, 01c — Home default + scrolled views show where the variants slot into the existing dashboard stack and where UpcomingPayoutWidget sits).
 
@@ -660,9 +666,9 @@ Incentive surface extension:
 
 ---
 
-### Step I-4.1: Driver Incentives Page + Dashboard Carousel Rework
+### Step I-4.1: Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework
 
-**Goal:** Reverse the earlier "no standalone Incentives Catalog" decision (it was dropped on 2026-04-27 and reinstated on 2026-05-01 after the I-3 design landed and stakeholders wanted a richer dedicated home). Add the new stack-pushed `/incentives` page (full stacked card list + Upcoming Payout widget at the top), move `UpcomingPayoutWidget` off the dashboard onto the new page, rework the `dashboard-card-section` dashboard variant from a 4-stacked-cards layout into a swipe carousel (one card at a time, page dots), and add a "View All" link to every dashboard incentive surfacing variant that opens `/incentives`.
+**Goal:** Reverse the earlier "no standalone Incentives Catalog" decision and consolidate gamification surfaces into a single tabbed hub. Add the new stack-pushed `/incentives` page with three tabs (Incentives default, Leaderboard, Tier Progress — the latter two are placeholder shells until I-7/I-6 fill them). Rework the `dashboard-card-section` variant from a 4-stacked-cards layout into a swipe carousel. Add a "View All" link to every dashboard incentive surfacing variant. **`UpcomingPayoutWidget` STAYS on dashboard** — it does NOT move to `/incentives` (an earlier 2026-05-01 plan to move it was reversed; the widget belongs with at-a-glance dashboard context, and the richer review surface is `/payout` built in I-4.2).
 
 **Reference screenshots:** No new reference screenshots — this step builds on the I-3 dashboard surfacing output and reuses the existing `IncentiveCard` visual.
 
@@ -672,23 +678,17 @@ Incentive surface extension:
 
 - New route at `/incentives` (Next.js App Router under `app/incentives/page.tsx`).
 - **Stack-pushed** — bottom nav is HIDDEN on this screen (same pattern as Ride History and Ride Details).
-- Header: WHITE background (per BIBLE Header rule), `<` back chevron + bold "Driver Incentives" title centered + top-right Variants pill button (carries through from any other screen).
-- Body sections (top to bottom):
-  1. **Upcoming Payout widget** — moved from Dashboard. Same `UpcomingPayoutWidget` composite built in I-3; just rendered here instead. Anchor id `#upcoming-payout` preserved. Section title "Upcoming Payout" + sub-label "Next payout: <Mon, May 4>" + bold $ headline + base/bonus breakdown row + tappable Sheet for per-program breakdown. Empty state when no programs are complete: "No bonuses earned yet this week. Complete an incentive program to earn one."
-  2. **"All Incentives" sub-section heading** (small bold black text) + the full stacked list of `IncentiveCard` rows, one per active incentive program (uses the existing card visual from `dashboard-card-section`). Each card: program name pill at top-left, optional "Completed" status text, bonus amount on the right, description text, ProgressMeter, count line ("5 done +2 taken · 1 to go"), small chevron on the right. Each card is tappable → deep-links to `/requests?incentive=<type>` — same contract as dashboard cards.
+- Header: WHITE background (per BIBLE Header rule), `<` back chevron + bold "Driver Incentives" title centered + top-right Variants pill button.
+- Body — Tabs row directly under header using `@/components/ui/tabs`:
+  - **Tab 1: "Incentives"** (default active) — full stacked list of `IncentiveCard` rows, one per program in `incentiveDefinitions` seed (4 programs in current seed). Includes BOTH active and completed programs. Each card uses the EXISTING `IncentiveCard` visual from I-3 `dashboard-card-section` (program name pill, optional "Completed" status, bonus amount, description, ProgressMeter, count line, chevron). Each card tappable → `router.push('/requests?incentive=<type>')`.
+  - **Tab 2: "Leaderboard"** — placeholder shell in I-4.1: empty container with copy "Leaderboard coming soon" or similar. Filled in **I-7**.
+  - **Tab 3: "Tier Progress"** — placeholder shell in I-4.1: empty container with copy "Tier Progress coming soon" or similar. Filled in **I-6**.
 - Page background: light gray (`#F9FAFB`, same as dashboard).
 - No sticky footer.
 
-#### Part 2 — Move `UpcomingPayoutWidget` off Dashboard
+#### Part 2 — Rework `dashboard-card-section` variant into swipe carousel (`IncentiveCarousel`)
 
-- Remove the widget instance from the Dashboard (`/`) page.
-- The composite itself is NOT deleted — it's re-imported into the new `IncentivesPage`.
-- Remove the section title "Upcoming Payout" from dashboard.
-- Dashboard's vertical stack on `/` is now: Earnings card → Confirm-Upcoming-Trip prompt → DashboardIncentiveSection (variant-driven) → New Requests preview → Next Accepted Ride.
-
-#### Part 3 — Rework `dashboard-card-section` variant into swipe carousel (`IncentiveCarousel`)
-
-The other two dashboard variants (`dashboard-banner` mini-card scroll + `dashboard-widget-integrated` chips) stay as-is. Only `dashboard-card-section` changes.
+The other two dashboard variants (`dashboard-banner` mini-card scroll + `dashboard-widget-integrated` chips) stay structurally as-is. Only `dashboard-card-section` changes.
 
 - Build `IncentiveCarousel` composite using `@/components/ui/carousel` if available, else fall back to `ScrollArea` with `snap-x snap-mandatory` on a horizontal flex container.
 - Render ONE full-size `IncentiveCard` at a time inside the viewport. The remaining cards are off-screen left/right.
@@ -697,51 +697,147 @@ The other two dashboard variants (`dashboard-banner` mini-card scroll + `dashboa
 - Same card visual as before (don't redesign the card — only the surrounding layout changes).
 - Tap on a card still deep-links to `/requests?incentive=<type>` (unchanged contract).
 
-#### Part 4 — Add "View All" link to every dashboard variant
+#### Part 3 — Add "View All" link to every dashboard variant
 
-Every dashboard incentive surfacing variant (`dashboard-banner`, `dashboard-card-section` (now carousel), `dashboard-widget-integrated`) gains a small "View All" link/CTA top-right of the section title. Tap → navigates to `/incentives`.
+Every dashboard incentive surfacing variant (`dashboard-banner`, `dashboard-card-section` (now carousel), `dashboard-widget-integrated`) gains a small "View All" link/CTA top-right of the section title. Tap → navigates to `/incentives` (lands on the Incentives tab by default).
 
 - Style: small text link in primary `#10B981`, with a small `>` chevron icon.
 - Position: top-right of the section header row (mirroring the existing "View All" pattern on the dashboard's "New Requests" section).
 
-#### Part 5 — Update Achievement Unlock CTA path (forward-looking, for I-8)
+#### Part 4 — `UpcomingPayoutWidget` stays on Dashboard (no move)
 
-The Achievement Unlock Dialog "View Earnings" CTA originally scrolled the dashboard to the `#upcoming-payout` anchor (built in I-8). Now it must navigate to the page route AND scroll to the anchor: `router.push('/incentives#upcoming-payout')`. Update the I-8 step spec accordingly. **No code change here in I-4.1 since the Dialog is built in I-8 — but document the change so I-8 picks it up correctly.**
+DO NOT move the `UpcomingPayoutWidget` to `/incentives`. The widget remains on Dashboard between the Earnings card and the New Requests preview. The Sheet popup on tap still exists in I-4.1; it gets removed in I-4.2 (which adds `/payout`).
 
 **Constraints:**
 
-- The card visual (program name + bonus + progress + count line) stays the same — DO NOT redesign the card. Only the dashboard layout changes (carousel) + the cards relocate to a dedicated page.
+- The card visual (program name + bonus + progress + count line) stays the same — DO NOT redesign the card. Reuse the existing `IncentiveCard` from I-3.
 - DO NOT add a bottom-nav tab for "Incentives" — `/incentives` is stack-pushed, reachable only via "View All" links on dashboard.
 - DO NOT change the deep-link contract (`/requests?incentive=<type>`).
-- DO NOT change the `UpcomingPayoutWidget` internals; it's just relocated.
-- The `#upcoming-payout` anchor MUST remain stable across the move (Achievement Unlock CTA depends on it).
-- "View All" link is added to ALL dashboard variants, not just `dashboard-card-section`.
-- Carousel page dots reflect the NUMBER of active incentive programs (4 in seed), not a fixed number.
+- DO NOT touch `UpcomingPayoutWidget` in this step (no relocation, no Sheet removal — that's I-4.2).
+- "View All" link is added to ALL three dashboard variants, not just `dashboard-card-section`.
+- The Tabs row on `/incentives` uses 3 tabs exactly (Incentives default / Leaderboard / Tier Progress). Leaderboard and Tier Progress are placeholder shells in this step.
+- Tab labels are exactly: "Incentives", "Leaderboard", "Tier Progress" — match this casing/wording.
+- Carousel page dots reflect the NUMBER of programs (4 in seed), not a fixed number.
 - The carousel must be touch-friendly on the 375×812 viewport — snap behavior is required.
 
 **Backend Implications (capture only):**
 
 - The `/incentives` page reads the same data as the Dashboard surfacing variants — no new endpoint.
-- Pagination: prototype shows ALL active programs on the page. Production may need pagination if the program count grows; out-of-scope here.
+- Pagination: prototype shows ALL programs on the Incentives tab. Production may need pagination if the program count grows; out-of-scope here.
 
 **Test Flows After This Step:**
 
 - [ ] New `/incentives` route exists and is reachable from Dashboard via "View All" link
 - [ ] `/incentives` is stack-pushed (no bottom nav visible)
 - [ ] Header on `/incentives` has WHITE background, back chevron, "Driver Incentives" title, top-right Variants pill
-- [ ] `UpcomingPayoutWidget` renders at the TOP of `/incentives` page with anchor id `#upcoming-payout`
-- [ ] `UpcomingPayoutWidget` is GONE from Dashboard (`/`)
-- [ ] `/incentives` page shows "All Incentives" sub-section heading + full stacked list of incentive cards (4 in seed)
-- [ ] Each card on `/incentives` deep-links to `/requests?incentive=<type>` correctly
+- [ ] Tabs row visible directly under header with 3 tabs: Incentives (active by default) / Leaderboard / Tier Progress
+- [ ] Incentives tab shows full stacked list of IncentiveCard rows (4 in seed)
+- [ ] Each card on Incentives tab deep-links to `/requests?incentive=<type>` correctly
+- [ ] Leaderboard tab shows placeholder shell (filled in I-7)
+- [ ] Tier Progress tab shows placeholder shell (filled in I-6)
+- [ ] `UpcomingPayoutWidget` STAYS on Dashboard (NOT moved to `/incentives`)
 - [ ] Back chevron on `/incentives` returns to Dashboard
 - [ ] Dashboard `dashboard-card-section` variant is now a swipe carousel — ONE card at a time, swipe reveals others, page dots below
 - [ ] Active page dot uses primary green; inactive dots are gray
 - [ ] Cards in the carousel still tap-deep-link to `/requests?incentive=<type>`
 - [ ] Other dashboard variants (`dashboard-banner`, `dashboard-widget-integrated`) unchanged structurally but get a "View All" link/CTA top-right
-- [ ] "View All" link visible on all 3 dashboard variants and navigates to `/incentives`
+- [ ] "View All" link visible on all 3 dashboard variants and navigates to `/incentives` (lands on Incentives tab)
 - [ ] No "Incentives" bottom-nav tab added
-- [ ] Card visual itself unchanged (program name + bonus + progress + count line)
+- [ ] Card visual itself unchanged from I-3
 - [ ] Mobile portrait 375×812 viewport, no horizontal overflow on the carousel snap
+- [ ] Zero TypeScript errors
+
+---
+
+### Step I-4.2: Upcoming Payout Page (`/payout`) + Retire Sheet Popup
+
+**Goal:** Add a dedicated stack-pushed `/payout` page that serves as the richer review surface for the upcoming payout — completed trips that contributed to base earnings + completed incentive programs that earned bonuses. Remove the Sheet popup from the dashboard `UpcomingPayoutWidget` (the Sheet is too thin a surface for the full payout context); tap target swaps to `router.push('/payout')`. The widget itself STAYS on dashboard for at-a-glance context.
+
+**Reference screenshots:** No new reference screenshots — reuses existing `RideCard` (Ride History style) and `IncentiveCard` (dashboard `dashboard-card-section` style).
+
+**What to build:**
+
+#### Part 1 — New `/payout` page (`PayoutPage` composite)
+
+- New route at `/payout` (Next.js App Router under `app/payout/page.tsx`).
+- **Stack-pushed** — bottom nav is HIDDEN on this screen (same pattern as Ride History, Ride Details, `/incentives`).
+- Header: WHITE background, `<` back chevron + bold "Upcoming Payout" title centered + top-right Variants pill button.
+- Body sections (top to bottom):
+
+  1. **Summary header section** — sits directly under the header, on a white card with subtle shadow:
+     - Sub-label "Next payout: <Mon, May 4>" (computed from `DashboardData.nextPayoutDate`)
+     - Large bold green dollar amount = `baseEarnings + bonusesEarned` (matches the same calculation as the dashboard `UpcomingPayoutWidget`)
+     - Breakdown row: "Base $XXX.XX · Bonuses +$YY.YY" with the bonus portion in `[EXTENDED: bonus-revenue-accent ~#10B981]`
+     - Empty state: when `bonusesEarned === 0`, show "No bonuses earned yet this week" inline below the breakdown row (do NOT hide the section).
+
+  2. **Tabs row** using `@/components/ui/tabs` with TWO tabs:
+
+     **Tab 1: "Rides Completed"** (default active) — completed-trips filter showing trips that contributed to base earnings this pay period.
+       - Reuse the EXISTING `RideCard` component from I-0a (the Ride History styling: BLUE revenue color, blue county tags, no bottom pill).
+       - Filter to `trip.status === 'completed'` from the `trips` seed array (3 trips in current seed).
+       - Render the same vertical list of `RideCard` instances as Ride History.
+       - List header: small text "<N> rides this pay period" or similar.
+       - Tap on a card: console.log only (no navigation — these are historical receipts, not actionable).
+       - Empty state: "No rides completed in this pay period yet."
+
+     **Tab 2: "Completed Incentives"** — programs the driver has completed in this pay period.
+       - Reuse the EXISTING `IncentiveCard` visual from I-3 `dashboard-card-section`.
+       - Filter to programs where `DriverIncentiveProgress.earnedThisPeriod === true`.
+       - Render the same stacked-list layout used on `/incentives` Incentives tab.
+       - Tap on a card: deep-link to `/requests?incentive=<type>` (same contract — though this is a historical view, the deep-link still works as a "find more like this" affordance).
+       - Empty state: "No incentives completed yet this pay period. Complete an incentive program to see it here."
+
+- Page background: light gray (`#F9FAFB`).
+- No sticky footer.
+
+#### Part 2 — Retire the Sheet popup on `UpcomingPayoutWidget`
+
+- The Sheet popup that opens when the `UpcomingPayoutWidget` is tapped (built in I-3) is REMOVED.
+- The widget itself STAYS on dashboard between the Earnings card and the New Requests preview — visual unchanged.
+- Tap target swaps from "open Sheet" to `router.push('/payout')`.
+- Remove the Sheet component import + the per-program breakdown rendering inside the widget. The breakdown is now lived on the `/payout` page (richer + scoped by tab).
+
+#### Part 3 — Anchor handling
+
+- The `#upcoming-payout` anchor is no longer needed for Achievement Unlock CTA navigation — the entire `/payout` page IS the payout view, so navigating to `/payout` is sufficient (no scroll-to-anchor needed).
+- Remove the `id="upcoming-payout"` attribute from the dashboard widget if it exists (no longer referenced).
+- The Achievement Unlock Dialog "View Earnings" CTA in I-8 will use `router.push('/payout')` (no anchor).
+
+**Constraints:**
+
+- DO NOT redesign `RideCard` or `IncentiveCard` — reuse them from I-0a and I-3 respectively.
+- DO NOT add accept/decline/start-trip buttons on Rides Completed tab — these are historical, read-only.
+- The `/payout` page is read-only — NO Cash out / Withdraw / Bank account / Transfer buttons.
+- The `UpcomingPayoutWidget` itself stays on dashboard with same visual treatment — only the tap behavior changes.
+- The Sheet code from I-3 must be fully removed (no dead code branches).
+- DO NOT add `/payout` as a bottom-nav tab — it's stack-pushed only.
+- Tab labels are exactly: "Rides Completed", "Completed Incentives" — match this casing/wording.
+
+**Backend Implications (capture only):**
+
+- `/payout` page reads `trips` filtered by status + pay period AND `driverIncentiveProgress` filtered by `earnedThisPeriod`. Backend should provide both as scoped lists for the page.
+- "Pay period" definition: prototype assumes Mon–Sun cutoff (open question in Working Plan). Production: backend should define and expose the current pay period boundaries.
+- The Achievement Unlock event from I-8 doesn't need an anchor — just a route change to `/payout`.
+
+**Test Flows After This Step:**
+
+- [ ] New `/payout` route exists and is reachable from Dashboard by tapping `UpcomingPayoutWidget`
+- [ ] `/payout` is stack-pushed (no bottom nav visible)
+- [ ] Header on `/payout` has WHITE background, back chevron, "Upcoming Payout" title, top-right Variants pill
+- [ ] Summary section at top shows "Next payout: <date>", bold green total, "Base $X · Bonuses +$Y" breakdown row
+- [ ] Tabs row visible directly under summary with 2 tabs: Rides Completed (active default) / Completed Incentives
+- [ ] Rides Completed tab shows list of `RideCard` instances filtered to completed trips, using Ride History styling (BLUE revenue, blue county tags, no bottom pill)
+- [ ] Completed Incentives tab shows list of `IncentiveCard` instances filtered to programs where `earnedThisPeriod === true`
+- [ ] Each card on Completed Incentives tab deep-links to `/requests?incentive=<type>`
+- [ ] Both tabs show appropriate empty states when their filtered lists are empty
+- [ ] `UpcomingPayoutWidget` on Dashboard NO LONGER opens a Sheet on tap
+- [ ] `UpcomingPayoutWidget` on Dashboard now navigates to `/payout` on tap (`router.push('/payout')`)
+- [ ] The Sheet component code is fully removed from `UpcomingPayoutWidget`
+- [ ] `UpcomingPayoutWidget` visual on Dashboard unchanged (same card, same content)
+- [ ] Back chevron on `/payout` returns to Dashboard
+- [ ] No `/payout` bottom-nav tab added
+- [ ] Card visuals (`RideCard` and `IncentiveCard`) unchanged from prior steps — reused as-is
+- [ ] Mobile portrait 375×812 viewport, no horizontal overflow
 - [ ] Zero TypeScript errors
 
 ---
@@ -781,74 +877,82 @@ The Achievement Unlock Dialog "View Earnings" CTA originally scrolled the dashbo
 
 ---
 
-### Step I-6: Tier System + Tier-Based Bonus Boost (Single Design)
+### Step I-6: Tier Progress (tab content on `/incentives`) — Single Design
 
-**Goal:** Build the Tiers section + finalize the `TierBadge` composite. Wire the multiplier into Dashboard projected bonus. Single design. **Built BEFORE Leaderboard so I-7 consumes the finalized `TierBadge` directly — no stub-then-refine cycle.**
+**Goal:** Fill the **Tier Progress** tab on the `/incentives` page (placeholder shell created in I-4.1). Build the `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + threshold copy + path-to-next-tier progress. **Pure status badges based on incentive completion count — NO multiplier wiring into Dashboard projected bonus.** Built BEFORE Leaderboard (I-7) so the leaderboard consumes the finalized `TierBadge` directly — no stub-then-refine cycle.
 
-(No reference screenshots for this step — Tier System is a net-new section.)
+(No reference screenshots for this step — Tier Progress is a net-new screen.)
 
 **What to build:**
-- New "Tiers" section reachable from the dashboard (small CTA "View Tier Progress" or tap on the tier badge area).
-- Tiers section:
-  - Horizontal row of all 4 tiers (Bronze/Silver/Gold/Platinum) as `TierBadge` composites.
-  - Current tier highlighted with primary border + "Current" caption.
-  - Each tier: threshold (e.g., "10 incentives accomplished"), multiplier (e.g., "×1.25").
-  - `Progress` bar showing path to next tier.
-  - Top tier reached message if applicable.
-- Finalize `TierBadge` composite — used here, in I-7 leaderboard, and in I-3 dashboard.
-- Wire multiplier into Dashboard:
-  - Projected bonus = `bonusAmount × min(assignedCount, targetCount) × tierMultiplier`
-  - Show "×1.10 tier boost applied" caption near the projected total OR per incentive (per active dashboard variant).
-- Note: I-3 dashboard surfacing was built with a `tierMultiplier` value of 1.0 in seed; this step makes the multiplier visually meaningful and adds the "boost applied" caption.
+
+- Replace the Tier Progress tab placeholder shell on `/incentives` with the actual content.
+- Tab content layout:
+  - Horizontal row of all 4 tiers (Bronze / Silver / Gold / Platinum) as `TierBadge` composites.
+  - Current tier highlighted with primary border + "Current" caption underneath.
+  - For each tier: threshold copy (e.g., "Complete 5 incentives" for Silver, "10 incentives" for Gold, "20 incentives" for Platinum).
+  - `Progress` bar below the tier row showing path to next tier (e.g., "3 more incentives toward Gold").
+  - Top tier reached message if applicable: "You've reached the highest tier — Platinum!"
+- Finalize `TierBadge` composite (Badge + Avatar accent using `[EXTENDED: tier-*]` color tokens) — used here, in I-7 leaderboard rows, and reusable elsewhere.
+- **NO multiplier wiring into Dashboard.** The dashboard projected bonus stays at `bonusAmount × min(assignedCount, targetCount)` (no tier multiplier visualization). Tier is a status badge / achievement system only — financial multiplier was simplified out of scope on 2026-05-01.
 
 **Constraints:**
-- Multiplier values come from `TierConfig.multiplier` — never hardcode.
-- Path uses `CurrentDriver.incentivesAccomplishedThisPeriod` against `TierConfig.threshold`.
-- Tier transitions do NOT animate or celebrate in this step — that's I-8.
-- Multiplier is uniform across incentives (per-incentive multiplier override out of scope).
+
+- Threshold values come from `TierConfig.threshold` — never hardcode.
+- Path-to-next uses `CurrentDriver.incentivesAccomplishedThisPeriod` against `TierConfig.threshold`.
+- Tier transitions do NOT animate or celebrate here — that's I-8 (Tier Unlock Dialog).
+- **DO NOT add a "×1.10 tier boost applied" caption to Dashboard projected bonus** — tier is purely a status badge, not a multiplier on earnings. The `TierConfig.multiplier` field stays in the seed data as a parking-lot field but is NOT visualized.
 - No variants — single design only.
+- The Tier Progress content lives ONLY inside the `/incentives` Tier Progress tab. Do NOT add a separate route or dashboard CTA for tiers.
 
 **Test Flows After This Step:**
-- [ ] Tiers section shows all 4 tiers in correct order
-- [ ] Current tier highlighted
-- [ ] Path-to-next-tier shows correct progress (Silver=5, Gold=10, current=7 → "3 more toward Gold")
-- [ ] Dashboard projected bonus reflects ×1.10 multiplier
-- [ ] "×1.10 tier boost applied" caption visible
+
+- [ ] Tier Progress tab on `/incentives` shows all 4 tiers in correct order (Bronze / Silver / Gold / Platinum)
+- [ ] Current tier (Silver in seed) highlighted with primary border + "Current" caption
+- [ ] Each tier shows threshold copy
+- [ ] Path-to-next-tier progress bar shows correct progress (current=7, Gold threshold=10 → "3 more incentives toward Gold")
 - [ ] `TierBadge` composite is finalized (no stub state)
+- [ ] **No "tier boost applied" caption on Dashboard** (multiplier visualization out of scope)
+- [ ] No separate Tiers route or Dashboard CTA exists — content lives inside `/incentives` tab only
 
 ---
 
-### Step I-7: Leaderboard (Single Design)
+### Step I-7: Leaderboard (tab content on `/incentives`) — Single Design
 
-**Goal:** Build the Leaderboard ranked by bonuses earned with anonymized handles + period selector. Single design — no variant toggle. **Consumes the finalized `TierBadge` from I-6 directly.**
+**Goal:** Fill the **Leaderboard** tab on the `/incentives` page (placeholder shell created in I-4.1). Build the leaderboard ranked by bonuses earned with anonymized handles + period selector. Single design — no variant toggle. Consumes the finalized `TierBadge` from I-6 directly.
 
-(No reference screenshots for this step — Leaderboard is a net-new screen. Follow PROTOTYPE-BIBLE.md design system + observed-styling rules already absorbed from earlier steps.)
+(No reference screenshots for this step — Leaderboard is a net-new screen.)
 
 **What to build:**
-- New "Leaderboard" route reachable from somewhere in the dashboard (e.g., a small CTA "See Leaderboard" near the incentive surfacing variants in I-3).
-- Top section: PeriodSelector (`This Week` / `Last Week`) — static toggle that swaps the label only (no real period switching for prototype).
-- Ranked list of 10 drivers from `LeaderboardEntry` seed data.
-- Each row: rank, anonymized handle, `TierBadge` (finalized — from I-6), bonuses earned ("$XXX").
-- Top 3 ranks visually distinct (e.g., medal accent or larger text).
-- Current driver row (`Driver-7821`) highlighted with primary border + background tint.
-- Sticky "Your rank: #4" pill at the bottom of the screen for quick reference.
-- Anonymity footer: "Names are anonymized for privacy."
+
+- Replace the Leaderboard tab placeholder shell on `/incentives` with the actual content.
+- Tab content layout:
+  - Top section: PeriodSelector (`This Week` / `Last Week`) — static toggle that swaps the label only (no real period switching for prototype).
+  - Ranked list of 10 drivers from `LeaderboardEntry` seed data.
+  - Each row: rank, anonymized handle, finalized `TierBadge` (from I-6), bonuses earned ("$XXX").
+  - Top 3 ranks visually distinct (subtle elevation or border).
+  - Current driver row (`Driver-7821`) highlighted with primary border + low-alpha tint.
+  - Sticky "Your rank: #4" pill at the bottom of the tab area for quick reference (sticky within the tab content scroll, not the global page).
+  - Anonymity footer: "Names are anonymized for privacy."
 
 **Constraints:**
+
 - All names anonymized (`Driver-XXXX` handles only).
 - No real driver names or rider data anywhere.
 - Period selector is visual only — no real data switching.
 - Use the finalized `TierBadge` from I-6 — do NOT build a stub.
+- Leaderboard content lives ONLY inside the `/incentives` Leaderboard tab. Do NOT add a separate route or dashboard CTA.
 
 **Test Flows After This Step:**
-- [ ] All 10 drivers in rank order
-- [ ] Current driver Driver-7821 at #4 highlighted
+
+- [ ] Leaderboard tab on `/incentives` shows all 10 drivers in rank order
+- [ ] Current driver Driver-7821 at #4 highlighted with primary border + low-alpha tint
 - [ ] Top 3 visually distinct from ranks 4–10
 - [ ] Each row shows rank + handle + finalized `TierBadge` + bonuses
 - [ ] PeriodSelector toggles label without breaking
 - [ ] Sticky "Your rank: #4" pill visible
 - [ ] Anonymity footer present
 - [ ] NO real driver names or rider data anywhere
+- [ ] No separate Leaderboard route or Dashboard CTA exists — content lives inside `/incentives` tab only
 
 ---
 
@@ -872,15 +976,16 @@ The Achievement Unlock Dialog "View Earnings" CTA originally scrolled the dashbo
   - Earnings tab (or Dashboard if no Earnings tab): `Alert` "Your bonuses are pending payout. Payouts process every 2 weeks." Display only.
 - **Ineligible market/client state:**
   - Trip detail callout (I-4): replace incentive blocks with "This client is not enrolled in driver incentives." (uses `Trip.clientEnrolledInIncentives` flag)
-- **Achievement Unlock Dialog (program completion — primary celebration):**
+- **Achievement Unlock Dialog (program completion — primary celebration) — three CTAs:**
   - Fires automatically when an incentive transitions from "in progress" to "completed" (mock-triggerable via a [DEV] button on Dashboard since the prototype is read-only and has no real start/end-trip flow).
   - Dialog content:
     - 🎉 emoji header
     - Bold title: "Bonus Earned!"
     - Body: "You completed [Incentive Name] — $XX added to your next payout."
-    - Primary CTA: "View Earnings" → closes dialog AND **navigates to `/incentives#upcoming-payout`** (the dedicated Driver Incentives page added in I-4.1, scrolled to the Upcoming Payout widget anchor). After I-4.1 the widget lives on `/incentives`, not the dashboard. Use `router.push('/incentives#upcoming-payout')` (Next.js App Router).
-    - Secondary CTA: "Dismiss" → closes dialog.
-  - Auto-dismiss after 6 seconds if no interaction.
+    - **Primary CTA: "View Earnings"** → closes dialog AND `router.push('/payout')`. The bonus shows up on the Completed Incentives tab + contributes to the total payout summary on `/payout`.
+    - **Secondary CTA: "View Achievements"** → closes dialog AND `router.push('/incentives')`. Lands on the Incentives tab; user can switch to Leaderboard or Tier Progress tabs from there.
+    - **Tertiary CTA: "Dismiss"** → closes dialog, no navigation.
+  - Auto-dismiss after 6 seconds if no interaction (treats no-action as Dismiss).
 - **Tier Unlock Dialog (secondary celebration):**
   - Profile tab "[DEV] Trigger tier unlock" button (or anywhere in Dashboard if Profile is just a placeholder).
   - Tap → Dialog with "You've reached Gold tier! Your bonus multiplier is now ×1.25." + 🎉 emoji.
@@ -890,7 +995,7 @@ The Achievement Unlock Dialog "View Earnings" CTA originally scrolled the dashbo
 - All edge states use template `Alert` / `Dialog` / `Card` styling — no custom celebration components.
 - Confetti is emoji-based (🎉) only — no animation library.
 - Achievement Unlock Dialog and Tier Unlock Dialog are local-only — no notification mechanism, no push.
-- Achievement Unlock "View Earnings" CTA navigates to `/incentives#upcoming-payout` (route change to the Driver Incentives page added in I-4.1, then scroll to anchor).
+- Achievement Unlock "View Earnings" CTA navigates to `/payout` (the Upcoming Payout page added in I-4.2). "View Achievements" navigates to `/incentives` (the Driver Incentives Hub from I-4.1). "Dismiss" closes without navigation.
 - Payout-pending Alert is display-only — no buttons.
 
 **Backend Implications (capture only):**
@@ -905,8 +1010,10 @@ The Achievement Unlock Dialog "View Earnings" CTA originally scrolled the dashbo
 - [ ] Period-ended state visible when seed flag toggled
 - [ ] Payout-pending Alert visible
 - [ ] Ineligible market state visible on flagged trip
-- [ ] [DEV] Achievement Unlock Dialog (program completion) appears with "Bonus Earned!" + 🎉 + body + "View Earnings" + "Dismiss" CTAs
-- [ ] Achievement Unlock "View Earnings" closes dialog AND navigates to `/incentives#upcoming-payout` (the Driver Incentives page added in I-4.1), scrolled to the UpcomingPayoutWidget anchor
+- [ ] [DEV] Achievement Unlock Dialog (program completion) appears with "Bonus Earned!" + 🎉 + body + 3 CTAs ("View Earnings" / "View Achievements" / "Dismiss")
+- [ ] Achievement Unlock "View Earnings" closes dialog AND navigates to `/payout`
+- [ ] Achievement Unlock "View Achievements" closes dialog AND navigates to `/incentives` (lands on Incentives tab)
+- [ ] Achievement Unlock "Dismiss" closes dialog without navigation
 - [ ] Achievement Unlock auto-dismisses after 6s
 - [ ] [DEV] Tier Unlock Dialog appears and dismisses correctly
 - [ ] NO custom celebration component (template Dialog only)
