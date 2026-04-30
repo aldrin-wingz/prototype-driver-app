@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-4.2
-## Last Completed: I-4.1 (`/incentives` Hub + Dashboard Carousel + View All)
+## Current Step: I-0a
+## Last Completed: —
 
 ---
 
@@ -13,7 +13,11 @@
 
 This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Driver App. The existing surfaces are replicated faithfully and then augmented with an incentive layer. A global Variant Toggle (built in I-1) lets stakeholders compare named UI variants per surface.
 
-**Bonus model: PROGRAM-LEVEL.** A trip "counts toward" one or more incentive programs. The driver earns a program's bonus only when they hit `IncentiveDefinition.targetCount` (e.g., complete 5 short-notice trips → earn $8). The `Trip` data type carries `incentiveTypes: IncentiveType[]` only — never a per-trip bonus dollar amount. Bonus values appear ONLY at the program level (I-2 contribution popover/tooltip layered on the pill/badge/banner, I-3 dashboard cards once per program, I-3 Upcoming Payout widget for completed programs, I-8 Achievement Unlock Dialog).
+**Bonus model: PROGRAM-LEVEL, single-program-per-trip (post I-4.2).** A trip "counts toward" ONE incentive program (`Trip.incentiveType: IncentiveType | null`). Driver earns the program's bonus when they hit `IncentiveDefinition.targetCount`. Trip never carries per-trip bonus dollars. Bonus values appear ONLY at the program level (I-2 contribution popover/tooltip; I-3 dashboard cards; `/payout` page summary + Completed Incentives tab; I-8 Achievement Unlock Dialog).
+
+**Points model (post I-4.2).** Each `IncentiveDefinition` has a `tierLevel: 'gold' | 'silver' | 'bronze'`. Constant `INCENTIVE_TIER_POINTS = { gold: 3, silver: 2, bronze: 1 }`. When a program completes the driver earns BOTH (a) the program's `bonusAmount` ($) and (b) the program's tier points. Points are STATUS-ONLY — non-monetary. Drive: leaderboard ranking + driver's tier (Bronze/Silver/Gold/Platinum). `TierConfig.threshold` is points-based.
+
+**No-flow / data-driven only.** This prototype renders STATES from seed. NO completion events, NO tier-up events, NO payout-fire events, NO points-accumulation events. All states seeded directly. Achievement Unlock + Tier Unlock dialogs (I-8) are mock-triggered via [DEV] buttons.
 
 **Two required navigation paths for stakeholder testing:**
 
@@ -31,17 +35,18 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | 0     | Setup                                                         | ⬜ Planned | Bible + Tracker + screenshots tree uploaded; v0 confirms understanding                                                                                                                                                                                                                           |
 | I-0a  | Shell Replication — Scaffold + List Surfaces                  | ⬜ Planned | App layout, Header, BottomNav (5 tabs), routing. Replicate Dashboard, Requests, My Rides, Ride History. Build shared RideCard once, reuse across all 4 list surfaces.                                                                                                                            |
 | I-0b  | Shell Replication — Ride Details (both states merged)         | ⬜ Planned | Shared trip-detail body (map + metadata + leg cards). Two state variants swap the bottom region: Before Taken (swipe footer) + Needs Action / In Progress (amber alert + action toolbar + sticky red CTA). Two nav paths working: Requests→Detail (Before Taken), MyRides→Detail (Needs Action). |
-| I-0.5 | Schema + Seed Data                                            | ⬜ Planned | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only. `IncentiveDefinition` holds `bonusAmount` + `targetCount`.                                                                                                                                                     |
+| I-0.5 | Schema + Seed Data                                            | ⬜ Planned | `lib/data/incentives.ts` + `lib/variants.ts`. Trip carries `incentiveTypes` only (refactored to singular `incentiveType` in I-4.2). `IncentiveDefinition` holds `bonusAmount` + `targetCount` (gains `tierLevel` in I-4.2). |
 | I-1   | Variant Toggle Infrastructure                                 | ⬜ Planned | Floating Variants pill + Sheet picker + URL/localStorage persistence + default variants for 3 surfaces (pill / dashboard / detail).                                                                                                                                                              |
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
 | I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
-| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ✅ Done    | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard` from I-3), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Reworked `dashboard-card-section` variant from 4 stacked cards → `IncentiveCarousel` (swipe with page dots). Added "View All" link to all 3 dashboard variants → `router.push('/incentives')`. `UpcomingPayoutWidget` UNTOUCHED (stays on dashboard with Sheet popup intact for now). |
-| I-4.2 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ⬜ Planned | New stack-pushed `/payout` page with summary header + 2 tabs: **Rides Completed** (completed-rides filter using existing `RideCard` from Ride History, scoped to current pay period) and **Completed Incentives** (reuses `IncentiveCard` filtered to completed-this-period). Remove Sheet popup from `UpcomingPayoutWidget` on dashboard; tap → `router.push('/payout')`. |
+| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ⬜ Planned | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard`), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel. Add "View All" link to all dashboard variants. **`UpcomingPayoutWidget` STAYS on dashboard** (does NOT move). |
+| I-4.2 | Component Unification + Single-Incentive Schema + Achievement Banner Variant + Points System | ⬜ Planned | **Schema:** `Trip.incentiveType: IncentiveType \| null` (singular, was array); add `IncentiveDefinition.tierLevel` + `INCENTIVE_TIER_POINTS`; add `LeaderboardEntry.pointsEarnedThisPeriod`; `CurrentDriver.incentivesAccomplishedThisPeriod` → `pointsAccumulatedThisPeriod`; `TierConfig.threshold` shifts to points-based (Bronze 0 / Silver 5 / Gold 12 / Platinum 24). **Variant set:** drop `badge-corner-flag`, add `achievement-banner`. Hero Banner refined (black + Wingz mark backdrop tinted by tierLevel). **`IncentiveCard` themed by active variant** (Dashboard carousel, `/incentives` Incentives tab, `/payout` Completed Incentives tab). Drop multi-program rendering everywhere. **Seed updates:** assign tierLevels to programs; trips become single-program; trips for completed programs get `incentiveType: null` (data-driven suppression — NO runtime filter). |
+| I-4.3 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ⬜ Planned | (Renumbered from I-4.2 on 2026-05-01.) New stack-pushed `/payout` page with summary header + 2 tabs: **Rides Completed** (completed-rides filter using existing `RideCard` from Ride History, scoped to current pay period) and **Completed Incentives** (reuses unified `IncentiveCard` filtered to completed-this-period). Remove Sheet popup from `UpcomingPayoutWidget` on dashboard; tap → `router.push('/payout')`. |
 | I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
-| I-6   | Tier Progress (tab content on `/incentives`)                  | ⬜ Planned | Build `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + thresholds + path-to-next-tier progress. Pure status badges based on incentive count — **NO multiplier wiring into Dashboard projected bonus**. |
-| I-7   | Leaderboard (tab content on `/incentives`)                    | ⬜ Planned | Anonymized handles, period selector, current driver highlighted, consumes finalized `TierBadge` from I-6.                                                                                                                                                                                        |
-| I-8   | Polish + Edge States + Achievement Unlock Dialog              | ⬜ Planned | Empty / period-ended / payout-pending / ineligible states + Achievement Unlock Dialog with **3 CTAs** ("View Earnings" → `/payout`, "View Achievements" → `/incentives`, "Dismiss") + Tier Unlock Dialog.                                                                                        |
+| I-6   | Tier Progress (tab content on `/incentives`)                  | ⬜ Planned | Build `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + threshold copy ("Earn N points to reach <Tier>") + path-to-next-tier progress. **Points-based** — driver's tier from `pointsAccumulatedThisPeriod`. NO multiplier wiring into Dashboard projected bonus. |
+| I-7   | Leaderboard (tab content on `/incentives`)                    | ⬜ Planned | Anonymized handles, period selector, current driver highlighted, consumes finalized `TierBadge` from I-6. **Ranked by `pointsEarnedThisPeriod`**; `bonusesEarned` shown per row as a secondary $ figure. |
+| I-8   | Polish + Edge States + Achievement Unlock Dialog              | ⬜ Planned | Empty / period-ended / payout-pending / ineligible states + Achievement Unlock Dialog with **3 CTAs** ("View Earnings" → `/payout`, "View Achievements" → `/incentives`, "Dismiss") + Tier Unlock Dialog. Mock-triggered via [DEV] buttons (no real events).                                                                                        |
 
 ---
 
@@ -49,7 +54,7 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 
 | Step | Decision | Date | Delta Notes |
 |------|----------|------|-------------|
-| I-4.1 | Complete | 2026-05-01 | Reversed earlier "no Incentives Catalog" decision — added `/incentives` tabbed hub. Reworked `dashboard-card-section` variant into `IncentiveCarousel` (one card visible + page dots, non-interactive). Added "View All" link to all 3 dashboard variants. `UpcomingPayoutWidget` left untouched on dashboard (Sheet popup retired in I-4.2). |
+| | | | |
 
 ---
 
@@ -84,12 +89,13 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | RideCard | I-0a | I-0a list surfaces, plus I-2 (incentive surfaces layered on top), I-3 (dashboard previews), I-5 (filtered list) |
 | RideDetailLayout | I-0b | I-0b detail routes, plus I-4 (incentive surface placement on the detail layout) |
 | VariantToggle | I-1 | All variant-set steps (I-2, I-3). Sheet has 2 sections: pill, dashboard. |
-| IncentiveBadgeRenderer | I-2 | I-3 (dashboard cards), I-4 (Ride Details placement), I-5 (filter chips). Switches between `pill-named-bottom` / `badge-corner-flag` / `banner-wingz-hero` based on `useVariants().pill`. |
-| ProgramContributionIndicator | I-2 | I-4 (ride detail surfaces inherit the same wrapper). Tooltip + Popover wrapper around `IncentiveBadgeRenderer`. Single design (no toggle). |
+| IncentiveBadgeRenderer | I-2 (built) → I-4.2 (refined) | I-3 (dashboard cards), I-4 (Ride Details placement), I-5 (filter chips). Switches between `pill-named-bottom` / `banner-wingz-hero` / `achievement-banner` based on `useVariants().pill` (post I-4.2; `badge-corner-flag` retired in I-4.2). Renders ONE program per surface (multi-program rendering dropped in I-4.2). |
+| ProgramContributionIndicator | I-2 (built) → I-4.2 (refined) | I-4 (ride detail surfaces inherit the same wrapper). Tooltip + Popover wrapper around `IncentiveBadgeRenderer`. Single design (no toggle). Single-program rendering only (multi-program dropped in I-4.2). |
+| IncentiveCard | I-3 (built as white card) → I-4.2 (themed by active variant) | Dashboard `dashboard-card-section` carousel (I-4.1), `/incentives` Incentives tab (I-4.1), `/payout` Completed Incentives tab (I-4.3). Reads `useVariants().pill`: `pill-named-bottom` = white card; `banner-wingz-hero` = black with tier-tinted Wingz mark backdrop; `achievement-banner` = full `tierLevel` color. |
 | DashboardIncentiveSection | I-3 | Dashboard. `dashboard-card-section` variant reworked into IncentiveCarousel in I-4.1. Every variant gains a "View All" link in I-4.1 that opens `/incentives`. |
 | IncentiveCarousel | I-4.1 | Dashboard `dashboard-card-section` variant — replaces the 4-stacked-cards layout. One card at a time, swipe left/right, page dots. |
 | IncentivesPage | I-4.1 | New `/incentives` route — Driver Incentives Hub. Composed from header (back chevron + "Driver Incentives" title + Variants pill) + Tabs (Incentives default / Leaderboard / Tier Progress). Tabs are placeholder shells in I-4.1; Leaderboard tab filled in I-7, Tier Progress tab filled in I-6. |
-| PayoutPage | I-4.2 | New `/payout` route — Upcoming Payout breakdown. Composed from header (back chevron + "Upcoming Payout" title + Variants pill) + summary section (total payout / payout date / base + bonus split) + Tabs (Rides Completed default / Completed Incentives). Reuses existing `RideCard` (Rides Completed tab) and `IncentiveCard` (Completed Incentives tab). |
+| PayoutPage | I-4.3 (renumbered from I-4.2 on 2026-05-01) | New `/payout` route — Upcoming Payout breakdown. Composed from header (back chevron + "Upcoming Payout" title + Variants pill) + summary section (total payout / payout date / base + bonus split) + Tabs (Rides Completed default / Completed Incentives). Reuses existing `RideCard` (Rides Completed tab) and the unified `IncentiveCard` (Completed Incentives tab — themed by active variant per I-4.2). |
 | UpcomingPayoutWidget | I-3 (built on dashboard with Sheet) → I-4.2 (Sheet retired, tap navigates to `/payout`) | Stays on dashboard for at-a-glance context. Originally tapped to open a Sheet for breakdown — Sheet REMOVED in I-4.2 because the new `/payout` page is the richer review surface. Tap target swaps to `router.push('/payout')`. |
 | ProgressMeter | I-3 | I-4 (banner-wingz-hero on detail when applicable), I-6 |
 | TierBadge | I-6 | I-7 (leaderboard rows), I-3 (dashboard tier badge) |
@@ -407,6 +413,15 @@ export const VARIANT_LABELS = {
 ---
 
 ### Step I-2: Pill / Badge / Banner on Ride Card — Variant Set + Trip Contribution Popover
+
+> **Forward-looking note (added 2026-05-01):** This step ships as approved with `pill-named-bottom` / `badge-corner-flag` / `banner-wingz-hero`. **In I-4.2** several pieces will be revised:
+> - `badge-corner-flag` retired; replaced by `achievement-banner` (full banner color = program's `tierLevel`).
+> - `banner-wingz-hero` refined: black banner with the Wingz mark backdrop tinted by program's `tierLevel`.
+> - Multi-program rendering dropped everywhere — banner shows ONE program's name + ONE Earn $X (no joined `<Name A> · <Name B>` labels, no summed Earn $X).
+> - `Trip.incentiveTypes: IncentiveType[]` schema becomes `Trip.incentiveType: IncentiveType | null` (singular).
+> - The `ProgramContributionIndicator` popover shows ONE program (no multi-program list).
+>
+> Build I-2 normally with the existing 3 variants and multi-program logic; I-4.2 handles the rework on top.
 
 **Goal:** Add 3 named, fun, eye-catching variants for surfacing incentive eligibility on ride cards in Requests + My Rides + Ride History (variant set), AND a single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants so a driver tapping the surface sees program progress + program-level bonus. Stakeholders compare visual variants AND their interaction in one review. **NO dollar amount on any pill/badge/banner surface itself** — bonuses are program-level (see BIBLE → "What NOT to Build" #3); the bonus dollar value appears ONLY inside the popover/tooltip.
 
@@ -749,7 +764,237 @@ DO NOT move the `UpcomingPayoutWidget` to `/incentives`. The widget remains on D
 
 ---
 
-### Step I-4.2: Upcoming Payout Page (`/payout`) + Retire Sheet Popup
+### Step I-4.2: Component Unification + Single-Incentive Schema + Achievement Banner Variant + Points System
+
+**Goal:** Major restructure with five intertwined parts: (1) **Schema** simplifies to single-program-per-trip + adds tier/points; (2) **Seed data** reseeded for the new schema + completed programs suppressed via `incentiveType: null` (data-driven, NO runtime filter); (3) **Variant set** drops `badge-corner-flag`, adds `achievement-banner`; refines Hero Banner with tier-colored Wingz mark backdrop; (4) **`IncentiveCard` themed by active variant** — propagates the visual identity across Dashboard carousel, `/incentives` Incentives tab, `/payout` Completed Incentives tab; (5) **Multi-program rendering dropped** everywhere — banner shows ONE program, popover shows ONE program, no joined `<Name A> · <Name B>` labels, no summed Earn $X.
+
+**This is a no-flow restructure.** All states are seeded directly. NO completion events, NO points-accumulation events, NO tier-up events.
+
+(No reference screenshots — schema + component changes only.)
+
+**What to build:**
+
+#### Part 1 — Schema changes (`lib/data/incentives.ts`)
+
+```ts
+// CHANGED: Trip now carries SINGLE program (or null), not array
+export interface Trip {
+  id: string;
+  pickupTime: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  status: TripStatus;
+  estimatedMiles: number;
+  client: string;
+  market: string;
+  revenue: number;
+  incentiveType: IncentiveType | null;   // ← was incentiveTypes: IncentiveType[]
+  clientEnrolledInIncentives: boolean;
+}
+
+// CHANGED: IncentiveDefinition gains tierLevel
+export interface IncentiveDefinition {
+  type: IncentiveType;
+  label: string;
+  description: string;
+  targetCount: number;
+  bonusAmount: number;          // dollars at completion (existing)
+  tierLevel: 'gold' | 'silver' | 'bronze';   // ← NEW: program difficulty / value
+  window: Period;
+  eligibilityHint: string;
+}
+
+// NEW: constant for points per tier
+export const INCENTIVE_TIER_POINTS = {
+  gold: 3,
+  silver: 2,
+  bronze: 1,
+} as const;
+
+// CHANGED: LeaderboardEntry adds pointsEarnedThisPeriod
+export interface LeaderboardEntry {
+  rank: number;
+  handle: string;
+  bonusesEarned: number;             // existing — secondary $ figure shown per row
+  pointsEarnedThisPeriod: number;    // ← NEW: primary ranking metric
+  isCurrentDriver: boolean;
+  tier: Tier;                        // driver's tier (Bronze/Silver/Gold/Platinum)
+}
+
+// CHANGED: TierConfig threshold semantics shift to points-based
+export interface TierConfig {
+  tier: Tier;
+  label: string;
+  threshold: number;                 // ← was "incentives accomplished"; now POINTS
+  multiplier: number;                // parking-lot field (not visualized — no UI surface)
+  badgeColor: string;
+}
+
+// CHANGED: CurrentDriver renames + adds points
+export interface CurrentDriver {
+  id: string;
+  displayName: string;
+  initials: string;
+  currentTier: Tier;
+  pointsAccumulatedThisPeriod: number;   // ← was incentivesAccomplishedThisPeriod
+  totalBonusesEarnedThisPeriod: number;
+}
+```
+
+Other types (`IncentiveType`, `Tier`, `TripStatus`, `Period`, `PeriodStatus`, `DriverIncentiveProgress`, `DashboardData`) unchanged.
+
+#### Part 2 — Seed data updates
+
+**Assign tierLevel to each `IncentiveDefinition`** (4 programs in current seed):
+- Weekend Warrior — `tierLevel: 'gold'` (high difficulty / value)
+- Peak Performer — `tierLevel: 'gold'`
+- Early Bird — `tierLevel: 'silver'`
+- Loyalty Streak — `tierLevel: 'bronze'`
+
+(Pushback welcome — adjust values to taste. Reasoning: Weekend Warrior + Peak Performer are gold because they're the in-progress / high-effort programs in the existing demo; Early Bird is silver as completed-mid; Loyalty Streak is bronze as completed-low. Visual variety in seed: every tier represented.)
+
+**Reseed `Trips` to single-program.** Any multi-incentive trip in the existing seed gets reduced to a single program (pick the most relevant one — typically the higher-value tier). 12 trips total in seed.
+
+**Suppress completed programs in seed.** For programs where `DriverIncentiveProgress.earnedThisPeriod === true` (Early Bird + Loyalty Streak in current seed), any trip whose `incentiveType` would have pointed to those programs gets `incentiveType: null` instead. The trip becomes a regular trip with no banner. **NO conditional rendering logic** — this is purely a seed-data rule.
+
+**Update `LeaderboardEntries` (10 rows) with `pointsEarnedThisPeriod` values.** Sort the leaderboard by points descending. Current driver Driver-7821 stays at #4. Sample distribution:
+- #1: 18 points
+- #2: 15 points
+- #3: 13 points
+- #4 (current): 11 points
+- #5–#10: descending values
+
+Each row also keeps `bonusesEarned: number` (existing) — shown as secondary $ figure in the row.
+
+**Update `TierConfig` thresholds (points-based):**
+- Bronze: 0 points
+- Silver: 5 points
+- Gold: 12 points
+- Platinum: 24 points
+
+`multiplier` field stays in seed but is NOT visualized.
+
+**Update `CurrentDriver`:** rename `incentivesAccomplishedThisPeriod` → `pointsAccumulatedThisPeriod`. Set value such that driver is in Silver tier with progress toward Gold. Example: 11 points (Silver tier, 1 point shy of Gold which needs 12).
+
+#### Part 3 — Variant set restructure (`lib/variants.ts`)
+
+```ts
+// CHANGED: PillVariant union — drop badge-corner-flag, add achievement-banner
+export type PillVariant = 'pill-named-bottom' | 'banner-wingz-hero' | 'achievement-banner';
+
+// CHANGED: VARIANT_LABELS — drop badge-corner-flag entry, add achievement-banner entry
+export const VARIANT_LABELS = {
+  pill: {
+    'pill-named-bottom': 'Pill Row (Bottom)',
+    'banner-wingz-hero': 'Hero Banner',
+    'achievement-banner': 'Achievement Banner',
+  },
+  dashboard: { /* unchanged */ },
+} as const;
+```
+
+**Variant Toggle Sheet labels** (locked — match what v0 already shows):
+- Section 1 "Ride Card Indicator" with sub-copy "How incentive eligibility appears on ride cards in list views."
+- Section 2 "Dashboard Incentives" with sub-copy "How incentive progress is surfaced on the home screen."
+
+#### Part 4 — `IncentiveBadgeRenderer` updates
+
+Drop the `badge-corner-flag` branch entirely. Add the `achievement-banner` branch.
+
+**`banner-wingz-hero` REFINED:**
+- Banner background stays BLACK (`#1F2937`)
+- The Wingz mark (LEFT side of banner, ~14×14px) sits on a small backdrop pill/square — that backdrop's color = the program's `tierLevel` color (gold `#EAB308` / silver `#94A3B8` / bronze `#B45309`). Tier indicator while the rest of the banner stays neutral black.
+- Single program in the banner (NO `<Name A> · <Name B>` joined labels)
+- "Earn $<bonusAmount>" right-aligned in green
+- Progress bar with verbose labels below
+
+**`achievement-banner` NEW:**
+- Banner background = program's `tierLevel` color (gold `#EAB308` / silver `#94A3B8` / bronze `#B45309`)
+- Program name LEFT, "Earn $<bonusAmount>" right-aligned (in dark text on the colored bg, or contrast-appropriate)
+- Wingz mark on the LEFT (white/dark mark depending on bg contrast — pick what reads cleanly)
+- Progress bar with verbose labels below
+- Visual prominence is highest of the three variants — celebratory, tier-themed.
+
+#### Part 5 — `IncentiveCard` themed by active variant
+
+The `IncentiveCard` component (used on Dashboard carousel, `/incentives` Incentives tab, `/payout` Completed Incentives tab) reads `useVariants().pill` and switches its visual treatment:
+
+- `pill-named-bottom`: existing white card with program-name pill at top-left, $ at top-right, description, ProgressMeter, count line, chevron.
+- `banner-wingz-hero`: card body is BLACK (matching the ride card banner). Layout: program name + tier-tinted Wingz mark backdrop on top-left, "Earn $X" right-aligned in green, description as light/muted subtitle, ProgressMeter inline, count line.
+- `achievement-banner`: card body is the program's `tierLevel` color (gold/silver/bronze). Same layout as `banner-wingz-hero` but on the colored background.
+
+Same data, three thematic states. NO new sub-components — the same `IncentiveCard` instance handles all three by branching on the variant.
+
+#### Part 6 — `ProgramContributionIndicator` updates
+
+Drop multi-program rendering. The popover/tooltip now shows the SINGLE program info:
+```
+Counts toward Short Notice — 3/5 trips · Earn $8 when complete
+```
+or
+```
+✓ Short Notice — Completed · $8 added to next payout
+```
+
+No joined `· <Name B>` lines. No summed bonus. One program, period.
+
+#### Part 7 — Dashboard `dashboard-card-section` carousel propagation
+
+The carousel built in I-4.1 already renders `IncentiveCard` instances. After this step, those cards automatically pick up the active variant's theme. No additional carousel work — just verify the visual change ripples through.
+
+**Constraints:**
+
+- DO NOT build any flow / event logic. All states come from the seed.
+- DO NOT add a runtime filter `if (program.earnedThisPeriod) return null` — the seed handles suppression by setting `incentiveType: null` on the affected trips.
+- DO NOT break the existing deep-link contract `/requests?incentive=<type>`.
+- DO NOT add a 4th variant — exactly 3 (Pill Row / Hero Banner / Achievement Banner).
+- DO NOT redesign the IncentiveCard layout — only the background colors switch per variant.
+- DO NOT visualize `TierConfig.multiplier` anywhere — it's a parking-lot field.
+- The `CurrentDriver.pointsAccumulatedThisPeriod` value seeded such that the driver is in Silver tier with realistic Gold-tier progress (e.g., 11 points → Silver achieved at 5, Gold needs 12).
+
+**Backend Implications (capture only):**
+
+- Production: backend computes `pointsEarnedThisPeriod` per driver per period (sum of `INCENTIVE_TIER_POINTS[program.tierLevel]` for completed programs).
+- Driver's tier is backend-derived: largest tier where `pointsAccumulatedThisPeriod >= TierConfig.threshold`.
+- Trip's `incentiveType` may be derived backend-side based on which active program a trip qualifies for (and is null if no active program applies). The "suppress completed" rule belongs to backend trip-tagging logic, not frontend rendering.
+- Multi-program-per-trip is dropped from the prototype model. Backend may still compute "this trip is eligible for any of these programs" and pick one to surface — pick rule out of scope here.
+
+**Test Flows After This Step:**
+
+Schema:
+- [ ] `Trip.incentiveType: IncentiveType | null` (singular, not array)
+- [ ] `IncentiveDefinition.tierLevel` exists per program (gold / silver / bronze)
+- [ ] `INCENTIVE_TIER_POINTS = { gold: 3, silver: 2, bronze: 1 }` exported
+- [ ] `LeaderboardEntry.pointsEarnedThisPeriod` exists
+- [ ] `CurrentDriver.pointsAccumulatedThisPeriod` exists (renamed from incentivesAccomplishedThisPeriod)
+- [ ] `TierConfig.threshold` values updated (Bronze 0 / Silver 5 / Gold 12 / Platinum 24)
+- [ ] No multi-program trip in seed
+- [ ] Trips for completed programs have `incentiveType: null` in seed (no runtime filter)
+- [ ] Zero TypeScript errors
+
+Variant set:
+- [ ] `PillVariant = 'pill-named-bottom' | 'banner-wingz-hero' | 'achievement-banner'`
+- [ ] `badge-corner-flag` fully removed from the codebase (no rendering branch, no label)
+- [ ] Variant Toggle Sheet shows 3 variant options under "Ride Card Indicator": Pill Row (Bottom) / Hero Banner / Achievement Banner
+- [ ] `achievement-banner` renders with `tierLevel` color (gold/silver/bronze) as the full banner background
+- [ ] `banner-wingz-hero` renders with black banner + Wingz mark backdrop tinted by `tierLevel`
+- [ ] No multi-program rendering anywhere (no joined `<Name A> · <Name B>` labels, no summed Earn $X)
+
+IncentiveCard theming:
+- [ ] When `useVariants().pill === 'pill-named-bottom'`: IncentiveCard renders white card (existing visual)
+- [ ] When `useVariants().pill === 'banner-wingz-hero'`: IncentiveCard renders BLACK background with Wingz mark backdrop tinted by program's tier
+- [ ] When `useVariants().pill === 'achievement-banner'`: IncentiveCard renders with program's `tierLevel` color as full background (gold/silver/bronze)
+- [ ] Theme propagates to Dashboard carousel + `/incentives` Incentives tab cards consistently
+
+Behavior:
+- [ ] No runtime filter for completed-program suppression (verify by inspecting components — no `earnedThisPeriod ? null` branches in render)
+- [ ] No flow/event handlers added — pure data-driven rendering
+
+---
+
+### Step I-4.3: Upcoming Payout Page (`/payout`) + Retire Sheet Popup
+
+(Renumbered from I-4.2 on 2026-05-01 when the Component Unification step was inserted.)
 
 **Goal:** Add a dedicated stack-pushed `/payout` page that serves as the richer review surface for the upcoming payout — completed trips that contributed to base earnings + completed incentive programs that earned bonuses. Remove the Sheet popup from the dashboard `UpcomingPayoutWidget` (the Sheet is too thin a surface for the full payout context); tap target swaps to `router.push('/payout')`. The widget itself STAYS on dashboard for at-a-glance context.
 
@@ -877,9 +1122,9 @@ DO NOT move the `UpcomingPayoutWidget` to `/incentives`. The widget remains on D
 
 ---
 
-### Step I-6: Tier Progress (tab content on `/incentives`) — Single Design
+### Step I-6: Tier Progress (tab content on `/incentives`) — Points-Based, Single Design
 
-**Goal:** Fill the **Tier Progress** tab on the `/incentives` page (placeholder shell created in I-4.1). Build the `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + threshold copy + path-to-next-tier progress. **Pure status badges based on incentive completion count — NO multiplier wiring into Dashboard projected bonus.** Built BEFORE Leaderboard (I-7) so the leaderboard consumes the finalized `TierBadge` directly — no stub-then-refine cycle.
+**Goal:** Fill the **Tier Progress** tab on the `/incentives` page (placeholder shell created in I-4.1). Build the `TierBadge` composite + horizontal row of 4 tiers (Bronze/Silver/Gold/Platinum) + points-threshold copy + path-to-next-tier progress. **Pure status badges based on `pointsAccumulatedThisPeriod` (introduced in I-4.2) — NO multiplier wiring into Dashboard projected bonus.** Built BEFORE Leaderboard (I-7) so the leaderboard consumes the finalized `TierBadge` directly — no stub-then-refine cycle.
 
 (No reference screenshots for this step — Tier Progress is a net-new screen.)
 
@@ -889,36 +1134,39 @@ DO NOT move the `UpcomingPayoutWidget` to `/incentives`. The widget remains on D
 - Tab content layout:
   - Horizontal row of all 4 tiers (Bronze / Silver / Gold / Platinum) as `TierBadge` composites.
   - Current tier highlighted with primary border + "Current" caption underneath.
-  - For each tier: threshold copy (e.g., "Complete 5 incentives" for Silver, "10 incentives" for Gold, "20 incentives" for Platinum).
-  - `Progress` bar below the tier row showing path to next tier (e.g., "3 more incentives toward Gold").
+  - For each tier: threshold copy in points (e.g., "Earn 5 points to reach Silver", "12 to Gold", "24 to Platinum"). Use the values from `TierConfig.threshold`.
+  - `Progress` bar below the tier row showing path to next tier (e.g., "1 more point toward Gold" if `pointsAccumulatedThisPeriod = 11` and Gold threshold = 12).
+  - Optional info copy explaining the points system: "Complete bronze incentives to earn 1 point, silver = 2 points, gold = 3 points." (small italic muted text below the tier row)
   - Top tier reached message if applicable: "You've reached the highest tier — Platinum!"
 - Finalize `TierBadge` composite (Badge + Avatar accent using `[EXTENDED: tier-*]` color tokens) — used here, in I-7 leaderboard rows, and reusable elsewhere.
-- **NO multiplier wiring into Dashboard.** The dashboard projected bonus stays at `bonusAmount × min(assignedCount, targetCount)` (no tier multiplier visualization). Tier is a status badge / achievement system only — financial multiplier was simplified out of scope on 2026-05-01.
+- **NO multiplier wiring into Dashboard.** The dashboard projected bonus stays at `bonusAmount × min(assignedCount, targetCount)` (no tier multiplier visualization). Tier is a status badge only — financial multiplier was simplified out of scope on 2026-05-01.
 
 **Constraints:**
 
 - Threshold values come from `TierConfig.threshold` — never hardcode.
-- Path-to-next uses `CurrentDriver.incentivesAccomplishedThisPeriod` against `TierConfig.threshold`.
+- Path-to-next uses `CurrentDriver.pointsAccumulatedThisPeriod` against `TierConfig.threshold`.
 - Tier transitions do NOT animate or celebrate here — that's I-8 (Tier Unlock Dialog).
 - **DO NOT add a "×1.10 tier boost applied" caption to Dashboard projected bonus** — tier is purely a status badge, not a multiplier on earnings. The `TierConfig.multiplier` field stays in the seed data as a parking-lot field but is NOT visualized.
 - No variants — single design only.
 - The Tier Progress content lives ONLY inside the `/incentives` Tier Progress tab. Do NOT add a separate route or dashboard CTA for tiers.
+- DO NOT build any tier-up event logic — this is data-driven display only.
 
 **Test Flows After This Step:**
 
 - [ ] Tier Progress tab on `/incentives` shows all 4 tiers in correct order (Bronze / Silver / Gold / Platinum)
 - [ ] Current tier (Silver in seed) highlighted with primary border + "Current" caption
-- [ ] Each tier shows threshold copy
-- [ ] Path-to-next-tier progress bar shows correct progress (current=7, Gold threshold=10 → "3 more incentives toward Gold")
+- [ ] Each tier shows points threshold copy ("Earn N points to reach <Tier>")
+- [ ] Path-to-next-tier progress bar shows correct progress against points (e.g., 11/12 points → 1 more to Gold)
 - [ ] `TierBadge` composite is finalized (no stub state)
+- [ ] Optional points-system explainer text visible
 - [ ] **No "tier boost applied" caption on Dashboard** (multiplier visualization out of scope)
 - [ ] No separate Tiers route or Dashboard CTA exists — content lives inside `/incentives` tab only
 
 ---
 
-### Step I-7: Leaderboard (tab content on `/incentives`) — Single Design
+### Step I-7: Leaderboard (tab content on `/incentives`) — Points-Ranked, Single Design
 
-**Goal:** Fill the **Leaderboard** tab on the `/incentives` page (placeholder shell created in I-4.1). Build the leaderboard ranked by bonuses earned with anonymized handles + period selector. Single design — no variant toggle. Consumes the finalized `TierBadge` from I-6 directly.
+**Goal:** Fill the **Leaderboard** tab on the `/incentives` page (placeholder shell created in I-4.1). Build the leaderboard **ranked by `pointsEarnedThisPeriod` (primary)** with `bonusesEarned` shown as a secondary $ figure per row. Anonymized handles + period selector. Single design — no variant toggle. Consumes the finalized `TierBadge` from I-6 directly.
 
 (No reference screenshots for this step — Leaderboard is a net-new screen.)
 
@@ -927,8 +1175,8 @@ DO NOT move the `UpcomingPayoutWidget` to `/incentives`. The widget remains on D
 - Replace the Leaderboard tab placeholder shell on `/incentives` with the actual content.
 - Tab content layout:
   - Top section: PeriodSelector (`This Week` / `Last Week`) — static toggle that swaps the label only (no real period switching for prototype).
-  - Ranked list of 10 drivers from `LeaderboardEntry` seed data.
-  - Each row: rank, anonymized handle, finalized `TierBadge` (from I-6), bonuses earned ("$XXX").
+  - Ranked list of 10 drivers from `LeaderboardEntry` seed data, **sorted descending by `pointsEarnedThisPeriod`**.
+  - Each row: rank, anonymized handle, finalized `TierBadge` (from I-6), **points earned ("N pts" — primary metric, prominent)**, bonuses earned ("$XXX" — secondary metric, smaller / muted).
   - Top 3 ranks visually distinct (subtle elevation or border).
   - Current driver row (`Driver-7821`) highlighted with primary border + low-alpha tint.
   - Sticky "Your rank: #4" pill at the bottom of the tab area for quick reference (sticky within the tab content scroll, not the global page).
@@ -941,13 +1189,14 @@ DO NOT move the `UpcomingPayoutWidget` to `/incentives`. The widget remains on D
 - Period selector is visual only — no real data switching.
 - Use the finalized `TierBadge` from I-6 — do NOT build a stub.
 - Leaderboard content lives ONLY inside the `/incentives` Leaderboard tab. Do NOT add a separate route or dashboard CTA.
+- **Sort order: `pointsEarnedThisPeriod` descending.** Bonuses are NOT the ranking metric in the post-I-4.2 model.
 
 **Test Flows After This Step:**
 
-- [ ] Leaderboard tab on `/incentives` shows all 10 drivers in rank order
+- [ ] Leaderboard tab on `/incentives` shows all 10 drivers in rank order **by points (descending)**
 - [ ] Current driver Driver-7821 at #4 highlighted with primary border + low-alpha tint
 - [ ] Top 3 visually distinct from ranks 4–10
-- [ ] Each row shows rank + handle + finalized `TierBadge` + bonuses
+- [ ] Each row shows rank + handle + finalized `TierBadge` + **points (primary, prominent)** + bonuses (secondary, muted $)
 - [ ] PeriodSelector toggles label without breaking
 - [ ] Sticky "Your rank: #4" pill visible
 - [ ] Anonymity footer present
