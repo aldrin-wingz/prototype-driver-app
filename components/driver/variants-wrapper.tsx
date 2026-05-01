@@ -2,13 +2,18 @@
 
 import { Suspense } from "react";
 import { VariantsProvider, VariantsFallbackProvider } from "@/lib/variants-context";
+import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
 import { VariantToggle } from "./variant-toggle";
+import { IncentiveEarnedPopup } from "./incentive-earned-popup";
 
 function VariantsContent({ children }: { children: React.ReactNode }) {
   return (
     <VariantsProvider>
-      {children}
-      <VariantToggle />
+      <IncentiveEarnedProvider>
+        {children}
+        <VariantToggle />
+        <IncentiveEarnedPopup />
+      </IncentiveEarnedProvider>
     </VariantsProvider>
   );
 }
@@ -16,7 +21,10 @@ function VariantsContent({ children }: { children: React.ReactNode }) {
 function VariantsFallback({ children }: { children: React.ReactNode }) {
   return (
     <VariantsFallbackProvider>
-      {children}
+      <IncentiveEarnedProvider>
+        {children}
+        <IncentiveEarnedPopup />
+      </IncentiveEarnedProvider>
     </VariantsFallbackProvider>
   );
 }

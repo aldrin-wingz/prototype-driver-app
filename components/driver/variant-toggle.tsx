@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings2 } from "lucide-react";
+import { PartyPopper, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -27,6 +27,16 @@ import {
   type TierProgressVariant,
   type LeaderboardVariant,
 } from "@/lib/variants";
+import { useIncentiveEarned } from "@/lib/incentive-earned-context";
+import { incentiveDefinitions, type IncentiveType } from "@/lib/data/incentives";
+import { INCENTIVE_PILL_COLORS } from "@/lib/data/incentive-utils";
+import { sortByTierDesc } from "@/lib/incentive-sort";
+import { cn } from "@/lib/utils";
+
+// Stable order, sorted Gold → Silver → Bronze (matches Incentives tab)
+const INCENTIVE_TRIGGER_TYPES: IncentiveType[] = sortByTierDesc(incentiveDefinitions).map(
+  (def) => def.type
+);
 
 export function VariantToggle() {
   const [open, setOpen] = useState(false);
@@ -40,6 +50,13 @@ export function VariantToggle() {
     resetToDefaults,
     isLoaded,
   } = useVariants();
+  const { showEarned } = useIncentiveEarned();
+
+  const handleShowEarned = (type: IncentiveType) => {
+    setOpen(false);
+    // Brief delay so the drawer close animation doesn't fight the popup mount
+    setTimeout(() => showEarned(type), 150);
+  };
 
   if (!isLoaded) {
     return null;
@@ -270,6 +287,52 @@ export function VariantToggle() {
                   </div>
                 ))}
               </RadioGroup>
+            </div>
+
+            <Separator />
+
+            {/* Prototype Triggers — Incentive Earned Pop-up */}
+            <div>
+              <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <PartyPopper className="h-4 w-4 text-[#10B981]" />
+                Show Earned Pop-up
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Stakeholder mockup — preview the celebration overlay shown when a
+                driver completes an incentive. Pick one to trigger it.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {INCENTIVE_TRIGGER_TYPES.map((type) => {
+                  const def = incentiveDefinitions.find((d) => d.type === type);
+                  if (!def) return null;
+                  const colors = INCENTIVE_PILL_COLORS[type];
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => handleShowEarned(type)}
+                      className={cn(
+                        "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
+                        "hover:border-[#10B981] hover:bg-[#10B981]/5",
+                        colors.border
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          colors.bg,
+                          colors.text
+                        )}
+                      >
+                        {def.name}
+                      </span>
+                      <span className="text-xs font-medium text-gray-900">
+                        +${def.bonusAmount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
           </div>
