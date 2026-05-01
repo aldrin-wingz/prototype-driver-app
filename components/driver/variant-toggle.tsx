@@ -50,7 +50,7 @@ export function VariantToggle() {
       {/* Floating Pill Button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed top-3 left-3 z-50 flex items-center gap-1.5 rounded-full bg-[#10B981] px-3 py-1.5 text-xs font-medium text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 rounded-full bg-[#10B981] px-3 py-1.5 text-xs font-medium text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
         aria-label="Open variant comparison settings"
       >
         <Settings2 className="h-3.5 w-3.5" />
