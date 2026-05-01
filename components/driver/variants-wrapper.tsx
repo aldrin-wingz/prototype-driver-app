@@ -5,6 +5,7 @@ import { VariantsProvider, VariantsFallbackProvider } from "@/lib/variants-conte
 import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
 import { VariantToggle } from "./variant-toggle";
 import { IncentiveEarnedPopup } from "./incentive-earned-popup";
+import { TierUpPopup } from "./tier-up-popup";
 
 function VariantsContent({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ function VariantsContent({ children }: { children: React.ReactNode }) {
         {children}
         <VariantToggle />
         <IncentiveEarnedPopup />
+        <TierUpPopup />
       </IncentiveEarnedProvider>
     </VariantsProvider>
   );
@@ -24,6 +26,7 @@ function VariantsFallback({ children }: { children: React.ReactNode }) {
       <IncentiveEarnedProvider>
         {children}
         <IncentiveEarnedPopup />
+        <TierUpPopup />
       </IncentiveEarnedProvider>
     </VariantsFallbackProvider>
   );

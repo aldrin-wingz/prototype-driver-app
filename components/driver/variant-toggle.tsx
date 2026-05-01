@@ -27,16 +27,24 @@ import {
   type TierProgressVariant,
   type LeaderboardVariant,
 } from "@/lib/variants";
-import { useIncentiveEarned } from "@/lib/incentive-earned-context";
+import { useIncentiveEarned, type TierUpTier } from "@/lib/incentive-earned-context";
 import { incentiveDefinitions, type IncentiveType } from "@/lib/data/incentives";
 import { INCENTIVE_PILL_COLORS } from "@/lib/data/incentive-utils";
 import { sortByTierDesc } from "@/lib/incentive-sort";
+import { TIER_COLORS } from "@/components/driver/tier-badge";
 import { cn } from "@/lib/utils";
 
 // Stable order, sorted Gold → Silver → Bronze (matches Incentives tab)
 const INCENTIVE_TRIGGER_TYPES: IncentiveType[] = sortByTierDesc(incentiveDefinitions).map(
   (def) => def.type
 );
+
+// Tier-up trigger options (Bronze excluded — there's no level-up to Bronze)
+const TIER_UP_TRIGGERS: { tier: TierUpTier; threshold: number }[] = [
+  { tier: "silver", threshold: 50 },
+  { tier: "gold", threshold: 150 },
+  { tier: "platinum", threshold: 300 },
+];
 
 export function VariantToggle() {
   const [open, setOpen] = useState(false);
@@ -50,12 +58,17 @@ export function VariantToggle() {
     resetToDefaults,
     isLoaded,
   } = useVariants();
-  const { showEarned } = useIncentiveEarned();
+  const { showEarned, showTierUp } = useIncentiveEarned();
 
   const handleShowEarned = (type: IncentiveType) => {
     setOpen(false);
     // Brief delay so the drawer close animation doesn't fight the popup mount
     setTimeout(() => showEarned(type), 150);
+  };
+
+  const handleShowTierUp = (tier: TierUpTier) => {
+    setOpen(false);
+    setTimeout(() => showTierUp(tier), 150);
   };
 
   if (!isLoaded) {
@@ -328,6 +341,48 @@ export function VariantToggle() {
                       </span>
                       <span className="text-xs font-medium text-gray-900">
                         +${def.bonusAmount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Prototype Triggers — Tier Up Pop-up */}
+            <div>
+              <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <PartyPopper className="h-4 w-4 text-[#10B981]" />
+                Show Tier Up Pop-up
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Stakeholder mockup — preview the tier-up celebration shown when a
+                driver crosses a tier threshold. Bronze is excluded (drivers start
+                at Bronze).
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {TIER_UP_TRIGGERS.map(({ tier, threshold }) => {
+                  const tc = TIER_COLORS[tier];
+                  return (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => handleShowTierUp(tier)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors",
+                        "hover:border-[#10B981] hover:bg-[#10B981]/5"
+                      )}
+                      style={{ borderColor: `${tc.bg}66` }}
+                    >
+                      <span
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
+                        style={{ backgroundColor: tc.bg }}
+                      >
+                        {tc.label}
+                      </span>
+                      <span className="text-xs font-medium text-gray-900">
+                        ${threshold}
                       </span>
                     </button>
                   );
