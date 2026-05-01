@@ -8,6 +8,7 @@ import { TierBadge, TIER_COLORS, type Tier } from "@/components/driver/tier-badg
 import { useIncentiveEarned } from "@/lib/incentive-earned-context";
 import {
   getIncentiveProgressInfo,
+  getUpcomingPayoutSummary,
   INCENTIVE_PILL_COLORS,
 } from "@/lib/data/incentive-utils";
 import { incentiveDefinitions, type IncentiveType, type IncentiveTierLevel } from "@/lib/data/incentives";
@@ -114,6 +115,8 @@ export function IncentiveEarnedPopup() {
   }
 
   const tierColor = TIER_COLORS[badgeTier];
+  const payoutSummary = getUpcomingPayoutSummary();
+  const nextPayoutDateFormatted = payoutSummary.nextPayoutDateFormatted;
 
   const handleViewPayout = () => {
     dismiss();
@@ -189,9 +192,16 @@ export function IncentiveEarnedPopup() {
           +${definition.bonusAmount}
         </p>
 
-        {/* Sub-line — "Added to your next payout" */}
+        {/* Sub-line — "Added to your next payout on {date}" */}
         <p className="mt-1 text-center text-sm text-gray-500">
-          Added to your next payout
+          Added to your next payout on{" "}
+          <button
+            type="button"
+            onClick={handleViewPayout}
+            className="font-semibold text-[#10B981] underline underline-offset-2 hover:text-[#0EA371]"
+          >
+            {nextPayoutDateFormatted}
+          </button>
         </p>
 
         {/* Mini tier progress */}
