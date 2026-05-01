@@ -7,6 +7,8 @@ import {
   type PillVariant,
   type DashboardVariant,
   type PayoutSummaryVariant,
+  type TierProgressVariant,
+  type LeaderboardVariant,
   DEFAULT_VARIANTS,
   VARIANT_QUERY_PARAMS,
   parseVariantsFromUrl,
@@ -25,6 +27,8 @@ interface VariantsContextValue {
   setPillVariant: (variant: PillVariant) => void;
   setDashboardVariant: (variant: DashboardVariant) => void;
   setPayoutSummaryVariant: (variant: PayoutSummaryVariant) => void;
+  setTierProgressVariant: (variant: TierProgressVariant) => void;
+  setLeaderboardVariant: (variant: LeaderboardVariant) => void;
   resetToDefaults: () => void;
   isLoaded: boolean;
 }
@@ -66,6 +70,8 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
       params.set(VARIANT_QUERY_PARAMS.pill, newVariants.pill);
       params.set(VARIANT_QUERY_PARAMS.dashboard, newVariants.dashboard);
       params.set(VARIANT_QUERY_PARAMS.payoutSummary, newVariants.payoutSummary);
+      params.set(VARIANT_QUERY_PARAMS.tierProgress, newVariants.tierProgress);
+      params.set(VARIANT_QUERY_PARAMS.leaderboard, newVariants.leaderboard);
       
       // Use replace to avoid adding to history stack
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -105,6 +111,20 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
     [variants, setVariants]
   );
 
+  const setTierProgressVariant = useCallback(
+    (variant: TierProgressVariant) => {
+      setVariants({ ...variants, tierProgress: variant });
+    },
+    [variants, setVariants]
+  );
+
+  const setLeaderboardVariant = useCallback(
+    (variant: LeaderboardVariant) => {
+      setVariants({ ...variants, leaderboard: variant });
+    },
+    [variants, setVariants]
+  );
+
   // Reset to defaults
   const resetToDefaults = useCallback(() => {
     clearVariantsFromStorage();
@@ -122,6 +142,8 @@ export function VariantsProvider({ children }: { children: React.ReactNode }) {
         setPillVariant,
         setDashboardVariant,
         setPayoutSummaryVariant,
+        setTierProgressVariant,
+        setLeaderboardVariant,
         resetToDefaults,
         isLoaded,
       }}
@@ -143,6 +165,8 @@ export function VariantsFallbackProvider({ children }: { children: React.ReactNo
     setPillVariant: () => {},
     setDashboardVariant: () => {},
     setPayoutSummaryVariant: () => {},
+    setTierProgressVariant: () => {},
+    setLeaderboardVariant: () => {},
     resetToDefaults: () => {},
     isLoaded: false,
   };

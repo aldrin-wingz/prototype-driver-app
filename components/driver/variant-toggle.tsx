@@ -19,9 +19,13 @@ import {
   PILL_VARIANT_OPTIONS,
   DASHBOARD_VARIANT_OPTIONS,
   PAYOUT_SUMMARY_VARIANT_OPTIONS,
+  TIER_PROGRESS_VARIANT_OPTIONS,
+  LEADERBOARD_VARIANT_OPTIONS,
   type PillVariant,
   type DashboardVariant,
   type PayoutSummaryVariant,
+  type TierProgressVariant,
+  type LeaderboardVariant,
 } from "@/lib/variants";
 
 export function VariantToggle() {
@@ -31,6 +35,8 @@ export function VariantToggle() {
     setPillVariant,
     setDashboardVariant,
     setPayoutSummaryVariant,
+    setTierProgressVariant,
+    setLeaderboardVariant,
     resetToDefaults,
     isLoaded,
   } = useVariants();
@@ -171,6 +177,88 @@ export function VariantToggle() {
                     <div className="flex-1">
                       <Label
                         htmlFor={`payoutSummary-${option.value}`}
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {option.label}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {option.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <Separator />
+
+            {/* Tier Progress Section */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                Tier Progress
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                How tier progression is visualized on the Tier Progress tab.
+              </p>
+              <RadioGroup
+                value={variants.tierProgress}
+                onValueChange={(value) => setTierProgressVariant(value as TierProgressVariant)}
+                className="space-y-2"
+              >
+                {TIER_PROGRESS_VARIANT_OPTIONS.map((option) => (
+                  <div
+                    key={option.value}
+                    className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-[#10B981] has-[[data-state=checked]]:bg-[#10B981]/5"
+                  >
+                    <RadioGroupItem
+                      value={option.value}
+                      id={`tierProgress-${option.value}`}
+                      className="mt-0.5 border-[#10B981] text-[#10B981]"
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor={`tierProgress-${option.value}`}
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {option.label}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {option.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <Separator />
+
+            {/* Leaderboard Section */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                Leaderboard
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                How drivers are ranked on the Leaderboard tab.
+              </p>
+              <RadioGroup
+                value={variants.leaderboard}
+                onValueChange={(value) => setLeaderboardVariant(value as LeaderboardVariant)}
+                className="space-y-2"
+              >
+                {LEADERBOARD_VARIANT_OPTIONS.map((option) => (
+                  <div
+                    key={option.value}
+                    className="flex items-start space-x-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-[#10B981] has-[[data-state=checked]]:bg-[#10B981]/5"
+                  >
+                    <RadioGroupItem
+                      value={option.value}
+                      id={`leaderboard-${option.value}`}
+                      className="mt-0.5 border-[#10B981] text-[#10B981]"
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor={`leaderboard-${option.value}`}
                         className="text-sm font-medium cursor-pointer"
                       >
                         {option.label}

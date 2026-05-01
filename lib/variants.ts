@@ -38,6 +38,22 @@ export type PayoutSummaryVariant =
   | 'boxed-tabs'             // Outer card sits inside standard horizontal page padding
   | 'edge-to-edge-tabs';     // Outer card extends flush to viewport horizontal edges
 
+/**
+ * Tier Progress tab visualization (I-6)
+ * Two layouts for showing the driver's progression across the 4 tiers.
+ */
+export type TierProgressVariant = 
+  | 'tier-linear'            // Hero $ + 4 tier icons + horizontal progress bar with marker
+  | 'tier-stack';            // Hero $ + vertical stack of 4 tier cards (status indicators)
+
+/**
+ * Leaderboard tab visualization (I-6)
+ * Two layouts for ranking drivers by monthly bonus earnings.
+ */
+export type LeaderboardVariant = 
+  | 'leaderboard-list'       // Flat ranked list of 10 rows
+  | 'leaderboard-podium';    // Top-3 podium + ranks 4+ as a list
+
 // -----------------------------------------------------------------------------
 // VARIANT SELECTION
 // -----------------------------------------------------------------------------
@@ -51,6 +67,8 @@ export interface VariantSelection {
   pill: PillVariant;
   dashboard: DashboardVariant;
   payoutSummary: PayoutSummaryVariant;
+  tierProgress: TierProgressVariant;
+  leaderboard: LeaderboardVariant;
 }
 
 /**
@@ -61,6 +79,8 @@ export const DEFAULT_VARIANTS: VariantSelection = {
   pill: 'pill-named-bottom',
   dashboard: 'dashboard-card-section',
   payoutSummary: 'boxed-tabs',
+  tierProgress: 'tier-linear',
+  leaderboard: 'leaderboard-list',
 };
 
 // -----------------------------------------------------------------------------
@@ -84,6 +104,16 @@ export const PAYOUT_SUMMARY_VARIANT_LABELS: Record<PayoutSummaryVariant, string>
   'edge-to-edge-tabs': 'Edge-to-Edge Tabs',
 };
 
+export const TIER_PROGRESS_VARIANT_LABELS: Record<TierProgressVariant, string> = {
+  'tier-linear': 'Linear Progress',
+  'tier-stack': 'Tier Stack',
+};
+
+export const LEADERBOARD_VARIANT_LABELS: Record<LeaderboardVariant, string> = {
+  'leaderboard-list': 'Ranked List',
+  'leaderboard-podium': 'Podium Top 3',
+};
+
 /**
  * Combined labels map for programmatic access.
  */
@@ -91,6 +121,8 @@ export const VARIANT_LABELS = {
   pill: PILL_VARIANT_LABELS,
   dashboard: DASHBOARD_VARIANT_LABELS,
   payoutSummary: PAYOUT_SUMMARY_VARIANT_LABELS,
+  tierProgress: TIER_PROGRESS_VARIANT_LABELS,
+  leaderboard: LEADERBOARD_VARIANT_LABELS,
 } as const;
 
 // -----------------------------------------------------------------------------
@@ -152,6 +184,32 @@ export const PAYOUT_SUMMARY_VARIANT_OPTIONS: VariantOption<PayoutSummaryVariant>
   },
 ];
 
+export const TIER_PROGRESS_VARIANT_OPTIONS: VariantOption<TierProgressVariant>[] = [
+  {
+    value: 'tier-linear',
+    label: 'Linear Progress',
+    description: 'Hero $ + 4 tier icons across a horizontal progress bar with a position marker.',
+  },
+  {
+    value: 'tier-stack',
+    label: 'Tier Stack',
+    description: 'Hero $ + vertical stack of 4 tier cards with status indicators (Locked / Current / Achieved).',
+  },
+];
+
+export const LEADERBOARD_VARIANT_OPTIONS: VariantOption<LeaderboardVariant>[] = [
+  {
+    value: 'leaderboard-list',
+    label: 'Ranked List',
+    description: 'Flat 10-row ranked list. Current driver row highlighted with a green tint.',
+  },
+  {
+    value: 'leaderboard-podium',
+    label: 'Podium Top 3',
+    description: 'Top-3 drivers shown on a podium (1st centered + taller). Ranks 4+ render as a flat list below.',
+  },
+];
+
 // -----------------------------------------------------------------------------
 // STORAGE KEYS
 // -----------------------------------------------------------------------------
@@ -164,6 +222,8 @@ export const VARIANT_QUERY_PARAMS = {
   pill: 'v_pill',
   dashboard: 'v_dash',
   payoutSummary: 'payoutSummary',
+  tierProgress: 'tierProgress',
+  leaderboard: 'leaderboard',
 } as const;
 
 // -----------------------------------------------------------------------------
@@ -192,6 +252,16 @@ export function parseVariantsFromUrl(searchParams: URLSearchParams): Partial<Var
     result.payoutSummary = payoutSummaryParam;
   }
   
+  const tierProgressParam = searchParams.get(VARIANT_QUERY_PARAMS.tierProgress);
+  if (tierProgressParam && isValidTierProgressVariant(tierProgressParam)) {
+    result.tierProgress = tierProgressParam;
+  }
+  
+  const leaderboardParam = searchParams.get(VARIANT_QUERY_PARAMS.leaderboard);
+  if (leaderboardParam && isValidLeaderboardVariant(leaderboardParam)) {
+    result.leaderboard = leaderboardParam;
+  }
+  
   return result;
 }
 
@@ -203,6 +273,8 @@ export function serializeVariantsToUrl(variants: VariantSelection): string {
   params.set(VARIANT_QUERY_PARAMS.pill, variants.pill);
   params.set(VARIANT_QUERY_PARAMS.dashboard, variants.dashboard);
   params.set(VARIANT_QUERY_PARAMS.payoutSummary, variants.payoutSummary);
+  params.set(VARIANT_QUERY_PARAMS.tierProgress, variants.tierProgress);
+  params.set(VARIANT_QUERY_PARAMS.leaderboard, variants.leaderboard);
   return params.toString();
 }
 
@@ -264,6 +336,8 @@ const VALID_PILL_VARIANTS: PillVariant[] = [
 ];
 const VALID_DASHBOARD_VARIANTS: DashboardVariant[] = ['dashboard-banner', 'dashboard-card-section', 'dashboard-widget-integrated'];
 const VALID_PAYOUT_SUMMARY_VARIANTS: PayoutSummaryVariant[] = ['boxed-tabs', 'edge-to-edge-tabs'];
+const VALID_TIER_PROGRESS_VARIANTS: TierProgressVariant[] = ['tier-linear', 'tier-stack'];
+const VALID_LEADERBOARD_VARIANTS: LeaderboardVariant[] = ['leaderboard-list', 'leaderboard-podium'];
 
 export function isValidPillVariant(value: string): value is PillVariant {
   return VALID_PILL_VARIANTS.includes(value as PillVariant);
@@ -277,6 +351,14 @@ export function isValidPayoutSummaryVariant(value: string): value is PayoutSumma
   return VALID_PAYOUT_SUMMARY_VARIANTS.includes(value as PayoutSummaryVariant);
 }
 
+export function isValidTierProgressVariant(value: string): value is TierProgressVariant {
+  return VALID_TIER_PROGRESS_VARIANTS.includes(value as TierProgressVariant);
+}
+
+export function isValidLeaderboardVariant(value: string): value is LeaderboardVariant {
+  return VALID_LEADERBOARD_VARIANTS.includes(value as LeaderboardVariant);
+}
+
 export function isValidVariantSelection(obj: unknown): obj is VariantSelection {
   if (typeof obj !== 'object' || obj === null) return false;
   
@@ -285,6 +367,8 @@ export function isValidVariantSelection(obj: unknown): obj is VariantSelection {
   return (
     typeof selection.pill === 'string' && isValidPillVariant(selection.pill) &&
     typeof selection.dashboard === 'string' && isValidDashboardVariant(selection.dashboard) &&
-    typeof selection.payoutSummary === 'string' && isValidPayoutSummaryVariant(selection.payoutSummary)
+    typeof selection.payoutSummary === 'string' && isValidPayoutSummaryVariant(selection.payoutSummary) &&
+    typeof selection.tierProgress === 'string' && isValidTierProgressVariant(selection.tierProgress) &&
+    typeof selection.leaderboard === 'string' && isValidLeaderboardVariant(selection.leaderboard)
   );
 }

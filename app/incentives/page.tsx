@@ -2,25 +2,12 @@
 
 import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IncentiveCard } from "@/components/driver/dashboard-incentive-section";
+import { TierProgressTab } from "@/components/driver/tier-progress-tab";
+import { LeaderboardTab } from "@/components/driver/leaderboard-tab";
 import { getAllIncentiveProgress } from "@/lib/data/incentive-utils";
 import type { IncentiveType } from "@/lib/data/incentives";
-
-// -----------------------------------------------------------------------------
-// Placeholder Tab Content (Leaderboard + Tier Progress)
-// -----------------------------------------------------------------------------
-
-function PlaceholderContent({ message }: { message: string }) {
-  return (
-    <div className="px-4 py-8">
-      <Card className="bg-gray-50 border-dashed border-gray-200 p-12 text-center shadow-none">
-        <p className="text-sm text-gray-500">{message}</p>
-      </Card>
-    </div>
-  );
-}
 
 // -----------------------------------------------------------------------------
 // Main Page Component
@@ -93,14 +80,14 @@ export default function IncentivesPage() {
           </div>
         </TabsContent>
 
-        {/* Leaderboard Tab - Placeholder shell (filled in I-7) */}
+        {/* Leaderboard Tab (I-6) */}
         <TabsContent value="leaderboard" className="mt-0">
-          <PlaceholderContent message="Leaderboard coming soon" />
+          <LeaderboardTab />
         </TabsContent>
 
-        {/* Tier Progress Tab - Placeholder shell (filled in I-6) */}
+        {/* Tier Progress Tab (I-6) */}
         <TabsContent value="tier-progress" className="mt-0">
-          <PlaceholderContent message="Tier Progress coming soon" />
+          <TierProgressTab />
         </TabsContent>
       </Tabs>
     </div>
