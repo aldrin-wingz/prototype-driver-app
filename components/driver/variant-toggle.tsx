@@ -59,7 +59,7 @@ export function VariantToggle() {
 
       {/* Sheet */}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent side="left" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Compare Variants</SheetTitle>
             <SheetDescription>
