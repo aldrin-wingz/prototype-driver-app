@@ -79,7 +79,7 @@ export function FilterRequestsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/50">
       {/* Modal container */}
-      <div className="w-full max-h-[90vh] overflow-y-auto rounded-t-2xl bg-white p-6 shadow-lg">
+      <div className="w-full max-h-[90vh] overflow-y-auto rounded-t-2xl bg-white px-6 pt-6 pb-28 shadow-lg">
         {/* Header with close button */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Filter Requests</h2>
