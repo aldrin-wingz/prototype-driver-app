@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, RotateCcw } from "lucide-react";
+import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, RotateCcw, Info } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
