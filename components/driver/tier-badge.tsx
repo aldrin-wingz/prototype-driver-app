@@ -1,6 +1,6 @@
 "use client";
 
-import { Award, Medal, Shield, Trophy } from "lucide-react";
+import { Medal, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type Tier = "bronze" | "silver" | "gold" | "platinum";
@@ -46,10 +46,11 @@ export const TIER_COLORS: Record<Tier, { bg: string; fg: string; ring: string; s
   },
 };
 
+// Icon family: Medal for ranking tiers (Bronze/Silver/Gold), Trophy for top tier (Platinum).
 const TIER_ICONS: Record<Tier, typeof Medal> = {
   bronze: Medal,
-  silver: Shield,
-  gold: Award,
+  silver: Medal,
+  gold: Medal,
   platinum: Trophy,
 };
 
