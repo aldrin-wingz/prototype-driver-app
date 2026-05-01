@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   getAllIncentiveProgress,
   getProjectedTotalBonus,
+  getQualifyingTripsCount,
   INCENTIVE_PILL_COLORS,
   INCENTIVE_TIER_COLORS,
   type IncentiveProgressInfo,
@@ -250,6 +251,7 @@ function ThemedProgressMeter({
 function IncentiveCard({ progress, onTap, variant = "full" }: IncentiveCardProps) {
   const { variants, isLoaded } = useVariants();
   const colors = INCENTIVE_PILL_COLORS[progress.incentiveType];
+  const availableCount = getQualifyingTripsCount(progress.incentiveType);
 
   // mini variant always uses the white card (used inside dashboard-banner horizontal scroll)
   if (variant === "mini") {
@@ -348,6 +350,36 @@ function IncentiveCard({ progress, onTap, variant = "full" }: IncentiveCardProps
             toGoTextClass={theme.progressToGoText}
             stripeRgba={theme.stripeRgba}
           />
+
+          {/* Available trips CTA — clickable area is the outer card button */}
+          <div
+            className={cn(
+              "mt-3 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium",
+              availableCount > 0
+                ? "bg-[#10B981]/10 text-[#10B981]"
+                : "bg-gray-100 text-gray-500"
+            )}
+            aria-label={
+              availableCount > 0
+                ? `${availableCount} qualifying trips available — tap to filter`
+                : "No qualifying trips right now — tap to refresh"
+            }
+          >
+            {availableCount > 0 ? (
+              <>
+                <span className="font-semibold">{availableCount}</span>
+                <span>{availableCount === 1 ? "trip" : "trips"} available</span>
+                <span aria-hidden="true">·</span>
+                <span>Tap to filter</span>
+              </>
+            ) : (
+              <>
+                <span>No trips available right now</span>
+                <span aria-hidden="true">·</span>
+                <span>Tap to refresh</span>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end justify-between self-stretch">
           <span className={cn("text-lg font-bold", theme.bonusText)}>

@@ -11,6 +11,7 @@ import type {
 } from "./incentives";
 import { incentiveDefinitions, driverIncentiveProgress } from "./incentives";
 import { sortByTierDesc } from "@/lib/incentive-sort";
+import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 
 // -----------------------------------------------------------------------------
 // INCENTIVE DISPLAY NAMES
@@ -25,6 +26,10 @@ export const INCENTIVE_DISPLAY_NAMES: Record<IncentiveType, string> = {
   'new-rider-bonus': 'New Rider',
   'long-haul': 'Long Haul',
   'perfect-rating': 'Perfect Rating',
+  'white-glove': 'White Glove',
+  'quick-wins': 'Quick Wins',
+  'hometown-hero': 'Hometown Hero',
+  'squad-goals': 'Squad Goals',
 };
 
 /** Short trip labels (e.g., "Early Bird Trip") */
@@ -45,6 +50,13 @@ export const INCENTIVE_PILL_COLORS: Record<IncentiveType, { bg: string; text: st
   'new-rider-bonus': { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300' },
   'long-haul': { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
   'perfect-rating': { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300' },
+  // Gold tier — White Glove (rose) & Squad Goals (fuchsia)
+  'white-glove': { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300' },
+  'squad-goals': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-300' },
+  // Bronze tier — Quick Wins (yellow / warm tan)
+  'quick-wins': { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+  // Silver tier — Hometown Hero (cyan / blue family)
+  'hometown-hero': { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300' },
 };
 
 /** Muted/desaturated colors for completed trips in Ride History */
@@ -56,6 +68,10 @@ export const INCENTIVE_PILL_COLORS_MUTED: Record<IncentiveType, { bg: string; te
   'new-rider-bonus': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
   'long-haul': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
   'perfect-rating': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+  'white-glove': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+  'quick-wins': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+  'hometown-hero': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+  'squad-goals': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
 };
 
 // -----------------------------------------------------------------------------
@@ -279,4 +295,16 @@ export function getPayoutBreakdown(): PayoutBreakdownItem[] {
 export function getProjectedTotalBonus(): number {
   const allProgress = getAllIncentiveProgress();
   return allProgress.reduce((sum, item) => sum + item.bonusAmount, 0);
+}
+
+// -----------------------------------------------------------------------------
+// REQUEST FEED COUNT HELPERS
+// -----------------------------------------------------------------------------
+
+/**
+ * Count of qualifying request trips for a given incentive type, computed live
+ * from the mock request feed. Used by the "Available trips" CTA on Incentive cards.
+ */
+export function getQualifyingTripsCount(type: IncentiveType): number {
+  return mockRequestTrips.filter((t) => t.incentiveType === type).length;
 }

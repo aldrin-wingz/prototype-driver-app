@@ -17,7 +17,11 @@ export type IncentiveType =
   | 'loyalty-streak'       // Complete trips X consecutive days
   | 'new-rider-bonus'      // Complete X trips with first-time riders
   | 'long-haul'            // Complete X trips over 20 miles
-  | 'perfect-rating';      // Maintain 5-star rating for X trips
+  | 'perfect-rating'       // Maintain 5-star rating for X trips
+  | 'white-glove'          // Complete door-to-door trips
+  | 'quick-wins'           // Complete short-distance trips
+  | 'hometown-hero'        // Complete trips within your home county
+  | 'squad-goals';         // Complete multi-loading (multi-rider) trips
 
 /** Driver tier levels */
 export type Tier = 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -296,6 +300,50 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     qualifyingCriteria: 'Rides on 5 consecutive days',
     tierLevel: 'bronze',
   },
+  {
+    id: 'white-glove',
+    type: 'white-glove',
+    name: 'White Glove',
+    description: 'Complete 6 door-to-door trips this month',
+    bonusAmount: 50,
+    targetCount: 6,
+    periodId: 'may-2026',
+    qualifyingCriteria: 'Trips with door-to-door service',
+    tierLevel: 'gold',
+  },
+  {
+    id: 'quick-wins',
+    type: 'quick-wins',
+    name: 'Quick Wins',
+    description: 'Complete 10 short-distance trips this month',
+    bonusAmount: 10,
+    targetCount: 10,
+    periodId: 'may-2026',
+    qualifyingCriteria: 'Trips under 5 miles',
+    tierLevel: 'bronze',
+  },
+  {
+    id: 'hometown-hero',
+    type: 'hometown-hero',
+    name: 'Hometown Hero',
+    description: 'Complete 8 trips within your home county',
+    bonusAmount: 30,
+    targetCount: 8,
+    periodId: 'may-2026',
+    qualifyingCriteria: 'Pickup and dropoff in same county',
+    tierLevel: 'silver',
+  },
+  {
+    id: 'squad-goals',
+    type: 'squad-goals',
+    name: 'Squad Goals',
+    description: 'Complete 6 multi-rider trips this month',
+    bonusAmount: 50,
+    targetCount: 6,
+    periodId: 'may-2026',
+    qualifyingCriteria: 'Trips with 2+ passengers',
+    tierLevel: 'gold',
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -340,6 +388,38 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
     isComplete: true,
     bonusEarned: 85,
     lastQualifyingTripId: 'trip-hist-003',
+  },
+  {
+    incentiveId: 'white-glove',
+    currentCount: 2,
+    scheduledCount: 1,
+    targetCount: 6,
+    isComplete: false,
+    bonusEarned: 0,
+  },
+  {
+    incentiveId: 'quick-wins',
+    currentCount: 4,
+    scheduledCount: 1,
+    targetCount: 10,
+    isComplete: false,
+    bonusEarned: 0,
+  },
+  {
+    incentiveId: 'hometown-hero',
+    currentCount: 3,
+    scheduledCount: 2,
+    targetCount: 8,
+    isComplete: false,
+    bonusEarned: 0,
+  },
+  {
+    incentiveId: 'squad-goals',
+    currentCount: 1,
+    scheduledCount: 1,
+    targetCount: 6,
+    isComplete: false,
+    bonusEarned: 0,
   },
 ];
 
