@@ -31,20 +31,15 @@ export default function RequestsPage() {
   // Initialize filter state from URL param on first render
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [appliedFilters, setAppliedFilters] = React.useState<RequestFilters>(() => ({
-    mode: incentiveParam ? "driver-incentives" : "full-trip",
     incentiveType: incentiveParam ?? undefined,
   }));
 
   // Derive filtered trips from appliedFilters
   const filteredTrips = React.useMemo(() => {
     let result = mockRequestTrips;
-    if (appliedFilters.mode === "driver-incentives") {
-      result = result.filter((t) => {
-        if (appliedFilters.incentiveType) {
-          return t.incentiveType === appliedFilters.incentiveType;
-        }
-        return !!t.incentiveType;
-      });
+    // Filter by incentive type if set
+    if (appliedFilters.incentiveType) {
+      result = result.filter((t) => t.incentiveType === appliedFilters.incentiveType);
     }
     return result;
   }, [appliedFilters]);
