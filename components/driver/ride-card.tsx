@@ -82,17 +82,11 @@ function LegBlock({ leg, isLast, revenueColor, isCompleted }: {
             </div>
           </div>
           <div className="text-right">
-            <p className={cn(
-              "text-sm",
-              isCompleted ? "text-blue-600" : "text-gray-600"
-            )}>
+            <p className="text-sm text-gray-600">
               {leg.county}
             </p>
             {leg.revenue > 0 && (
-              <p className={cn(
-                "font-semibold",
-                revenueColor === "blue" ? "text-blue-600" : "text-[#10B981]"
-              )}>
+              <p className="font-semibold text-[#10B981]">
                 ${leg.revenue.toFixed(2)}
               </p>
             )}

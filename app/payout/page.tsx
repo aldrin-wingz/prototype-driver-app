@@ -426,7 +426,7 @@ export default function PayoutPage() {
                     <RideCard
                       key={trip.id}
                       trip={trip}
-                      revenueColor="blue"
+                      revenueColor="green"
                       onClick={handleRideTap}
                       showDistance={false}
                     />
@@ -450,7 +450,7 @@ export default function PayoutPage() {
                     <RideCard
                       key={trip.id}
                       trip={trip}
-                      revenueColor="blue"
+                      revenueColor="green"
                       onClick={handleRideTap}
                       showDistance={false}
                     />
