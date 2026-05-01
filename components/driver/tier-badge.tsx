@@ -1,6 +1,6 @@
 "use client";
 
-import { Medal, Trophy } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export type Tier = "bronze" | "silver" | "gold" | "platinum";
@@ -14,7 +14,7 @@ interface TierBadgeProps {
   className?: string;
 }
 
-// Tier color tokens (per I-6 spec)
+// Tier color tokens (per I-6 spec; bg is the only thing that varies between tiers in I-6.1).
 export const TIER_COLORS: Record<Tier, { bg: string; fg: string; ring: string; soft: string; label: string }> = {
   bronze: {
     bg: "#B45309",
@@ -46,27 +46,23 @@ export const TIER_COLORS: Record<Tier, { bg: string; fg: string; ring: string; s
   },
 };
 
-// Icon family: Medal for ranking tiers (Bronze/Silver/Gold), Trophy for top tier (Platinum).
-const TIER_ICONS: Record<Tier, typeof Medal> = {
-  bronze: Medal,
-  silver: Medal,
-  gold: Medal,
-  platinum: Trophy,
-};
-
-const SIZE_DIMENSIONS: Record<TierBadgeSize, { container: string; icon: string; text: string }> = {
-  sm: { container: "h-6 w-6", icon: "h-3.5 w-3.5", text: "text-xs" },
-  md: { container: "h-8 w-8", icon: "h-4 w-4", text: "text-sm" },
-  lg: { container: "h-12 w-12", icon: "h-6 w-6", text: "text-base" },
+const SIZE_DIMENSIONS: Record<
+  TierBadgeSize,
+  { container: string; image: number; text: string }
+> = {
+  sm: { container: "h-6 w-6", image: 14, text: "text-xs" },
+  md: { container: "h-8 w-8", image: 18, text: "text-sm" },
+  lg: { container: "h-12 w-12", image: 28, text: "text-base" },
 };
 
 /**
- * Shared TierBadge composite (I-6).
- * Renders a tier-colored circular icon, optionally with the tier label beside it.
- * Used in: TierProgressTab (both variants), LeaderboardTab (both variants), Dashboard tier surfaces.
+ * Shared TierBadge composite (I-6 → redesigned in I-6.1).
+ * Renders the green Wingz brand mark on a tier-colored circular background.
+ * Same Wingz mark across all 4 tiers — only the bg color changes.
+ * Used in: TierProgressSection (Incentives tab top), LeaderboardTab (rows + podium),
+ * YourPlacementCard, Dashboard tier surface.
  */
 export function TierBadge({ tier, size = "md", showLabel = false, className }: TierBadgeProps) {
-  const Icon = TIER_ICONS[tier];
   const colors = TIER_COLORS[tier];
   const dims = SIZE_DIMENSIONS[size];
 
@@ -80,7 +76,13 @@ export function TierBadge({ tier, size = "md", showLabel = false, className }: T
         style={{ backgroundColor: colors.bg }}
         aria-label={`${colors.label} tier`}
       >
-        <Icon className={dims.icon} style={{ color: colors.fg }} />
+        <Image
+          src="/WINGZLOGO2.png"
+          alt=""
+          width={dims.image}
+          height={dims.image}
+          className="object-contain"
+        />
       </div>
       {showLabel && (
         <span className={cn("font-semibold text-gray-900", dims.text)}>

@@ -22,10 +22,10 @@ function getThreshold(tier: Tier): number {
 }
 
 // -----------------------------------------------------------------------------
-// VARIANT A: tier-linear — Hero $ + 4 tier icons + horizontal progress bar
+// VARIANT A: tier-linear — Card-pill with hero $ + 4 tier badges + progress bar
 // -----------------------------------------------------------------------------
 
-function TierLinearVariant() {
+function TierLinearSection() {
   const earned = currentDriver.totalBonusesEarnedThisMonth;
   const currentTier = currentDriver.currentTier;
   const nextTier = getNextTier(currentTier);
@@ -33,38 +33,41 @@ function TierLinearVariant() {
   const progressPct = Math.min(100, (earned / platinumThreshold) * 100);
 
   return (
-    <div className="px-4 py-6">
-      {/* Hero header */}
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+    <Card className="border-gray-200 bg-white p-4 shadow-sm">
+      {/* Header: small uppercase label + $ hero */}
+      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
         Earned this month — May 2026
       </p>
-      <p className="mb-8 text-5xl font-bold text-[#10B981]">
+      <p className="mb-3 text-4xl font-bold leading-none text-[#10B981]">
         ${earned}
       </p>
 
+      {/* Hairline divider */}
+      <div className="-mx-4 mb-4 h-px bg-gray-100" />
+
       {/* Tier badges row */}
-      <div className="mb-3 flex items-center justify-between px-2">
+      <div className="mb-2 flex items-center justify-between px-1">
         {ALL_TIERS.map((tier) => (
           <div key={tier} className="flex flex-col items-center gap-1">
             <TierBadge tier={tier} size="sm" />
-            <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+            <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">
               {TIER_COLORS[tier].label}
             </span>
           </div>
         ))}
       </div>
 
-      {/* Progress bar with $80 callout above the marker */}
-      <div className="relative mx-2 mb-1 mt-7 h-2 rounded-full bg-gray-200">
-        {/* Earned-amount callout sitting directly above the marker */}
+      {/* Progress bar with $ callout above marker */}
+      <div className="relative mx-1 mb-1 mt-5 h-1.5 rounded-full bg-gray-200">
+        {/* $ callout sitting directly above the marker */}
         <div
-          className="pointer-events-none absolute bottom-full left-0 flex -translate-x-1/2 flex-col items-center"
+          className="pointer-events-none absolute bottom-full flex -translate-x-1/2 flex-col items-center"
           style={{ left: `${progressPct}%` }}
         >
           <span className="mb-0.5 text-[10px] font-semibold tabular-nums text-gray-600">
             ${earned}
           </span>
-          <div className="h-1.5 w-px bg-gray-400" />
+          <div className="h-1 w-px bg-gray-400" />
         </div>
 
         {/* Filled bar */}
@@ -78,21 +81,21 @@ function TierLinearVariant() {
           className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
           style={{ left: `${progressPct}%` }}
         >
-          <div className="h-4 w-4 rounded-full border-2 border-white bg-[#10B981] shadow-md" />
+          <div className="h-3.5 w-3.5 rounded-full border-2 border-white bg-[#10B981] shadow-md" />
         </div>
       </div>
 
-      {/* Tier $ markers below the bar */}
-      <div className="mb-6 flex items-center justify-between px-2 text-[10px] font-medium text-gray-500">
+      {/* $ thresholds below the bar */}
+      <div className="mb-3 flex items-center justify-between px-1 text-[9px] font-medium tabular-nums text-gray-500">
         <span>${getThreshold("bronze")}</span>
         <span>${getThreshold("silver")}</span>
         <span>${getThreshold("gold")}</span>
         <span>${getThreshold("platinum")}</span>
       </div>
 
-      {/* Status copy — inline (no card wrapper) */}
+      {/* Status copy — inline (no nested card) */}
       {nextTier ? (
-        <p className="text-center text-sm leading-relaxed text-gray-700">
+        <p className="text-center text-xs leading-relaxed text-gray-700">
           You&apos;re in{" "}
           <span className="font-semibold" style={{ color: TIER_COLORS[currentTier].bg }}>
             {TIER_COLORS[currentTier].label}
@@ -107,22 +110,22 @@ function TierLinearVariant() {
           </span>
         </p>
       ) : (
-        <p className="text-center text-sm leading-relaxed text-gray-700">
+        <p className="text-center text-xs leading-relaxed text-gray-700">
           You&apos;ve reached the highest tier —{" "}
           <span className="font-semibold" style={{ color: TIER_COLORS.platinum.bg }}>
             Platinum!
           </span>
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
 // -----------------------------------------------------------------------------
-// VARIANT B: tier-stack — Hero $ + vertical stack of 4 tier cards
+// VARIANT B: tier-stack — Card-pill with hero $ + vertical stack of 4 tier rows
 // -----------------------------------------------------------------------------
 
-function TierStackVariant() {
+function TierStackSection() {
   const earned = currentDriver.totalBonusesEarnedThisMonth;
   const currentTier = currentDriver.currentTier;
   const nextTier = getNextTier(currentTier);
@@ -131,17 +134,20 @@ function TierStackVariant() {
   const renderOrder: Tier[] = ["platinum", "gold", "silver", "bronze"];
 
   return (
-    <div className="px-4 py-6">
-      {/* Hero header (same as Variant A) */}
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+    <Card className="border-gray-200 bg-white p-4 shadow-sm">
+      {/* Header: small uppercase label + $ hero */}
+      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
         Earned this month — May 2026
       </p>
-      <p className="mb-6 text-5xl font-bold text-[#10B981]">
+      <p className="mb-3 text-4xl font-bold leading-none text-[#10B981]">
         ${earned}
       </p>
 
-      {/* Tier stack (compressed cards: ~64px tall) */}
-      <div className="space-y-2">
+      {/* Hairline divider */}
+      <div className="-mx-4 mb-3 h-px bg-gray-100" />
+
+      {/* Tier stack */}
+      <div className="space-y-1.5">
         {renderOrder.map((tier) => {
           const threshold = getThreshold(tier);
           const isCurrent = tier === currentTier;
@@ -149,7 +155,6 @@ function TierStackVariant() {
           const isAchieved =
             ALL_TIERS.indexOf(tier) < ALL_TIERS.indexOf(currentTier);
 
-          // Status content per row
           let statusContent: React.ReactNode;
           if (isCurrent) {
             statusContent = (
@@ -157,68 +162,67 @@ function TierStackVariant() {
                 className="flex items-center gap-1.5 text-xs font-bold"
                 style={{ color: TIER_COLORS[tier].ring }}
               >
-                <CircleDot className="h-4 w-4" />
+                <CircleDot className="h-3.5 w-3.5" />
                 <span>Current</span>
               </div>
             );
           } else if (isAchieved) {
             statusContent = (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-[#10B981]">
-                <Check className="h-4 w-4" />
+                <Check className="h-3.5 w-3.5" />
                 <span>Achieved</span>
               </div>
             );
           } else if (isNextTier) {
             statusContent = (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
-                <Lock className="h-4 w-4 text-gray-500" />
+                <Lock className="h-3.5 w-3.5 text-gray-500" />
                 <span>${threshold - earned} to go</span>
               </div>
             );
           } else {
             statusContent = (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
-                <Lock className="h-4 w-4" />
+                <Lock className="h-3.5 w-3.5" />
                 <span>Locked</span>
               </div>
             );
           }
 
           return (
-            <Card
+            <div
               key={tier}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 shadow-sm transition-colors",
-                isCurrent ? "border-2" : "border border-gray-200 bg-white"
+                "flex items-center gap-2.5 rounded-md px-2.5 py-2 transition-colors",
+                isCurrent ? "border-2" : "border border-gray-200"
               )}
               style={
                 isCurrent
                   ? {
-                      // More saturated bg + 2px tier-color border for active state
                       backgroundColor: TIER_COLORS[tier].soft,
                       borderColor: TIER_COLORS[tier].bg,
                     }
-                  : undefined
+                  : { backgroundColor: "#FFFFFF" }
               }
             >
               <TierBadge tier={tier} size="sm" />
               <div className="flex-1">
                 <p
                   className={cn(
-                    "text-sm text-gray-900",
+                    "text-sm leading-tight text-gray-900",
                     isCurrent ? "font-bold" : "font-semibold"
                   )}
                 >
                   {TIER_COLORS[tier].label}
                 </p>
-                <p className="text-[11px] text-gray-500">${threshold}+</p>
+                <p className="text-[11px] leading-tight text-gray-500">${threshold}+</p>
               </div>
               <div>{statusContent}</div>
-            </Card>
+            </div>
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -226,13 +230,13 @@ function TierStackVariant() {
 // EXPORT — picks active variant from context
 // -----------------------------------------------------------------------------
 
-export function TierProgressTab() {
+export function TierProgressSection() {
   const { variants, isLoaded } = useVariants();
 
   if (!isLoaded) return null;
 
   if (variants.tierProgress === "tier-stack") {
-    return <TierStackVariant />;
+    return <TierStackSection />;
   }
-  return <TierLinearVariant />;
+  return <TierLinearSection />;
 }

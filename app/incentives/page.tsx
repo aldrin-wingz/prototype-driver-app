@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IncentiveCard } from "@/components/driver/dashboard-incentive-section";
-import { TierProgressTab } from "@/components/driver/tier-progress-tab";
+import { TierProgressSection } from "@/components/driver/tier-progress-section";
 import { LeaderboardTab } from "@/components/driver/leaderboard-tab";
 import { getAllIncentiveProgress } from "@/lib/data/incentive-utils";
 import type { IncentiveType } from "@/lib/data/incentives";
@@ -22,9 +22,9 @@ export default function IncentivesPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F9FAFB]">
-      {/* Header - WHITE background per BIBLE */}
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-white px-4 shadow-sm">
+    <div className="flex h-[100dvh] flex-col bg-[#F9FAFB]">
+      {/* Header — WHITE background per BIBLE */}
+      <header className="flex h-14 shrink-0 items-center justify-between bg-white px-4 shadow-sm">
         {/* Back button */}
         <button
           onClick={() => router.back()}
@@ -39,36 +39,36 @@ export default function IncentivesPage() {
           Driver Incentives
         </h1>
 
-        {/* Spacer for balance (Variants pill renders globally as floating button) */}
+        {/* Spacer (Variants pill renders as floating button globally) */}
         <div className="w-10" />
       </header>
 
-      {/* Tabs */}
-      <Tabs defaultValue="incentives" className="flex-1">
-        <TabsList className="w-full justify-start rounded-none border-b bg-white px-4 h-12">
+      {/* Tabs — 2 tabs after I-6.1 (Tier Progress tab dropped, content moved into Incentives tab) */}
+      <Tabs defaultValue="incentives" className="flex flex-1 flex-col overflow-hidden">
+        <TabsList className="h-12 w-full shrink-0 justify-start rounded-none border-b bg-white px-4">
           <TabsTrigger
             value="incentives"
-            className="flex-1 data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:text-[#10B981] data-[state=active]:shadow-none rounded-none"
+            className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:text-[#10B981] data-[state=active]:shadow-none"
           >
             Incentives
           </TabsTrigger>
           <TabsTrigger
             value="leaderboard"
-            className="flex-1 data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:text-[#10B981] data-[state=active]:shadow-none rounded-none"
+            className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:text-[#10B981] data-[state=active]:shadow-none"
           >
             Leaderboard
           </TabsTrigger>
-          <TabsTrigger
-            value="tier-progress"
-            className="flex-1 data-[state=active]:border-b-2 data-[state=active]:border-[#10B981] data-[state=active]:text-[#10B981] data-[state=active]:shadow-none rounded-none"
-          >
-            Tier Progress
-          </TabsTrigger>
         </TabsList>
 
-        {/* Incentives Tab - Full stacked cards (reuses IncentiveCard from I-3) */}
-        <TabsContent value="incentives" className="mt-0 p-4">
-          <div className="space-y-3">
+        {/* Incentives Tab — sticky TierProgressSection at top + scrollable IncentiveCard list */}
+        <TabsContent value="incentives" className="mt-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+          {/* Sticky tier section */}
+          <div className="shrink-0 px-4 pb-3 pt-4">
+            <TierProgressSection />
+          </div>
+
+          {/* Scrollable IncentiveCard list */}
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-4">
             {progressItems.map((item) => (
               <IncentiveCard
                 key={item.incentiveType}
@@ -80,14 +80,9 @@ export default function IncentivesPage() {
           </div>
         </TabsContent>
 
-        {/* Leaderboard Tab (I-6) */}
-        <TabsContent value="leaderboard" className="mt-0">
+        {/* Leaderboard Tab — internal sticky regions + scrollable ranks list */}
+        <TabsContent value="leaderboard" className="mt-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
           <LeaderboardTab />
-        </TabsContent>
-
-        {/* Tier Progress Tab (I-6) */}
-        <TabsContent value="tier-progress" className="mt-0">
-          <TierProgressTab />
         </TabsContent>
       </Tabs>
     </div>

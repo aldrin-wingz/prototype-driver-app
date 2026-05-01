@@ -144,8 +144,9 @@ export interface LeaderboardEntry {
   rank: number;
   handle: string;                    // Anonymized (e.g., "Driver-7821")
   bonusesEarnedThisMonth: number;    // Total bonus $ earned this month (PRIMARY ranking metric)
-  isCurrentDriver: boolean;          // Highlight if this is the logged-in driver
+  isCurrentDriver: boolean;          // Unused in I-6.1 seed (current driver at rank #47, outside top 20). Kept for future flexibility.
   tier: Tier;
+  county: string;                    // Driver's home county (e.g., "Fulton County")
 }
 
 /**
@@ -170,6 +171,9 @@ export interface CurrentDriver {
   initials: string;
   currentTier: Tier;
   totalBonusesEarnedThisMonth: number;   // Monthly scope: total bonus $ accumulated
+  currentRank: number;                   // Driver's rank against the global driver pool (e.g., 47)
+  totalDrivers: number;                  // Total drivers in the pool (e.g., 200)
+  county: string;                        // Driver's home county (e.g., "Fulton County")
 }
 
 /**
@@ -744,25 +748,35 @@ export const seedTrips: Trip[] = [
 ];
 
 // -----------------------------------------------------------------------------
-// LEADERBOARD (10 entries, current driver at #4)
+// LEADERBOARD (20 entries — current driver NOT in top 20; lives in YourPlacementCard at #47/200)
 // Sorted by bonusesEarnedThisMonth DESC ($ earned).
 // Month = May 2026.
-// Ranks 1-10 with anonymized handles, tiers computed from $ thresholds.
-// Rank 4 = current driver (Driver-7821, Alex B., $80, Silver tier).
+// Ranks 1-20, all anonymized handles, all isCurrentDriver: false.
+// Atlanta-metro counties: Fulton, DeKalb, Cobb, Gwinnett, Henry, Clayton.
 // Thresholds: Bronze 0 / Silver 50 / Gold 150 / Platinum 300.
 // -------
 
 export const leaderboardEntries: LeaderboardEntry[] = [
-  { rank: 1,  handle: 'Driver-9142', bonusesEarnedThisMonth: 230, tier: 'gold',     isCurrentDriver: false },
-  { rank: 2,  handle: 'Driver-3856', bonusesEarnedThisMonth: 180, tier: 'gold',     isCurrentDriver: false },
-  { rank: 3,  handle: 'Driver-6204', bonusesEarnedThisMonth: 130, tier: 'silver',   isCurrentDriver: false },
-  { rank: 4,  handle: 'Driver-7821', bonusesEarnedThisMonth: 80,  tier: 'silver',   isCurrentDriver: true  },
-  { rank: 5,  handle: 'Driver-1093', bonusesEarnedThisMonth: 60,  tier: 'silver',   isCurrentDriver: false },
-  { rank: 6,  handle: 'Driver-4527', bonusesEarnedThisMonth: 40,  tier: 'bronze',   isCurrentDriver: false },
-  { rank: 7,  handle: 'Driver-8361', bonusesEarnedThisMonth: 30,  tier: 'bronze',   isCurrentDriver: false },
-  { rank: 8,  handle: 'Driver-2749', bonusesEarnedThisMonth: 20,  tier: 'bronze',   isCurrentDriver: false },
-  { rank: 9,  handle: 'Driver-5918', bonusesEarnedThisMonth: 10,  tier: 'bronze',   isCurrentDriver: false },
-  { rank: 10, handle: 'Driver-7034', bonusesEarnedThisMonth: 0,   tier: 'bronze',   isCurrentDriver: false },
+  { rank: 1,  handle: 'Driver-9142', bonusesEarnedThisMonth: 230, tier: 'gold',   county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 2,  handle: 'Driver-3856', bonusesEarnedThisMonth: 180, tier: 'gold',   county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 3,  handle: 'Driver-6204', bonusesEarnedThisMonth: 130, tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
+  { rank: 4,  handle: 'Driver-2845', bonusesEarnedThisMonth: 80,  tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 5,  handle: 'Driver-1093', bonusesEarnedThisMonth: 60,  tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
+  { rank: 6,  handle: 'Driver-4527', bonusesEarnedThisMonth: 40,  tier: 'bronze', county: 'Henry County',    isCurrentDriver: false },
+  { rank: 7,  handle: 'Driver-8361', bonusesEarnedThisMonth: 30,  tier: 'bronze', county: 'Clayton County',  isCurrentDriver: false },
+  { rank: 8,  handle: 'Driver-2749', bonusesEarnedThisMonth: 20,  tier: 'bronze', county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 9,  handle: 'Driver-5918', bonusesEarnedThisMonth: 10,  tier: 'bronze', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 10, handle: 'Driver-7034', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Cobb County',     isCurrentDriver: false },
+  { rank: 11, handle: 'Driver-3217', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Henry County',    isCurrentDriver: false },
+  { rank: 12, handle: 'Driver-5604', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Clayton County',  isCurrentDriver: false },
+  { rank: 13, handle: 'Driver-8920', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Gwinnett County', isCurrentDriver: false },
+  { rank: 14, handle: 'Driver-1456', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 15, handle: 'Driver-6783', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 16, handle: 'Driver-4019', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Cobb County',     isCurrentDriver: false },
+  { rank: 17, handle: 'Driver-2358', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Henry County',    isCurrentDriver: false },
+  { rank: 18, handle: 'Driver-9471', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Clayton County',  isCurrentDriver: false },
+  { rank: 19, handle: 'Driver-5286', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 20, handle: 'Driver-7148', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Fulton County',   isCurrentDriver: false },
 ];
 
 // -----------------------------------------------------------------------------
@@ -804,6 +818,7 @@ export const tierConfigs: TierConfig[] = [
 // -----------------------------------------------------------------------------
 // CURRENT DRIVER
 // $80 earned this month = Silver tier (>= $50, < $150)
+// Rank #47 of 200 — outside the top-20 leaderboard, lives in YourPlacementCard.
 // -------
 
 export const currentDriver: CurrentDriver = {
@@ -812,6 +827,9 @@ export const currentDriver: CurrentDriver = {
   initials: 'AB',
   currentTier: 'silver',
   totalBonusesEarnedThisMonth: 80,
+  currentRank: 47,
+  totalDrivers: 200,
+  county: 'Fulton County',
 };
 
 // -----------------------------------------------------------------------------
