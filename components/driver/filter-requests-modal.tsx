@@ -42,12 +42,22 @@ export function FilterRequestsModal({
     ...initialFilters,
   });
 
-  // Sync if initialFilters changes (e.g. deep-link param changes)
+  // Reset local filter state each time the modal opens so it reflects
+  // the currently applied filters (e.g. from a deep-link tap).
+  const prevIsOpen = React.useRef(false);
   React.useEffect(() => {
-    if (initialFilters) {
-      setFilters((prev) => ({ ...prev, ...initialFilters }));
+    if (isOpen && !prevIsOpen.current) {
+      setFilters({
+        pickupLocation: undefined,
+        day: undefined,
+        client: undefined,
+        sortBy: "expiration-date",
+        mode: "full-trip",
+        ...initialFilters,
+      });
     }
-  }, [initialFilters?.mode, initialFilters?.incentiveType]);
+    prevIsOpen.current = isOpen;
+  }, [isOpen]);
 
   const handleUpdateClick = () => {
     onUpdate(filters);
