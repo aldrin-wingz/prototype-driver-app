@@ -123,6 +123,11 @@ export function IncentiveEarnedPopup() {
     router.push("/payout");
   };
 
+  const handleViewIncentives = () => {
+    dismiss();
+    router.push("/incentives");
+  };
+
   return (
     <div
       role="dialog"
@@ -240,10 +245,10 @@ export function IncentiveEarnedPopup() {
         {/* CTAs */}
         <div className="mt-6 space-y-2">
           <Button
-            onClick={handleViewPayout}
+            onClick={handleViewIncentives}
             className="h-12 w-full rounded-full bg-[#10B981] text-base font-semibold text-white shadow-sm hover:bg-[#0EA371]"
           >
-            View Next Payout
+            View My Incentives
           </Button>
           <button
             type="button"
