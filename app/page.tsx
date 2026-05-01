@@ -108,17 +108,17 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIn
 
 function ConfirmTripPrompt() {
   return (
-    <Card className="mx-4 mb-4 flex items-center gap-3 rounded-xl bg-[#10B981] p-4 text-white">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-        <ClipboardCheck className="h-6 w-6 text-white" />
+    <Card className="mx-4 mb-4 flex cursor-pointer items-center gap-3 rounded-xl bg-[#10B981] p-4 text-white shadow-sm transition-opacity hover:opacity-95 active:opacity-90">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
+        <ClipboardCheck className="h-5 w-5 text-white" />
       </div>
       <div className="flex-1">
-        <p className="font-semibold">Confirm Your Upcoming Trip</p>
-        <p className="text-sm text-white/90">
+        <p className="font-semibold leading-snug">Confirm Your Upcoming Trip</p>
+        <p className="text-sm leading-snug text-white/85">
           Your next trip requires action. Tap to view rides awaiting confirmation.
         </p>
       </div>
-      <ChevronRight className="h-6 w-6 text-white" />
+      <ChevronRight className="h-5 w-5 shrink-0 text-white/80" />
     </Card>
   );
 }
@@ -146,23 +146,17 @@ export default function HomePage() {
           <DashboardIncentiveSection placement="top" />
         )}
         
-        {/* NEW ORDER (I-6.2): 
-          1. Upcoming Payout Widget (promote to top)
-          2. Driver Incentives (promote second)
-          3. Monthly Earnings Card (demote)
-          4. Confirm Your Upcoming Trip (demote)
-          5. New Requests (stays at bottom)
+        {/* ORDER:
+          1. Upcoming Payout Widget
+          2. This Month Earnings Card
+          3. Confirm Your Upcoming Trip
+          4. Driver Incentives
         */}
 
-        {/* 1. Upcoming Payout Widget — PROMOTED to top */}
+        {/* 1. Upcoming Payout Widget */}
         <UpcomingPayoutWidget />
-        
-        {/* 2. VARIANT: Dashboard Card Section - PROMOTED to second */}
-        {isDashboardCardSection && (
-          <DashboardIncentiveSection placement="middle" />
-        )}
-        
-        {/* 3. Earnings Card — DEMOTED from top */}
+
+        {/* 2. Earnings Card */}
         <EarningsCard
           data={earningsData}
           onPrevious={() => setPeriod("this-month")}
@@ -171,9 +165,14 @@ export default function HomePage() {
           showNext={period === "this-month"}
           showIntegratedWidget={isDashboardWidgetIntegrated}
         />
-        
-        {/* 4. Confirm Trip Prompt — DEMOTED */}
+
+        {/* 3. Confirm Trip Prompt */}
         <ConfirmTripPrompt />
+
+        {/* 4. Driver Incentives */}
+        {isDashboardCardSection && (
+          <DashboardIncentiveSection placement="middle" />
+        )}
         
         {/* 5. New Requests Section — stays at bottom */}
         <div className="px-4">
