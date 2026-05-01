@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ interface FilterRequestsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (filters: RequestFilters) => void;
+  initialFilters?: RequestFilters;
 }
 
 export interface RequestFilters {
@@ -23,12 +24,14 @@ export interface RequestFilters {
   client?: string;
   sortBy?: string;
   mode?: string;
+  incentiveType?: string;
 }
 
 export function FilterRequestsModal({
   isOpen,
   onClose,
   onUpdate,
+  initialFilters,
 }: FilterRequestsModalProps) {
   const [filters, setFilters] = useState<RequestFilters>({
     pickupLocation: undefined,
@@ -36,7 +39,15 @@ export function FilterRequestsModal({
     client: undefined,
     sortBy: "expiration-date",
     mode: "full-trip",
+    ...initialFilters,
   });
+
+  // Sync if initialFilters changes (e.g. deep-link param changes)
+  React.useEffect(() => {
+    if (initialFilters) {
+      setFilters((prev) => ({ ...prev, ...initialFilters }));
+    }
+  }, [initialFilters?.mode, initialFilters?.incentiveType]);
 
   const handleUpdateClick = () => {
     onUpdate(filters);

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
+import { X } from "lucide-react";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
@@ -9,42 +10,75 @@ import { FilterRequestsModal, type RequestFilters } from "@/components/driver/fi
 import { Button } from "@/components/ui/button";
 import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 import { useToast } from "@/hooks/use-toast";
+import type { IncentiveType } from "@/lib/data/incentives";
+
+// Human-readable label for each incentive type
+const INCENTIVE_LABELS: Record<string, string> = {
+  "weekend-warrior": "Weekend Warrior",
+  "early-bird": "Early Bird",
+  "peak-hours": "Peak Hours",
+  "loyalty-streak": "Loyalty Streak",
+};
 
 export default function RequestsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
-  const [filteredTrips, setFilteredTrips] = React.useState(mockRequestTrips);
-  const [appliedFilters, setAppliedFilters] = React.useState<RequestFilters>({});
+  // Read ?incentive= deep-link param from dashboard IncentiveCard tap
+  const incentiveParam = searchParams.get("incentive") as IncentiveType | null;
 
-  const handleFilterClick = () => {
-    setIsFilterOpen(true);
-  };
+  // Initialize filter state from URL param on first render
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
+  const [appliedFilters, setAppliedFilters] = React.useState<RequestFilters>(() => ({
+    mode: incentiveParam ? "driver-incentives" : "full-trip",
+    incentiveType: incentiveParam ?? undefined,
+  }));
+
+  // Derive filtered trips from appliedFilters
+  const filteredTrips = React.useMemo(() => {
+    let result = mockRequestTrips;
+    if (appliedFilters.mode === "driver-incentives") {
+      result = result.filter((t) => {
+        if (appliedFilters.incentiveType) {
+          return t.incentiveType === appliedFilters.incentiveType;
+        }
+        return !!t.incentiveType;
+      });
+    }
+    return result;
+  }, [appliedFilters]);
+
+  // When URL param changes (e.g. navigating back and forth), re-sync
+  React.useEffect(() => {
+    if (incentiveParam) {
+      setAppliedFilters({ mode: "driver-incentives", incentiveType: incentiveParam });
+    }
+  }, [incentiveParam]);
+
+  const handleFilterClick = () => setIsFilterOpen(true);
 
   const handleFilterUpdate = (filters: RequestFilters) => {
     setAppliedFilters(filters);
-    // Apply filters to trips (mock filtering)
-    let filtered = mockRequestTrips;
-    
-    if (filters.mode === "driver-incentives") {
-      filtered = filtered.filter((t) => t.incentiveType);
-    }
-    
-    setFilteredTrips(filtered);
+    // Clear URL param when user manually updates via modal
+    router.replace("/requests", { scroll: false });
   };
 
   const handleClearFilters = () => {
-    setAppliedFilters({});
-    setFilteredTrips(mockRequestTrips);
+    setAppliedFilters({ mode: "full-trip" });
+    router.replace("/requests", { scroll: false });
   };
 
   const handleRefreshClick = () => {
-    toast({
-      title: "Refreshing...",
-      description: "Request list refreshed.",
-    });
+    toast({ title: "Refreshing...", description: "Request list refreshed." });
   };
+
+  // Active filter chip label
+  const activeChipLabel = appliedFilters.incentiveType
+    ? INCENTIVE_LABELS[appliedFilters.incentiveType] ?? appliedFilters.incentiveType
+    : appliedFilters.mode === "driver-incentives"
+    ? "Driver Incentives"
+    : null;
 
   return (
     <div className="flex min-h-screen flex-col pb-20">
@@ -60,7 +94,26 @@ export default function RequestsPage() {
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         onUpdate={handleFilterUpdate}
+        initialFilters={appliedFilters}
       />
+
+      {/* Active filter chip — shown when a filter is applied */}
+      {activeChipLabel && (
+        <div className="flex items-center gap-2 border-b border-gray-100 bg-white px-4 py-2">
+          <span className="text-xs font-medium text-gray-500">Filtered by:</span>
+          <span className="flex items-center gap-1.5 rounded-full bg-[#10B981]/10 px-3 py-1 text-xs font-semibold text-[#10B981]">
+            {activeChipLabel}
+            <button
+              onClick={handleClearFilters}
+              aria-label="Clear filter"
+              className="ml-0.5 rounded-full text-[#10B981]/70 hover:text-[#10B981]"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        </div>
+      )}
+
       
       <main className="flex-1 p-4">
         {filteredTrips.length === 0 ? (
