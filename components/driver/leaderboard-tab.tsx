@@ -3,6 +3,8 @@
 import { Card } from "@/components/ui/card";
 import { useVariants } from "@/lib/variants-context";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { Pencil, Check, X } from "lucide-react";
 import { TierBadge, TIER_COLORS } from "./tier-badge";
 import {
   leaderboardEntries,
@@ -12,14 +14,73 @@ import {
 
 // -----------------------------------------------------------------------------
 // YourPlacementCard — Always-visible sticky card at the top of the Leaderboard tab
-// -----------------------------------------------------------------------------
+// With editable username (local state only, mock-only)
+// -------
 
 function YourPlacementCard() {
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editedUsername, setEditedUsername] = useState(currentDriver.username);
+  const [displayUsername, setDisplayUsername] = useState(currentDriver.username);
+
+  const handleSaveUsername = () => {
+    setDisplayUsername(editedUsername);
+    setIsEditingUsername(false);
+  };
+
+  const handleCancelUsername = () => {
+    setEditedUsername(displayUsername);
+    setIsEditingUsername(false);
+  };
+
   return (
     <Card className="border-[#10B981]/30 bg-[#10B981]/5 p-3 shadow-sm">
       <p className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
         Your placement
       </p>
+      
+      {/* Username row with edit icon */}
+      <div className="mb-1.5 flex items-center gap-1">
+        {isEditingUsername ? (
+          <>
+            <input
+              type="text"
+              value={editedUsername}
+              onChange={(e) => setEditedUsername(e.target.value)}
+              autoFocus
+              className="h-6 flex-1 rounded border border-[#10B981] px-2 text-sm font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+            />
+            <button
+              onClick={handleSaveUsername}
+              className="flex h-6 w-6 items-center justify-center rounded text-[#10B981] hover:bg-[#10B981]/10"
+              aria-label="Save username"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleCancelUsername}
+              className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100"
+              aria-label="Cancel edit"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-semibold text-gray-900">
+              {displayUsername}
+            </span>
+            <button
+              onClick={() => setIsEditingUsername(true)}
+              className="ml-1 flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Edit username"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Rank + $ row */}
       <p className="mb-1.5 flex items-baseline gap-2 text-lg font-bold text-gray-900">
         <span className="tabular-nums">
           #{currentDriver.currentRank} of {currentDriver.totalDrivers}
@@ -29,6 +90,8 @@ function YourPlacementCard() {
           ${currentDriver.totalBonusesEarnedThisMonth}
         </span>
       </p>
+
+      {/* Tier + county row */}
       <div className="flex items-center gap-2">
         <TierBadge tier={currentDriver.currentTier} size="sm" />
         <span className="text-xs font-semibold text-gray-900">

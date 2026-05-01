@@ -174,6 +174,7 @@ export interface CurrentDriver {
   currentRank: number;                   // Driver's rank against the global driver pool (e.g., 47)
   totalDrivers: number;                  // Total drivers in the pool (e.g., 200)
   county: string;                        // Driver's home county (e.g., "Fulton County")
+  username: string;                      // Editable display name (e.g., "alex_b")
 }
 
 /**
@@ -751,32 +752,33 @@ export const seedTrips: Trip[] = [
 // LEADERBOARD (20 entries — current driver NOT in top 20; lives in YourPlacementCard at #47/200)
 // Sorted by bonusesEarnedThisMonth DESC ($ earned).
 // Month = May 2026.
-// Ranks 1-20, all anonymized handles, all isCurrentDriver: false.
+// Ranks 1-20, all anonymized realistic usernames, all isCurrentDriver: false.
+// All entries have $ > 80 (current driver is outside top 20 at rank 47 with $80).
 // Atlanta-metro counties: Fulton, DeKalb, Cobb, Gwinnett, Henry, Clayton.
 // Thresholds: Bronze 0 / Silver 50 / Gold 150 / Platinum 300.
 // -------
 
 export const leaderboardEntries: LeaderboardEntry[] = [
-  { rank: 1,  handle: 'Driver-9142', bonusesEarnedThisMonth: 230, tier: 'gold',   county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 2,  handle: 'Driver-3856', bonusesEarnedThisMonth: 180, tier: 'gold',   county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 3,  handle: 'Driver-6204', bonusesEarnedThisMonth: 130, tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
-  { rank: 4,  handle: 'Driver-2845', bonusesEarnedThisMonth: 80,  tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 5,  handle: 'Driver-1093', bonusesEarnedThisMonth: 60,  tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
-  { rank: 6,  handle: 'Driver-4527', bonusesEarnedThisMonth: 40,  tier: 'bronze', county: 'Henry County',    isCurrentDriver: false },
-  { rank: 7,  handle: 'Driver-8361', bonusesEarnedThisMonth: 30,  tier: 'bronze', county: 'Clayton County',  isCurrentDriver: false },
-  { rank: 8,  handle: 'Driver-2749', bonusesEarnedThisMonth: 20,  tier: 'bronze', county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 9,  handle: 'Driver-5918', bonusesEarnedThisMonth: 10,  tier: 'bronze', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 10, handle: 'Driver-7034', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Cobb County',     isCurrentDriver: false },
-  { rank: 11, handle: 'Driver-3217', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Henry County',    isCurrentDriver: false },
-  { rank: 12, handle: 'Driver-5604', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Clayton County',  isCurrentDriver: false },
-  { rank: 13, handle: 'Driver-8920', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Gwinnett County', isCurrentDriver: false },
-  { rank: 14, handle: 'Driver-1456', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 15, handle: 'Driver-6783', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 16, handle: 'Driver-4019', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Cobb County',     isCurrentDriver: false },
-  { rank: 17, handle: 'Driver-2358', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Henry County',    isCurrentDriver: false },
-  { rank: 18, handle: 'Driver-9471', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Clayton County',  isCurrentDriver: false },
-  { rank: 19, handle: 'Driver-5286', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 20, handle: 'Driver-7148', bonusesEarnedThisMonth: 0,   tier: 'bronze', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 1,  handle: 'mike_atl',    bonusesEarnedThisMonth: 230, tier: 'gold',   county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 2,  handle: 'j_williams',  bonusesEarnedThisMonth: 180, tier: 'gold',   county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 3,  handle: 'sarah_d',     bonusesEarnedThisMonth: 130, tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
+  { rank: 4,  handle: 'raj_patel',   bonusesEarnedThisMonth: 125, tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 5,  handle: 'tasha_b',     bonusesEarnedThisMonth: 120, tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
+  { rank: 6,  handle: 'carlos_r',    bonusesEarnedThisMonth: 115, tier: 'silver', county: 'Henry County',    isCurrentDriver: false },
+  { rank: 7,  handle: 'leah_w',      bonusesEarnedThisMonth: 110, tier: 'silver', county: 'Clayton County',  isCurrentDriver: false },
+  { rank: 8,  handle: 'devon_k',     bonusesEarnedThisMonth: 105, tier: 'silver', county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 9,  handle: 'maria_l',     bonusesEarnedThisMonth: 102, tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 10, handle: 'jamal_h',     bonusesEarnedThisMonth: 100, tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
+  { rank: 11, handle: 'kim_n',       bonusesEarnedThisMonth: 97,  tier: 'silver', county: 'Henry County',    isCurrentDriver: false },
+  { rank: 12, handle: 'tyler_p',     bonusesEarnedThisMonth: 95,  tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 13, handle: 'nina_g',      bonusesEarnedThisMonth: 93,  tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
+  { rank: 14, handle: 'omar_s',      bonusesEarnedThisMonth: 91,  tier: 'silver', county: 'Clayton County',  isCurrentDriver: false },
+  { rank: 15, handle: 'ruby_t',      bonusesEarnedThisMonth: 90,  tier: 'silver', county: 'DeKalb County',   isCurrentDriver: false },
+  { rank: 16, handle: 'alex_v',      bonusesEarnedThisMonth: 89,  tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
+  { rank: 17, handle: 'jenna_m',     bonusesEarnedThisMonth: 88,  tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
+  { rank: 18, handle: 'pete_o',      bonusesEarnedThisMonth: 87,  tier: 'silver', county: 'Henry County',    isCurrentDriver: false },
+  { rank: 19, handle: 'angie_c',     bonusesEarnedThisMonth: 86,  tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
+  { rank: 20, handle: 'derek_y',     bonusesEarnedThisMonth: 85,  tier: 'silver', county: 'Clayton County',  isCurrentDriver: false },
 ];
 
 // -----------------------------------------------------------------------------
@@ -830,6 +832,7 @@ export const currentDriver: CurrentDriver = {
   currentRank: 47,
   totalDrivers: 200,
   county: 'Fulton County',
+  username: 'alex_b',
 };
 
 // -----------------------------------------------------------------------------

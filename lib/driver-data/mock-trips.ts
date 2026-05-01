@@ -618,8 +618,8 @@ export interface EarningsData {
 export const mockEarningsThisMonth: EarningsData = {
   period: "this-month",
   label: "This Month",
-  earnings: 0.00,
-  trips: 0,
+  earnings: 907.02,
+  trips: 5,
   onTimePerformance: "N/A",
   sendBacks: 0,
 };
@@ -627,8 +627,8 @@ export const mockEarningsThisMonth: EarningsData = {
 export const mockEarningsLastMonth: EarningsData = {
   period: "last-month",
   label: "Last Month",
-  earnings: 0.00,
-  trips: 0,
+  earnings: 725.62,
+  trips: 4,
   onTimePerformance: "N/A",
   sendBacks: 0,
 };

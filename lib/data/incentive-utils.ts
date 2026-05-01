@@ -10,6 +10,7 @@ import type {
   DriverIncentiveProgress,
 } from "./incentives";
 import { incentiveDefinitions, driverIncentiveProgress } from "./incentives";
+import { sortByTierDesc } from "@/lib/incentive-sort";
 
 // -----------------------------------------------------------------------------
 // INCENTIVE DISPLAY NAMES
@@ -196,17 +197,17 @@ export interface WeeklyPayoutData {
  * Get all incentive progress items (for dashboard display).
  */
 export function getAllIncentiveProgress(): IncentiveProgressInfo[] {
-  const allTypes: IncentiveType[] = [
-    'weekend-warrior',
-    'early-bird', 
-    'peak-hours',
-    'loyalty-streak',
-  ];
+  // Sort incentive definitions by tier (Gold → Silver → Bronze)
+  const sortedDefinitions = sortByTierDesc(incentiveDefinitions);
   
-  const progressItems = allTypes
+  // Map to IncentiveType based on sorted order
+  const sortedTypes: IncentiveType[] = sortedDefinitions.map(def => def.type);
+  
+  const progressItems = sortedTypes
     .map(type => getIncentiveProgressInfo(type))
     .filter((info): info is IncentiveProgressInfo => info !== null);
   
+  // Then sort by completion status (in-progress first, completed last)
   return progressItems.sort((a, b) => {
     if (a.isComplete === b.isComplete) return 0;
     return a.isComplete ? 1 : -1;

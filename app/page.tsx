@@ -146,7 +146,23 @@ export default function HomePage() {
           <DashboardIncentiveSection placement="top" />
         )}
         
-        {/* Earnings Card */}
+        {/* NEW ORDER (I-6.2): 
+          1. Upcoming Payout Widget (promote to top)
+          2. Driver Incentives (promote second)
+          3. Monthly Earnings Card (demote)
+          4. Confirm Your Upcoming Trip (demote)
+          5. New Requests (stays at bottom)
+        */}
+
+        {/* 1. Upcoming Payout Widget — PROMOTED to top */}
+        <UpcomingPayoutWidget />
+        
+        {/* 2. VARIANT: Dashboard Card Section - PROMOTED to second */}
+        {isDashboardCardSection && (
+          <DashboardIncentiveSection placement="middle" />
+        )}
+        
+        {/* 3. Earnings Card — DEMOTED from top */}
         <EarningsCard
           data={earningsData}
           onPrevious={() => setPeriod("this-month")}
@@ -156,18 +172,10 @@ export default function HomePage() {
           showIntegratedWidget={isDashboardWidgetIntegrated}
         />
         
-        {/* Upcoming Payout Widget */}
-        <UpcomingPayoutWidget />
-        
-        {/* Confirm Trip Prompt */}
+        {/* 4. Confirm Trip Prompt — DEMOTED */}
         <ConfirmTripPrompt />
         
-        {/* VARIANT: Dashboard Card Section - MIDDLE position */}
-        {isDashboardCardSection && (
-          <DashboardIncentiveSection placement="middle" />
-        )}
-        
-        {/* New Requests Section */}
+        {/* 5. New Requests Section — stays at bottom */}
         <div className="px-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">New Requests</h3>
