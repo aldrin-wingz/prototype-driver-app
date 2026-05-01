@@ -115,9 +115,9 @@ export function IncentiveEarnedPopup() {
 
   const tierColor = TIER_COLORS[badgeTier];
 
-  const handleViewIncentives = () => {
+  const handleViewPayout = () => {
     dismiss();
-    router.push("/incentives");
+    router.push("/payout");
   };
 
   return (
@@ -189,9 +189,9 @@ export function IncentiveEarnedPopup() {
           +${definition.bonusAmount}
         </p>
 
-        {/* Sub-line */}
+        {/* Sub-line — "Added to your next payout" */}
         <p className="mt-1 text-center text-sm text-gray-500">
-          Added to your May 2026 earnings
+          Added to your next payout
         </p>
 
         {/* Mini tier progress */}
@@ -230,10 +230,10 @@ export function IncentiveEarnedPopup() {
         {/* CTAs */}
         <div className="mt-6 space-y-2">
           <Button
-            onClick={handleViewIncentives}
+            onClick={handleViewPayout}
             className="h-12 w-full rounded-full bg-[#10B981] text-base font-semibold text-white shadow-sm hover:bg-[#0EA371]"
           >
-            View Incentives
+            View Next Payout
           </Button>
           <button
             type="button"
