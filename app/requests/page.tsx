@@ -2,7 +2,6 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
-import { X } from "lucide-react";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
@@ -11,14 +10,6 @@ import { Button } from "@/components/ui/button";
 import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 import { useToast } from "@/hooks/use-toast";
 import type { IncentiveType } from "@/lib/data/incentives";
-
-// Human-readable label for each incentive type
-const INCENTIVE_LABELS: Record<string, string> = {
-  "weekend-warrior": "Weekend Warrior",
-  "early-bird": "Early Bird",
-  "peak-hours": "Peak Hours",
-  "loyalty-streak": "Loyalty Streak",
-};
 
 export default function RequestsPage() {
   const router = useRouter();
@@ -68,13 +59,6 @@ export default function RequestsPage() {
     toast({ title: "Refreshing...", description: "Request list refreshed." });
   };
 
-  // Active filter chip label
-  const activeChipLabel = appliedFilters.incentiveType
-    ? INCENTIVE_LABELS[appliedFilters.incentiveType] ?? appliedFilters.incentiveType
-    : appliedFilters.mode === "driver-incentives"
-    ? "Driver Incentives"
-    : null;
-
   return (
     <div className="flex min-h-screen flex-col pb-20">
       <Header 
@@ -92,24 +76,6 @@ export default function RequestsPage() {
         initialFilters={appliedFilters}
       />
 
-      {/* Active filter chip — shown when a filter is applied */}
-      {activeChipLabel && (
-        <div className="flex items-center gap-2 border-b border-gray-100 bg-white px-4 py-2">
-          <span className="text-xs font-medium text-gray-500">Filtered by:</span>
-          <span className="flex items-center gap-1.5 rounded-full bg-[#10B981]/10 px-3 py-1 text-xs font-semibold text-[#10B981]">
-            {activeChipLabel}
-            <button
-              onClick={handleClearFilters}
-              aria-label="Clear filter"
-              className="ml-0.5 rounded-full text-[#10B981]/70 hover:text-[#10B981]"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        </div>
-      )}
-
-      
       <main className="flex-1 p-4">
         {filteredTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-4 py-12">

@@ -224,10 +224,10 @@ export function FilterRequestsModal({
           Clear Filters
         </button>
 
-        {/* Update button */}
+        {/* Update button — full-width primary green */}
         <Button
           onClick={handleUpdateClick}
-          className="w-full bg-[#10B981] px-6 py-3 text-base font-semibold text-white hover:bg-[#0EA371]"
+          className="h-12 w-full rounded-full bg-[#10B981] text-base font-semibold text-white shadow-sm hover:bg-[#0EA371]"
         >
           Update
         </Button>
