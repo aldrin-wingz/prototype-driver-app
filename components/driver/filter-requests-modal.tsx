@@ -163,20 +163,51 @@ export function FilterRequestsModal({
         {/* Mode section */}
         <div className="mb-6">
           <h3 className="mb-3 text-sm font-semibold text-gray-900">Mode:</h3>
-          <Select
-            value={filters.mode || "full-trip"}
-            onValueChange={(value) =>
-              setFilters({ ...filters, mode: value })
-            }
-          >
-            <SelectTrigger className="h-12 border-gray-300 bg-white px-4 py-3 text-left text-gray-900">
-              <SelectValue placeholder="Full Trip" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="full-trip">Full Trip</SelectItem>
-              <SelectItem value="driver-incentives">Driver Incentives</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="space-y-3">
+            <Select
+              value={filters.mode || "full-trip"}
+              onValueChange={(value) =>
+                setFilters({
+                  ...filters,
+                  mode: value,
+                  // Clear incentive type when switching away from driver-incentives
+                  incentiveType: value === "driver-incentives" ? filters.incentiveType : undefined,
+                })
+              }
+            >
+              <SelectTrigger className="h-12 border-gray-300 bg-white px-4 py-3 text-left text-gray-900">
+                <SelectValue placeholder="Full Trip" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full-trip">Full Trip</SelectItem>
+                <SelectItem value="driver-incentives">Driver Incentives</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Incentive type sub-filter — only shown when Driver Incentives mode is active */}
+            {filters.mode === "driver-incentives" && (
+              <Select
+                value={filters.incentiveType || "all"}
+                onValueChange={(value) =>
+                  setFilters({
+                    ...filters,
+                    incentiveType: value === "all" ? undefined : value,
+                  })
+                }
+              >
+                <SelectTrigger className="h-12 border-[#10B981]/40 bg-[#10B981]/5 px-4 py-3 text-left text-gray-900">
+                  <SelectValue placeholder="All Incentives" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Incentives</SelectItem>
+                  <SelectItem value="weekend-warrior">Weekend Warrior</SelectItem>
+                  <SelectItem value="early-bird">Early Bird</SelectItem>
+                  <SelectItem value="peak-hours">Peak Hours</SelectItem>
+                  <SelectItem value="loyalty-streak">Loyalty Streak</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
 
         {/* Clear Filters link */}
