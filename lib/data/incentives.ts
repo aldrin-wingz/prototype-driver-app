@@ -105,7 +105,8 @@ export interface Trip {
   client: string;                  // Client/payer name (e.g., "Verida", "MTM")
   passengerCount: number;
   distance: string;                // e.g., "12.5 mi away" or ""
-  revenue: number;                 // Base trip revenue in dollars (INTEGER)
+  revenue: number;                 // TOTAL trip revenue in dollars (base + sum of revenueAddons)
+  revenueAddons?: { label: string; amount: number }[];  // Display-only ad-hoc bonuses (sent-back, D2D, etc.)
   notes: string;
   status: TripStatus;
   

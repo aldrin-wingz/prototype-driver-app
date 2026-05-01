@@ -45,7 +45,8 @@ export const mockRequestTrips: Trip[] = [
     client: "Verida",
     passengerCount: 1,
     distance: "8881.2 mi away",
-    totalRevenue: 45.25,
+    totalRevenue: 70.25,
+    revenueAddons: [{ label: "Sent-back bonus", amount: 25.00 }],
     notes: "FOR TESTING PURPOSES ONLY - CH...",
     legs: [
       {
@@ -82,7 +83,8 @@ export const mockRequestTrips: Trip[] = [
     client: "Verida",
     passengerCount: 1,
     distance: "8883.5 mi away",
-    totalRevenue: 10.80,
+    totalRevenue: 13.30,
+    revenueAddons: [{ label: "Door-to-Door bump", amount: 2.50 }],
     notes: "Postman generated ride for manual t...",
     legs: [
       {
@@ -139,7 +141,11 @@ export const mockRequestTrips: Trip[] = [
     client: "Verida",
     passengerCount: 1,
     distance: "8881.2 mi away",
-    totalRevenue: 45.25,
+    totalRevenue: 72.75,
+    revenueAddons: [
+      { label: "Sent-back bonus", amount: 25.00 },
+      { label: "Door-to-Door bump", amount: 2.50 }
+    ],
     notes: "FOR TESTING PURPOSES ONLY -...",
     legs: [
       {
@@ -402,7 +408,8 @@ export const mockCompletedTrips: Trip[] = [
     client: "Verida",
     passengerCount: 1,
     distance: "",
-    totalRevenue: 95.00,
+    totalRevenue: 97.50,
+    revenueAddons: [{ label: "Door-to-Door bump", amount: 2.50 }],
     notes: "",
     legs: [
       {
@@ -471,7 +478,8 @@ export const mockCompletedTrips: Trip[] = [
     client: "Verida",
     passengerCount: 1,
     distance: "",
-    totalRevenue: 109.80,
+    totalRevenue: 134.80,
+    revenueAddons: [{ label: "Sent-back bonus", amount: 25.00 }],
     notes: "Pick Up: driver Keegan Hooker - Dro...",
     legs: [
       {

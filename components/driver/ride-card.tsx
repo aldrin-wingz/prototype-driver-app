@@ -1,11 +1,12 @@
 "use client";
 
-import { Expand, Users, Info, Phone } from "lucide-react";
+import { Expand, Users, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useVariants } from "@/lib/variants-context";
 import type { Trip, TripLeg, TripPill, TimeAnchorType } from "@/lib/driver-data/mock-trips";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
+import { RevenueDisplay } from "./revenue-display";
 
 interface RideCardProps {
   trip: Trip;
@@ -146,16 +147,17 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
           <button className="text-gray-500 hover:text-gray-700">
             <Expand className="h-5 w-5" />
           </button>
-          <div className="flex items-center gap-1 text-gray-500">
-            <span className="text-sm">{trip.passengerCount}</span>
-            <Users className="h-4 w-4" />
-            <span className={cn(
-              "font-semibold",
-              revenueColor === "blue" ? "text-blue-600" : "text-[#10B981]"
-            )}>
-              ${trip.totalRevenue.toFixed(2)}
-            </span>
-            <Info className="h-4 w-4 text-gray-400" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-gray-500">
+              <span className="text-sm">{trip.passengerCount}</span>
+              <Users className="h-4 w-4" />
+            </div>
+            <RevenueDisplay
+              totalRevenue={trip.totalRevenue}
+              addons={trip.revenueAddons}
+              revenueColor={revenueColor}
+              layout="vertical"
+            />
           </div>
           {showDistance && trip.distance && (
             <p className="text-xs text-gray-500">{trip.distance}</p>

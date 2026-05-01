@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, Info, RotateCcw } from "lucide-react";
+import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
+import { RevenueDisplay } from "./revenue-display";
 import { useVariants } from "@/lib/variants-context";
 import { cn } from "@/lib/utils";
 import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
@@ -78,9 +79,12 @@ function LegCard({ leg, isFirst, isLast, state }: {
           
           {/* Revenue - show for first leg or legs with revenue */}
           {leg.revenue > 0 && (
-            <p className="mt-1 font-semibold text-gray-900">
-              ${leg.revenue.toFixed(2)} {state === "needs-action" && "Accepted by you"}
-            </p>
+            <RevenueDisplay
+              totalRevenue={leg.revenue}
+              addons={undefined}
+              revenueColor="green"
+              layout="vertical"
+            />
           )}
           
           {/* Address details */}
