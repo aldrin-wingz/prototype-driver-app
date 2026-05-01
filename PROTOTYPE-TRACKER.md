@@ -4,8 +4,8 @@
 
 ---
 
-## Current Step: I-8
-## Last Completed: I-6 (Tier Progress + Leaderboard Tabs — Combined)
+## Current Step: I-0a
+## Last Completed: —
 
 ---
 
@@ -40,14 +40,15 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | I-2   | Pill / Badge / Banner on Ride Card + Trip Contribution        | ⬜ Planned | 3 fun variants: `pill-named-bottom` (named pill in bottom row + small Wingz mark), `badge-corner-flag` (green Wingz on black square at top-right corner with tooltip), `banner-wingz-hero` (full black + green Wingz banner at top of card). NO dollar amount on any variant. **Plus** the single-design `ProgramContributionIndicator` (Tooltip + Popover) layered on all 3 variants — taps surface program progress + program-level bonus. |
 | I-3   | Dashboard Incentive Surfacing — Variant Set + Upcoming Payout | ⬜ Planned | 2–3 dashboard surfacing variants + deep-link to Requests filter + Upcoming Payout widget (read-only weekly projection summing completed-program bonuses).                                                                                                                                        |
 | I-4   | Ride Details Incentive Surfacing — Single Design + Regression Fixes | ⬜ Planned | Extend the active I-2 surface (pill / badge / banner) to Ride Details (both states) with placement adapted per variant — NO separate variant set. **Plus** fix inherited regressions: white header bg, white nav bg, trip metadata card layout (below map, contains Leg field). |
-| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ⬜ Planned | New stack-pushed `/incentives` page with 3 tabs: **Incentives** (default, full stacked card list reusing `IncentiveCard`), **Leaderboard** (placeholder until I-7), **Tier Progress** (placeholder until I-6). Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel. Add "View All" link to all dashboard variants. **`UpcomingPayoutWidget` STAYS on dashboard** (does NOT move). |
+| I-4.1 | Driver Incentives Hub Page (`/incentives`) + Dashboard Carousel Rework | ⬜ Planned | New stack-pushed `/incentives` page. Originally built with 3 tabs (Incentives / Leaderboard / Tier Progress placeholders); **restructured in I-6.1 to 2 tabs** (Incentives / Leaderboard) — Tier Progress tab dropped, tier section absorbed into the top of the Incentives tab as a sticky card-pill. Rework `dashboard-card-section` variant from 4 stacked cards → swipe carousel. Add "View All" link to all dashboard variants. **`UpcomingPayoutWidget` STAYS on dashboard** (does NOT move). |
 | I-4.2 | Component Unification + Single-Incentive Schema + Achievement Banner Variant + Points System | ✅ Approved | **Schema:** `Trip.incentiveType: IncentiveType \| null` (singular, was array); add `IncentiveDefinition.tierLevel` + `INCENTIVE_TIER_POINTS`; add `LeaderboardEntry.pointsEarnedThisPeriod`; `CurrentDriver.incentivesAccomplishedThisPeriod` → `pointsAccumulatedThisPeriod`; `TierConfig.threshold` shifts to points-based (Bronze 0 / Silver 5 / Gold 12 / Platinum 24). **Variant set:** drop `badge-corner-flag`, add `achievement-banner`. Hero Banner refined (black + Wingz mark backdrop tinted by tierLevel). **`IncentiveCard` themed by active variant** (Dashboard carousel, `/incentives` Incentives tab, `/payout` Completed Incentives tab). Drop multi-program rendering everywhere. **Seed updates:** assign tierLevels to programs; trips become single-program; trips for completed programs get `incentiveType: null` (data-driven suppression — NO runtime filter). |
 | I-4.3 | Upcoming Payout Page (`/payout`) + Retire Sheet Popup         | ✅ Approved (v1) | (Renumbered from I-4.2 on 2026-05-01.) New stack-pushed `/payout` page with summary header + 2 tabs: **Rides Completed** (completed-rides filter using existing `RideCard` from Ride History, scoped to current pay period) and **Completed Incentives** (reuses unified `IncentiveCard` filtered to completed-this-period). Remove Sheet popup from `UpcomingPayoutWidget` on dashboard; tap → `router.push('/payout')`. **Note:** Replaced/extended in I-4.4 (3 tabs + period nav + summary tri-state with new variant set). |
 | I-4.4 | `/payout` Period-Aware: 3 Tabs + Period Nav + Summary Tri-State + 2 Variants | ✅ Approved | (Post-refinement.) Adds **Rides Upcoming** tab (3rd, from My Rides accepted; drops on completion). Period selector with `<` `>` chevrons (2 prior + 1 future periods seeded). Tab rename "Completed Incentives" → **"Incentives"** (shows earned + in-progress for the period). Summary tri-state: **Earned + Upcoming + Incentives = Projected** hero ("Final" on closed periods). Single merged outer card with hero + hairline + 3 metric cells. Two layout variants behind toggle Section 3 "Payout Summary": **`boxed-tabs`** (default — pill-style cells INSIDE the card with standard ~16px page padding; active = full Wingz green bg + white text) / **`edge-to-edge-tabs`** (cells extend FLUSH to viewport horizontal edges; active = subtle green bg tint + green underline). Both drop the separate tab row + count subtitle (cells double as clickable tabs; counts live in list header). Sticky behavior: summary block stays put, only list scrolls. |
-| I-4.5 | Per-Trip Revenue Add-Ons (`Trip.revenueAddons`)               | ✅ Done    | Single optional schema field `Trip.revenueAddons?: { label: string; amount: number }[]` (no `kind` enum — display only). `trip.revenue` STAYS the total (base + addons baked in) so all existing sum-totals work unchanged. Seed 5 trips with addons: 2 with "Sent-back bonus +$25.00", 2 with "Door-to-Door bump +$2.50", 1 with both. New `RevenueDisplay` component renders `$<base>` with `+$<addons>` below (green accent) when addons present; tap → popover with itemized breakdown + total. Applied to all RideCard usages (Requests, My Rides, Ride History, `/payout` tabs, Dashboard) and RideDetailLayout. When addons absent: render single `$<revenue>` as today. No leaderboard / payout math changes. |
-| I-4.6 | Tier System Rework — Drop Points, Tier-Based $ + Monthly Cadence | ✅ Done    | **Schema:** Replaced `INCENTIVE_TIER_POINTS` with `INCENTIVE_TIER_BONUSES = { gold: 50, silver: 30, bronze: 10 }`. Simplified `LeaderboardEntry` to single metric `bonusesEarnedThisMonth` (removed `pointsEarnedThisPeriod`). Updated `CurrentDriver.totalBonusesEarnedThisMonth` (monthly scope), removed `pointsAccumulatedThisPeriod`. Updated `TierConfig.threshold` to $ monthly: Bronze $0 / Silver $50 / Gold $150 / Platinum $300. **Seed:** Locked all programs to tier-based bonusAmounts (Weekend Warrior + Peak Performer = $50; Early Bird = $30; Loyalty Streak = $10). Reseeded `leaderboardEntries` (10 rows, $230 → $0) sorted by bonusesEarnedThisMonth. Set `currentDriver.totalBonusesEarnedThisMonth: 80` (Silver tier). No new UI — cascading updates via schema/seed changes. |
-| I-5   | Filter Trips by Incentive                                     | ✅ Done    | New `IncentiveFilter` component (filters on incentive eligibility + type). Chip row: "All Trips" (default) | "Incentive-Eligible". When "Incentive-Eligible" active, reveal Select dropdown "Type": All Incentives | Short Notice | Short Distance | Door-to-Door | Standing Order. On page mount, read `?incentive=<type>` URL query param; if present, auto-set filter to "Incentive-Eligible" + type, show "Filtered from Dashboard: <Type Label>" badge with X to clear (clearing removes query param and resets to "All Trips"). Empty state: "No incentive-eligible trips right now." + "Clear filter" button when filter yields zero. RideCard + existing pills (I-2) unmodified — render on filtered results as-is. Filter state resets when navigating away. |
-| I-6   | Tier Progress + Leaderboard — Combined Tab Content (`/incentives`) | ✅ Done    | Combined fill of both tabs in one pass. **Schema/setters added:** `TierProgressVariant` (`tier-linear` \| `tier-stack`) + `LeaderboardVariant` (`leaderboard-list` \| `leaderboard-podium`) added to `lib/variants.ts` + `lib/variants-context.tsx` (URL params `?tierProgress=` / `?leaderboard=`, localStorage persistence, full validation). **Variant Toggle Sheet:** new Sections 4 ("Tier Progress") + 5 ("Leaderboard"), identical chrome to Sections 1–3. **Shared `TierBadge` composite** (`components/driver/tier-badge.tsx`): props `tier` (bronze/silver/gold/platinum) + `size` (sm/md/lg) + `showLabel`, exports `TIER_COLORS` map (Bronze #B45309 / Silver #94A3B8 / Gold #EAB308 / Platinum #7C3AED). **Tier Progress tab** (`components/driver/tier-progress-tab.tsx`): `tier-linear` = "Earned this month — May 2026" header + `$80` Wingz green hero + 4 evenly-spaced TierBadges + horizontal progress bar with green marker dot at 80/300 ≈ 27% + "You're in Silver — $70 to Gold" status card. `tier-stack` = same hero + vertical stack (Platinum top → Bronze bottom, ladder-up reading): each row = TierBadge + label + threshold + status (Locked / `$X to go` for next tier / ◉ Current with tier-soft bg / ✓ Achieved in green). **Leaderboard tab** (`components/driver/leaderboard-tab.tsx`): `leaderboard-list` = "This month — May 2026" header + 10 rows (rank + small TierBadge + handle + `$<bonusesEarnedThisMonth>`); current driver (rank #4) highlighted with green-50 bg + green text + handle reads "YOU". `leaderboard-podium` = same header + top-3 podium grid (1st centered ~176px, 2nd left ~144px, 3rd right ~128px), each podium card showing position number on tier-colored badge + TierBadge + handle + $; ranks 4+ rendered below as flat list with current driver highlighted. Both variants end with "Names anonymized for privacy." footer. Tier/Leaderboard variants are fully independent of Section 1 (no pill coupling); no month chevron / period selector; no real names; no points metric anywhere. Placeholder shells in `app/incentives/page.tsx` replaced wholesale. |
+| I-4.5 | Per-Trip Revenue Add-Ons (`Trip.revenueAddons`)               | ⬜ Planned | Single optional schema field `Trip.revenueAddons?: { label: string; amount: number }[]` (no `kind` enum — display only). `trip.revenue` STAYS the total (base + addons baked in) so all existing sum-totals work unchanged. Seed 4–5 trips with addons (mix of "Sent-back bonus +$25.00" and "Door-to-Door bump +$2.50"). RideCard revenue cell renders `$<base> +$<addons>` when addons present (`+$X` in `#10B981` accent), tap opens popover with labeled breakdown. Applies to all RideCard usages (Requests / My Rides / Ride History / `/payout` Rides Completed + Rides Upcoming tabs / Dashboard previews) and to ride detail revenue display. NO change to dashboard `UpcomingPayoutWidget` math. NO change to leaderboard $ (incentive-only). |
+| I-4.6 | Tier System Rework — Drop Points, Tier-Based $ + Monthly Cadence | ⬜ Planned | (Added 2026-05-01 after I-4.4 approval. Reverses parts of I-4.2's points additions.) **Schema:** drop `INCENTIVE_TIER_POINTS`; add `INCENTIVE_TIER_BONUSES = { gold: 50, silver: 30, bronze: 10 }`. Drop `LeaderboardEntry.pointsEarnedThisPeriod`; rename `bonusesEarned` (existing secondary $) → `bonusesEarnedThisMonth` (now PRIMARY ranking metric — drop secondary-figure concept). Drop `CurrentDriver.pointsAccumulatedThisPeriod`; rename `totalBonusesEarnedThisPeriod` → `totalBonusesEarnedThisMonth`. `TierConfig.threshold` becomes $-based monthly: Bronze $0 / Silver $50 / Gold $150 / Platinum $300. **Seed:** lock all programs' `bonusAmount` to tier-based value (Weekend Warrior + Peak Performer = $50 gold; Early Bird = $30 silver; Loyalty Streak = $10 bronze — was $50/$100/$75/$85). Rewrite LeaderboardEntries with $ values for May 2026 (#1: $230 / #2: $180 / #3: $130 / #4 current: $80 / rest descending). CurrentDriver.totalBonusesEarnedThisMonth: 80 (Silver tier, $70 to Gold). Cascading visual updates auto-flow through banners, IncentiveCards, /payout summary. NO new UI in this step — schema/seed only. |
+| I-5   | Filter Trips by Incentive                                     | ⬜ Planned | Single-design filter chip + sub-filter in Requests; extends existing modal pattern; supports `?incentive=` URL param init.                                                                                                                                                                       |
+| I-6   | Tier Progress + Leaderboard — Combined Tab Content (`/incentives`) | ✅ Approved (v1) | (Combined step — absorbs former I-7. Both tabs filled in one v0 pass.) **Tier Progress tab — 2 variants (toggle Section 4 "Tier Progress"):** `tier-linear` (4 tier icons across the top + single progress bar with position marker + "You're in Silver — $X to Gold" copy below) / `tier-stack` (vertical stack of 4 tier cards Bronze/Silver/Gold/Platinum, each with threshold + status achieved ✓ / current ◉ / locked 🔒, current tier highlighted with tier color bg). **Leaderboard tab — 2 variants (toggle Section 5 "Leaderboard"):** `leaderboard-list` (plain ranked list, # + handle + $ earned + tier badge per row, current driver row highlighted) / `leaderboard-podium` (top 3 in podium layout — 1st centered taller, 2nd left, 3rd right; ranks 4+ as ranked list below; current driver row highlighted in the list). Both tabs use **monthly cadence** ("This month — May 2026"). Build shared `TierBadge` composite. **Note:** Restructured in I-6.1 (3 tabs → 2 tabs, Wingz-mark TierBadge redesign, expanded leaderboard with YourPlacementCard, podium cleanup). |
+| I-6.1 | `/incentives` Restructure: 2 Tabs + Sticky Tier Section + Expanded Leaderboard + Wingz-mark TierBadge | ⬜ Planned | (Polish/restructure step on top of I-6 v1. Added 2026-05-01 after I-6 review.) **Restructure `/incentives` from 3 tabs to 2 tabs** (drop Tier Progress tab; tier section moves to top of Incentives tab as sticky card-pill — same pattern as `/payout` summary). **Schema:** add `LeaderboardEntry.county`; add `CurrentDriver.currentRank` + `totalDrivers` + `county`. **Seed:** 20 LeaderboardEntries (was 10), all with county; current driver OUTSIDE top 20 — `currentRank: 47`, `totalDrivers: 200`, `county: 'Fulton County'`, `bonusesEarnedThisMonth: 80`. **Leaderboard layout:** sticky Header + sticky **YourPlacementCard** (always visible — shows #47 of 200 + $ + tier + county) + sticky Top 3 region (podium for podium variant; rows 1-3 for list variant) + scrollable ranks 4–20 (default visible 4–10, scroll reveals 11–20). Each row + podium card adds `county` (small gray subtitle). **TierBadge redesign:** all 4 tiers = green Wingz mark on a tier-colored circle bg (Bronze #B45309 / Silver #94A3B8 / Gold #EAB308 / Platinum #7C3AED) — replaces medal/shield/trophy icons; unifies brand identity with ride card `banner-wingz-hero`. **Podium cleanup:** drop standalone rank number circle (position implies rank); fix handle truncation. Variant Toggle Section 4 + 5 stay (no rename). Tier/leaderboard variants still stand alone. |
 | I-8   | Polish + Edge States + Achievement Unlock Dialog              | ⬜ Planned | Empty / period-ended / payout-pending / ineligible states + Achievement Unlock Dialog with **3 CTAs** ("View Earnings" → `/payout`, "View Achievements" → `/incentives`, "Dismiss") + Tier Unlock Dialog. Mock-triggered via [DEV] buttons (no real events).                                                                                        |
 
 ---
@@ -102,9 +103,11 @@ This prototype is a **variant-comparison overlay** on the existing Wingz NEMT Dr
 | PeriodSelector | I-4.4 | `/payout` only. `< Apr 28 – May 4 >` chevron pair with status pill ("Current" / "Closed" / "Upcoming"). Steps backward 2 periods + forward 1 period from current; clamps at boundaries (chevron disabled at edge). Drives `PayPeriod` selection state on the page. |
 | UpcomingPayoutWidget | I-3 (built on dashboard with Sheet) → I-4.2 (Sheet retired, tap navigates to `/payout`) | Stays on dashboard for at-a-glance context. Originally tapped to open a Sheet for breakdown — Sheet REMOVED in I-4.2 because the new `/payout` page is the richer review surface. Tap target swaps to `router.push('/payout')`. |
 | ProgressMeter | I-3 | I-4 (banner-wingz-hero on detail when applicable), I-6 |
-| TierBadge | I-6 | Used in both tabs of the combined I-6 step (Tier Progress + Leaderboard rows) + I-3 (dashboard tier badge). Composite shows tier color (gold/silver/bronze) with optional label. Reads driver's `currentTier` from `CurrentDriver` for the dashboard surface. |
-| TierProgressTab | I-6 | `/incentives` Tier Progress tab. Reads `useVariants().tierProgress`: `tier-linear` (4 tier icons across top + horizontal progress bar with position marker + "You're in Silver — $X to Gold" copy) or `tier-stack` (vertical stack of 4 tier cards with threshold + status achieved/current/locked). Header: "Earned this month — May 2026" + `$totalBonusesEarnedThisMonth` figure. |
-| LeaderboardTab | I-6 | `/incentives` Leaderboard tab. Reads `useVariants().leaderboard`: `leaderboard-list` (plain ranked list — # + handle + $ + tier badge per row) or `leaderboard-podium` (top 3 podium + ranks 4+ as list below). Header: "This month — May 2026". Current driver row highlighted in green tint regardless of variant. Reuses `TierBadge` per row. |
+| TierBadge | I-6 (built) → I-6.1 (redesigned) | Originally built in I-6 with medal/shield/trophy icons + tier-colored accents. **Redesigned in I-6.1**: green Wingz mark (`/WINGZLOGO2.png`) on a tier-colored circle bg (Bronze #B45309 / Silver #94A3B8 / Gold #EAB308 / Platinum #7C3AED). Same Wingz mark across all 4 tiers — only bg color changes. Used in: TierProgressSection (Incentives tab top), Leaderboard rows + podium + YourPlacementCard, Dashboard tier badge surface. Unifies brand identity with ride card `banner-wingz-hero`. |
+| TierProgressSection | I-6.1 | Sticky card-pill at the top of the Incentives tab (replaces the former Tier Progress tab from I-6). Reads `useVariants().tierProgress`: `tier-linear` (4 Wingz-mark tier icons across top + horizontal progress bar with position marker + "You're in Silver — $X to Gold" copy below — all wrapped in a single card-pill matching the `/payout` summary card pattern) or `tier-stack` (vertical stack of 4 tier cards with threshold + status indicators achieved/current/locked, current tier highlighted with tier-color bg). Header inside the card: "Earned this month — May 2026" + `$<totalBonusesEarnedThisMonth>` hero figure. Sticky behavior: card-pill stays put; incentive program list scrolls under. |
+| IncentivesTab | I-6.1 | Restructured composite for the Incentives tab on `/incentives`. Layout: sticky `TierProgressSection` at top + scrollable list of `IncentiveCard` instances below. Replaces the original simple stacked list from I-4.1 (no tier section) and I-6 (3-tab structure). |
+| YourPlacementCard | I-6.1 | Sticky composite at the very top of the Leaderboard tab. Shows current driver placement among ALL drivers: "You're #<currentRank> of <totalDrivers>" + `$<bonusesEarnedThisMonth>` + `<county>` + small Wingz-mark TierBadge for current tier. Always visible regardless of scroll. Standard horizontal page padding (not edge-to-edge). |
+| LeaderboardTab | I-6 (built) → I-6.1 (expanded) | `/incentives` Leaderboard tab. Reads `useVariants().leaderboard`: `leaderboard-list` or `leaderboard-podium`. **I-6 v1:** 10 drivers, current driver in list at #4, top 3 visually distinct. **I-6.1 expansion:** 20 drivers (none is the current driver), `county` field per row, sticky `YourPlacementCard` at very top, sticky Top 3 region, scrollable ranks 4–20 (default visible 4–10, scroll reveals 11–20). Each row + podium card shows Wingz-mark `TierBadge` + handle + county subtitle + $. Anonymity footer at end of scroll. |
 | AchievementUnlockDialog | I-8 | (Dashboard) |
 
 ---
@@ -1575,6 +1578,8 @@ These updates flow automatically from the seed change — no component code touc
 
 **This step has SIX parts in one v0 generation pass.**
 
+> **Forward-looking note:** This step ships v1 with the structure described below (3 tabs on `/incentives`; medal/shield/trophy TierBadge icons; 10-driver leaderboard with current driver in top 10). **I-6.1 (post-build polish/restructure)** drops the Tier Progress tab (tier section moves to top of Incentives tab as sticky card-pill), redesigns TierBadge with Wingz-mark-on-tier-bg, expands the leaderboard to 20 drivers with county field, and adds a sticky `YourPlacementCard` for the case when the current driver is outside the top 20. Build I-6 normally with the 6 parts below; I-6.1 handles the restructure on top.
+
 ---
 
 #### Part 1 — Variant set additions in `lib/variants.ts`
@@ -1644,6 +1649,8 @@ Build once, reuse across both tabs + dashboard tier badge.
   - Platinum: deep purple `#7C3AED` (or similar — pick what reads cleanly alongside the other 3)
 - Icon: simple medal/shield outline; color matches tier
 - Used in: TierProgressTab (both variants), LeaderboardTab (both variants — small size per row), Dashboard tier badge surface (existing from I-3)
+
+> **Note (post-build):** TierBadge gets redesigned in **I-6.1** to use a green Wingz mark on a tier-colored circle bg (replaces medals/shields/trophy). Build I-6 with the simple medal/shield/trophy approach; I-6.1 swaps in the Wingz-mark visual.
 
 ---
 
@@ -1797,6 +1804,245 @@ Specifics:
 - Leaderboard rank = sorted server-side; frontend reads ordered list.
 - Anonymized handles = production privacy requirement; backend assigns/derives.
 - Variant selection is client UI state — no backend impact.
+
+---
+
+### Step I-6.1: `/incentives` Restructure — 2 Tabs + Sticky Tier Section + Expanded Leaderboard + Wingz-mark TierBadge
+
+**Why this step exists:** I-6 v1 shipped with 3 tabs (Incentives / Leaderboard / Tier Progress) + medal/shield/trophy TierBadge icons + a 10-driver leaderboard with the current driver in the top 10. After review the user decided several things together: (1) Tier visualization shouldn't have its own tab — better as a sticky context section at the top of the Incentives tab so drivers see their tier alongside the programs they're working on. (2) The leaderboard should expand to 20 drivers with county info per row, default visible 10 with scroll-to-reveal-20. (3) The current driver should be **outside** the top 20 (at #47 of 200) with a sticky "Your Placement" card at the very top of the Leaderboard tab. (4) TierBadge should be redesigned to use the green Wingz mark on a tier-colored bg — replaces medals/shields/trophy and unifies brand identity with the ride card `banner-wingz-hero` variant. (5) Podium needs cleanup — drop the standalone rank number circle (position implies rank), fix handle truncation. This step delivers all five together as deltas on top of I-6 v1. **DO NOT revert v0 to before I-6 — apply this as forward-only changes.**
+
+**Goal:** Restructure `/incentives` from 3 tabs to 2 tabs. Move tier visualization to the top of the Incentives tab as a sticky card-pill. Redesign TierBadge with Wingz-mark-on-tier-bg. Expand the Leaderboard tab with `YourPlacementCard` + 20-driver seed + county field + sticky regions. Clean up the podium.
+
+**Reference screenshots:** None (deltas on top of I-6 v1 build).
+
+**This step has FIVE parts in one v0 generation pass.**
+
+---
+
+#### Part 1 — Schema additions in `lib/data/incentives.ts`
+
+```ts
+// CHANGED: LeaderboardEntry gains county
+export interface LeaderboardEntry {
+  rank: number;
+  handle: string;
+  bonusesEarnedThisMonth: number;
+  isCurrentDriver: boolean;       // unused in seed (current driver outside top 20) — keep for future
+  tier: Tier;
+  county: string;                 // NEW
+}
+
+// CHANGED: CurrentDriver gains rank position fields + county
+export interface CurrentDriver {
+  id: string;
+  displayName: string;
+  initials: string;
+  currentTier: Tier;
+  totalBonusesEarnedThisMonth: number;   // existing
+  currentRank: number;                   // NEW: e.g., 47
+  totalDrivers: number;                  // NEW: e.g., 200
+  county: string;                        // NEW: e.g., 'Fulton County'
+}
+```
+
+---
+
+#### Part 2 — Seed updates
+
+**`LEADERBOARD_ENTRIES` array — 20 drivers** (was 10), all anonymized handles, sorted desc by `bonusesEarnedThisMonth`. Each row gets a `county` field. None of the 20 entries is the current driver (`isCurrentDriver: false` for all 20).
+
+Sample distribution (use realistic Atlanta-metro county names):
+
+| Rank | handle | $ | tier | county |
+|---|---|---|---|---|
+| 1 | (anon) | $230 | gold | Fulton County |
+| 2 | (anon) | $180 | gold | DeKalb County |
+| 3 | (anon) | $130 | silver | Cobb County |
+| 4 | (anon) | $80 | silver | Fulton County |
+| 5 | (anon) | $60 | silver | Gwinnett County |
+| 6 | (anon) | $40 | bronze | Henry County |
+| 7 | (anon) | $30 | bronze | Clayton County |
+| 8 | (anon) | $20 | bronze | DeKalb County |
+| 9 | (anon) | $10 | bronze | Fulton County |
+| 10 | (anon) | $0 | bronze | Cobb County |
+| 11–20 | (anon) | $0 | bronze | (vary across the same counties) |
+
+(Lower-rank rows can all be $0 or trail off — the gradient just needs to feel realistic for v1 review.)
+
+**`CurrentDriver` updates:**
+- `totalBonusesEarnedThisMonth: 80` (existing — unchanged)
+- `currentRank: 47` (NEW)
+- `totalDrivers: 200` (NEW)
+- `county: 'Fulton County'` (NEW)
+- `currentTier: 'silver'` (existing — unchanged)
+
+---
+
+#### Part 3 — Tab restructure: 3 tabs → 2 tabs on `/incentives`
+
+Restructure `IncentivesPage` (built in I-4.1) from 3 tabs to 2 tabs:
+
+- **Tab 1 — "Incentives"** (default) — sticky `TierProgressSection` at top + scrollable `IncentiveCard` list below
+- **Tab 2 — "Leaderboard"** — sticky Header + sticky `YourPlacementCard` + sticky Top 3 region + scrollable ranks 4–20
+
+**Drop the old "Tier Progress" tab entirely.** Drop the `TierProgressTab` composite from I-6 (or rename + relocate it as `TierProgressSection` per Part 5).
+
+Variant Toggle Sheet Section 4 ("Tier Progress") **stays** (same label, same options) — it now controls the tier visualization at the top of the Incentives tab instead of a dedicated tab.
+
+---
+
+#### Part 4 — `TierBadge` redesign: Wingz mark on tier-color bg
+
+Replace the medal/shield/trophy icon mix from I-6 v1 with a unified Wingz-mark-on-tier-bg pattern.
+
+- **Foreground:** the existing green Wingz mark image (`/WINGZLOGO2.png`) — same brand recall element as ride card `banner-wingz-hero`
+- **Background:** tier-colored circle (the only thing that varies between tiers):
+  - Bronze: `#B45309`
+  - Silver: `#94A3B8`
+  - Gold: `#EAB308`
+  - Platinum: `#7C3AED`
+- Same Wingz mark for all 4 tiers; only bg color changes
+- Apply EVERYWHERE TierBadge is rendered: TierProgressSection (Incentives tab top), Leaderboard rows, podium cards, YourPlacementCard, dashboard tier badge surface
+
+This unifies the prototype's visual identity around the green Wingz mark — same element appears on ride card banners, IncentiveCards, dashboard, and now tier visualizations.
+
+---
+
+#### Part 5 — Incentives tab: `TierProgressSection` (sticky top, both variants)
+
+Move the I-6 TierProgressTab content into a new sticky composite at the top of the Incentives tab.
+
+Sticky card-pill at the top of the Incentives tab. Reads `useVariants().tierProgress`.
+
+**Shared header (both variants):**
+- Inside the card-pill, top section: "Earned this month — May 2026" (small uppercase gray) + `$<totalBonusesEarnedThisMonth>` hero (large green)
+- Hairline divider below the hero
+
+**Variant `tier-linear` (default):**
+```
+╔═════════════════════════════════╗
+║  Earned this month — May 2026   ║
+║  $80                            ║
+║  ─── hairline ───                ║
+║  ⓦ    ⓦ    ⓦ    ⓦ              ║  ← 4 Wingz-mark TierBadges (Bronze/Silver/Gold/Platinum bg)
+║  ──●──────────                   ║  ← horizontal progress bar with green dot marker (~27%)
+║  You're in Silver — $70 to Gold ║  ← inline copy (NOT a separate card)
+╚═════════════════════════════════╝
+```
+
+**Variant `tier-stack`:**
+```
+╔═════════════════════════════════╗
+║  Earned this month — May 2026   ║
+║  $80                            ║
+║  ─── hairline ───                ║
+║  ⓦ Platinum   $300+   🔒 Locked ║
+║  ⓦ Gold       $150+   🔒 $70 to go│
+║  ⓦ Silver     $50+    ◉ Current ║  ← silver bg, bolder
+║  ⓦ Bronze     $0+     ✓ Achieved║
+╚═════════════════════════════════╝
+```
+
+**Sticky behavior:**
+- The card-pill stays pinned at the top of the Incentives tab content
+- Below it, the IncentiveCard list scrolls independently
+- Same pattern as `/payout` summary card sticky behavior
+
+**Below the sticky `TierProgressSection`:**
+- Scrollable list of `IncentiveCard` instances (existing visual from I-3, themed by `useVariants().pill`)
+- Same content as the original Incentives tab from I-4.1 — no change to the program list itself
+
+---
+
+#### Part 6 — Leaderboard tab: expanded layout with sticky regions
+
+Restructure the Leaderboard tab. Three vertical regions:
+
+**Region 1 (sticky) — Header**
+- "This month — May 2026" — small gray, no chevrons
+
+**Region 2 (sticky) — `YourPlacementCard`**
+- Always visible. Pinned just below the header.
+- Layout (single card, same horizontal padding as the rest of the page):
+  ```
+  ┌─────────────────────────────────┐
+  │  Your placement                  │
+  │  #47 of 200 · $80                │  ← bold $ in green
+  │  ⓦ Silver · Fulton County        │  ← Wingz-mark TierBadge + tier name + county
+  └─────────────────────────────────┘
+  ```
+- Reads from `CurrentDriver`: `currentRank`, `totalDrivers`, `bonusesEarnedThisMonth`, `currentTier`, `county`
+- Always shown (even if a future seed places the current driver inside top 20 — for prototype, current driver is at #47, outside top 20)
+- Standard horizontal page padding (NOT edge-to-edge)
+
+**Region 3 (mixed) — Top 3 (sticky) + Ranks 4–20 (scrollable)**
+
+For `leaderboard-list` variant:
+- Top 3 rows (ranks 1, 2, 3) are visually grouped at the top of the rankings list and STICKY (stay pinned when user scrolls within the rankings)
+- Subtle visual separation between Top 3 and ranks 4+
+- Ranks 4–20 scroll within their region (default visible: 4–10; user scrolls to reveal 11–20)
+- Each row: rank # + small `TierBadge` (Wingz mark on tier bg) + handle + county (small gray subtitle below handle, OR inline) + `$<bonusesEarnedThisMonth>` (right-aligned)
+- Anonymity footer at the END of the scroll: "Names anonymized for privacy."
+
+For `leaderboard-podium` variant:
+- Top 3 podium pinned/sticky (same podium pattern: 1st centered taller ~140px, 2nd left ~96px, 3rd right ~96px)
+- Each podium card: large Wingz-mark TierBadge + handle + county (small gray below handle) + `$<bonusesEarnedThisMonth>`
+- **NO standalone rank number circle** on podium cards — position implies rank (center = 1st, left = 2nd, right = 3rd)
+- 1st card has subtle gold-tinted bg or top border for visual prominence
+- Below podium: thin divider with "RANKS 4+" label
+- Below divider: ranks 4–20 scroll within their region (default visible: 4–10; user scrolls to reveal 11–20)
+- Each rank row: same as in `leaderboard-list` variant
+- Handle truncation: ellipsis or smaller font; never overflow podium card width
+- Anonymity footer at the END of the scroll
+
+**Sticky scroll behavior — both variants:**
+- Header + YourPlacementCard + Top 3 region all stay pinned
+- Only the ranks 4–20 list scrolls (within its allotted vertical space)
+- When the user scrolls down within ranks, the sticky regions remain visible
+
+---
+
+**Constraints:**
+
+- DO NOT keep a 3rd "Tier Progress" tab — explicitly drop it from `IncentivesPage`. The Tier Progress tab placeholder shell from I-4.1 + the I-6 TierProgressTab composite should be removed in this step.
+- DO NOT revert v0 to before I-6 — apply this as forward-only changes on top of the existing build.
+- DO NOT couple tier/leaderboard variants to Section 1 (pill variant). No `useVariants().pill` reads in TierProgressSection or LeaderboardTab.
+- DO NOT add a month chevron / period selector — single current-month view only ("May 2026" hardcoded).
+- DO NOT add real driver names — handles only.
+- DO NOT show secondary $ figures or any "points" metric anywhere — purely $ on leaderboard rows.
+- DO NOT add tier-up event logic — display only; Tier Unlock dialog comes in I-8.
+- DO NOT use medal/shield/trophy icons in TierBadge — Wingz mark on tier-color bg is the only visual.
+- DO NOT show standalone rank number circles on podium cards (position implies rank).
+- DO NOT extend the leaderboard edge-to-edge horizontally — standard page padding stays.
+- DO NOT include the current driver in the 20 LeaderboardEntries — they live in `YourPlacementCard` only.
+- DO NOT rename Variant Toggle Sheet Section 4 ("Tier Progress" stays, even though it's no longer its own tab).
+
+**Test Flows After This Step:**
+
+- [ ] `/incentives` page has exactly 2 tabs: Incentives / Leaderboard (no Tier Progress tab)
+- [ ] Variant Toggle Sheet still shows 5 sections; Section 4 + Section 5 unchanged labels
+- [ ] **Incentives tab — `tier-linear`**: TierProgressSection renders as a sticky card-pill at the top with hero $ + 4 Wingz-mark tier icons + progress bar + position marker + inline threshold copy "$70 to Gold"
+- [ ] **Incentives tab — `tier-stack`**: TierProgressSection renders 4 tier cards stacked, current Silver highlighted, status indicators correct
+- [ ] **Incentives tab — sticky behavior**: scrolling the IncentiveCard list keeps TierProgressSection pinned at top
+- [ ] **Leaderboard tab — header + YourPlacementCard + Top 3** all sticky/pinned at top; only ranks 4–20 scroll
+- [ ] **YourPlacementCard**: shows "#47 of 200" + "$80" + Silver Wingz-mark TierBadge + "Fulton County"
+- [ ] `leaderboard-list`: ranks 1–3 sticky group, ranks 4–20 scrollable, default visible 4–10, scroll reveals 11–20
+- [ ] `leaderboard-podium`: top 3 podium sticky, NO standalone rank circles, ranks 4–20 scrollable
+- [ ] Each rank row + podium card shows handle + county + $ + Wingz-mark TierBadge
+- [ ] Podium handle truncation handled (ellipsis or smaller font, no overflow)
+- [ ] **TierBadge composite renders Wingz mark on tier-color bg for all 4 tiers** (no medals/shields/trophies anywhere)
+- [ ] TierBadge appears identically across TierProgressSection, podium, rank rows, YourPlacementCard, dashboard tier badge surface
+- [ ] Anonymity footer at end of leaderboard scroll
+- [ ] Current driver NOT in the 20 LeaderboardEntries
+- [ ] Mobile portrait 375×812 viewport, no horizontal overflow on any variant
+- [ ] Zero TypeScript errors
+
+**Backend Implications (capture only):**
+
+- Production: backend computes `bonusesEarnedThisMonth` per driver per month + per-driver rank against the global driver pool. Frontend reads precomputed values.
+- `currentRank` + `totalDrivers` are backend-derived per period.
+- `county` lives on driver records in production; backend includes it on leaderboard responses.
+- Sticky scroll regions are pure UI state — no backend impact.
 
 ---
 
