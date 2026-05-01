@@ -108,8 +108,8 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIn
 
 function ConfirmTripPrompt() {
   return (
-    <Card className="mx-4 mb-4 flex cursor-pointer items-center gap-3 rounded-xl bg-[#10B981] p-4 text-white shadow-sm transition-opacity hover:opacity-95 active:opacity-90">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
+    <Card className="mx-4 mb-4 flex cursor-pointer items-center gap-3 rounded-xl bg-gray-900 p-4 text-white shadow-sm transition-opacity hover:opacity-95 active:opacity-90">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#10B981]">
         <ClipboardCheck className="h-5 w-5 text-white" />
       </div>
       <div className="flex-1">
