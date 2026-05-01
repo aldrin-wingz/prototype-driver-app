@@ -45,14 +45,13 @@ export type Period = {
 export type PeriodStatus = 'active' | 'upcoming' | 'completed';
 
 // -----------------------------------------------------------------------------
-// POINTS PER TIER
-// -----------------------------------------------------------------------------
-
-/** Points earned per completed program by tier level. */
-export const INCENTIVE_TIER_POINTS = {
-  gold: 3,
-  silver: 2,
-  bronze: 1,
+// BONUS PER TIER (in dollars)
+// Gold programs are worth $50, Silver $30, Bronze $10
+// This replaces the points abstraction with direct dollar values.
+export const INCENTIVE_TIER_BONUSES = {
+  gold: 50,
+  silver: 30,
+  bronze: 10,
 } as const;
 
 // -----------------------------------------------------------------------------
@@ -139,40 +138,38 @@ export interface TripPill {
 /**
  * Entry in the leaderboard.
  * Uses anonymized handles for privacy.
- * Primary ranking metric is `pointsEarnedThisPeriod` (sum of tier points for completed programs).
+ * Primary ranking metric is `bonusesEarnedThisMonth` (total bonus $ earned).
  */
 export interface LeaderboardEntry {
   rank: number;
   handle: string;                    // Anonymized (e.g., "Driver-7821")
-  bonusesEarned: number;             // Total bonus $ earned this period (secondary figure per row)
-  pointsEarnedThisPeriod: number;    // Primary ranking metric (sum of INCENTIVE_TIER_POINTS for completed programs)
+  bonusesEarnedThisMonth: number;    // Total bonus $ earned this month (PRIMARY ranking metric)
   isCurrentDriver: boolean;          // Highlight if this is the logged-in driver
   tier: Tier;
 }
 
 /**
  * Configuration for a tier level.
- * Tier is reached when driver's pointsAccumulatedThisPeriod >= threshold.
+ * Tier is reached when driver's totalBonusesEarnedThisMonth >= threshold (in dollars).
  */
 export interface TierConfig {
   tier: Tier;
   label: string;          // Display name
-  threshold: number;      // POINTS required to reach this tier
+  threshold: number;      // MONTHLY DOLLARS required to reach this tier
   multiplier: number;     // Parking-lot field (NOT visualized — no UI surface)
   badgeColor: string;     // Badge background color
 }
 
 /**
  * Current logged-in driver info.
- * Tier is backend-derived from pointsAccumulatedThisPeriod against TierConfig.threshold.
+ * Tier is backend-derived from totalBonusesEarnedThisMonth against TierConfig.threshold.
  */
 export interface CurrentDriver {
   id: string;
   displayName: string;
   initials: string;
   currentTier: Tier;
-  pointsAccumulatedThisPeriod: number;
-  totalBonusesEarnedThisPeriod: number;
+  totalBonusesEarnedThisMonth: number;   // Monthly scope: total bonus $ accumulated
 }
 
 /**
@@ -262,39 +259,36 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     tierLevel: 'gold',
   },
   {
-    id: 'inc-early-bird-apr26',
+    id: 'early-bird',
     type: 'early-bird',
     name: 'Early Bird',
-    description: 'Complete 10 trips before 9am',
-    bonusAmount: 75,
-    targetCount: 10,
-    periodId: 'period-2026-04',
-    qualifyingCriteria: 'Trips with pickup time before 9:00 AM',
-    iconName: 'sunrise',
+    description: 'Complete 8 qualifying trips before 9am',
+    bonusAmount: 30,
+    targetCount: 8,
+    periodId: 'may-2026',
+    qualifyingCriteria: '8 trips before 9am',
     tierLevel: 'silver',
   },
   {
-    id: 'inc-peak-hours-apr26',
+    id: 'peak-performer',
     type: 'peak-hours',
     name: 'Peak Performer',
-    description: 'Complete 15 trips during peak hours',
-    bonusAmount: 100,
-    targetCount: 15,
-    periodId: 'period-2026-04',
-    qualifyingCriteria: 'Trips during 5-9am or 4-8pm',
-    iconName: 'clock-peak',
+    description: 'Complete qualifying trips during peak hours (5-9am, 4-8pm)',
+    bonusAmount: 50,
+    targetCount: 10,
+    periodId: 'may-2026',
+    qualifyingCriteria: '10 trips between 5-9am or 4-8pm',
     tierLevel: 'gold',
   },
   {
-    id: 'inc-loyalty-streak-apr26',
+    id: 'loyalty-streak',
     type: 'loyalty-streak',
     name: 'Loyalty Streak',
-    description: 'Complete trips 5 consecutive days',
-    bonusAmount: 85,
+    description: 'Complete rides for 5 consecutive calendar days',
+    bonusAmount: 10,
     targetCount: 5,
-    periodId: 'period-2026-04',
-    qualifyingCriteria: 'At least 1 trip per day for 5 days in a row',
-    iconName: 'flame',
+    periodId: 'may-2026',
+    qualifyingCriteria: 'Rides on 5 consecutive days',
     tierLevel: 'bronze',
   },
 ];
@@ -751,25 +745,30 @@ export const seedTrips: Trip[] = [
 
 // -----------------------------------------------------------------------------
 // LEADERBOARD (10 entries, current driver at #4)
-// Sorted by pointsEarnedThisPeriod DESC.
-// -----------------------------------------------------------------------------
+// Sorted by bonusesEarnedThisMonth DESC ($ earned).
+// Month = May 2026.
+// Ranks 1-10 with anonymized handles, tiers computed from $ thresholds.
+// Rank 4 = current driver (Driver-7821, Alex B., $80, Silver tier).
+// Thresholds: Bronze 0 / Silver 50 / Gold 150 / Platinum 300.
+// -------
 
 export const leaderboardEntries: LeaderboardEntry[] = [
-  { rank: 1,  handle: 'Driver-9142', pointsEarnedThisPeriod: 18, bonusesEarned: 285, tier: 'platinum', isCurrentDriver: false },
-  { rank: 2,  handle: 'Driver-3856', pointsEarnedThisPeriod: 15, bonusesEarned: 245, tier: 'gold',     isCurrentDriver: false },
-  { rank: 3,  handle: 'Driver-6204', pointsEarnedThisPeriod: 13, bonusesEarned: 220, tier: 'gold',     isCurrentDriver: false },
-  { rank: 4,  handle: 'Driver-7821', pointsEarnedThisPeriod: 11, bonusesEarned: 160, tier: 'silver',   isCurrentDriver: true  },
-  { rank: 5,  handle: 'Driver-1093', pointsEarnedThisPeriod: 9,  bonusesEarned: 150, tier: 'silver',   isCurrentDriver: false },
-  { rank: 6,  handle: 'Driver-4527', pointsEarnedThisPeriod: 7,  bonusesEarned: 125, tier: 'silver',   isCurrentDriver: false },
-  { rank: 7,  handle: 'Driver-8361', pointsEarnedThisPeriod: 5,  bonusesEarned: 100, tier: 'bronze',   isCurrentDriver: false },
-  { rank: 8,  handle: 'Driver-2749', pointsEarnedThisPeriod: 4,  bonusesEarned: 85,  tier: 'bronze',   isCurrentDriver: false },
-  { rank: 9,  handle: 'Driver-5918', pointsEarnedThisPeriod: 3,  bonusesEarned: 75,  tier: 'bronze',   isCurrentDriver: false },
-  { rank: 10, handle: 'Driver-7034', pointsEarnedThisPeriod: 2,  bonusesEarned: 50,  tier: 'bronze',   isCurrentDriver: false },
+  { rank: 1,  handle: 'Driver-9142', bonusesEarnedThisMonth: 230, tier: 'gold',     isCurrentDriver: false },
+  { rank: 2,  handle: 'Driver-3856', bonusesEarnedThisMonth: 180, tier: 'gold',     isCurrentDriver: false },
+  { rank: 3,  handle: 'Driver-6204', bonusesEarnedThisMonth: 130, tier: 'silver',   isCurrentDriver: false },
+  { rank: 4,  handle: 'Driver-7821', bonusesEarnedThisMonth: 80,  tier: 'silver',   isCurrentDriver: true  },
+  { rank: 5,  handle: 'Driver-1093', bonusesEarnedThisMonth: 60,  tier: 'silver',   isCurrentDriver: false },
+  { rank: 6,  handle: 'Driver-4527', bonusesEarnedThisMonth: 40,  tier: 'bronze',   isCurrentDriver: false },
+  { rank: 7,  handle: 'Driver-8361', bonusesEarnedThisMonth: 30,  tier: 'bronze',   isCurrentDriver: false },
+  { rank: 8,  handle: 'Driver-2749', bonusesEarnedThisMonth: 20,  tier: 'bronze',   isCurrentDriver: false },
+  { rank: 9,  handle: 'Driver-5918', bonusesEarnedThisMonth: 10,  tier: 'bronze',   isCurrentDriver: false },
+  { rank: 10, handle: 'Driver-7034', bonusesEarnedThisMonth: 0,   tier: 'bronze',   isCurrentDriver: false },
 ];
 
 // -----------------------------------------------------------------------------
-// TIER CONFIGURATIONS (4 tiers, points-based thresholds)
-// -----------------------------------------------------------------------------
+// Tier thresholds are now MONTHLY DOLLARS (not points).
+// Bronze: 0 / Silver: 50 / Gold: 150 / Platinum: 300
+// -------
 
 export const tierConfigs: TierConfig[] = [
   {
@@ -782,21 +781,21 @@ export const tierConfigs: TierConfig[] = [
   {
     tier: 'silver',
     label: 'Silver',
-    threshold: 5,
+    threshold: 50,
     multiplier: 1.1,
     badgeColor: '#C0C0C0',
   },
   {
     tier: 'gold',
     label: 'Gold',
-    threshold: 12,
+    threshold: 150,
     multiplier: 1.25,
     badgeColor: '#FFD700',
   },
   {
     tier: 'platinum',
     label: 'Platinum',
-    threshold: 24,
+    threshold: 300,
     multiplier: 1.5,
     badgeColor: '#E5E4E2',
   },
@@ -804,16 +803,15 @@ export const tierConfigs: TierConfig[] = [
 
 // -----------------------------------------------------------------------------
 // CURRENT DRIVER
-// 11 points = Silver tier (>= 5, < 12); 1 point shy of Gold.
-// -----------------------------------------------------------------------------
+// $80 earned this month = Silver tier (>= $50, < $150)
+// -------
 
 export const currentDriver: CurrentDriver = {
   id: 'driver-7821',
   displayName: 'Alex B.',
   initials: 'AB',
   currentTier: 'silver',
-  pointsAccumulatedThisPeriod: 11,
-  totalBonusesEarnedThisPeriod: 160, // 75 (early-bird) + 85 (loyalty-streak)
+  totalBonusesEarnedThisMonth: 80,
 };
 
 // -----------------------------------------------------------------------------
