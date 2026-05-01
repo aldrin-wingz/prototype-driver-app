@@ -189,8 +189,12 @@ export function FilterRequestsModal({
               <SelectItem value="all">All Incentives</SelectItem>
               <SelectItem value="weekend-warrior">Weekend Warrior</SelectItem>
               <SelectItem value="early-bird">Early Bird</SelectItem>
-              <SelectItem value="peak-hours">Peak Hours</SelectItem>
+              <SelectItem value="peak-hours">Peak Performer</SelectItem>
               <SelectItem value="loyalty-streak">Loyalty Streak</SelectItem>
+              <SelectItem value="white-glove">White Glove</SelectItem>
+              <SelectItem value="quick-wins">Quick Wins</SelectItem>
+              <SelectItem value="hometown-hero">Hometown Hero</SelectItem>
+              <SelectItem value="squad-goals">Squad Goals</SelectItem>
             </SelectContent>
           </Select>
         </div>

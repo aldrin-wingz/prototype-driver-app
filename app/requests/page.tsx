@@ -38,7 +38,7 @@ export default function RequestsPage() {
   // When URL param changes (e.g. navigating back and forth), re-sync
   React.useEffect(() => {
     if (incentiveParam) {
-      setAppliedFilters({ mode: "driver-incentives", incentiveType: incentiveParam });
+      setAppliedFilters({ incentiveType: incentiveParam });
     }
   }, [incentiveParam]);
 
