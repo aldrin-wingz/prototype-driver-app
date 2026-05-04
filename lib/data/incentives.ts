@@ -49,44 +49,47 @@ export type PeriodStatus = 'active' | 'upcoming' | 'completed';
 // -----------------------------------------------------------------------------
 
 /**
- * Definition of an incentive program.
- * Bonus is paid ONLY when driver completes targetCount qualifying trips.
- * Per-incentive `bonusAmount` is the sole source of truth in v1.
- *
- * NOTE: Admin-editable fields (color, timeframe, enabled, sortOrder, marketScope,
- * clientScope, trigger) plus the rename of `name`→`title`, `targetCount`→`goal`,
- * and removal of `periodId` are part of I-1, not I-0.
+ * Definition of an incentive program (v1 — fully admin-editable).
+ * `bonusAmount` is the sole $ source of truth (INCENTIVE_TIER_BONUSES deleted in I-0).
+ * Per-incentive `color` drives pill rendering; `timeframe` replaces `periodId`;
+ * `sortOrder` controls list order (ASC). New admin fields: enabled, marketScope,
+ * clientScope, trigger (read-only, eng-managed).
  */
 export interface IncentiveDefinition {
   id: string;
   type: IncentiveType;
-  name: string;                    // Human-readable name
+  title: string;                   // RENAMED from `name`
   description: string;             // Short description
-  bonusAmount: number;             // Dollars paid when target is hit (INTEGER)
-  targetCount: number;             // Number of qualifying trips needed
-  periodId: string;                // Which period this belongs to
+  goal: number;                    // RENAMED from `targetCount` — trips needed
+  bonusAmount: number;             // Dollars paid when goal is hit ($ source of truth)
+  timeframe: 'daily' | 'weekly' | 'monthly' | 'all-time';  // REPLACES periodId
+  color: string;                   // Hex — pill bg color
+  enabled: boolean;                // Admin toggle
+  sortOrder: number;               // ASC; lower = higher in list
+  marketScope: string[];           // Admin-editable markets (e.g. ['Atlanta'])
+  clientScope: string[];           // Admin-editable clients (e.g. ['Verida', 'MTM'])
   qualifyingCriteria: string;      // Human-readable criteria
   iconName?: string;               // Optional icon identifier
+  trigger: string;                 // Read-only; eng-managed trigger identifier
 }
 
 /**
- * A driver's progress toward an incentive program.
+ * A driver's progress toward an incentive program (v1).
+ * `scheduledCount` stripped (no "+N taken" in v1 UI). Binary progress: currentCount vs goal.
  */
 export interface DriverIncentiveProgress {
   incentiveId: string;             // References IncentiveDefinition.id
-  currentCount: number;            // Trips completed toward this incentive
-  scheduledCount: number;          // Trips scheduled/accepted that will count when completed
-  targetCount: number;             // Copied from definition for convenience
-  isComplete: boolean;             // Has the driver hit the target?
+  currentCount: number;            // Trips completed toward this incentive (the "done" count)
+  goal: number;                    // RENAMED from `targetCount` — copied from definition
+  isComplete: boolean;             // Has the driver hit the goal?
   bonusEarned: number;             // 0 if not complete, bonusAmount if complete
-  lastQualifyingTripId?: string;
+  lastQualifyingTripId?: string;   // Last qualifying trip ID
 }
 
 /**
- * A trip/ride in the system.
- *
- * v1 still uses the singular `incentiveType: IncentiveType | null` field. The
- * migration to `incentiveTypes: IncentiveType[]` (multi-incentive) is part of I-1.
+ * A trip/ride in the system (v1 — multi-incentive support).
+ * `incentiveTypes: IncentiveType[]` replaces singular nullable `incentiveType`.
+ * Empty array = no incentives; 1+ entries = stacked pills on ride card.
  */
 export interface Trip {
   id: string;
@@ -100,8 +103,8 @@ export interface Trip {
   notes: string;
   status: TripStatus;
 
-  // Incentive-related fields
-  incentiveType: IncentiveType | null;
+  // Incentive-related fields (v1: multi-incentive)
+  incentiveTypes: IncentiveType[];          // MIGRATED: singular → plural array
   clientEnrolledInIncentives: boolean;
 
   // Leg information
@@ -176,85 +179,132 @@ export const currentPeriod: Period = {
 
 export const incentiveDefinitions: IncentiveDefinition[] = [
   {
-    id: 'inc-weekend-warrior-apr26',
+    id: 'inc-ww-001',
     type: 'weekend-warrior',
-    name: 'Weekend Warrior',
-    description: 'Complete 8 trips on weekends this month',
+    title: 'Weekend Warrior',
+    description: 'Complete 8 trips on weekends',
+    goal: 8,
     bonusAmount: 50,
-    targetCount: 8,
-    periodId: 'period-2026-04',
-    qualifyingCriteria: 'Trips completed on Saturday or Sunday',
-    iconName: 'calendar-weekend',
+    timeframe: 'monthly',
+    color: '#10B981',
+    enabled: true,
+    sortOrder: 10,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: 'Trips on Saturday or Sunday',
+    trigger: 'weekend-trip',
   },
   {
-    id: 'early-bird',
-    type: 'early-bird',
-    name: 'Early Bird',
-    description: 'Complete 8 qualifying trips before 9am',
-    bonusAmount: 30,
-    targetCount: 8,
-    periodId: 'may-2026',
-    qualifyingCriteria: '8 trips before 9am',
-  },
-  {
-    id: 'peak-performer',
+    id: 'inc-pp-001',
     type: 'peak-hours',
-    name: 'Peak Performer',
-    description: 'Complete qualifying trips during peak hours (5-9am, 4-8pm)',
+    title: 'Peak Performer',
+    description: 'Complete 10 trips during peak hours (5-9am, 4-8pm)',
+    goal: 10,
     bonusAmount: 50,
-    targetCount: 10,
-    periodId: 'may-2026',
+    timeframe: 'monthly',
+    color: '#EAB308',
+    enabled: true,
+    sortOrder: 20,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
     qualifyingCriteria: '10 trips between 5-9am or 4-8pm',
+    trigger: 'peak-hours',
   },
   {
-    id: 'loyalty-streak',
-    type: 'loyalty-streak',
-    name: 'Loyalty Streak',
-    description: 'Complete rides for 5 consecutive calendar days',
-    bonusAmount: 10,
-    targetCount: 5,
-    periodId: 'may-2026',
-    qualifyingCriteria: 'Rides on 5 consecutive days',
-  },
-  {
-    id: 'white-glove',
-    type: 'white-glove',
-    name: 'White Glove',
-    description: 'Complete 6 door-to-door trips this month',
-    bonusAmount: 50,
-    targetCount: 6,
-    periodId: 'may-2026',
-    qualifyingCriteria: 'Trips with door-to-door service',
-  },
-  {
-    id: 'quick-wins',
-    type: 'quick-wins',
-    name: 'Quick Wins',
-    description: 'Complete 10 short-distance trips this month',
-    bonusAmount: 10,
-    targetCount: 10,
-    periodId: 'may-2026',
-    qualifyingCriteria: 'Trips under 5 miles',
-  },
-  {
-    id: 'hometown-hero',
-    type: 'hometown-hero',
-    name: 'Hometown Hero',
-    description: 'Complete 8 trips within your home county',
+    id: 'inc-eb-001',
+    type: 'early-bird',
+    title: 'Early Bird',
+    description: 'Complete 8 trips before 9am',
+    goal: 8,
     bonusAmount: 30,
-    targetCount: 8,
-    periodId: 'may-2026',
-    qualifyingCriteria: 'Pickup and dropoff in same county',
+    timeframe: 'monthly',
+    color: '#06B6D4',
+    enabled: true,
+    sortOrder: 30,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: '8 trips before 9am',
+    trigger: 'before-9am',
   },
   {
-    id: 'squad-goals',
-    type: 'squad-goals',
-    name: 'Squad Goals',
-    description: 'Complete 6 multi-rider trips this month',
+    id: 'inc-wg-001',
+    type: 'white-glove',
+    title: 'White Glove',
+    description: 'Complete 6 door-to-door trips',
+    goal: 6,
     bonusAmount: 50,
-    targetCount: 6,
-    periodId: 'may-2026',
+    timeframe: 'monthly',
+    color: '#8B5CF6',
+    enabled: true,
+    sortOrder: 40,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida'],
+    qualifyingCriteria: 'Trips with door-to-door service',
+    trigger: 'door-to-door',
+  },
+  {
+    id: 'inc-hh-001',
+    type: 'hometown-hero',
+    title: 'Hometown Hero',
+    description: 'Complete 8 trips within your home county',
+    goal: 8,
+    bonusAmount: 30,
+    timeframe: 'monthly',
+    color: '#94A3B8',
+    enabled: true,
+    sortOrder: 50,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: 'Pickup and dropoff in same county',
+    trigger: 'in-county',
+  },
+  {
+    id: 'inc-sg-001',
+    type: 'squad-goals',
+    title: 'Squad Goals',
+    description: 'Complete 6 multi-rider trips',
+    goal: 6,
+    bonusAmount: 50,
+    timeframe: 'monthly',
+    color: '#EC4899',
+    enabled: true,
+    sortOrder: 60,
+    marketScope: ['Atlanta'],
+    clientScope: ['MTM'],
     qualifyingCriteria: 'Trips with 2+ passengers',
+    trigger: 'multi-rider',
+  },
+  {
+    id: 'inc-qw-001',
+    type: 'quick-wins',
+    title: 'Quick Wins',
+    description: 'Complete 10 short-distance trips',
+    goal: 10,
+    bonusAmount: 10,
+    timeframe: 'monthly',
+    color: '#3B82F6',
+    enabled: true,
+    sortOrder: 70,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: 'Trips under 5 miles',
+    trigger: 'short-distance',
+  },
+  {
+    id: 'inc-ls-001',
+    type: 'loyalty-streak',
+    title: 'Loyalty Streak',
+    description: 'Complete trips for 5 consecutive days',
+    goal: 5,
+    bonusAmount: 10,
+    timeframe: 'monthly',
+    color: '#F59E0B',
+    enabled: true,
+    sortOrder: 80,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: 'Rides on 5 consecutive days',
+    trigger: 'consecutive-days',
   },
 ];
 
@@ -264,72 +314,68 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
 
 export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   {
-    incentiveId: 'inc-weekend-warrior-apr26',
+    incentiveId: 'inc-ww-001',
     currentCount: 5,
-    scheduledCount: 2,
-    targetCount: 8,
+    goal: 8,
     isComplete: false,
     bonusEarned: 0,
-    lastQualifyingTripId: 'trip-req-003',
+    lastQualifyingTripId: 'trip-ww-005',
   },
   {
-    incentiveId: 'inc-early-bird-apr26',
-    currentCount: 10,
-    scheduledCount: 0,
-    targetCount: 10,
-    isComplete: true,
-    bonusEarned: 75,
-    lastQualifyingTripId: 'trip-hist-002',
-  },
-  {
-    incentiveId: 'inc-peak-hours-apr26',
+    incentiveId: 'inc-pp-001',
     currentCount: 9,
-    scheduledCount: 3,
-    targetCount: 15,
+    goal: 10,
     isComplete: false,
     bonusEarned: 0,
-    lastQualifyingTripId: 'trip-upcoming-002',
+    lastQualifyingTripId: 'trip-pp-009',
   },
   {
-    incentiveId: 'inc-loyalty-streak-apr26',
-    currentCount: 5,
-    scheduledCount: 0,
-    targetCount: 5,
-    isComplete: true,
-    bonusEarned: 85,
-    lastQualifyingTripId: 'trip-hist-003',
-  },
-  {
-    incentiveId: 'white-glove',
-    currentCount: 2,
-    scheduledCount: 1,
-    targetCount: 6,
+    incentiveId: 'inc-eb-001',
+    currentCount: 7,
+    goal: 8,
     isComplete: false,
     bonusEarned: 0,
+    lastQualifyingTripId: 'trip-eb-007',
   },
   {
-    incentiveId: 'quick-wins',
-    currentCount: 4,
-    scheduledCount: 1,
-    targetCount: 10,
-    isComplete: false,
-    bonusEarned: 0,
-  },
-  {
-    incentiveId: 'hometown-hero',
+    incentiveId: 'inc-wg-001',
     currentCount: 3,
-    scheduledCount: 2,
-    targetCount: 8,
+    goal: 6,
     isComplete: false,
     bonusEarned: 0,
+    lastQualifyingTripId: 'trip-wg-003',
   },
   {
-    incentiveId: 'squad-goals',
-    currentCount: 1,
-    scheduledCount: 1,
-    targetCount: 6,
+    incentiveId: 'inc-hh-001',
+    currentCount: 4,
+    goal: 8,
     isComplete: false,
     bonusEarned: 0,
+    lastQualifyingTripId: 'trip-hh-004',
+  },
+  {
+    incentiveId: 'inc-sg-001',
+    currentCount: 2,
+    goal: 6,
+    isComplete: false,
+    bonusEarned: 0,
+    lastQualifyingTripId: 'trip-sg-002',
+  },
+  {
+    incentiveId: 'inc-qw-001',
+    currentCount: 8,
+    goal: 10,
+    isComplete: false,
+    bonusEarned: 0,
+    lastQualifyingTripId: 'trip-qw-008',
+  },
+  {
+    incentiveId: 'inc-ls-001',
+    currentCount: 5,
+    goal: 5,
+    isComplete: true,
+    bonusEarned: 10,
+    lastQualifyingTripId: 'trip-ls-005',
   },
 ];
 

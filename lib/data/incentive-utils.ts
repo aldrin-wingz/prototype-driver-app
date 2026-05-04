@@ -80,8 +80,7 @@ export interface IncentiveProgressInfo {
   incentiveType: IncentiveType;
   name: string;
   currentCount: number;
-  scheduledCount: number;
-  targetCount: number;
+  goal: number;
   remainingCount: number;
   bonusAmount: number;
   isComplete: boolean;
@@ -95,16 +94,14 @@ export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgress
   const progress = driverIncentiveProgress.find(p => p.incentiveId === definition.id);
 
   const currentCount = progress?.currentCount ?? 0;
-  const scheduledCount = progress?.scheduledCount ?? 0;
-  const targetCount = definition.targetCount;
-  const remainingCount = Math.max(0, targetCount - currentCount - scheduledCount);
+  const goal = definition.goal;
+  const remainingCount = Math.max(0, goal - currentCount);
 
   return {
     incentiveType: type,
-    name: definition.name,
+    name: definition.title,
     currentCount,
-    scheduledCount,
-    targetCount,
+    goal,
     remainingCount,
     bonusAmount: definition.bonusAmount,
     isComplete: progress?.isComplete ?? false,
@@ -139,15 +136,11 @@ export interface WeeklyPayoutData {
 }
 
 /**
- * Get all incentive progress items.
- *
- * I-0 placeholder: sorts by definition `id` ASC, then puts in-progress before
- * completed. I-1 will replace this with `sortOrder` ASC once the admin field
- * lands.
+ * Get all incentive progress items, sorted by sortOrder ASC (then in-progress before completed).
  */
 export function getAllIncentiveProgress(): IncentiveProgressInfo[] {
   const sortedDefinitions = [...incentiveDefinitions].sort((a, b) =>
-    a.id.localeCompare(b.id)
+    a.sortOrder - b.sortOrder
   );
 
   const progressItems = sortedDefinitions
@@ -201,5 +194,5 @@ export function getWeeklyPayoutData(): WeeklyPayoutData {
  * from the mock request feed. Used by the "Available trips" CTA on Incentive cards.
  */
 export function getQualifyingTripsCount(type: IncentiveType): number {
-  return mockRequestTrips.filter((t) => t.incentiveType === type).length;
+  return mockRequestTrips.filter((t) => t.incentiveTypes.includes(type)).length;
 }
