@@ -120,9 +120,9 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
 
   const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
 
-  // Single-program-per-trip in v1
-  const hasIncentives = !!trip.incentiveType && trip.clientEnrolledInIncentives !== false;
-  const activeIncentiveType = hasIncentives ? trip.incentiveType! : null;
+  // Multi-incentive support in v1: render all incentive pills
+  const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
+  const activeIncentiveTypes = hasIncentives ? trip.incentiveTypes : [];
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB]">
@@ -235,13 +235,15 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               <span className="inline-block rounded-full bg-[#F3F4F6] px-3 py-1 text-xs font-medium text-[#6B7280]">
                 Expires in 185 days
               </span>
-              {hasIncentives && (
-                <ProgramContributionIndicator
-                  incentiveType={activeIncentiveType}
-                  isCompleted={false}
-                  context="detail"
-                />
-              )}
+              {hasIncentives &&
+                activeIncentiveTypes.map((incentiveType) => (
+                  <ProgramContributionIndicator
+                    key={incentiveType}
+                    incentiveType={incentiveType}
+                    isCompleted={false}
+                    context="detail"
+                  />
+                ))}
             </div>
           )}
 
@@ -250,13 +252,15 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
                 Not Confirmed
               </span>
-              {hasIncentives && (
-                <ProgramContributionIndicator
-                  incentiveType={activeIncentiveType}
-                  isCompleted={false}
-                  context="detail"
-                />
-              )}
+              {hasIncentives &&
+                activeIncentiveTypes.map((incentiveType) => (
+                  <ProgramContributionIndicator
+                    key={incentiveType}
+                    incentiveType={incentiveType}
+                    isCompleted={false}
+                    context="detail"
+                  />
+                ))}
             </div>
           )}
         </div>

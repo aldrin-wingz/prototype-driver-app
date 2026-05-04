@@ -30,7 +30,7 @@ export default function RequestsPage() {
     let result = mockRequestTrips;
     // Filter by incentive type if set
     if (appliedFilters.incentiveType) {
-      result = result.filter((t) => t.incentiveType === appliedFilters.incentiveType);
+      result = result.filter((t) => t.incentiveTypes.includes(appliedFilters.incentiveType as IncentiveType));
     }
     return result;
   }, [appliedFilters]);

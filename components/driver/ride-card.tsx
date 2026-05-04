@@ -103,7 +103,7 @@ export function RideCard({
   showDistance = true,
 }: RideCardProps) {
   const isCompleted = trip.status === "completed";
-  const hasIncentives = !!trip.incentiveType;
+  const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0;
 
   return (
     <Card
@@ -177,12 +177,14 @@ export function RideCard({
           </span>
         ))}
 
-        {hasIncentives && (
-          <ProgramContributionIndicator
-            incentiveType={trip.incentiveType!}
-            isCompleted={isCompleted}
-          />
-        )}
+        {hasIncentives &&
+          trip.incentiveTypes.map((incentiveType) => (
+            <ProgramContributionIndicator
+              key={incentiveType}
+              incentiveType={incentiveType}
+              isCompleted={isCompleted}
+            />
+          ))}
       </div>
     </Card>
   );
