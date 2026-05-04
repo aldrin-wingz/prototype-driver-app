@@ -12,7 +12,7 @@
 
 **Re-orientation prompt (Prompt 0)**: re-uploads the v1 BIBLE + this v1 TRACKER (overwriting the v3 versions in the duplicated repo) and confirms v0 understands the v1 scope before stripping begins.
 
-**Why 3 steps instead of 5:** The existing UI is already CEO-approved; we're scoping down, not rebuilding. I-0 is one big strip pass (Variant Toggle + Tier + Leaderboard + `/payout` + UpcomingPayoutWidget downgrade). I-1 is the only ADD step (per-incentive admin schema). I-2 is polish + grep sweep. Minimizes prompt rounds while keeping each prompt focused on a single intent.
+**Why 3 steps instead of 5:** The existing UI is already CEO-approved; we're scoping down, not rebuilding. I-0 is one big strip pass (Variant Toggle + Tier + Leaderboard + `/payout` page + UpcomingPayoutWidget removed entirely + Earned popup downgrade). I-1 is the only ADD step (per-incentive admin schema). I-2 is polish + grep sweep. Minimizes prompt rounds while keeping each prompt focused on a single intent.
 
 ## Current Step
 I-0 (Mega Strip — Variant Toggle + Tier + Leaderboard + /payout + Widget Downgrade)
@@ -28,7 +28,7 @@ The v1 BIBLE describes the END STATE. After I-0 through I-2 complete, the protot
 | # | Goal | Status | Description |
 |---|---|---|---|
 | 0 | Re-orientation | ⬜ Planned | On the duplicated v0 chat: upload v1 BIBLE + TRACKER (overwriting v3 versions in repo). v0 confirms v1 scope. No code changes. |
-| I-0 | Mega Strip — Variant Toggle + Tier + Leaderboard + `/payout` + Widget downgrade | ⬜ Planned | One pass. DELETE: variant toggle infra, unused ride-card + dashboard variants, tier system, leaderboard, `/payout` page, `Trip.revenueAddons`. DOWNGRADE: UpcomingPayoutWidget → display-only. STRIP: tier-coupled fields from schema (`tierLevel`, `INCENTIVE_TIER_BONUSES`, `Tier`, `TierConfig`, `LeaderboardEntry`). DOWNGRADE: Earned popup → single "Dismiss" CTA. STRIP: `/incentives` Tabs. |
+| I-0 | Mega Strip — Variant Toggle + Tier + Leaderboard + `/payout` page + UpcomingPayoutWidget DELETED + Earned popup downgrade | ⬜ Planned | One pass. DELETE: variant toggle infra, unused ride-card + dashboard variants, tier system, leaderboard, `/payout` page, **UpcomingPayoutWidget (component file + dashboard mount; revised 2026-05-04 from "downgrade" to full delete since all payout surfaces defer to v2)**, `Trip.revenueAddons`. STRIP: tier-coupled fields from schema (`tierLevel`, `INCENTIVE_TIER_BONUSES`, `Tier`, `TierConfig`, `LeaderboardEntry`). DOWNGRADE: Earned popup → single "Dismiss" CTA. STRIP: `/incentives` Tabs. |
 | I-1 | Schema migration — per-incentive admin fields + re-seed | ⬜ Planned | ADD: `color`, `timeframe`, `enabled`, `sortOrder`, `marketScope`, `clientScope`, `trigger` to `IncentiveDefinition`. RENAME: `targetCount` → `goal`, `name` → `title`. `bonusAmount` is sole $ source. Re-seed 8 incentives. Pill bg uses `color`. Sort by `sortOrder` ASC. |
 | I-2 | Polish + edge states + final QA grep sweep | ⬜ Planned | Empty states, disabled-incentive filtering, [DEV] Earned popup trigger, full grep sweep returning zero hits on stripped tokens. |
 
@@ -48,7 +48,7 @@ After I-0 → I-2 complete, the v0 repo should contain only these driver-incenti
 - `components/driver/incentive-pill-renderer.tsx` (formerly `incentive-badge-renderer.tsx`; renamed during I-0 — only `pill-named-bottom` path remains)
 - `components/driver/program-contribution-indicator.tsx`
 - `components/driver/dashboard-incentive-section.tsx` (only `dashboard-card-section` carousel render path)
-- `components/driver/upcoming-payout-widget.tsx` (display-only)
+- ~~`components/driver/upcoming-payout-widget.tsx` (display-only)~~ — DELETED (revised 2026-05-04 later; entire payout surface defers to v2)
 - `components/driver/filter-requests-modal.tsx` (with `incentiveType` field)
 - `components/driver/incentive-earned-popup.tsx` (single-CTA Dismiss)
 - `components/driver/revenue-display.tsx` (kept; `revenueAddons` stripped from data)
@@ -59,6 +59,7 @@ After I-0 → I-2 complete, the v0 repo should contain only these driver-incenti
 - `components/driver/tier-badge.tsx`
 - `components/driver/tier-progress-section.tsx`
 - `components/driver/leaderboard-tab.tsx`
+- `components/driver/upcoming-payout-widget.tsx` (revised 2026-05-04 later — full delete, not display-only)
 - `components/driver/tier-up-popup.tsx`
 - `lib/variants.ts`
 - `lib/variants-context.tsx`
@@ -140,7 +141,8 @@ After I-0 → I-2 complete, the v0 repo should contain only these driver-incenti
 - Strip `revenueAddons` arrays from any seeded trips
 
 **`/payout` strip — components:**
-- `components/driver/upcoming-payout-widget.tsx`: remove the `router.push('/payout')` handler. Tap → no-op (or simple toast: "Payout page redesign coming in v2"). Widget retains its visual: `$amount` + breakdown row + "Next payout: <date>" caption. Display-only.
+- DELETE `components/driver/upcoming-payout-widget.tsx` entirely (revised 2026-05-04 later; previously was a display-only downgrade — user revised because the entire payout surface defers to v2).
+- Remove the UpcomingPayoutWidget import + mount from the dashboard (`app/page.tsx` or wherever it's rendered). Dashboard top-of-page becomes: Header → "This Month" earnings card with dot pagination → Confirm Trip prompt → Driver Incentives section → New Requests preview → Next Accepted Ride.
 - `components/driver/revenue-display.tsx`: strip the `+$<addons>` rendering and tap-popover. Revenue cell renders `$<base>` only.
 
 **Acceptance:**
@@ -152,7 +154,8 @@ After I-0 → I-2 complete, the v0 repo should contain only these driver-incenti
 - [ ] `/incentives` page has no Tabs — single Incentives view
 - [ ] Earned popup has only "Dismiss" CTA
 - [ ] No `app/payout/` directory; no `PayPeriod` / `PayoutPeriodSummary` types; no `revenueAddons` in code
-- [ ] UpcomingPayoutWidget tap doesn't navigate; revenue cells show base $ only
+- [ ] No `components/driver/upcoming-payout-widget.tsx` file; no UpcomingPayoutWidget mount on dashboard; revenue cells show base $ only
+- [ ] grep `UpcomingPayoutWidget` / `upcoming-payout-widget` returns 0 code hits
 - [ ] grep "useVariants" / "banner-wingz-hero" / "achievement-banner" / "dashboard-banner" / "dashboard-widget-integrated" / "tier-linear" / "tier-stack" / "leaderboard-list" / "leaderboard-podium" / "boxed-tabs" / "edge-to-edge-tabs" / "tier" (case-insensitive) / "leaderboard" (case-insensitive) / "Bronze|Silver|Gold|Platinum" / "INCENTIVE_TIER_BONUSES" / "podium" / "YourPlacement" / "/payout" / "PAYOUT_PERIOD" / "revenueAddons" → all return 0 code hits (matches in comments noting "v2 only" / "v3 only" are OK)
 
 ### Step I-1: Schema migration — per-incentive admin fields + re-seed
@@ -210,15 +213,15 @@ incentiveTypes: string[];                     // 0..N programs this trip counts 
 - Empty array → no pills (replaces null suppression).
 - ProgramContributionIndicator (popover/tooltip) now lists ALL programs the trip contributes to, one row per program with progress + bonus amount.
 - Filter modal: "Filter by Incentive" matches if `trip.incentiveTypes.includes(filterValue)`.
-- All `Trip.incentiveType` reads → `Trip.incentiveTypes`. Helpers (`getTripsByIncentive`, etc.) refactored to array-includes.
+- All `Trip.incentiveType` reads → `Trip.incentiveTypes`. Helper `getTripsForIncentiveType` (existing name in code) refactored from `===` to `.includes()`. `tripHasIncentives` migrates from `trip.incentiveType !== null` to `trip.incentiveTypes.length > 0`.
 
 **Progress simplification — binary done-vs-to-go:**
 
 The current v3 baseline UI shows a 3-state progress: solid green (`X done`) + hatched green (`+Y taken`) + gray (`Z to go`). v1 simplifies to **2-state binary**: solid green (`X done`) + gray (rest of bar). Drop the "taken" intermediate state entirely.
 
-- Progress data: only `completedCount: number` is consumed by the bar/text. If a `takenCount` / in-flight field exists in seed data, leave it but stop reading it from the UI (or drop entirely — it's display-only, not load-bearing).
-- Bar: `completedCount / goal` solid fill, rest gray. No hatched section.
-- Caption text: `"5 done · 3 to go"` (computed: `goal - completedCount` = to go). NO `+N taken` segment.
+- Progress data: only `currentCount: number` is consumed by the bar/text. If a `takenCount` / in-flight field exists in seed data, leave it but stop reading it from the UI (or drop entirely — it's display-only, not load-bearing).
+- Bar: `currentCount / goal` solid fill, rest gray. No hatched section.
+- Caption text: `"5 done · 3 to go"` (computed: `goal - currentCount` = to go). NO `+N taken` segment.
 - Applies to: `IncentiveCard` on Dashboard carousel + `/incentives` page.
 - "Earned this month" sticky aggregate (the green dollar above the tier bar in v3) — kept, but the tier bar itself is GONE in v1 (stripped in I-0).
 
@@ -250,7 +253,7 @@ Re-seed ~15 trips total. At LEAST 4 must be multi-incentive to demonstrate stack
 | Plain weekday midday single trip | `[]` | No pills |
 | Plus ~10 more single-incentive trips spread across all 8 programs | various 1-element arrays | 1 pill each |
 
-Each multi-incentive trip should still complete to a single trip record — the trip "counts toward" each listed program (increments `completedCount` for each). Stacking pills must NOT overflow the ride card; if 4+ pills don't fit, allow horizontal scroll within the bottom pill row OR truncate to first 3 + "+N more" chip (whichever the existing layout already supports cleanest — defer to v0's judgment but note both options).
+Each multi-incentive trip should still complete to a single trip record — the trip "counts toward" each listed program (increments `currentCount` for each). Stacking pills must NOT overflow the ride card; if 4+ pills don't fit, allow horizontal scroll within the bottom pill row OR truncate to first 3 + "+N more" chip (whichever the existing layout already supports cleanest — defer to v0's judgment but note both options).
 
 **Renames across codebase:**
 - `IncentiveDefinition.name` → `title`
@@ -322,7 +325,7 @@ Each multi-incentive trip should still complete to a single trip record — the 
 - `TierConfig` / `LeaderboardEntry` / `TierBadge`
 
 **Screenshot pass:**
-- Dashboard (top → bottom): UpcomingPayoutWidget → Driver Incentives carousel → Earnings card → Confirm Trip → New Requests preview → Next Accepted Ride
+- Dashboard (top → bottom): "This Month" earnings card with dot pagination → Confirm Trip prompt → Driver Incentives carousel → New Requests preview → Next Accepted Ride. NO UpcomingPayoutWidget — it was deleted in I-0 (full payout surface defers to v2).
 - `/incentives` (single view, no tabs)
 - Requests with `?incentive=weekend-warrior` filter
 - Ride card with pill (each of 8 incentives produces a different colored pill)

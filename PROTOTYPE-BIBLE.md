@@ -10,7 +10,7 @@
 
 A mobile-first prototype that overlays a Driver Incentives layer on top of the existing **Wingz NEMT Driver App** shell. The existing Dashboard, Requests, My Rides, Ride Details (before-taken + needs-action), and Ride History are replicated faithfully and then augmented with:
 
-- **Pill on ride cards** signaling that a trip "counts toward" one or more driver incentive programs. Single locked variant: **Pill Row (Bottom)** — `pill-named-bottom`. Each pill tap reveals a program-contribution popover listing every program the trip contributes to (with progress + program-level bonus per row). **Multi-incentive trips supported** — `Trip.incentiveTypes: string[]` (revised 2026-05-04, was singular `incentiveType: string | null`). The Pill Row Bottom layout was always built for stacking; we now seed it.
+- **Pill on ride cards** signaling that a trip "counts toward" one or more driver incentive programs. Single locked variant: **Pill Row (Bottom)** — `pill-named-bottom`. Each pill tap reveals a program-contribution popover listing every program the trip contributes to (with progress + program-level bonus per row). **Multi-incentive trips supported** — `Trip.incentiveTypes: IncentiveType[]` (revised 2026-05-04, was singular `incentiveType: string | null`). The Pill Row Bottom layout was always built for stacking; we now seed it.
 - **Dashboard incentive surfacing** — single locked variant: **Card Section** — `dashboard-card-section`. Swipe carousel (one card at a time, page dots, "View All" link top-right that opens the Driver Incentives page).
 - **Dedicated `/incentives` page (Driver Incentives Hub)** — stack-pushed, no bottom nav. **Single tab** — Incentives only (no Leaderboard, no Tier Progress in v1). Sticky header + scrollable list of `IncentiveCard`s sorted by `sortOrder`.
 - **Ride details incentive surfacing** — extends the same pill to Ride Details (placement adapts per surface; visual treatment shared with the ride card).
@@ -20,13 +20,13 @@ A mobile-first prototype that overlays a Driver Incentives layer on top of the e
 
 **This is an OVERLAY on the existing app, not a rebuild.** Do not redesign the dashboard or trip lists from scratch. Replicate the existing surfaces faithfully (per Reference Screenshots), then layer the incentive pieces on top.
 
-**Bonus model is PROGRAM-LEVEL, not per-trip.** A trip "counts toward" zero or more incentive programs (`Trip.incentiveTypes: string[]` — revised 2026-05-04, was singular). Each entry in the array means the trip increments that program's `completedCount` on completion. The driver earns a bonus per program only when that program hits its `goal` (e.g., complete 5 short-notice trips → earn $25). Trips never carry a per-trip bonus dollar amount. Bonus dollar values appear ONLY at the program level: in the contribution popover (one row per program in `incentiveTypes`), on Dashboard incentive cards (once per program), on the `/incentives` page, and in the Earned popup when a program completes.
+**Bonus model is PROGRAM-LEVEL, not per-trip.** A trip "counts toward" zero or more incentive programs (`Trip.incentiveTypes: IncentiveType[]` — revised 2026-05-04, was singular). Each entry in the array means the trip increments that program's `currentCount` on completion. The driver earns a bonus per program only when that program hits its `goal` (e.g., complete 5 short-notice trips → earn $25). Trips never carry a per-trip bonus dollar amount. Bonus dollar values appear ONLY at the program level: in the contribution popover (one row per program in `incentiveTypes`), on Dashboard incentive cards (once per program), on the `/incentives` page, and in the Earned popup when a program completes.
 
 **Per-incentive $ model.** Each `IncentiveDefinition` has its own `bonusAmount` (any positive integer), `goal` (target trip count), and `timeframe` (`'daily' | 'weekly' | 'monthly' | 'all-time'`). The Incentives Manager admin tool (separate v1 prototype) is the source of truth for these values. In this Driver App prototype, seed mock incentives directly in `lib/data/incentives.ts`. There is NO tier-locked $ formula.
 
 **Suppression on ride card pills is DATA-DRIVEN, not LOGIC-DRIVEN.** Trips whose programs are all completed (or that don't qualify for any program this period) are seeded with `incentiveTypes: []` so the bottom pill row naturally renders nothing. To suppress a specific program from a trip's pill row (e.g., that program already hit goal), omit it from `incentiveTypes`. No conditional filtering in components. Completed programs still appear on `/incentives` — that's the right context. Only ride card pills are suppressed.
 
-**Progress UI is BINARY (revised 2026-05-04).** IncentiveCard progress shows ONLY done vs to-go: solid green fill from 0 to (`completedCount` / `goal`), gray for the rest. Caption is `"X done · Y to go"` where Y = `goal - completedCount`. The v3 baseline 3-state progress (solid green / hatched green "+N taken" / gray) is REMOVED from v1. Drivers see a clean black-and-white "did or didn't" view per program.
+**Progress UI is BINARY (revised 2026-05-04).** IncentiveCard progress shows ONLY done vs to-go: solid green fill from 0 to (`currentCount` / `goal`), gray for the rest. Caption is `"X done · Y to go"` where Y = `goal - currentCount`. The v3 baseline 3-state progress (solid green / hatched green "+N taken" / gray) is REMOVED from v1. Drivers see a clean black-and-white "did or didn't" view per program. NOTE: `currentCount` is the existing field name in `lib/data/incentives.ts` `DriverIncentiveProgress` — kept as-is, NOT renamed to `completedCount`.
 
 **Per-incentive color drives pill theming.** Each `IncentiveDefinition` carries a `color: string` (hex). The pill background uses this color for its bg tint; the label color is high-contrast against it. Color is admin-editable in the Incentives Manager.
 
@@ -210,7 +210,7 @@ These details inform v0 directly when replicating the existing surfaces (I-0) an
 
 Stacked vertical sections on a light gray page background (`~#F9FAFB`). Order:
 
-1. **UpcomingPayoutWidget** (top — display-only in v1, no Sheet popup, tap is a no-op or simple toast in v1; full payout page is v2)
+1. ~~**UpcomingPayoutWidget** (top — display-only in v1, no Sheet popup, tap is a no-op or simple toast in v1; full payout page is v2)~~ — REMOVED 2026-05-04 (later). The entire payout surface (page + dashboard widget) defers to v2. v1 dashboard top-of-page is the "This Month" earnings card.
 2. **Driver Incentives surfacing** — `dashboard-card-section` (locked variant). Swipe carousel with one `IncentiveCard` visible at a time + page dots + "View All" link top-right that opens `/incentives`. Programs sorted by `sortOrder`.
 3. **Earnings card** — period label (`This Month` / `Last Month`) toggled by `<` `>` chevrons; large bold black `$X.XX`; `EARNINGS` sub-label; 3-column stat row (`Trips` / `On-Time Performance` / `Send Backs`).
 4. **"Confirm Your Upcoming Trip" prompt** (green-tinted card).
@@ -298,7 +298,7 @@ These patterns are reused across multiple steps:
 - **IncentivesPage** — carried from v3 baseline as the dedicated `/incentives` route. Stack-pushed (no bottom nav). Composed from a top header (back chevron + "Driver Incentives" title) + a scrollable list of `IncentiveCard`s sorted by `sortOrder` (post-I-1; pre-I-1 it was sorted gold-first by tier). **v1 I-0 strip removes the Tabs wrapper + Leaderboard tab + sticky Tier Progress section.** No Leaderboard. No Tier Progress section in v1. Each card tap deep-links to filtered Requests.
 - **Ride Detail extension** — carried from v3 baseline. The same `IncentivePill` + `ProgramContributionIndicator` render on the detail screen. Placement: small named pill below the trip metadata card (mirrors the bottom pill row on ride cards). Sticky bottom CTAs (pink/green swipe on Before-Taken; red "I REACHED OUT TO CONFIRM" on Needs Action) MUST remain visible.
 - **EarnedPopup** — composed from `Dialog` + 🎉 emoji + "Dismiss" CTA. Already built in v3 baseline (per 2026-05-01 spot-check) with 3 CTAs (Dismiss / View Earnings / View Achievements); v1 I-0 strip downgrades to single "Dismiss" CTA since `/payout` is gone and `/incentives` Leaderboard tab is gone. v1 I-2 adds the [DEV] floating trigger.
-- **UpcomingPayoutWidget** — display-only in v1. Composed from `Card` + bold `$amount` + breakdown row. Does NOT navigate anywhere in v1 (no `/payout` page in v1; full redesign is v2). Tap shows a brief toast or is a no-op. Sums program-level bonuses for programs the driver completed this period.
+- ~~**UpcomingPayoutWidget**~~ — DELETED in v1 (revised 2026-05-04 later). Component file removed; mount removed from dashboard. Entire payout surface defers to v2 redesign (which will combine an Upcoming Payout card with the new `/payout` page + Wallet + Instant Pay).
 
 ---
 
@@ -333,15 +333,19 @@ Wired in v3 baseline (page exists at `/incentives`; "View All" link from dashboa
 
 ## Data Schema
 
-All sample data lives in `lib/data/incentives.ts`. Every page and component imports from this file. **NEVER create ad-hoc sample data inline.** See `PROTOTYPE-TRACKER.md` → Step I-0.5 for the full type and seed data spec.
+Sample data lives in TWO files (verified against current v0 repo, 2026-05-04 calibration):
+- `lib/data/incentives.ts` — `IncentiveDefinition`, `DriverIncentiveProgress`, `IncentiveType` union, `IncentiveTierLevel`, current driver, leaderboard entries, tier configs (the latter four are stripped in I-0).
+- `lib/driver-data/mock-trips.ts` — the active `Trip` seed consumed by ride cards, ride detail, requests/my-rides/ride-history pages, and the (about-to-be-deleted) `/payout` page. Heavily imported across the app.
+
+Both files must stay in sync on schema changes. **NEVER create ad-hoc sample data inline.** See `PROTOTYPE-TRACKER.md` → Step I-1 for the schema migration that touches both files (e.g., `Trip.incentiveType` → `Trip.incentiveTypes`, `revenueAddons` strip).
 
 **Schema canonical source:** the `IncentiveDefinition` type is canonically defined in the **Incentives Manager** prototype's BIBLE (the admin tool is the system of record). This Driver App reads a documented subset. Any change to the schema in either prototype's BIBLE must bump a `schemaVersion: <date>` comment in BOTH BIBLEs. See [Schema Sync Note](../../../../References/Schema%20Sync%20Note.md) at project root for the sync rule.
 
 **Key v1 schema rules:**
 
-- `Trip.incentiveTypes: string[]` — the array of programs this trip counts toward (revised 2026-05-04, was singular `incentiveType: string | null`). `[]` = no active programs. Multi-element arrays render multiple stacked pills in the Pill Row Bottom. NO per-trip bonus dollar fields.
+- `Trip.incentiveTypes: IncentiveType[]` — the array of programs this trip counts toward (revised 2026-05-04, was singular `incentiveType: string | null`). `[]` = no active programs. Multi-element arrays render multiple stacked pills in the Pill Row Bottom. NO per-trip bonus dollar fields.
 - `IncentiveDefinition` carries `bonusAmount`, `goal`, `timeframe`, `color`, `enabled`, `sortOrder`, `marketScope`, `clientScope`, `trigger`, `title`, `description`. The bonus is paid only when the driver hits `goal`. **No `tierLevel` field in v1** (v3 only).
-- `DriverIncentiveProgress` tracks `completedCount` / `scheduledCount` / `goal` per program per driver.
+- `DriverIncentiveProgress` tracks `currentCount` / `goal` / `isComplete` / `bonusEarned` per program per driver. (`scheduledCount` field dropped 2026-05-04 — was the "+N taken" intermediate state, no longer consumed by binary progress UI.)
 
 **Driver App reads (subset of canonical schema):**
 
@@ -366,7 +370,7 @@ Driver App does NOT need: market/client scope (filtered server-side; admin-only)
 
 1. **Tier system / Tier badges / Tier progress section.** No `Tier` enum. No `TierConfig`. No `TierBadge`. No "Bronze/Silver/Gold/Platinum" anywhere in the UI. v3 only.
 2. **Leaderboard.** No leaderboard tab on `/incentives`. No `LeaderboardEntry` type. No "Your Placement Card". v3 only.
-3. **`/payout` page.** v1 has no dedicated payout page. `UpcomingPayoutWidget` is display-only on the dashboard. Full payout redesign is v2.
+3. **`/payout` page OR UpcomingPayoutWidget on dashboard.** v1 has no dedicated payout page AND no UpcomingPayoutWidget on the dashboard (revised 2026-05-04 later — the widget was previously a "display-only" carve-out but user revised to full removal since the entire payout surface defers to v2's Earnings/Incentives/Fees + Wallet + Instant Pay redesign).
 4. **Variant Toggle Sheet.** Variants are CEO-locked. No floating "Compare Variants" button, no Sheet picker, no `lib/variants.ts`, no `useVariants()` context, no URL query param parsing for variants.
 5. **`achievement-banner` and `banner-wingz-hero` ride card variants.** Only `pill-named-bottom` in v1. The v3 baseline preserves the alternatives.
 6. **`dashboard-banner` and `dashboard-widget-integrated` dashboard variants.** Only `dashboard-card-section` in v1.
@@ -375,13 +379,15 @@ Driver App does NOT need: market/client scope (filtered server-side; admin-only)
 9. **Payment / payout processing flow** — no "Cash out", "Withdraw", "Bank account" buttons.
 10. **Wallet / Instant Pay / bank card management.** v2 only.
 11. **Per-trip bonus dollar amounts on ride cards or trip detail surfaces.** Bonuses are program-level (driver completes N trips → earns one bonus). The `pill-named-bottom` label is `<Title> Trip` only — no $.
-12. **3-state progress bars** with hatched "+N taken" intermediate fill. v1 IncentiveCard progress is BINARY: solid green done vs gray to-go. Caption is `"X done · Y to go"`. (Revised 2026-05-04 — v3 baseline used 3-state; v1 simplifies to binary.) ~~Multi-program banners on a single trip~~ — REMOVED 2026-05-04: trips can now stack multiple pills via `Trip.incentiveTypes: string[]`.
+12. **3-state progress bars** with hatched "+N taken" intermediate fill. v1 IncentiveCard progress is BINARY: solid green done vs gray to-go. Caption is `"X done · Y to go"`. (Revised 2026-05-04 — v3 baseline used 3-state; v1 simplifies to binary.) ~~Multi-program banners on a single trip~~ — REMOVED 2026-05-04: trips can now stack multiple pills via `Trip.incentiveTypes: IncentiveType[]`.
 13. **Accounting integration** — no QuickBooks, Stripe Connect, or payroll export UI.
 14. **Multi-period historical analytics** — no charts comparing this week vs last week. Current period only.
 15. **Admin-side incentive configuration UI.** That's the separate v1 Incentives Manager prototype — NOT part of the Driver App.
 16. **Rider-facing surfacing** — no rider app screens.
 17. **Real authentication / onboarding flows** — assume the driver is already logged in.
-18. **Real backend wiring** — all data comes from `lib/data/incentives.ts`. No fetch calls.
+18. **Real backend wiring** — all data comes from `lib/data/incentives.ts` + `lib/driver-data/mock-trips.ts`. No fetch calls.
+
+**Multi-prototype monorepo note (2026-05-04 calibration):** The v0 repo contains UNRELATED prototypes hosted in the same workspace — `components/agent/`, `components/dispatch-tool/`, `components/onboarding/`, `components/post-hire-compliance/`, `components/in-app-announcements/`, `lib/agent-mock/`, `lib/communications-context.tsx`, `lib/api/`. **Do not touch any of these in I-0/I-1/I-2.** No deletes, no edits, no import audits. Driver Incentives v1 work scopes only to: `app/incentives/`, `app/payout/` (deleted in I-0), `app/requests/`, `app/registry/` + `app/components/` (showcase shell — minimum strip to keep build green when deleted components are imported), `app/layout.tsx` (variant-pill removal only), `components/driver/`, `lib/data/incentives.ts`, `lib/driver-data/mock-trips.ts`, `lib/incentive-earned-context.tsx`, `lib/incentive-sort.ts`, `lib/variants.ts`, `lib/variants-context.tsx`. The `app/registry/page.tsx` + `app/components/components-showcase-nav.tsx` + `app/components/page.tsx` showcase pages may import deleted variants/tier/leaderboard/payout components — strip those references during I-0 (option (a) — minimum-viable to keep build green; do not redesign the showcase). If a showcase page becomes empty after stripping, leave a one-liner placeholder.
 19. **No flow / no events.** This prototype renders STATES from seed data — it does NOT simulate flow. Earned popup is mock-triggered via [DEV] button (added in v1 I-2 polish).
 20. **Trip booking / dispatch flow** — drivers see trips already assigned. No accept/reject business logic.
 21. **GPS, mapping, or live tracking** — out of scope.
@@ -400,7 +406,7 @@ Driver App does NOT need: market/client scope (filtered server-side; admin-only)
 | # | Goal |
 |---|------|
 | 0 | Re-orientation — upload v1 BIBLE + TRACKER (overwriting v3 versions), v0 confirms scope. No code generated. |
-| I-0 | **Mega Strip** — one forward-only deletion pass. DELETE: Variant Toggle infra + 2-of-3 ride card variants + 2-of-3 dashboard variants + Tier system + Leaderboard + `/payout` page + `Trip.revenueAddons`. DOWNGRADE: UpcomingPayoutWidget → display-only; Earned popup → single "Dismiss" CTA. STRIP: tier-coupled fields from `IncentiveDefinition` (`tierLevel`, `INCENTIVE_TIER_BONUSES`, `Tier`, `TierConfig`, `LeaderboardEntry`). STRIP: `/incentives` Tabs wrapper. After this step, the prototype is structurally v1. |
+| I-0 | **Mega Strip** — one forward-only deletion pass. DELETE: Variant Toggle infra + 2-of-3 ride card variants + 2-of-3 dashboard variants + Tier system + Leaderboard + `/payout` page + UpcomingPayoutWidget (full delete; revised 2026-05-04 later) + `Trip.revenueAddons`. DOWNGRADE: Earned popup → single "Dismiss" CTA. STRIP: tier-coupled fields from `IncentiveDefinition` (`tierLevel`, `INCENTIVE_TIER_BONUSES`, `Tier`, `TierConfig`, `LeaderboardEntry`). STRIP: `/incentives` Tabs wrapper. After this step, the prototype is structurally v1. |
 | I-1 | **Schema migration + re-seed** — only ADD step. Add per-incentive admin fields (`color`, `timeframe`, `enabled`, `sortOrder`, `marketScope`, `clientScope`, `trigger`). Rename `targetCount` → `goal`, `name` → `title`. `bonusAmount` is sole $ source. Re-seed 8 incentives. Pill bg = `incentive.color`. Sort by `sortOrder` ASC. |
 | I-2 | **Polish + edge states + final QA grep sweep** — empty states, disabled-incentive filtering, [DEV] Earned popup trigger, full grep sweep returning zero hits on stripped tokens. |
 
