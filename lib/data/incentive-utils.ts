@@ -162,7 +162,7 @@ export function getAllIncentiveProgress(): IncentiveProgressInfo[] {
 
 /**
  * Get weekly payout data for the current driver.
- * Display-only in v1 (UpcomingPayoutWidget + IncentiveEarnedPopup sub-line).
+ * Display-only in v1 (IncentiveEarnedPopup sub-line, pill renderer badge).
  */
 export function getWeeklyPayoutData(): WeeklyPayoutData {
   const baseEarnings = 342.50;

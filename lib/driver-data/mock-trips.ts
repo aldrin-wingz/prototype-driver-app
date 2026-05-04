@@ -883,7 +883,7 @@ export const mockInProgressTrips: Trip[] = [];
 
 // Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);
 // `CURRENT-COMP-*` are dated within the current pay period (Apr 28–May 4, 2026)
-// so the dashboard's UpcomingPayoutWidget can sum the current period's bonuses.
+// so the dashboard's EarningsCard can sum the current period's completed trips.
 export const mockCompletedTrips: Trip[] = [
   // === CURRENT PERIOD (Apr 28–May 4, 2026): 3 trips totaling $342.50 ===
   {

@@ -7,7 +7,6 @@ import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
 import { Card } from "@/components/ui/card";
 import { DashboardIncentiveSection } from "@/components/driver/dashboard-incentive-section";
-import { UpcomingPayoutWidget } from "@/components/driver/upcoming-payout-widget";
 import {
   mockRequestTrips,
   mockNeedsActionTrips,
@@ -143,10 +142,7 @@ export default function HomePage() {
       <Header title="Home" />
 
       <main className="flex-1 pt-4">
-        {/* 1. Upcoming Payout Widget — display-only in v1 */}
-        <UpcomingPayoutWidget />
-
-        {/* 2. Earnings Card */}
+        {/* 1. Earnings Card */}
         <EarningsCard
           data={earningsData}
           onPrevious={() => setPeriod("this-month")}
@@ -155,13 +151,13 @@ export default function HomePage() {
           showNext={period === "this-month"}
         />
 
-        {/* 3. Confirm Trip Prompt */}
+        {/* 2. Confirm Trip Prompt */}
         <ConfirmTripPrompt />
 
-        {/* 4. Driver Incentives — locked variant: dashboard-card-section */}
+        {/* 3. Driver Incentives — locked variant: dashboard-card-section */}
         <DashboardIncentiveSection placement="middle" />
 
-        {/* 5. New Requests Section */}
+        {/* 4. New Requests Section */}
         <div className="px-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">New Requests</h3>
