@@ -1,11 +1,19 @@
 "use client";
 
-import { ChevronLeft, RefreshCw, AlertTriangle, Phone, MessageSquare, MoreHorizontal, Users, RotateCcw, Info } from "lucide-react";
+import {
+  ChevronLeft,
+  RefreshCw,
+  AlertTriangle,
+  Phone,
+  MessageSquare,
+  Users,
+  RotateCcw,
+  Info,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
-import { useVariants } from "@/lib/variants-context";
 import { cn } from "@/lib/utils";
 import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
 
@@ -31,63 +39,66 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; 
   }
 }
 
-function LegCard({ leg, isFirst, isLast, state }: { 
-  leg: TripLeg; 
+function LegCard({
+  leg,
+  isFirst,
+  isLast,
+}: {
+  leg: TripLeg;
   isFirst: boolean;
-  isLast: boolean; 
+  isLast: boolean;
   state: DetailState;
 }) {
   const anchorStyles = getTimeAnchorStyles(leg.type);
   const showWaitForCall = leg.type === "wait-for-call";
   const showOTP = leg.type === "appointment";
-  
+
   return (
     <div className="relative">
-      {/* Timeline line - connects from previous to this node */}
+      {/* Timeline line — connects from previous to this node */}
       {!isFirst && (
-        <div 
-          className="absolute left-[7px] bottom-[calc(100%-8px)] w-0.5 bg-blue-500" 
+        <div
+          className="absolute left-[7px] bottom-[calc(100%-8px)] w-0.5 bg-blue-500"
           style={{ height: "24px" }}
         />
       )}
-      
+
       {/* Timeline node and content */}
       <div className="flex gap-3">
-        {/* Timeline node */}
         <div className="relative flex flex-col items-center">
-          <div className={cn("h-4 w-4 rounded-full border-2", anchorStyles.bg, anchorStyles.border)} />
-          {/* Line to next node */}
+          <div
+            className={cn(
+              "h-4 w-4 rounded-full border-2",
+              anchorStyles.bg,
+              anchorStyles.border
+            )}
+          />
           {!isLast && (
             <div className="w-0.5 flex-1 bg-blue-500" style={{ minHeight: "80px" }} />
           )}
         </div>
-        
+
         {/* Content */}
         <div className="flex-1 pb-4">
           <p className="text-sm font-medium text-gray-700">{leg.label}</p>
           <div className="flex items-center gap-2">
             <p className={cn("text-xl font-bold", anchorStyles.text)}>{leg.time}</p>
-            {showWaitForCall && (
-              <Phone className="h-4 w-4 text-amber-500" />
-            )}
+            {showWaitForCall && <Phone className="h-4 w-4 text-amber-500" />}
             {showOTP && (
               <span className="rounded border border-gray-400 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
                 OTP
               </span>
             )}
           </div>
-          
-          {/* Revenue - show for first leg or legs with revenue */}
+
           {leg.revenue > 0 && (
             <RevenueDisplay
               totalRevenue={leg.revenue}
-              addons={undefined}
               revenueColor="green"
               layout="vertical"
             />
           )}
-          
-          {/* Address details */}
+
           <p className="mt-1 text-sm text-gray-700">{leg.address.split(",")[0]}</p>
           <p className="text-sm text-gray-600">{leg.address}</p>
           <p className="text-sm text-gray-500">{leg.county}</p>
@@ -97,26 +108,27 @@ function LegCard({ leg, isFirst, isLast, state }: {
   );
 }
 
+/**
+ * Ride detail layout.
+ *
+ * v1 locked variant: `pill-named-bottom` — incentive pills render only in the
+ * inline chips row alongside the status pill. The above-metadata-card banner
+ * surface and the variant-switch were stripped in I-0.
+ */
 export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
   const router = useRouter();
-  const { variants, isLoaded } = useVariants();
-  
+
   const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
-  const hasWaitForCall = trip.legs.some(leg => leg.type === "wait-for-call");
-  
-  // Determine incentive eligibility (single program per trip)
+
+  // Single-program-per-trip in v1
   const hasIncentives = !!trip.incentiveType && trip.clientEnrolledInIncentives !== false;
   const activeIncentiveType = hasIncentives ? trip.incentiveType! : null;
-  
-  // Determine if banner variant is active (banner renders ABOVE the metadata card)
-  const isBannerVariant = isLoaded && (variants.pill === 'banner-wingz-hero' || variants.pill === 'achievement-banner');
-  const isPillVariant = isLoaded && variants.pill === 'pill-named-bottom';
-  
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB]">
       {/* Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between bg-white px-4 py-3 shadow-sm">
-        <button 
+        <button
           onClick={() => router.push(backHref)}
           className="flex items-center text-gray-700"
         >
@@ -131,12 +143,14 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
           <RefreshCw className="h-5 w-5" />
         </button>
       </header>
-      
+
       {/* Scrollable content area */}
-      <div className={cn(
-        "flex-1 overflow-y-auto",
-        state === "before-taken" ? "pb-28" : "pb-44"
-      )}>
+      <div
+        className={cn(
+          "flex-1 overflow-y-auto",
+          state === "before-taken" ? "pb-28" : "pb-44"
+        )}
+      >
         {/* Map preview */}
         <div className="relative h-64 w-full bg-[#1e3a4c]">
           <iframe
@@ -145,12 +159,10 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             style={{ filter: "saturate(0.8) hue-rotate(150deg)" }}
             title="Trip route map"
           />
-          {/* Route line overlay indicator */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-1 w-32 rounded-full bg-[#10B981]/60" />
           </div>
-          
-          {/* Confirmation alert - only for needs-action state */}
+
           {state === "needs-action" && (
             <div className="absolute bottom-4 left-4 right-4">
               <div className="rounded-lg bg-[#FEE2E2] border border-[#F87171] px-4 py-3">
@@ -167,24 +179,9 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </div>
           )}
         </div>
-        
-        {/* Banner variant: Incentive banner ABOVE the metadata card */}
-        {hasIncentives && isBannerVariant && (
-          <div className="mx-4 mt-4">
-            <ProgramContributionIndicator
-              incentiveType={activeIncentiveType}
-              isCompleted={false}
-              context="detail"
-            />
-          </div>
-        )}
-        
-        {/* Trip metadata card - sits cleanly below map with gap */}
-        <Card className={cn(
-          "mx-4 rounded-xl bg-white p-4 shadow-md",
-          // Reduce top margin when banner is present above
-          hasIncentives && isBannerVariant ? "mt-2" : "mt-4"
-        )}>
+
+        {/* Trip metadata card */}
+        <Card className="mx-4 mt-4 rounded-xl bg-white p-4 shadow-md">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <p className="text-sm text-gray-600">
@@ -197,7 +194,6 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
                 Client: <span className="font-semibold text-gray-900">{trip.client}</span>
                 {trip.client === "Verida" && <span className="ml-1">🌿</span>}
               </p>
-              {/* Leg ID inside the metadata card */}
               <p className="text-sm text-gray-600">
                 Leg: <span className="font-semibold text-gray-900">{trip.legs[0]?.id || trip.id}</span>
               </p>
@@ -212,14 +208,12 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </div>
           </div>
         </Card>
-        
+
         {/* Leg details section */}
         <div className="p-4">
-          
-          {/* Leg cards with timeline */}
           <div className="ml-1">
             {trip.legs.map((leg, index) => (
-              <LegCard 
+              <LegCard
                 key={leg.id}
                 leg={leg}
                 isFirst={index === 0}
@@ -228,21 +222,20 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               />
             ))}
           </div>
-          
-          {/* Notes */}
+
           {trip.notes && (
             <p className="mt-2 text-sm text-gray-600">
               <span className="font-medium text-gray-700">Notes:</span> {trip.notes}
             </p>
           )}
-          
-          {/* Chips row: status pill + incentive pills side by side */}
+
+          {/* Chips row — locked variant: pill-named-bottom */}
           {state === "before-taken" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#F3F4F6] px-3 py-1 text-xs font-medium text-[#6B7280]">
                 Expires in 185 days
               </span>
-              {hasIncentives && isPillVariant && (
+              {hasIncentives && (
                 <ProgramContributionIndicator
                   incentiveType={activeIncentiveType}
                   isCompleted={false}
@@ -251,13 +244,13 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               )}
             </div>
           )}
-          
+
           {state === "needs-action" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
                 Not Confirmed
               </span>
-              {hasIncentives && isPillVariant && (
+              {hasIncentives && (
                 <ProgramContributionIndicator
                   incentiveType={activeIncentiveType}
                   isCompleted={false}
@@ -268,25 +261,18 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
           )}
         </div>
       </div>
-      
-      {/* Bottom region - varies by state */}
+
+      {/* Bottom region — varies by state */}
       {state === "before-taken" ? (
-        /* Swipe footer for before-taken */
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <div className="relative flex h-14 items-center justify-center overflow-hidden rounded-full">
-            {/* Pink reject side */}
             <div className="absolute inset-y-0 left-0 w-1/2 bg-[#F472B6]" />
-            {/* Green accept side */}
             <div className="absolute inset-y-0 right-0 w-1/2 bg-[#34D399]" />
-            
-            {/* Center pill with logo */}
             <div className="absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md">
               <svg className="h-6 w-6 text-[#10B981]" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none" />
               </svg>
             </div>
-            
-            {/* Labels */}
             <span className="relative z-10 pr-8 text-sm font-bold uppercase text-white">
               Swipe to Reject
             </span>
@@ -296,9 +282,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
           </div>
         </div>
       ) : (
-        /* Action toolbar + CTA for needs-action */
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-          {/* Action toolbar */}
           <div className="flex items-center justify-around border-b border-gray-100 px-4 py-3">
             <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#10B981]">
               <RotateCcw className="h-5 w-5 text-[#10B981]" />
@@ -314,8 +298,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </button>
             <span className="text-sm font-medium text-gray-700">More</span>
           </div>
-          
-          {/* Sticky red CTA */}
+
           <div className="px-4 py-4">
             <button className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">

@@ -50,7 +50,6 @@ export const mockRequestTrips: Trip[] = [
     passengerCount: 1,
     distance: "8.2 mi away",
     totalRevenue: 70.25,
-    revenueAddons: [{ label: "Sent-back bonus", amount: 25.00 }],
     notes: "Standing weekend dialysis appointment",
     legs: [
       {
@@ -367,7 +366,6 @@ export const mockRequestTrips: Trip[] = [
     passengerCount: 1,
     distance: "5.5 mi away",
     totalRevenue: 42.50,
-    revenueAddons: [{ label: "Door-to-Door bump", amount: 5.00 }],
     notes: "Door-to-door assistance required — wheelchair",
     legs: [
       {
@@ -393,7 +391,6 @@ export const mockRequestTrips: Trip[] = [
     passengerCount: 1,
     distance: "8.0 mi away",
     totalRevenue: 48.00,
-    revenueAddons: [{ label: "Door-to-Door bump", amount: 5.00 }],
     notes: "Door-to-door — escort to appointment",
     legs: [
       {
@@ -419,7 +416,6 @@ export const mockRequestTrips: Trip[] = [
     passengerCount: 1,
     distance: "9.2 mi away",
     totalRevenue: 52.50,
-    revenueAddons: [{ label: "Door-to-Door bump", amount: 5.00 }],
     notes: "Door-to-door — mobility aid required",
     legs: [
       {
@@ -932,7 +928,6 @@ export const mockCompletedTrips: Trip[] = [
     passengerCount: 1,
     distance: "",
     totalRevenue: 97.50,
-    revenueAddons: [{ label: "Door-to-Door bump", amount: 2.50 }],
     notes: "",
     legs: [
       {
@@ -1002,7 +997,6 @@ export const mockCompletedTrips: Trip[] = [
     passengerCount: 1,
     distance: "",
     totalRevenue: 134.80,
-    revenueAddons: [{ label: "Sent-back bonus", amount: 25.00 }],
     notes: "Pick Up: driver Keegan Hooker - Dro...",
     legs: [
       {

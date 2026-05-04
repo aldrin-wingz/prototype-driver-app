@@ -8,22 +8,26 @@ import { RideCard } from "@/components/driver/ride-card";
 import { Card } from "@/components/ui/card";
 import { DashboardIncentiveSection } from "@/components/driver/dashboard-incentive-section";
 import { UpcomingPayoutWidget } from "@/components/driver/upcoming-payout-widget";
-import { useVariants } from "@/lib/variants-context";
-import { 
-  mockRequestTrips, 
+import {
+  mockRequestTrips,
   mockNeedsActionTrips,
-  mockEarningsThisMonth, 
+  mockEarningsThisMonth,
   mockEarningsLastMonth,
-  type EarningsData 
+  type EarningsData,
 } from "@/lib/driver-data/mock-trips";
 
-function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIntegratedWidget }: {
+function EarningsCard({
+  data,
+  onPrevious,
+  onNext,
+  showPrevious,
+  showNext,
+}: {
   data: EarningsData;
   onPrevious: () => void;
   onNext: () => void;
   showPrevious: boolean;
   showNext: boolean;
-  showIntegratedWidget?: boolean;
 }) {
   return (
     <Card className="relative mx-4 mb-4 overflow-hidden rounded-xl bg-white p-6 shadow-sm">
@@ -31,7 +35,7 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIn
       <div className="mb-2 flex items-center justify-center">
         <h2 className="text-center text-lg font-semibold text-gray-900">{data.label}</h2>
       </div>
-      
+
       {/* Earnings amount */}
       <div className="mb-1 flex items-center justify-center gap-1">
         <p className="text-4xl font-bold text-gray-900">${data.earnings.toFixed(2)}</p>
@@ -40,10 +44,10 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIn
         <span className="text-xs font-medium tracking-wide text-gray-500">EARNINGS</span>
         <Info className="h-3 w-3 text-gray-400" />
       </div>
-      
+
       {/* Chevron navigation */}
       {showPrevious && (
-        <button 
+        <button
           onClick={onPrevious}
           className="absolute left-4 top-1/2 -translate-y-1/2 p-2 text-gray-800 hover:text-gray-600"
         >
@@ -51,14 +55,14 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIn
         </button>
       )}
       {showNext && (
-        <button 
+        <button
           onClick={onNext}
           className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-gray-800 hover:text-gray-600"
         >
           <ChevronRight className="h-6 w-6" />
         </button>
       )}
-      
+
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4 border-t border-gray-100 pt-4">
         <div className="text-center">
@@ -88,20 +92,16 @@ function EarningsCard({ data, onPrevious, onNext, showPrevious, showNext, showIn
           </div>
         </div>
       </div>
-      
+
       {/* Pagination dots */}
       <div className="mt-4 flex justify-center gap-2">
-        <div className={`h-2 w-2 rounded-full ${data.period === "this-month" ? "bg-gray-400" : "bg-gray-800"}`} />
-        <div className={`h-2 w-2 rounded-full ${data.period === "last-month" ? "bg-gray-400" : "bg-gray-800"}`} />
-      </div>
-      
-      {/* Integrated widget variant */}
-      {showIntegratedWidget && (
-        <DashboardIncentiveSection 
-          currentEarnings={data.earnings} 
-          placement="widget" 
+        <div
+          className={`h-2 w-2 rounded-full ${data.period === "this-month" ? "bg-gray-400" : "bg-gray-800"}`}
         />
-      )}
+        <div
+          className={`h-2 w-2 rounded-full ${data.period === "last-month" ? "bg-gray-400" : "bg-gray-800"}`}
+        />
+      </div>
     </Card>
   );
 }
@@ -123,37 +123,27 @@ function ConfirmTripPrompt() {
   );
 }
 
+/**
+ * Driver Home (dashboard) page.
+ *
+ * v1 locked variant: `dashboard-card-section` — DashboardIncentiveSection
+ * renders only in the middle slot. The dashboard-banner top placement and the
+ * dashboard-widget-integrated path were stripped in I-0.
+ */
 export default function HomePage() {
   const [period, setPeriod] = useState<"this-month" | "last-month">("this-month");
-  const { variants, isLoaded } = useVariants();
-  
-  const earningsData = period === "this-month" ? mockEarningsThisMonth : mockEarningsLastMonth;
+
+  const earningsData =
+    period === "this-month" ? mockEarningsThisMonth : mockEarningsLastMonth;
   const previewRequest = mockRequestTrips[0];
   const needsActionTrip = mockNeedsActionTrips[0];
-  
-  // Determine which variant is active for conditional rendering
-  const isDashboardBanner = isLoaded && variants.dashboard === "dashboard-banner";
-  const isDashboardCardSection = isLoaded && variants.dashboard === "dashboard-card-section";
-  const isDashboardWidgetIntegrated = isLoaded && variants.dashboard === "dashboard-widget-integrated";
-  
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F9FAFB] pb-20">
       <Header title="Home" />
-      
-      <main className="flex-1 pt-4">
-        {/* VARIANT: Dashboard Banner - TOP position */}
-        {isDashboardBanner && (
-          <DashboardIncentiveSection placement="top" />
-        )}
-        
-        {/* ORDER:
-          1. Upcoming Payout Widget
-          2. This Month Earnings Card
-          3. Confirm Your Upcoming Trip
-          4. Driver Incentives
-        */}
 
-        {/* 1. Upcoming Payout Widget */}
+      <main className="flex-1 pt-4">
+        {/* 1. Upcoming Payout Widget — display-only in v1 */}
         <UpcomingPayoutWidget />
 
         {/* 2. Earnings Card */}
@@ -163,31 +153,23 @@ export default function HomePage() {
           onNext={() => setPeriod("last-month")}
           showPrevious={period === "last-month"}
           showNext={period === "this-month"}
-          showIntegratedWidget={isDashboardWidgetIntegrated}
         />
 
         {/* 3. Confirm Trip Prompt */}
         <ConfirmTripPrompt />
 
-        {/* 4. Driver Incentives */}
-        {isDashboardCardSection && (
-          <DashboardIncentiveSection placement="middle" />
-        )}
-        
-        {/* 5. New Requests Section — stays at bottom */}
+        {/* 4. Driver Incentives — locked variant: dashboard-card-section */}
+        <DashboardIncentiveSection placement="middle" />
+
+        {/* 5. New Requests Section */}
         <div className="px-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">New Requests</h3>
             <button className="text-sm text-gray-500 hover:text-gray-700">View All</button>
           </div>
-          {previewRequest && (
-            <RideCard 
-              trip={previewRequest} 
-              revenueColor="green"
-            />
-          )}
+          {previewRequest && <RideCard trip={previewRequest} revenueColor="green" />}
         </div>
-        
+
         {/* Next Accepted Ride Section */}
         {needsActionTrip && (
           <div className="mt-6 px-4">
@@ -195,18 +177,18 @@ export default function HomePage() {
               <h3 className="text-lg font-bold text-gray-900">Next Accepted Ride</h3>
               <button className="text-sm text-gray-500 hover:text-gray-700">View All</button>
             </div>
-            <RideCard 
+            <RideCard
               trip={{
                 ...needsActionTrip,
-                pills: [{ label: "Not Confirmed", variant: "danger" }]
-              }} 
+                pills: [{ label: "Not Confirmed", variant: "danger" }],
+              }}
               revenueColor="green"
               showDistance={false}
             />
           </div>
         )}
       </main>
-      
+
       <BottomNav />
     </div>
   );

@@ -3,7 +3,6 @@
 import { Expand, Users, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useVariants } from "@/lib/variants-context";
 import type { Trip, TripLeg, TripPill, TimeAnchorType } from "@/lib/driver-data/mock-trips";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
@@ -46,15 +45,10 @@ function getPillStyles(variant: TripPill["variant"]): string {
   }
 }
 
-function LegBlock({ leg, isLast, revenueColor, isCompleted }: { 
-  leg: TripLeg; 
-  isLast: boolean; 
-  revenueColor: "green" | "blue";
-  isCompleted: boolean;
-}) {
+function LegBlock({ leg, isLast }: { leg: TripLeg; isLast: boolean }) {
   const anchorStyles = getTimeAnchorStyles(leg.type);
   const showWaitForCall = leg.type === "wait-for-call";
-  
+
   return (
     <div className="relative">
       {/* Timeline connector */}
@@ -64,7 +58,7 @@ function LegBlock({ leg, isLast, revenueColor, isCompleted }: {
           <div className="h-full w-0.5 bg-[#10B981]" style={{ minHeight: "60px" }} />
         )}
       </div>
-      
+
       <div className="ml-7 pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -82,9 +76,7 @@ function LegBlock({ leg, isLast, revenueColor, isCompleted }: {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-600">
-              {leg.county}
-            </p>
+            <p className="text-sm text-gray-600">{leg.county}</p>
             {leg.revenue > 0 && (
               <p className="font-semibold text-[#10B981]">
                 ${leg.revenue.toFixed(2)}
@@ -97,33 +89,28 @@ function LegBlock({ leg, isLast, revenueColor, isCompleted }: {
   );
 }
 
-export function RideCard({ trip, revenueColor = "green", onClick, showDistance = true }: RideCardProps) {
-  const { variants, isLoaded } = useVariants();
+/**
+ * Ride card.
+ *
+ * v1 locked variant: `pill-named-bottom` — incentive pills always render in the
+ * bottom pills row alongside trip pills. Banner-hero / achievement-banner
+ * variants and the variant-switch were stripped in I-0.
+ */
+export function RideCard({
+  trip,
+  revenueColor = "green",
+  onClick,
+  showDistance = true,
+}: RideCardProps) {
   const isCompleted = trip.status === "completed";
   const hasIncentives = !!trip.incentiveType;
-  
-  // Banner variants render at the top of the card (banner-wingz-hero, achievement-banner)
-  const isBannerVariant = isLoaded && (variants.pill === "banner-wingz-hero" || variants.pill === "achievement-banner");
 
   return (
-    <Card 
-      className={cn(
-        "relative cursor-pointer bg-white shadow-sm transition-shadow hover:shadow-md",
-        isBannerVariant && hasIncentives ? "rounded-xl overflow-hidden" : "rounded-xl p-4"
-      )}
+    <Card
+      className="relative cursor-pointer rounded-xl bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
       onClick={onClick}
     >
-      {/* Banner Variants - render at top of card */}
-      {isBannerVariant && hasIncentives && (
-        <ProgramContributionIndicator
-          incentiveType={trip.incentiveType!}
-          isCompleted={isCompleted}
-        />
-      )}
-
-      {/* Card content wrapper - adds padding when banner is present */}
-      <div className={cn(isBannerVariant && hasIncentives && "p-4")}>
-        {/* Header section */}
+      {/* Header section */}
       <div className="mb-3 flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-600">
@@ -136,7 +123,7 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
             Client: <span className="font-semibold text-gray-900">{trip.client}</span>
           </p>
         </div>
-        
+
         <div className="flex flex-col items-end gap-1">
           <button className="text-gray-500 hover:text-gray-700">
             <Expand className="h-5 w-5" />
@@ -148,7 +135,6 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
             </div>
             <RevenueDisplay
               totalRevenue={trip.totalRevenue}
-              addons={trip.revenueAddons}
               revenueColor={revenueColor}
               layout="vertical"
             />
@@ -162,12 +148,10 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
       {/* Legs timeline */}
       <div className="mb-3">
         {trip.legs.map((leg, index) => (
-          <LegBlock 
-            key={leg.id} 
-            leg={leg} 
+          <LegBlock
+            key={leg.id}
+            leg={leg}
             isLast={index === trip.legs.length - 1}
-            revenueColor={revenueColor}
-            isCompleted={isCompleted}
           />
         ))}
       </div>
@@ -179,9 +163,8 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
         </p>
       )}
 
-      {/* Pills row (existing pills + incentive pills for pill-named-bottom variant) */}
+      {/* Pills row — locked variant: pill-named-bottom */}
       <div className="flex flex-wrap gap-2">
-        {/* Existing pills (Single Legs Allowed, Expires in X, Not Confirmed, etc.) */}
         {trip.pills.map((pill, index) => (
           <span
             key={index}
@@ -194,14 +177,12 @@ export function RideCard({ trip, revenueColor = "green", onClick, showDistance =
           </span>
         ))}
 
-        {/* Incentive pills (pill-named-bottom variant only) */}
-        {isLoaded && variants.pill === "pill-named-bottom" && hasIncentives && (
+        {hasIncentives && (
           <ProgramContributionIndicator
             incentiveType={trip.incentiveType!}
             isCompleted={isCompleted}
           />
         )}
-      </div>
       </div>
     </Card>
   );

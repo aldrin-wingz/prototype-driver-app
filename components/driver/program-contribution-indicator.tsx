@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useVariants } from "@/lib/variants-context";
 import {
   Popover,
   PopoverContent,
@@ -13,11 +12,7 @@ import {
   formatProgressString,
   formatBonusString,
 } from "@/lib/data/incentive-utils";
-import {
-  PillRowVariant,
-  BannerHeroVariant,
-  AchievementBannerVariant,
-} from "./incentive-badge-renderer";
+import { IncentivePillRenderer } from "./incentive-pill-renderer";
 
 // -----------------------------------------------------------------------------
 // TYPES
@@ -28,19 +23,15 @@ interface ProgramContributionIndicatorProps {
   incentiveType: IncentiveType | null | undefined;
   /** Whether this is a completed trip (use muted colors) */
   isCompleted?: boolean;
-  /** Position context - affects Popover vs Tooltip behavior */
+  /** Position context — kept for API parity; behavior identical in v1. */
   context?: "card" | "detail";
 }
 
 // -----------------------------------------------------------------------------
-// POPOVER CONTENT (single program)
+// POPOVER CONTENT
 // -----------------------------------------------------------------------------
 
-interface PopoverInnerContentProps {
-  incentiveType: IncentiveType;
-}
-
-function PopoverInnerContent({ incentiveType }: PopoverInnerContentProps) {
+function PopoverInnerContent({ incentiveType }: { incentiveType: IncentiveType }) {
   const progress = getIncentiveProgressInfo(incentiveType);
   if (!progress) return null;
 
@@ -68,36 +59,12 @@ export function ProgramContributionIndicator({
   incentiveType,
   isCompleted = false,
 }: ProgramContributionIndicatorProps) {
-  const { variants, isLoaded } = useVariants();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
-  // Don't render if no incentive or null
   if (!incentiveType) {
     return null;
   }
 
-  // Don't render until variants are loaded
-  if (!isLoaded) {
-    return null;
-  }
-
-  const activeVariant = variants.pill;
-
-  // Render the badge based on variant
-  const renderBadge = () => {
-    switch (activeVariant) {
-      case "pill-named-bottom":
-        return <PillRowVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
-      case "banner-wingz-hero":
-        return <BannerHeroVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
-      case "achievement-banner":
-        return <AchievementBannerVariant incentiveType={incentiveType} isCompleted={isCompleted} />;
-      default:
-        return null;
-    }
-  };
-
-  // All variants use Popover for detailed progress on tap
   return (
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger asChild>
@@ -108,7 +75,10 @@ export function ProgramContributionIndicator({
             setPopoverOpen(true);
           }}
         >
-          {renderBadge()}
+          <IncentivePillRenderer
+            incentiveType={incentiveType}
+            isCompleted={isCompleted}
+          />
         </div>
       </PopoverTrigger>
       <PopoverContent

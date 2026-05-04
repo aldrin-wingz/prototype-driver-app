@@ -1,8 +1,10 @@
 // =============================================================================
-// INCENTIVE DATA SCHEMA + SEED DATA
+// INCENTIVE DATA SCHEMA + SEED DATA  (v1 — post I-0 strip)
 // =============================================================================
-// This file defines all TypeScript types for the Driver Incentives feature
-// and provides seed data for the prototype. All data is mock/synthetic.
+// Tier system, leaderboard, and pay-period summaries removed in I-0. Schema
+// migration to add admin-editable fields (color, timeframe, enabled, sortOrder,
+// marketScope, clientScope, trigger) and the multi-incentive `incentiveTypes[]`
+// array on Trip is the job of I-1 — DO NOT add those here.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -10,7 +12,7 @@
 // -----------------------------------------------------------------------------
 
 /** Types of incentive programs available */
-export type IncentiveType = 
+export type IncentiveType =
   | 'weekend-warrior'      // Complete X trips on Sat/Sun
   | 'early-bird'           // Complete X trips before 9am
   | 'peak-hours'           // Complete X trips during peak hours (5-9am, 4-8pm)
@@ -23,14 +25,8 @@ export type IncentiveType =
   | 'hometown-hero'        // Complete trips within your home county
   | 'squad-goals';         // Complete multi-loading (multi-rider) trips
 
-/** Driver tier levels */
-export type Tier = 'bronze' | 'silver' | 'gold' | 'platinum';
-
-/** Program difficulty / value tier (used for points + visual theming) */
-export type IncentiveTierLevel = 'gold' | 'silver' | 'bronze';
-
 /** Trip status in the driver app */
-export type TripStatus = 
+export type TripStatus =
   | 'request'              // Available to claim
   | 'upcoming'             // Accepted, not yet started
   | 'needs-action'         // Requires driver confirmation
@@ -49,23 +45,17 @@ export type Period = {
 export type PeriodStatus = 'active' | 'upcoming' | 'completed';
 
 // -----------------------------------------------------------------------------
-// BONUS PER TIER (in dollars)
-// Gold programs are worth $50, Silver $30, Bronze $10
-// This replaces the points abstraction with direct dollar values.
-export const INCENTIVE_TIER_BONUSES = {
-  gold: 50,
-  silver: 30,
-  bronze: 10,
-} as const;
-
-// -----------------------------------------------------------------------------
 // CORE TYPES
 // -----------------------------------------------------------------------------
 
 /**
  * Definition of an incentive program.
  * Bonus is paid ONLY when driver completes targetCount qualifying trips.
- * This is program-level, NOT per-trip.
+ * Per-incentive `bonusAmount` is the sole source of truth in v1.
+ *
+ * NOTE: Admin-editable fields (color, timeframe, enabled, sortOrder, marketScope,
+ * clientScope, trigger) plus the rename of `name`→`title`, `targetCount`→`goal`,
+ * and removal of `periodId` are part of I-1, not I-0.
  */
 export interface IncentiveDefinition {
   id: string;
@@ -77,7 +67,6 @@ export interface IncentiveDefinition {
   periodId: string;                // Which period this belongs to
   qualifyingCriteria: string;      // Human-readable criteria
   iconName?: string;               // Optional icon identifier
-  tierLevel: IncentiveTierLevel;   // Program difficulty / value tier
 }
 
 /**
@@ -90,36 +79,34 @@ export interface DriverIncentiveProgress {
   targetCount: number;             // Copied from definition for convenience
   isComplete: boolean;             // Has the driver hit the target?
   bonusEarned: number;             // 0 if not complete, bonusAmount if complete
-  lastQualifyingTripId?: string;   // Most recent qualifying trip
+  lastQualifyingTripId?: string;
 }
 
 /**
  * A trip/ride in the system.
- * NOTE: NO per-trip bonus dollars. `incentiveType` indicates which SINGLE program
- * this trip qualifies for (or null when no active program applies). Bonus is paid
- * at program completion. Suppression of completed-program banners is data-driven
- * via `incentiveType: null` on affected trips — there is no runtime filter.
+ *
+ * v1 still uses the singular `incentiveType: IncentiveType | null` field. The
+ * migration to `incentiveTypes: IncentiveType[]` (multi-incentive) is part of I-1.
  */
 export interface Trip {
   id: string;
-  date: string;                    // Display date (e.g., "Thu, Apr 30, 2026")
-  pickupTime: string;              // ISO datetime string
-  rider: string;                   // Anonymized rider name
-  client: string;                  // Client/payer name (e.g., "Verida", "MTM")
+  date: string;
+  pickupTime: string;
+  rider: string;
+  client: string;
   passengerCount: number;
-  distance: string;                // e.g., "12.5 mi away" or ""
-  revenue: number;                 // TOTAL trip revenue in dollars (base + sum of revenueAddons)
-  revenueAddons?: { label: string; amount: number }[];  // Display-only ad-hoc bonuses (sent-back, D2D, etc.)
+  distance: string;
+  revenue: number;
   notes: string;
   status: TripStatus;
-  
+
   // Incentive-related fields
-  incentiveType: IncentiveType | null;   // Which SINGLE program this trip qualifies for (null = no active program)
-  clientEnrolledInIncentives: boolean;   // Is this client/market enrolled in incentive programs?
-  
-  // Leg information (simplified for seed data)
+  incentiveType: IncentiveType | null;
+  clientEnrolledInIncentives: boolean;
+
+  // Leg information
   legs: TripLeg[];
-  
+
   // UI display pills (for list views)
   pills: TripPill[];
 }
@@ -140,82 +127,15 @@ export interface TripPill {
 }
 
 /**
- * Entry in the leaderboard.
- * Uses anonymized handles for privacy.
- * Primary ranking metric is `bonusesEarnedThisMonth` (total bonus $ earned).
- */
-export interface LeaderboardEntry {
-  rank: number;
-  handle: string;                    // Anonymized (e.g., "Driver-7821")
-  bonusesEarnedThisMonth: number;    // Total bonus $ earned this month (PRIMARY ranking metric)
-  isCurrentDriver: boolean;          // Unused in I-6.1 seed (current driver at rank #47, outside top 20). Kept for future flexibility.
-  tier: Tier;
-  county: string;                    // Driver's home county (e.g., "Fulton County")
-}
-
-/**
- * Configuration for a tier level.
- * Tier is reached when driver's totalBonusesEarnedThisMonth >= threshold (in dollars).
- */
-export interface TierConfig {
-  tier: Tier;
-  label: string;          // Display name
-  threshold: number;      // MONTHLY DOLLARS required to reach this tier
-  multiplier: number;     // Parking-lot field (NOT visualized — no UI surface)
-  badgeColor: string;     // Badge background color
-}
-
-/**
  * Current logged-in driver info.
- * Tier is backend-derived from totalBonusesEarnedThisMonth against TierConfig.threshold.
+ * Slimmed in I-0 — tier / rank / county / monthly-bonus fields removed alongside
+ * the leaderboard and tier system.
  */
 export interface CurrentDriver {
   id: string;
   displayName: string;
   initials: string;
-  currentTier: Tier;
-  totalBonusesEarnedThisMonth: number;   // Monthly scope: total bonus $ accumulated
-  currentRank: number;                   // Driver's rank against the global driver pool (e.g., 47)
-  totalDrivers: number;                  // Total drivers in the pool (e.g., 200)
-  county: string;                        // Driver's home county (e.g., "Fulton County")
-  username: string;                      // Editable display name (e.g., "alex_b")
-}
-
-/**
- * A pay period (Mon–Sun). Drivers are paid weekly.
- * id is also used as the denormalized period key on trips.
- */
-export interface PayPeriod {
-  id: string;                 // 'period-2026-04-28'
-  startDate: string;          // 'Apr 28'
-  endDate: string;            // 'May 4'
-  payoutDate: string;         // 'Mon, May 4'
-  status: 'closed' | 'current' | 'upcoming';
-}
-
-/**
- * Pre-computed payout summary per (driver, period).
- * Frontend reads this to render `/payout`.
- *
- * `Projected` (current/upcoming) or `Final` (closed) total =
- *   earnedFromCompletedRides + upcomingFromAcceptedRides + incentivesTotal
- */
-export interface PayoutPeriodSummary {
-  periodId: string;
-  // Mini-card 1: completed rides this period
-  earnedFromCompletedRides: number;
-  completedRidesCount: number;
-  // Mini-card 2: accepted/upcoming rides this period
-  upcomingFromAcceptedRides: number;
-  upcomingRidesCount: number;
-  // Mini-card 3: incentive bonuses (earned + projected)
-  incentivesTotal: number;            // sum of earned + projected
-  incentivesEarnedCount: number;      // programs already triggered
-  incentivesTotalCount: number;       // earned + in-progress contributing
-  // The trip lists for each tab — by reference
-  completedTripIds: string[];
-  upcomingTripIds: string[];
-  programIdsContributing: IncentiveType[];   // earned + in-progress
+  username: string;
 }
 
 /**
@@ -223,15 +143,15 @@ export interface PayoutPeriodSummary {
  */
 export interface DashboardData {
   currentPeriod: Period;
-  upcomingPayout: number;          // Estimated next payout
-  payoutDate: string;              // ISO date of next payout
+  upcomingPayout: number;
+  payoutDate: string;
   tripsThisMonth: number;
   tripsLastMonth: number;
-  earningsThisMonth: number;       // Base earnings (not including bonuses)
+  earningsThisMonth: number;
   earningsLastMonth: number;
   bonusEarnedThisMonth: number;
-  incentivesInProgress: number;    // Count of active incentive programs
-  incentivesCompleted: number;     // Count of completed this period
+  incentivesInProgress: number;
+  incentivesCompleted: number;
 }
 
 // =============================================================================
@@ -251,7 +171,7 @@ export const currentPeriod: Period = {
 };
 
 // -----------------------------------------------------------------------------
-// INCENTIVE DEFINITIONS (4 programs, each tagged with tierLevel)
+// INCENTIVE DEFINITIONS
 // -----------------------------------------------------------------------------
 
 export const incentiveDefinitions: IncentiveDefinition[] = [
@@ -265,7 +185,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     periodId: 'period-2026-04',
     qualifyingCriteria: 'Trips completed on Saturday or Sunday',
     iconName: 'calendar-weekend',
-    tierLevel: 'gold',
   },
   {
     id: 'early-bird',
@@ -276,7 +195,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 8,
     periodId: 'may-2026',
     qualifyingCriteria: '8 trips before 9am',
-    tierLevel: 'silver',
   },
   {
     id: 'peak-performer',
@@ -287,7 +205,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 10,
     periodId: 'may-2026',
     qualifyingCriteria: '10 trips between 5-9am or 4-8pm',
-    tierLevel: 'gold',
   },
   {
     id: 'loyalty-streak',
@@ -298,7 +215,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 5,
     periodId: 'may-2026',
     qualifyingCriteria: 'Rides on 5 consecutive days',
-    tierLevel: 'bronze',
   },
   {
     id: 'white-glove',
@@ -309,7 +225,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 6,
     periodId: 'may-2026',
     qualifyingCriteria: 'Trips with door-to-door service',
-    tierLevel: 'gold',
   },
   {
     id: 'quick-wins',
@@ -320,7 +235,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 10,
     periodId: 'may-2026',
     qualifyingCriteria: 'Trips under 5 miles',
-    tierLevel: 'bronze',
   },
   {
     id: 'hometown-hero',
@@ -331,7 +245,6 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 8,
     periodId: 'may-2026',
     qualifyingCriteria: 'Pickup and dropoff in same county',
-    tierLevel: 'silver',
   },
   {
     id: 'squad-goals',
@@ -342,22 +255,19 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     targetCount: 6,
     periodId: 'may-2026',
     qualifyingCriteria: 'Trips with 2+ passengers',
-    tierLevel: 'gold',
   },
 ];
 
 // -----------------------------------------------------------------------------
-// DRIVER INCENTIVE PROGRESS (4 entries, mixed states)
-// Note: early-bird and loyalty-streak are COMPLETED — trips that previously
-// qualified for these are reseeded with incentiveType: null.
+// DRIVER INCENTIVE PROGRESS
 // -----------------------------------------------------------------------------
 
 export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   {
     incentiveId: 'inc-weekend-warrior-apr26',
-    currentCount: 5,              // 5 trips completed
-    scheduledCount: 2,            // 2 trips already scheduled/taken
-    targetCount: 8,               // Need 8 total, so 1 more to take
+    currentCount: 5,
+    scheduledCount: 2,
+    targetCount: 8,
     isComplete: false,
     bonusEarned: 0,
     lastQualifyingTripId: 'trip-req-003',
@@ -373,9 +283,9 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   },
   {
     incentiveId: 'inc-peak-hours-apr26',
-    currentCount: 9,              // 9 completed
-    scheduledCount: 3,            // 3 scheduled
-    targetCount: 15,              // Need 15, so 3 more to take
+    currentCount: 9,
+    scheduledCount: 3,
+    targetCount: 15,
     isComplete: false,
     bonusEarned: 0,
     lastQualifyingTripId: 'trip-upcoming-002',
@@ -424,10 +334,7 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
 ];
 
 // -----------------------------------------------------------------------------
-// TRIPS (12 total: 5 Requests, 4 My Rides, 3 History)
-// SINGLE program per trip. Trips that previously qualified for COMPLETED programs
-// (early-bird, loyalty-streak) get incentiveType: null. Multi-program trips were
-// reduced to the higher-tier program.
+// TRIPS
 // -----------------------------------------------------------------------------
 
 export const seedTrips: Trip[] = [
@@ -443,7 +350,6 @@ export const seedTrips: Trip[] = [
     revenue: 32,
     notes: 'Wheelchair accessible vehicle required',
     status: 'request',
-    // Was: ['early-bird', 'peak-hours'] — early-bird is completed, so use peak-hours (gold)
     incentiveType: 'peak-hours',
     clientEnrolledInIncentives: true,
     legs: [
@@ -482,7 +388,7 @@ export const seedTrips: Trip[] = [
     revenue: 45,
     notes: '',
     status: 'request',
-    incentiveType: 'weekend-warrior', // Single (gold)
+    incentiveType: 'weekend-warrior',
     clientEnrolledInIncentives: true,
     legs: [
       {
@@ -511,7 +417,7 @@ export const seedTrips: Trip[] = [
     revenue: 28,
     notes: 'Please text upon arrival',
     status: 'request',
-    incentiveType: 'weekend-warrior', // Single (gold)
+    incentiveType: 'weekend-warrior',
     clientEnrolledInIncentives: true,
     legs: [
       {
@@ -548,7 +454,7 @@ export const seedTrips: Trip[] = [
     revenue: 52,
     notes: '',
     status: 'request',
-    incentiveType: null, // Client not enrolled
+    incentiveType: null,
     clientEnrolledInIncentives: false,
     legs: [
       {
@@ -577,7 +483,6 @@ export const seedTrips: Trip[] = [
     revenue: 38,
     notes: 'Early morning dialysis appointment',
     status: 'request',
-    // Was: ['early-bird', 'peak-hours'] — early-bird is completed, so use peak-hours (gold)
     incentiveType: 'peak-hours',
     clientEnrolledInIncentives: true,
     legs: [
@@ -617,7 +522,7 @@ export const seedTrips: Trip[] = [
     revenue: 35,
     notes: '',
     status: 'upcoming',
-    incentiveType: 'peak-hours', // Single (gold)
+    incentiveType: 'peak-hours',
     clientEnrolledInIncentives: true,
     legs: [
       {
@@ -652,7 +557,7 @@ export const seedTrips: Trip[] = [
     revenue: 42,
     notes: 'Return trip from therapy',
     status: 'upcoming',
-    incentiveType: 'peak-hours', // Single (gold)
+    incentiveType: 'peak-hours',
     clientEnrolledInIncentives: true,
     legs: [
       {
@@ -680,7 +585,7 @@ export const seedTrips: Trip[] = [
     revenue: 30,
     notes: 'Confirm 24 hours before',
     status: 'needs-action',
-    incentiveType: null, // No incentives
+    incentiveType: null,
     clientEnrolledInIncentives: true,
     legs: [
       {
@@ -717,7 +622,6 @@ export const seedTrips: Trip[] = [
     revenue: 48,
     notes: 'Two passengers, one in wheelchair',
     status: 'needs-action',
-    // Was: ['weekend-warrior', 'early-bird'] — early-bird is completed, weekend-warrior is gold
     incentiveType: 'weekend-warrior',
     clientEnrolledInIncentives: true,
     legs: [
@@ -748,7 +652,7 @@ export const seedTrips: Trip[] = [
     revenue: 36,
     notes: '',
     status: 'completed',
-    incentiveType: null, // Client not enrolled
+    incentiveType: null,
     clientEnrolledInIncentives: false,
     legs: [
       {
@@ -774,7 +678,6 @@ export const seedTrips: Trip[] = [
     revenue: 29,
     notes: 'Early bird trip',
     status: 'completed',
-    // Was: ['early-bird', 'peak-hours'] — early-bird is completed, so use peak-hours (gold)
     incentiveType: 'peak-hours',
     clientEnrolledInIncentives: true,
     legs: [
@@ -810,7 +713,6 @@ export const seedTrips: Trip[] = [
     revenue: 41,
     notes: 'Streak completed!',
     status: 'completed',
-    // Was: ['loyalty-streak'] — loyalty-streak is completed → null (data-driven suppression)
     incentiveType: null,
     clientEnrolledInIncentives: true,
     legs: [
@@ -829,89 +731,13 @@ export const seedTrips: Trip[] = [
 ];
 
 // -----------------------------------------------------------------------------
-// LEADERBOARD (20 entries — current driver NOT in top 20; lives in YourPlacementCard at #47/200)
-// Sorted by bonusesEarnedThisMonth DESC ($ earned).
-// Month = May 2026.
-// Ranks 1-20, all anonymized realistic usernames, all isCurrentDriver: false.
-// All entries have $ > 80 (current driver is outside top 20 at rank 47 with $80).
-// Atlanta-metro counties: Fulton, DeKalb, Cobb, Gwinnett, Henry, Clayton.
-// Thresholds: Bronze 0 / Silver 50 / Gold 150 / Platinum 300.
-// -------
-
-export const leaderboardEntries: LeaderboardEntry[] = [
-  { rank: 1,  handle: 'mike_atl',    bonusesEarnedThisMonth: 230, tier: 'gold',   county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 2,  handle: 'j_williams',  bonusesEarnedThisMonth: 180, tier: 'gold',   county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 3,  handle: 'sarah_d',     bonusesEarnedThisMonth: 130, tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
-  { rank: 4,  handle: 'raj_patel',   bonusesEarnedThisMonth: 125, tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 5,  handle: 'tasha_b',     bonusesEarnedThisMonth: 120, tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
-  { rank: 6,  handle: 'carlos_r',    bonusesEarnedThisMonth: 115, tier: 'silver', county: 'Henry County',    isCurrentDriver: false },
-  { rank: 7,  handle: 'leah_w',      bonusesEarnedThisMonth: 110, tier: 'silver', county: 'Clayton County',  isCurrentDriver: false },
-  { rank: 8,  handle: 'devon_k',     bonusesEarnedThisMonth: 105, tier: 'silver', county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 9,  handle: 'maria_l',     bonusesEarnedThisMonth: 102, tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 10, handle: 'jamal_h',     bonusesEarnedThisMonth: 100, tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
-  { rank: 11, handle: 'kim_n',       bonusesEarnedThisMonth: 97,  tier: 'silver', county: 'Henry County',    isCurrentDriver: false },
-  { rank: 12, handle: 'tyler_p',     bonusesEarnedThisMonth: 95,  tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 13, handle: 'nina_g',      bonusesEarnedThisMonth: 93,  tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
-  { rank: 14, handle: 'omar_s',      bonusesEarnedThisMonth: 91,  tier: 'silver', county: 'Clayton County',  isCurrentDriver: false },
-  { rank: 15, handle: 'ruby_t',      bonusesEarnedThisMonth: 90,  tier: 'silver', county: 'DeKalb County',   isCurrentDriver: false },
-  { rank: 16, handle: 'alex_v',      bonusesEarnedThisMonth: 89,  tier: 'silver', county: 'Cobb County',     isCurrentDriver: false },
-  { rank: 17, handle: 'jenna_m',     bonusesEarnedThisMonth: 88,  tier: 'silver', county: 'Fulton County',   isCurrentDriver: false },
-  { rank: 18, handle: 'pete_o',      bonusesEarnedThisMonth: 87,  tier: 'silver', county: 'Henry County',    isCurrentDriver: false },
-  { rank: 19, handle: 'angie_c',     bonusesEarnedThisMonth: 86,  tier: 'silver', county: 'Gwinnett County', isCurrentDriver: false },
-  { rank: 20, handle: 'derek_y',     bonusesEarnedThisMonth: 85,  tier: 'silver', county: 'Clayton County',  isCurrentDriver: false },
-];
-
+// CURRENT DRIVER  (slim — tier / rank / county fields removed in I-0)
 // -----------------------------------------------------------------------------
-// Tier thresholds are now MONTHLY DOLLARS (not points).
-// Bronze: 0 / Silver: 50 / Gold: 150 / Platinum: 300
-// -------
-
-export const tierConfigs: TierConfig[] = [
-  {
-    tier: 'bronze',
-    label: 'Bronze',
-    threshold: 0,
-    multiplier: 1.0,
-    badgeColor: '#CD7F32',
-  },
-  {
-    tier: 'silver',
-    label: 'Silver',
-    threshold: 50,
-    multiplier: 1.1,
-    badgeColor: '#C0C0C0',
-  },
-  {
-    tier: 'gold',
-    label: 'Gold',
-    threshold: 150,
-    multiplier: 1.25,
-    badgeColor: '#FFD700',
-  },
-  {
-    tier: 'platinum',
-    label: 'Platinum',
-    threshold: 300,
-    multiplier: 1.5,
-    badgeColor: '#E5E4E2',
-  },
-];
-
-// -----------------------------------------------------------------------------
-// CURRENT DRIVER
-// $80 earned this month = Silver tier (>= $50, < $150)
-// Rank #47 of 200 — outside the top-20 leaderboard, lives in YourPlacementCard.
-// -------
 
 export const currentDriver: CurrentDriver = {
   id: 'driver-7821',
   displayName: 'Alex B.',
   initials: 'AB',
-  currentTier: 'silver',
-  totalBonusesEarnedThisMonth: 80,
-  currentRank: 47,
-  totalDrivers: 200,
-  county: 'Fulton County',
   username: 'alex_b',
 };
 
@@ -928,113 +754,9 @@ export const dashboardData: DashboardData = {
   earningsThisMonth: 1247,
   earningsLastMonth: 982,
   bonusEarnedThisMonth: 160,
-  incentivesInProgress: 2, // weekend-warrior, peak-hours
-  incentivesCompleted: 2,  // early-bird, loyalty-streak
+  incentivesInProgress: 2,
+  incentivesCompleted: 2,
 };
-
-// -----------------------------------------------------------------------------
-// PAY PERIODS (4 entries: 2 closed, 1 current, 1 upcoming)
-// -----------------------------------------------------------------------------
-
-export const PAY_PERIODS: PayPeriod[] = [
-  {
-    id: 'period-2026-04-14',
-    startDate: 'Apr 14',
-    endDate: 'Apr 20',
-    payoutDate: 'Mon, Apr 20',
-    status: 'closed',
-  },
-  {
-    id: 'period-2026-04-21',
-    startDate: 'Apr 21',
-    endDate: 'Apr 27',
-    payoutDate: 'Mon, Apr 27',
-    status: 'closed',
-  },
-  {
-    id: 'period-2026-04-28',
-    startDate: 'Apr 28',
-    endDate: 'May 4',
-    payoutDate: 'Mon, May 4',
-    status: 'current',
-  },
-  {
-    id: 'period-2026-05-05',
-    startDate: 'May 5',
-    endDate: 'May 11',
-    payoutDate: 'Mon, May 11',
-    status: 'upcoming',
-  },
-];
-
-// -----------------------------------------------------------------------------
-// PAYOUT PERIOD SUMMARIES (one record per period)
-// Sum check (per period): earnedFromCompletedRides + upcomingFromAcceptedRides
-//   + incentivesTotal === Projected/Final hero shown
-// -----------------------------------------------------------------------------
-
-export const PAYOUT_PERIOD_SUMMARIES: PayoutPeriodSummary[] = [
-  // CLOSED — Apr 14–20: 1 completed ride + early-bird program triggered
-  // Final = 109.80 + 0 + 75 = 184.80
-  {
-    periodId: 'period-2026-04-14',
-    earnedFromCompletedRides: 109.80,
-    completedRidesCount: 1,
-    upcomingFromAcceptedRides: 0,
-    upcomingRidesCount: 0,
-    incentivesTotal: 75,
-    incentivesEarnedCount: 1,
-    incentivesTotalCount: 1,
-    completedTripIds: ['COMP-002'],
-    upcomingTripIds: [],
-    programIdsContributing: ['early-bird'],
-  },
-  // CLOSED — Apr 21–27: 2 completed rides + loyalty-streak triggered
-  // Final = 268.22 + 0 + 85 = 353.22
-  {
-    periodId: 'period-2026-04-21',
-    earnedFromCompletedRides: 268.22,
-    completedRidesCount: 2,
-    upcomingFromAcceptedRides: 0,
-    upcomingRidesCount: 0,
-    incentivesTotal: 85,
-    incentivesEarnedCount: 1,
-    incentivesTotalCount: 1,
-    completedTripIds: ['COMP-001', 'COMP-003'],
-    upcomingTripIds: [],
-    programIdsContributing: ['loyalty-streak'],
-  },
-  // CURRENT — Apr 28–May 4: 3 completed + 2 upcoming + 2 in-progress programs
-  // Projected = 342.50 + 87 + 150 = 579.50
-  {
-    periodId: 'period-2026-04-28',
-    earnedFromCompletedRides: 342.50,
-    completedRidesCount: 3,
-    upcomingFromAcceptedRides: 87,
-    upcomingRidesCount: 2,
-    incentivesTotal: 150,            // weekend-warrior $50 + peak-hours $100 (both projected)
-    incentivesEarnedCount: 0,
-    incentivesTotalCount: 2,
-    completedTripIds: ['CURRENT-COMP-001', 'CURRENT-COMP-002', 'CURRENT-COMP-003'],
-    upcomingTripIds: ['UP-CURRENT-001', 'UP-CURRENT-002'],
-    programIdsContributing: ['weekend-warrior', 'peak-hours'],
-  },
-  // UPCOMING — May 5–11: 1 accepted ride scheduled, no programs yet
-  // Projected = 0 + 38 + 0 = 38
-  {
-    periodId: 'period-2026-05-05',
-    earnedFromCompletedRides: 0,
-    completedRidesCount: 0,
-    upcomingFromAcceptedRides: 38,
-    upcomingRidesCount: 1,
-    incentivesTotal: 0,
-    incentivesEarnedCount: 0,
-    incentivesTotalCount: 0,
-    completedTripIds: [],
-    upcomingTripIds: ['UP-FUTURE-001'],
-    programIdsContributing: [],
-  },
-];
 
 // -----------------------------------------------------------------------------
 // HELPER FUNCTIONS
@@ -1053,11 +775,6 @@ export function getIncentiveByType(type: IncentiveType): IncentiveDefinition | u
 /** Get progress for an incentive */
 export function getProgressForIncentive(incentiveId: string): DriverIncentiveProgress | undefined {
   return driverIncentiveProgress.find(p => p.incentiveId === incentiveId);
-}
-
-/** Get tier config by tier */
-export function getTierConfig(tier: Tier): TierConfig | undefined {
-  return tierConfigs.find(t => t.tier === tier);
 }
 
 /** Get trips by status */
