@@ -3,7 +3,8 @@ import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import { VariantsWrapper } from "@/components/driver/variants-wrapper";
+import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
+import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -29,9 +30,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <VariantsWrapper>
+          <IncentiveEarnedProvider>
             {children}
-          </VariantsWrapper>
+            <IncentiveEarnedPopup />
+          </IncentiveEarnedProvider>
           <Toaster />
         </ThemeProvider>
       </body>

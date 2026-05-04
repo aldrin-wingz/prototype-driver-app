@@ -1,24 +1,36 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import { getWeeklyPayoutData } from "@/lib/data/incentive-utils";
 
 // -----------------------------------------------------------------------------
 // MAIN COMPONENT
 // -----------------------------------------------------------------------------
 
+/**
+ * Display-only Upcoming Payout widget.
+ *
+ * v1: tap is a no-op toast — there is no /payout page in v1 (full payout
+ * redesign is v2). Visual matches the v3 baseline minus the chevron.
+ */
 export function UpcomingPayoutWidget() {
-  const router = useRouter();
+  const { toast } = useToast();
   const payoutData = getWeeklyPayoutData();
 
   const hasBonus = payoutData.bonusesEarned > 0;
 
+  const handleTap = () => {
+    toast({
+      title: "Payout details coming soon",
+      description: "The full payout page is part of the v2 redesign.",
+    });
+  };
+
   return (
     <Card
       className="mx-4 mb-4 cursor-pointer rounded-xl bg-white p-4 shadow-sm transition-all hover:shadow-md active:scale-[0.99]"
-      onClick={() => router.push("/payout")}
+      onClick={handleTap}
     >
       {/* Section header */}
       <div className="mb-2 flex items-center justify-between">
@@ -60,8 +72,6 @@ export function UpcomingPayoutWidget() {
             </p>
           )}
         </div>
-
-        <ChevronRight className="h-5 w-5 text-gray-400" />
       </div>
     </Card>
   );
