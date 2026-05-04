@@ -821,10 +821,10 @@ export function getTripsByStatus(status: TripStatus): Trip[] {
 
 /** Get trips that qualify for a specific incentive type */
 export function getTripsForIncentiveType(type: IncentiveType): Trip[] {
-  return seedTrips.filter(t => t.incentiveType === type);
+  return seedTrips.filter(t => t.incentiveTypes.includes(type));
 }
 
 /** Check if a trip has an active incentive program */
 export function tripHasIncentives(trip: Trip): boolean {
-  return trip.incentiveType !== null && trip.clientEnrolledInIncentives;
+  return trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives;
 }

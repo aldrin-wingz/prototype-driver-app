@@ -25,8 +25,8 @@ export interface Trip {
   legs: TripLeg[];
   status: TripStatus;
   pills: TripPill[];
-  /** Single incentive program this trip qualifies for (null/undefined if none). */
-  incentiveType?: IncentiveType | null;
+  /** Incentive programs this trip qualifies for (v1: multi-incentive support). */
+  incentiveTypes: IncentiveType[];
   /** Whether this client/market is enrolled in incentive programs. */
   clientEnrolledInIncentives?: boolean;
 }
@@ -37,8 +37,8 @@ export interface TripPill {
 }
 
 // Mock request trips (available to claim).
-// SINGLE-PROGRAM-PER-TRIP RULE: each trip qualifies for AT MOST ONE incentive.
-// Some trips have no chip at all — incentiveType: null.
+// v1 MULTI-INCENTIVE: trips can qualify for multiple incentives (incentiveTypes array).
+// Some trips have no incentive at all — incentiveTypes: [].
 // Spread across 8 incentives with 2-3 qualifying trips each.
 export const mockRequestTrips: Trip[] = [
   // ===== WEEKEND WARRIOR (3 trips) =====
@@ -73,7 +73,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 185 days", variant: "neutral" }],
-    incentiveType: "weekend-warrior",
+    incentiveTypes: ["weekend-warrior"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -101,7 +101,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Wait For Call", variant: "attention" },
       { label: "Expires in 2 days", variant: "neutral" },
     ],
-    incentiveType: "weekend-warrior",
+    incentiveTypes: ["weekend-warrior"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -135,7 +135,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 3 days", variant: "neutral" }],
-    incentiveType: "weekend-warrior",
+    incentiveTypes: ["weekend-warrior"],
     clientEnrolledInIncentives: true,
   },
 
@@ -171,7 +171,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 12 hours", variant: "neutral" }],
-    incentiveType: "early-bird",
+    incentiveTypes: ["early-bird"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -199,7 +199,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Single Legs Allowed", variant: "success" },
       { label: "Expires in 1 day", variant: "neutral" },
     ],
-    incentiveType: "early-bird",
+    incentiveTypes: ["early-bird"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -224,7 +224,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 2 days", variant: "neutral" }],
-    incentiveType: "early-bird",
+    incentiveTypes: ["early-bird"],
     clientEnrolledInIncentives: true,
   },
 
@@ -251,7 +251,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 4 hours", variant: "warning" }],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -276,7 +276,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 1 day", variant: "neutral" }],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -301,7 +301,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 3 days", variant: "neutral" }],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
 
@@ -328,7 +328,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 1 day", variant: "neutral" }],
-    incentiveType: "loyalty-streak",
+    incentiveTypes: ["loyalty-streak"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -353,7 +353,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 2 days", variant: "neutral" }],
-    incentiveType: "loyalty-streak",
+    incentiveTypes: ["loyalty-streak"],
     clientEnrolledInIncentives: true,
   },
 
@@ -380,7 +380,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 1 day", variant: "neutral" }],
-    incentiveType: "white-glove",
+    incentiveTypes: ["white-glove"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -405,7 +405,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 2 days", variant: "neutral" }],
-    incentiveType: "white-glove",
+    incentiveTypes: ["white-glove"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -430,7 +430,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 4 days", variant: "neutral" }],
-    incentiveType: "white-glove",
+    incentiveTypes: ["white-glove"],
     clientEnrolledInIncentives: true,
   },
 
@@ -460,7 +460,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Single Legs Allowed", variant: "success" },
       { label: "Expires in 1 day", variant: "neutral" },
     ],
-    incentiveType: "quick-wins",
+    incentiveTypes: ["quick-wins"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -485,7 +485,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 2 days", variant: "neutral" }],
-    incentiveType: "quick-wins",
+    incentiveTypes: ["quick-wins"],
     clientEnrolledInIncentives: true,
   },
 
@@ -521,7 +521,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 4 days", variant: "neutral" }],
-    incentiveType: "hometown-hero",
+    incentiveTypes: ["hometown-hero"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -555,7 +555,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 6 days", variant: "neutral" }],
-    incentiveType: "hometown-hero",
+    incentiveTypes: ["hometown-hero"],
     clientEnrolledInIncentives: true,
   },
 
@@ -582,7 +582,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 7 days", variant: "neutral" }],
-    incentiveType: "squad-goals",
+    incentiveTypes: ["squad-goals"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -607,7 +607,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 8 days", variant: "neutral" }],
-    incentiveType: "squad-goals",
+    incentiveTypes: ["squad-goals"],
     clientEnrolledInIncentives: true,
   },
 
@@ -637,7 +637,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Single Legs Allowed", variant: "success" },
       { label: "Expires in 6 hours", variant: "warning" },
     ],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
   {
@@ -665,7 +665,7 @@ export const mockRequestTrips: Trip[] = [
       { label: "Single Legs Allowed", variant: "success" },
       { label: "Expires in 4 hours", variant: "warning" },
     ],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
   {
@@ -690,7 +690,7 @@ export const mockRequestTrips: Trip[] = [
     ],
     status: "request",
     pills: [{ label: "Expires in 3 days", variant: "neutral" }],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
 ];
@@ -721,7 +721,7 @@ export const mockUpcomingTrips: Trip[] = [
     ],
     status: "upcoming",
     pills: [],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -748,7 +748,7 @@ export const mockUpcomingTrips: Trip[] = [
     pills: [
       { label: "Single Legs Allowed", variant: "success" },
     ],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
   {
@@ -773,7 +773,7 @@ export const mockUpcomingTrips: Trip[] = [
     ],
     status: "upcoming",
     pills: [],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -798,7 +798,7 @@ export const mockUpcomingTrips: Trip[] = [
     ],
     status: "upcoming",
     pills: [],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
 ];
@@ -839,7 +839,7 @@ export const mockNeedsActionTrips: Trip[] = [
       { label: "Not Confirmed", variant: "danger" },
     ],
     // Was: ["weekend-warrior", "early-bird"] — early-bird is completed; weekend-warrior is gold
-    incentiveType: "weekend-warrior",
+    incentiveTypes: ["weekend-warrior"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -873,7 +873,7 @@ export const mockNeedsActionTrips: Trip[] = [
     ],
     status: "needs-action",
     pills: [],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
 ];
@@ -917,7 +917,7 @@ export const mockCompletedTrips: Trip[] = [
     ],
     status: "completed",
     pills: [],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -951,7 +951,7 @@ export const mockCompletedTrips: Trip[] = [
     ],
     status: "completed",
     pills: [],
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -985,7 +985,7 @@ export const mockCompletedTrips: Trip[] = [
     ],
     status: "completed",
     pills: [],
-    incentiveType: "weekend-warrior",
+    incentiveTypes: ["weekend-warrior"],
     clientEnrolledInIncentives: true,
   },
   // === HISTORICAL (Dec 2023) — referenced from past pay periods ===
@@ -1030,7 +1030,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     // Single (gold) — peak-hours still active
-    incentiveType: "peak-hours",
+    incentiveTypes: ["peak-hours"],
     clientEnrolledInIncentives: true,
   },
   {
@@ -1073,7 +1073,7 @@ export const mockCompletedTrips: Trip[] = [
     ],
     status: "completed",
     pills: [],
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
   {
@@ -1117,7 +1117,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     // Was: ["early-bird", "loyalty-streak"] — both completed → suppress (data-driven)
-    incentiveType: null,
+    incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 ];
