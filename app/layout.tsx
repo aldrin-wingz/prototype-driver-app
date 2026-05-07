@@ -13,7 +13,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Wingz Driver",
-  description: "Wingz NEMT Driver App - Driver Incentives Prototype",
+  description: "Wingz NEMT Driver App - Driver Incentives v1 Prototype",
 };
 
 export default function RootLayout({
