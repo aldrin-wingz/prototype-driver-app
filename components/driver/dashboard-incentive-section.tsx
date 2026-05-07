@@ -45,14 +45,12 @@ function ViewAllLink({ onTap }: ViewAllLinkProps) {
 
 interface ProgressMeterProps {
   currentCount: number;
-  scheduledCount: number;
-  targetCount: number;
+  goal: number;
 }
 
-function ProgressMeter({ currentCount, scheduledCount, targetCount }: ProgressMeterProps) {
-  const completedPercent = (currentCount / targetCount) * 100;
-  const scheduledPercent = (scheduledCount / targetCount) * 100;
-  const remainingCount = Math.max(0, targetCount - currentCount - scheduledCount);
+function ProgressMeter({ currentCount, goal }: ProgressMeterProps) {
+  const completedPercent = (currentCount / goal) * 100;
+  const remainingCount = Math.max(0, goal - currentCount);
 
   return (
     <div className="w-full space-y-1.5">
@@ -61,23 +59,9 @@ function ProgressMeter({ currentCount, scheduledCount, targetCount }: ProgressMe
           className="absolute inset-y-0 left-0 bg-[#10B981] transition-all"
           style={{ width: `${Math.min(completedPercent, 100)}%` }}
         />
-        {scheduledCount > 0 && (
-          <div
-            className="absolute inset-y-0 bg-[#10B981]/40"
-            style={{
-              left: `${completedPercent}%`,
-              width: `${Math.min(scheduledPercent, 100 - completedPercent)}%`,
-              backgroundImage:
-                "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)",
-            }}
-          />
-        )}
       </div>
       <div className="flex items-center gap-1 text-xs">
         <span className="font-medium text-gray-700">{currentCount} done</span>
-        {scheduledCount > 0 && (
-          <span className="text-[#10B981]">+{scheduledCount} taken</span>
-        )}
         {remainingCount > 0 && (
           <span className="text-gray-400">· {remainingCount} to go</span>
         )}
@@ -127,8 +111,7 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
 
           <ProgressMeter
             currentCount={progress.currentCount}
-            scheduledCount={progress.scheduledCount}
-            targetCount={progress.targetCount}
+            goal={progress.goal}
           />
 
           <div
