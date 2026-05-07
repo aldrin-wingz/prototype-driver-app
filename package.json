@@ -1,7 +1,7 @@
 {
   "name": "@wingz/react-component-registry",
   "version": "0.1.0",
-  "description": "Wingz design system and reusable React components for driver portal, agent portal, dispatch tool, post-hire compliance, in-app announcements, and new prototypes",
+  "description": "Wingz design system and reusable React components for driver portal, agent portal, dispatch tool, post-hire compliance, in-app announcements, and prototypes",
   "private": true,
   "scripts": {
     "dev": "next dev",
