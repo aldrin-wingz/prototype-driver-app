@@ -18,6 +18,13 @@
 //     direction (driver-facing metric, not eval question). Falls back to
 //     seeded `currentCount` if compute returns 0 (prototype simplification —
 //     `seedTrips` may not have enough density).
+//
+// App-I-5 additions (2026-05-12):
+//   - `formatEndsIn(endDate, today)` — returns `{copy, tone}` for the
+//     ends-in indicator on the dashboard `<IncentiveCard>`. Tone buckets:
+//     `urgent` (≤7 days, amber), `neutral` (>7 days, muted), `ended` (≤0,
+//     gray defensive). Reads `incentive.endDate` only — no schema change.
+//     Independent of Manager (no pair).
 // =============================================================================
 
 import type {
@@ -403,5 +410,58 @@ export function computeCurrentWindowProgress(
   return {
     done: Math.min(done, count),
     remaining: Math.max(0, count - done),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// ENDS-IN INDICATOR  (App-I-5, 2026-05-12)
+// -----------------------------------------------------------------------------
+
+/**
+ * App-I-5 — Dynamic "Ends in N day(s)" / "Ends Mon DD" indicator for the
+ * dashboard `<IncentiveCard>` (carousel tile) and the `/incentives` page
+ * tile. Reads `incentive.endDate` (already wired post-P-6 v5; no schema
+ * change). Independent — no Manager pair.
+ *
+ * Returns the copy + tone bucket so the caller can apply the matching
+ * Tailwind treatment. Tone buckets:
+ *   - `'urgent'`  → `daysUntilEnd <= 7`  → amber chip ("Ends in 3 days")
+ *   - `'neutral'` → `daysUntilEnd >  7`  → muted chip ("Ends May 31")
+ *   - `'ended'`   → `daysUntilEnd <= 0`  → gray chip ("Ended"); defensive,
+ *     incentive shouldn't show after end but render gracefully if it does.
+ *
+ * **Date math.** `Math.ceil((endDate - today) / day)` so a `today` mid-day
+ * with `endDate` later same day returns `1` ("Ends in 1 day") rather than
+ * `0`. The threshold is `daysUntilEnd <= 7` inclusive — so an incentive
+ * ending exactly 7 days from now reads amber + relative.
+ *
+ * Accepts `Date | string` for `endDate` because App stores window dates as
+ * ISO strings (per Schema Sync Note: Manager → `Date`, App → `string`,
+ * adapter logic lives in helpers). Caller may pass either.
+ */
+export function formatEndsIn(
+  endDate: Date | string,
+  today: Date = new Date(),
+): { copy: string; tone: "urgent" | "neutral" | "ended" } {
+  const end = typeof endDate === "string" ? new Date(endDate) : endDate;
+  if (Number.isNaN(end.getTime())) {
+    // Defensive: bad input → render as ended rather than crash.
+    return { copy: "Ended", tone: "ended" };
+  }
+
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const ms = end.getTime() - today.getTime();
+  const days = Math.ceil(ms / ONE_DAY_MS);
+
+  if (days <= 0) return { copy: "Ended", tone: "ended" };
+  if (days <= 7) {
+    return {
+      copy: `Ends in ${days} day${days !== 1 ? "s" : ""}`,
+      tone: "urgent",
+    };
+  }
+  return {
+    copy: `Ends ${formatRollingWindowDateShort(end)}`,
+    tone: "neutral",
   };
 }

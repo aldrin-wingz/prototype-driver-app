@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CalendarRange, ChevronRight } from "lucide-react";
+import { CalendarRange, ChevronRight, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Carousel,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import {
+  formatEndsIn,
   formatRollingWindow,
   getAllIncentiveProgress,
   getQualifyingTripsCount,
@@ -127,6 +128,13 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
     progress.endDate,
   );
 
+  // App-I-5 (2026-05-12): Dynamic ends-in indicator. Reads `endDate` only;
+  // returns urgent (≤7 days, amber) / neutral (>7 days, muted) / ended.
+  // Independent of rolling-window mode — total-mode cards show it too.
+  // Renders next to (or in place of, for total-mode) the rolling-window
+  // chip so both chips share the same row under the progress bar.
+  const endsIn = formatEndsIn(progress.endDate);
+
   return (
     <button
       onClick={() => onTap(progress.incentiveType)}
@@ -157,22 +165,50 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
             windowDays={progress.goalDays}
           />
 
-          {/* App-I-4 (P-11.1 hook): EXPLICIT rolling-window date chip. Only
-              renders for rolling-window mode AND today >= startDate. Total-mode
-              + upcoming campaigns: chip suppressed. Treatment is intentionally
-              more prominent than Manager preview's muted caption per user
-              direction (bordered chip with calendar icon vs text-only). */}
-          {rollingWindow ? (
-            <div
-              className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-1 text-xs font-medium text-[#10B981]"
-              aria-label={`Current rolling window: ${rollingWindow.fromLabel} to ${rollingWindow.toLabel}`}
-            >
-              <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>
-                Window: {rollingWindow.fromLabel} – {rollingWindow.toLabel}
+          {/* App-I-4 (P-11.1 hook) + App-I-5: chip row under the progress bar.
+              Rolling-window date chip (when applicable) sits beside the
+              ends-in indicator. Total-mode cards render only the ends-in
+              chip. Flex-wrap keeps the layout intact on narrow screens.
+              Ends-in chip always renders for any incentive that surfaces
+              on the dashboard so drivers see campaign timing at a glance. */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* App-I-4 (P-11.1): EXPLICIT rolling-window date chip. Only
+                  renders for rolling-window mode AND today >= startDate.
+                  Treatment intentionally more prominent than Manager preview
+                  (bordered chip with calendar icon vs text-only). */}
+              {rollingWindow ? (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-1 text-xs font-medium text-[#10B981]"
+                  aria-label={`Current rolling window: ${rollingWindow.fromLabel} to ${rollingWindow.toLabel}`}
+                >
+                  <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>
+                    Window: {rollingWindow.fromLabel} – {rollingWindow.toLabel}
+                  </span>
+                </span>
+              ) : null}
+
+              {/* App-I-5 (2026-05-12): Dynamic ends-in indicator. Tone-based
+                  treatment: urgent = amber (≤7 days, "Ends in N days"),
+                  neutral = muted gray (>7 days, "Ends MMM DD"), ended = gray
+                  defensive. Always renders for active/ended incentives so
+                  drivers see campaign timing at a glance. */}
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium",
+                  endsIn.tone === "urgent" &&
+                    "border-amber-300 bg-amber-50 text-amber-700",
+                  endsIn.tone === "neutral" &&
+                    "border-gray-200 bg-gray-50 text-gray-600",
+                  endsIn.tone === "ended" &&
+                    "border-gray-300 bg-gray-100 text-gray-500"
+                )}
+                aria-label={endsIn.copy}
+              >
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{endsIn.copy}</span>
               </span>
             </div>
-          ) : null}
 
           <div
             className={cn(
