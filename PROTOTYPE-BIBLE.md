@@ -408,7 +408,59 @@ Driver App does NOT need: market/client scope (filtered server-side; admin-only)
 | 0 | Re-orientation — upload v1 BIBLE + TRACKER (overwriting v3 versions), v0 confirms scope. No code generated. |
 | I-0 | **Mega Strip** — one forward-only deletion pass. DELETE: Variant Toggle infra + 2-of-3 ride card variants + 2-of-3 dashboard variants + Tier system + Leaderboard + `/payout` page + UpcomingPayoutWidget (full delete; revised 2026-05-04 later) + `Trip.revenueAddons`. DOWNGRADE: Earned popup → single "Dismiss" CTA. STRIP: tier-coupled fields from `IncentiveDefinition` (`tierLevel`, `INCENTIVE_TIER_BONUSES`, `Tier`, `TierConfig`, `LeaderboardEntry`). STRIP: `/incentives` Tabs wrapper. After this step, the prototype is structurally v1. |
 | I-1 | **Schema migration + re-seed** — only ADD step. Add per-incentive admin fields (`color`, `timeframe`, `enabled`, `sortOrder`, `marketScope`, `clientScope`, `trigger`). Rename `targetCount` → `goal`, `name` → `title`. `bonusAmount` is sole $ source. Re-seed 8 incentives. Pill bg = `incentive.color`. Sort by `sortOrder` ASC. |
-| I-2 | **Polish + edge states + final QA grep sweep** — empty states, disabled-incentive filtering, [DEV] Earned popup trigger, full grep sweep returning zero hits on stripped tokens. |
+| I-2 | **🟡 ABSORBED into Resume Wave 2026-05-09** — standalone I-2 retired; polish concerns redistributed across App-I-3..App-I-7 + Manager I-7 final cross-prototype sweep. Spec retained in TRACKER for grep targets that remain valid. |
+| **App-I-3** | **🔜 NEW — Resume Wave Empty Market/Client Scope Read-Side Confirmation.** App-side companion to Manager P-10 (W1-4). Audits + confirms App's eligibility filter handles empty `marketScope` / `clientScope` arrays as "all eligible" rather than "none." Likely already works that way (`array.length === 0 \|\| array.includes(driver.market)` pattern). No behavior change expected unless audit surfaces a bug. Auto model. Pairs with Manager P-10. |
+| **App-I-4** | **🔜 NEW — Resume Wave v6 Schema Sync — Goal Modes + Targeting Param Extensions.** App-side companion to Manager P-11. **Reads v6 schema:** `incentive.goal` discriminated union (total/rolling-window); OnTimePickup `{thresholdPct, windowDays}`; Sendbacks `{penalty, countRange, windowDays}`; trimmed catalog (Trip Targeting 6 entries + Driver Targeting 6 entries). **Sliding-window progress logic (gnarliest part):** for rolling-window goal, App tracks completed-trip timestamps + computes "best Y-day window so far" (find contiguous Y-day window in [startDate, today] containing most qualifying trips; caption: "Best Y-day window: <best> done · <count - best> needed"). Plan B if too complex: ship "total" mode only behind feature flag, defer rolling to v2. Higher-thinking model. Pairs with Manager P-11. |
+| **App-I-5** | **🔜 NEW — Resume Wave Dynamic Ends-in Indicator on Incentive Card** (W2-1). Add end-of-campaign indicator to dashboard `<IncentiveCard>` (the carousel tile). New helper `formatEndsIn(endDate, today): { copy: string; tone: 'urgent' \| 'neutral' }`. ≤7 days = "Ends in N day(s)" + amber treatment; >7 days = "Ends Mar 20" (absolute) + neutral muted treatment. No schema change. Independent — no Manager pair. Auto model. |
+| **App-I-6** | **🔜 NEW — Resume Wave Per-Incentive History (Counted ⏐ Missed Out tabs) + Disqualified-Trip UI.** Merged feature combining W2-2 (tap incentive → see completed qualifying rides; lighter-than-RideCard simple-list pattern from v3) + W3-A1 (disqualified-trips view) + W3-A2 (disqualified-trip unique UI: desaturated card + amber/red "Disqualified" badge + brief reason line). New tap target on dashboard `<IncentiveCard>` opens per-incentive history view with `Counted ⏐ Missed Out (N)` tabs. Reads `disqualifications` + `appeals` collections from v6 schema. Tap on Missed Out trip → opens dispute form (App-I-7). New routes: `app/incentives/[id]/history/page.tsx` OR inline-expand below dashboard card — Phase D builder picks based on user's v3 reference code paste. **Disambiguation:** new tap target coexists with existing "tap to filter Requests" behavior (chevron/affordance for history view; pill or progress-bar tap remains "filter Requests"). Higher-thinking model. Pairs with Manager P-12 (App reads disqualifications + appeals seeded by P-12). |
+| **App-I-7** | **🔜 NEW — Resume Wave Dispute Form + Appeal Feedback (Approved / Denied + Re-entry Pop-up).** Bundles W3-A3 (dispute form) + W3-A4 (appeal status feedback). **`<DisputeAppealSheet>`:** bottom sheet pattern mirrors Late Reasons pickup-reason sheet shape. Pre-filled context banner (red-tinted) shows the SPECIFIC disqualification reason + values. Free-text reason `<Textarea>` (V1 locked — preset dropdown deferred). Optional comments field. Submit creates `Appeal` record with status `pending`. **`<AppealResultDialog>` re-entry pop-up:** triggered on entry to dashboard or per-incentive history view when there's an unacknowledged resolved appeal. Approved = green check + "back on track" copy. Denied = amber warning + manager reason text. Dismiss writes `appealId` to `wingz-incentives:appeal-acks:v1` localStorage; dialog doesn't re-show. **Pending state:** trip shows "Appeal under review" badge; dispute form replaced by read-only summary. **Re-disqualification post-approval:** allow new appeal (separate `Appeal` record). Higher-thinking model. Pairs with Manager P-13b. |
+
+---
+
+## Resume Wave Reads — v6 Schema (planned 2026-05-09; Phase B ✅; date stamp finalizes at paste)
+
+The Driver App reads (does not own) the v6 schema additions from the Incentives Manager BIBLE. Key reads-subset additions:
+
+### Goal Mode Read (App-I-4 from W1-2)
+
+`incentive.goal` is now a discriminated union:
+- `{ type: "total"; count: number }` → existing behavior preserved (`currentCount / count` rendering).
+- `{ type: "rolling-window"; count: number; days: number }` → NEW. Caption: "Best `<days>`-day window: `<best>` done · `<count - best>` needed." App tracks completed-trip timestamps per driver+incentive and computes best Y-day window via sliding-window helper.
+
+Helper: `computeRollingWindowProgress(trips, count, days, startDate, today): { best: number; remaining: number }`.
+
+### Catalog Trim Read (App-I-4 from W1-3)
+
+Driver Targeting catalog reduced from 8 entries to 6:
+- Kept: Trips Completed · Days Since Last Activity · On-Time Pickup (with new window param) · Driver Address County · Tenure · Sendbacks (with penalty/range/window).
+- Removed: Completion Rate %, Vehicle Type.
+
+App's predicate evaluators tolerate the smaller catalog. Drop any reads of removed types.
+
+### OnTimePickup Window Read (App-I-4 from W1-3)
+
+App's eligibility check uses extended params: `driver.otpPercentLast<windowDays>Days >= thresholdPct`. If pre-computed window-specific OTP not available, fall back to existing `driver.otpPercent` field with hard-coded 30-day default.
+
+### Sendbacks Penalty/Range/Window Read (App-I-4 from W1-3)
+
+App's eligibility check filters driver's sendbacks by `penalty`, counts within `windowDays`, checks against `countRange`.
+
+### Disqualification + Appeal Reads (App-I-6 + App-I-7 from W3-S)
+
+App reads from new collections:
+- `wingz-incentives:disqualifications:v6` — driver-side filtered to `disqualifications.filter(d => d.driverId === currentDriver.id)`.
+- `wingz-incentives:appeals:v6` — driver-side filtered similarly.
+- Per-incentive Missed Out tab list = `disqualifications.filter(d => d.driverId === currentDriver.id && d.incentiveId === incentiveId)`.
+
+App writes via `createAppeal(...)` action exposed by `<IncentivesContext>`.
+
+### Dynamic Ends-in Indicator (App-I-5 from W2-1)
+
+Pure App-side feature. Reads existing `incentive.endDate` (already wired post-P-6 v5; no schema change). Helper `formatEndsIn(endDate, today)` returns `{ copy, tone }` based on ≤7-days threshold.
+
+### Empty Market/Client = "All" Read (App-I-3 from W1-4)
+
+App's eligibility filter must read empty `marketScope` / `clientScope` arrays as "all eligible." Audit + confirm in App-I-3.
 
 ---
 
@@ -426,4 +478,6 @@ This prototype has **no PRD** — design is being learned through ideation. The 
 
 Each step prompt includes a relevant excerpt from these files. **If a behavior is not in the excerpt, do not invent it.** Mark unclear states as `TODO` in the Tracker rather than guessing.
 
-`schemaVersion: 2026-05-04-v2` (bumps when canonical schema in Incentives Manager BIBLE changes)
+`schemaVersion: 2026-05-05-v3` (bumps when canonical schema in Incentives Manager BIBLE changes). **Resume Wave bumps to `2026-05-XX-v6`** (planned 2026-05-09 Phase B ✅; lands when Manager P-11 + P-12 ship and App-I-4 + App-I-6 sync). Driver App reads-subset documented in §Resume Wave Reads above.
+
+**v3 (2026-05-05) — Trigger Catalog rewrite (canonical-side).** `IncentiveDefinition.trigger: Trigger` (eng-managed string enum) → `IncentiveDefinition.triggerConfig: TriggerConfig` (discriminated union of 19 admin-configurable trigger types). Driver App reads `triggerConfig` for **display only** — server-side trip matching is out of v1 scope. If the Driver App's seed/render code consumes the old `trigger` field anywhere, swap to `triggerConfig` summary during I-2 grep sweep (e.g., a small caption "Day of Week: Sat, Sun" under the incentive title using the catalog's `summarize()` helper, OR drop the visual entirely and let the title carry the meaning). See Incentives Manager BIBLE §Trigger Catalog (Parameter-Driven) for the full union shape.
