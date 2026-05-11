@@ -1,11 +1,46 @@
 // =============================================================================
-// INCENTIVE DATA SCHEMA + SEED DATA  (v1 — post I-0 strip)
+// INCENTIVE DATA SCHEMA + SEED DATA  (v1 — post App-I-4 v6 catch-up)
 // =============================================================================
+// schemaVersion: 2026-05-12-v6
+//
 // Tier system, leaderboard, and pay-period summaries removed in I-0. Schema
-// migration to add admin-editable fields (color, timeframe, enabled, sortOrder,
-// marketScope, clientScope, trigger) and the multi-incentive `incentiveTypes[]`
-// array on Trip is the job of I-1 — DO NOT add those here.
-// =============================================================================
+// migration to add admin-editable fields landed in I-1
+// (`color`/`sortOrder`/`marketScope`/`clientScope`/`trigger`/etc.).
+//
+// **App-I-4 (2026-05-12) v3 → v6 catch-up** — Driver App reads-subset caught
+// up to the canonical Manager schema (`v1/Incentives V1 CS Tool` ✅ landed
+// P-11 + P-11.1 2026-05-12). Three coordinated changes on the App side:
+//
+//   1. `goal: number` → `goal: Goal` discriminated union covering total +
+//      rolling-window modes. Mirrors Manager's `Goal` type 1:1; sliding-window
+//      progress logic lives in `incentive-utils.ts::computeCurrentWindowProgress`.
+//
+//   2. Schedule model: drop legacy `timeframe` + `enabled` fields. Add
+//      `startDate` + `endDate` (ISO datetime strings — App keeps strings rather
+//      than `Date` objects for JSON round-trip safety; Manager uses `Date`
+//      objects which is fine because the Manager owns the canonical schema).
+//      Incentives become one-off campaigns active iff today ∈ window — App
+//      reads this passively for the `formatRollingWindow` helper to compute
+//      the slide-pointer + clamps.
+//
+//   3. Add `formatRollingWindow` + `computeCurrentWindowProgress` helpers
+//      (incentive-utils.ts) — sliding-window logic; explicit dynamic
+//      "Window: May 6 – May 12" chip on `<IncentiveCard>` per user direction
+//      2026-05-12 (more prominent than Manager preview's muted caption).
+//
+// Skipped on the App side (v4 was a Manager-only change — App doesn't model
+// `triggerConfigs[]` arrays; it carries a single human-readable `trigger`
+// string for App-UX display only). v5 catalog adds (Driver Targeting) are
+// Manager-only too — App doesn't filter by driverTargeting at runtime (see
+// App-I-3 audit 2026-05-12; PRD flag — Market/Client + driver-target are
+// admin-side analytics, NOT driver-side gating in v1).
+//
+// **App-only fields preserved as documented subset extensions:**
+//   - `qualifyingCriteria: string` — human-readable description used in the
+//     driver-facing UX (Manager has structured `tripTargeting` arrays).
+//   - `trigger: string` — eng-managed string kept for downstream display
+//     (e.g., trip-feed tagging).
+//   - `iconName?: string` — App-side icon hint.
 
 // -----------------------------------------------------------------------------
 // ENUMS & UNION TYPES
@@ -44,51 +79,73 @@ export type Period = {
 
 export type PeriodStatus = 'active' | 'upcoming' | 'completed';
 
+/**
+ * App-I-4 (v6, 2026-05-12): discriminated Goal shape mirrors Manager v6.
+ *   - Total mode: existing "X trips during the campaign" semantic preserved.
+ *   - Rolling-window mode: "X trips in any contiguous Y-day window during the
+ *     campaign." App computes "best window so far" via the sliding-window
+ *     helper in `incentive-utils.ts`.
+ */
+export type Goal =
+  | { type: 'total'; count: number }
+  | { type: 'rolling-window'; count: number; days: number };
+
 // -----------------------------------------------------------------------------
 // CORE TYPES
 // -----------------------------------------------------------------------------
 
 /**
- * Definition of an incentive program (v1 — fully admin-editable).
+ * Definition of an incentive program (v1 — App-I-4 v6 catch-up).
  * `bonusAmount` is the sole $ source of truth (INCENTIVE_TIER_BONUSES deleted in I-0).
- * Per-incentive `color` drives pill rendering; `timeframe` replaces `periodId`;
- * `sortOrder` controls list order (ASC). New admin fields: enabled, marketScope,
- * clientScope, trigger (read-only, eng-managed).
+ * Per-incentive `color` drives pill rendering; `sortOrder` controls list order (ASC).
+ *
+ * App-I-4 (v6): `goal` is now a discriminated union; `timeframe`/`enabled` dropped
+ * in favor of `startDate`/`endDate` window (ISO datetime strings). The App reads
+ * this subset of the canonical Manager schema.
  */
 export interface IncentiveDefinition {
   id: string;
   type: IncentiveType;
-  title: string;                   // RENAMED from `name`
+  title: string;                   // RENAMED from `name` (I-1)
   description: string;             // Short description
-  goal: number;                    // RENAMED from `targetCount` — trips needed
+  /** App-I-4 (v6): discriminated Goal. Read `goal.count` for the count target;
+   *  read `goal.type === 'rolling-window'` to drive sliding-window UI + chip. */
+  goal: Goal;
   bonusAmount: number;             // Dollars paid when goal is hit ($ source of truth)
-  timeframe: 'daily' | 'weekly' | 'monthly' | 'all-time';  // REPLACES periodId
+  /** App-I-4 (v6): campaign start (ISO datetime, inclusive). Replaces legacy `timeframe`. */
+  startDate: string;
+  /** App-I-4 (v6): campaign end (ISO datetime, inclusive). Must be > startDate. */
+  endDate: string;
   color: string;                   // Hex — pill bg color
-  enabled: boolean;                // Admin toggle
   sortOrder: number;               // ASC; lower = higher in list
-  // Empty array = ALL markets eligible (matches Manager P-10 read semantics, 2026-05-12).
-  // App does NOT filter on this field today: `CurrentDriver` carries no `market` field
-  // and the dashboard renders every enabled incentive regardless of scope. This is a
-  // pure passthrough read. If filter logic is ever added (App-I-4 / future), use the
-  // length-zero shortcut so empty = All is preserved:
-  //   `marketScope.length === 0 || marketScope.includes(driver.market)`
   marketScope: string[];           // Admin-editable markets (e.g. ['Atlanta'])
-  // Empty array = ALL clients eligible. Same passthrough convention as `marketScope`;
-  // see comment above for the length-zero filter shortcut.
+                                   // Empty array = ALL markets eligible (matches Manager P-10).
+                                   // App does NOT filter on this field today (see App-I-3 audit).
+                                   // PRD flag: admin-side analytics, NOT driver-side gating in v1.
   clientScope: string[];           // Admin-editable clients (e.g. ['Verida', 'MTM'])
-  qualifyingCriteria: string;      // Human-readable criteria
+                                   // Empty array = ALL clients eligible. Same passthrough note.
+  /** App-only convenience field: human-readable summary of trip criteria.
+   *  Manager v6 has structured `tripTargeting` arrays — App keeps the string. */
+  qualifyingCriteria: string;
   iconName?: string;               // Optional icon identifier
-  trigger: string;                 // Read-only; eng-managed trigger identifier
+  /** App-only convenience field: eng-managed trigger identifier for tagging. */
+  trigger: string;
 }
 
 /**
  * A driver's progress toward an incentive program (v1).
  * `scheduledCount` stripped (no "+N taken" in v1 UI). Binary progress: currentCount vs goal.
+ *
+ * App-I-4 note: `goal: number` here is the denormalized count target from
+ * `IncentiveDefinition.goal.count` (mode-agnostic). For rolling-window incentives
+ * `currentCount` represents the "best window so far" tally (computed at read time
+ * via `computeCurrentWindowProgress`). The seeded value below is a hand-tuned
+ * fallback used when the live computation surfaces 0 due to sparse seed trips.
  */
 export interface DriverIncentiveProgress {
   incentiveId: string;             // References IncentiveDefinition.id
-  currentCount: number;            // Trips completed toward this incentive (the "done" count)
-  goal: number;                    // RENAMED from `targetCount` — copied from definition
+  currentCount: number;            // Trips completed (total mode) OR best-window count (rolling-window mode)
+  goal: number;                    // = definition.goal.count; denormalized for display
   isComplete: boolean;             // Has the driver hit the goal?
   bonusEarned: number;             // 0 if not complete, bonusAmount if complete
   lastQualifyingTripId?: string;   // Last qualifying trip ID
@@ -184,6 +241,27 @@ export const currentPeriod: Period = {
 // -----------------------------------------------------------------------------
 // INCENTIVE DEFINITIONS
 // -----------------------------------------------------------------------------
+//
+// App-I-4 (v6, 2026-05-12) re-seed:
+//   - `goal: number` → `goal: Goal` (discriminated union)
+//   - Drop legacy `timeframe: 'monthly'` + `enabled: true` fields
+//   - Add `startDate` + `endDate` ISO datetime strings — window spans the
+//     anchor month of 2026-05-01 → 2026-05-31 to keep the demo "currently
+//     active" without forcing a calendar lookup on render
+//   - 2 demo rolling-window incentives (mirroring Manager P-11 demo picks):
+//       • inc-pp-001 Peak Performer — { type: "rolling-window", count: 5, days: 7 }
+//       • inc-qw-001 Quick Wins     — { type: "rolling-window", count: 5, days: 7 }
+//     Other 6 incentives stay in "total" mode.
+//
+// PRD flag: Market/Client scope is admin-side analytics, NOT driver-side
+// gating — driver visibility unaffected by these fields in v1 (App-I-3 audit).
+
+const SEED_WINDOW_START = '2026-05-01T00:00:00Z';
+const SEED_WINDOW_END = '2026-05-31T23:59:59Z';
+// Peak Performer + Quick Wins demo rolling-window incentives run a wider
+// window so the rolling pointer + clamp behavior is visible during the campaign.
+const SEED_LONG_WINDOW_START = '2026-04-15T00:00:00Z';
+const SEED_LONG_WINDOW_END = '2026-07-31T23:59:59Z';
 
 export const incentiveDefinitions: IncentiveDefinition[] = [
   {
@@ -191,11 +269,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     type: 'weekend-warrior',
     title: 'Weekend Warrior',
     description: 'Complete 8 trips on weekends',
-    goal: 8,
+    goal: { type: 'total', count: 8 },
     bonusAmount: 50,
-    timeframe: 'monthly',
+    startDate: SEED_WINDOW_START,
+    endDate: SEED_WINDOW_END,
     color: '#10B981',
-    enabled: true,
     sortOrder: 10,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -206,16 +284,17 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     id: 'inc-pp-001',
     type: 'peak-hours',
     title: 'Peak Performer',
-    description: 'Complete 10 trips during peak hours (5-9am, 4-8pm)',
-    goal: 10,
+    description: 'Complete 5 peak-hour trips in any 7-day window',
+    // App-I-4 v6 demo: rolling-window mode (mirrors Manager P-11 demo pick).
+    goal: { type: 'rolling-window', count: 5, days: 7 },
     bonusAmount: 50,
-    timeframe: 'monthly',
+    startDate: SEED_LONG_WINDOW_START,
+    endDate: SEED_LONG_WINDOW_END,
     color: '#EAB308',
-    enabled: true,
     sortOrder: 20,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
-    qualifyingCriteria: '10 trips between 5-9am or 4-8pm',
+    qualifyingCriteria: 'Trips between 5-9am or 4-8pm',
     trigger: 'peak-hours',
   },
   {
@@ -223,11 +302,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     type: 'early-bird',
     title: 'Early Bird',
     description: 'Complete 8 trips before 9am',
-    goal: 8,
+    goal: { type: 'total', count: 8 },
     bonusAmount: 30,
-    timeframe: 'monthly',
+    startDate: SEED_WINDOW_START,
+    endDate: SEED_WINDOW_END,
     color: '#06B6D4',
-    enabled: true,
     sortOrder: 30,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -239,11 +318,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     type: 'white-glove',
     title: 'White Glove',
     description: 'Complete 6 door-to-door trips',
-    goal: 6,
+    goal: { type: 'total', count: 6 },
     bonusAmount: 50,
-    timeframe: 'monthly',
+    startDate: SEED_WINDOW_START,
+    endDate: SEED_WINDOW_END,
     color: '#8B5CF6',
-    enabled: true,
     sortOrder: 40,
     marketScope: ['Atlanta'],
     clientScope: ['Verida'],
@@ -255,11 +334,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     type: 'hometown-hero',
     title: 'Hometown Hero',
     description: 'Complete 8 trips within your home county',
-    goal: 8,
+    goal: { type: 'total', count: 8 },
     bonusAmount: 30,
-    timeframe: 'monthly',
+    startDate: SEED_WINDOW_START,
+    endDate: SEED_WINDOW_END,
     color: '#94A3B8',
-    enabled: true,
     sortOrder: 50,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -271,11 +350,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     type: 'squad-goals',
     title: 'Squad Goals',
     description: 'Complete 6 multi-rider trips',
-    goal: 6,
+    goal: { type: 'total', count: 6 },
     bonusAmount: 50,
-    timeframe: 'monthly',
+    startDate: SEED_WINDOW_START,
+    endDate: SEED_WINDOW_END,
     color: '#EC4899',
-    enabled: true,
     sortOrder: 60,
     marketScope: ['Atlanta'],
     clientScope: ['MTM'],
@@ -286,12 +365,13 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     id: 'inc-qw-001',
     type: 'quick-wins',
     title: 'Quick Wins',
-    description: 'Complete 10 short-distance trips',
-    goal: 10,
+    description: 'Complete 5 short-distance trips in any 7-day window',
+    // App-I-4 v6 demo: rolling-window mode (mirrors Manager P-11 demo pick).
+    goal: { type: 'rolling-window', count: 5, days: 7 },
     bonusAmount: 10,
-    timeframe: 'monthly',
+    startDate: SEED_LONG_WINDOW_START,
+    endDate: SEED_LONG_WINDOW_END,
     color: '#3B82F6',
-    enabled: true,
     sortOrder: 70,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -303,11 +383,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     type: 'loyalty-streak',
     title: 'Loyalty Streak',
     description: 'Complete trips for 5 consecutive days',
-    goal: 5,
+    goal: { type: 'total', count: 5 },
     bonusAmount: 10,
-    timeframe: 'monthly',
+    startDate: SEED_WINDOW_START,
+    endDate: SEED_WINDOW_END,
     color: '#F59E0B',
-    enabled: true,
     sortOrder: 80,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -331,8 +411,11 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   },
   {
     incentiveId: 'inc-pp-001',
-    currentCount: 9,
-    goal: 10,
+    // App-I-4: rolling-window incentive — currentCount represents the seeded
+    // "best 7-day window" baseline. computeCurrentWindowProgress falls back
+    // to this when the live computation surfaces 0 (sparse seed trips).
+    currentCount: 4,
+    goal: 5,
     isComplete: false,
     bonusEarned: 0,
     lastQualifyingTripId: 'trip-pp-009',
@@ -371,8 +454,9 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
   },
   {
     incentiveId: 'inc-qw-001',
-    currentCount: 8,
-    goal: 10,
+    // App-I-4: rolling-window incentive — seeded best-window baseline.
+    currentCount: 3,
+    goal: 5,
     isComplete: false,
     bonusEarned: 0,
     lastQualifyingTripId: 'trip-qw-008',

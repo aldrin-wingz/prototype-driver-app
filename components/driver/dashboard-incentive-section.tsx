@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { CalendarRange, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Carousel,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import {
+  formatRollingWindow,
   getAllIncentiveProgress,
   getQualifyingTripsCount,
   INCENTIVE_PILL_COLORS,
@@ -46,9 +47,15 @@ function ViewAllLink({ onTap }: ViewAllLinkProps) {
 interface ProgressMeterProps {
   currentCount: number;
   goal: number;
+  /** App-I-4 (v6): goal mode discriminator. "total" preserves the existing
+   *  "X done · Y to go" caption. "rolling-window" renders the sliding-window
+   *  caption: "Current <Y>-day window: X done · Y needed" (corrected 2026-05-12). */
+  mode?: "total" | "rolling-window";
+  /** App-I-4: only used when `mode === "rolling-window"`. */
+  windowDays?: number;
 }
 
-function ProgressMeter({ currentCount, goal }: ProgressMeterProps) {
+function ProgressMeter({ currentCount, goal, mode = "total", windowDays }: ProgressMeterProps) {
   const completedPercent = (currentCount / goal) * 100;
   const remainingCount = Math.max(0, goal - currentCount);
 
@@ -61,9 +68,30 @@ function ProgressMeter({ currentCount, goal }: ProgressMeterProps) {
         />
       </div>
       <div className="flex items-center gap-1 text-xs">
-        <span className="font-medium text-gray-700">{currentCount} done</span>
-        {remainingCount > 0 && (
-          <span className="text-gray-400">· {remainingCount} to go</span>
+        {mode === "rolling-window" && windowDays != null ? (
+          <>
+            {/* App-I-4 (corrected 2026-05-12 per user feedback): label reads
+                "Current Y-day window" not "Best Y-day window". The chip dates
+                slide forward each day and the count reflects qualifying trips
+                in the CURRENT window — driver-facing metric, not eval question.
+                On completion, the existing "Completed" badge + opacity serves
+                as the lock; future enhancement freezes the chip to the
+                completion window via a stored snapshot. */}
+            <span className="font-medium text-gray-700">
+              Current {windowDays}-day window:
+            </span>
+            <span className="font-medium text-gray-700">{currentCount} done</span>
+            {remainingCount > 0 && (
+              <span className="text-gray-400">· {remainingCount} needed</span>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="font-medium text-gray-700">{currentCount} done</span>
+            {remainingCount > 0 && (
+              <span className="text-gray-400">· {remainingCount} to go</span>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -85,6 +113,19 @@ interface IncentiveCardProps {
 function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
   const colors = INCENTIVE_PILL_COLORS[progress.incentiveType];
   const availableCount = getQualifyingTripsCount(progress.incentiveType);
+
+  // App-I-4 (P-11.1 hook 2026-05-12): dynamic rolling-window range. Returns
+  // null for total mode + upcoming campaigns. Window slides daily as the
+  // device clock advances. Treatment is intentionally MORE prominent than
+  // Manager preview's muted caption per user direction — bordered chip with
+  // leading calendar icon directly under the progress bar.
+  const rollingWindow = formatRollingWindow(
+    progress.goalMode === "rolling-window" && progress.goalDays != null
+      ? { type: "rolling-window", count: progress.goal, days: progress.goalDays }
+      : { type: "total", count: progress.goal },
+    progress.startDate,
+    progress.endDate,
+  );
 
   return (
     <button
@@ -112,7 +153,26 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
           <ProgressMeter
             currentCount={progress.currentCount}
             goal={progress.goal}
+            mode={progress.goalMode}
+            windowDays={progress.goalDays}
           />
+
+          {/* App-I-4 (P-11.1 hook): EXPLICIT rolling-window date chip. Only
+              renders for rolling-window mode AND today >= startDate. Total-mode
+              + upcoming campaigns: chip suppressed. Treatment is intentionally
+              more prominent than Manager preview's muted caption per user
+              direction (bordered chip with calendar icon vs text-only). */}
+          {rollingWindow ? (
+            <div
+              className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-1 text-xs font-medium text-[#10B981]"
+              aria-label={`Current rolling window: ${rollingWindow.fromLabel} to ${rollingWindow.toLabel}`}
+            >
+              <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>
+                Window: {rollingWindow.fromLabel} – {rollingWindow.toLabel}
+              </span>
+            </div>
+          ) : null}
 
           <div
             className={cn(

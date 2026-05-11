@@ -83,7 +83,10 @@ export function IncentiveEarnedPopup() {
               data.colors.border
             )}
           >
-            {data.def.name}
+            {/* App-I-4 (2026-05-12): fix pre-existing stale ref — `def.name`
+                was renamed to `def.title` in I-1; this consumer was missed
+                in the grep sweep. */}
+            {data.def.title}
           </span>
         </div>
 

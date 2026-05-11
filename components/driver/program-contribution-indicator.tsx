@@ -35,13 +35,30 @@ function PopoverInnerContent({ incentiveType }: { incentiveType: IncentiveType }
   const progress = getIncentiveProgressInfo(incentiveType);
   if (!progress) return null;
 
+  // App-I-4 (2026-05-12): fix pre-existing stale ref (`progress.targetCount`
+  // — left over from the I-1 rename `targetCount` → `goal` which missed this
+  // file's grep sweep). Now reads `progress.goal` correctly. Also makes the
+  // popover mode-aware: rolling-window incentives show "Current Y-day window: X
+  // done · N needed" instead of "X/Y trips" to match the IncentiveCard
+  // semantics.
+  const isRollingWindow = progress.goalMode === "rolling-window" && progress.goalDays != null;
+
   return (
     <p className="text-sm text-gray-700">
       <span>Counts toward </span>
       <span className="font-semibold text-gray-900">{progress.name}</span>
       <span> — </span>
       <span className="font-medium text-gray-900">
-        {formatProgressString(progress.currentCount, progress.targetCount)}
+        {isRollingWindow ? (
+          <>
+            {/* App-I-4 (corrected 2026-05-12): "Current" not "Best" — see
+                ProgressMeter docblock in dashboard-incentive-section.tsx. */}
+            Current {progress.goalDays}-day window: {progress.currentCount} done
+            {progress.remainingCount > 0 ? ` · ${progress.remainingCount} needed` : ""}
+          </>
+        ) : (
+          formatProgressString(progress.currentCount, progress.goal)
+        )}
       </span>
       <span> · </span>
       <span className="font-semibold text-[#10B981]">

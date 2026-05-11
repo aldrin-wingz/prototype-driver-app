@@ -1,17 +1,35 @@
 // =============================================================================
-// INCENTIVE UTILITY FUNCTIONS  (v1 — post I-0 strip)
+// INCENTIVE UTILITY FUNCTIONS  (v1 — post App-I-4 v6 catch-up)
 // =============================================================================
-// Helper functions for mapping incentive types to display values. Tier color
-// theming, leaderboard helpers, payout-breakdown helpers, and the gold-first
-// `sortByTierDesc` were removed in I-0. The `getAllIncentiveProgress` callsite
-// uses a placeholder ASC-by-id sort until I-1 wires the admin `sortOrder` field.
+// Helper functions for mapping incentive types to display values + rolling-window
+// helpers ported from Manager P-11/P-11.1 (2026-05-12). Tier color theming,
+// leaderboard helpers, payout-breakdown helpers, and the gold-first
+// `sortByTierDesc` were removed in I-0.
+//
+// App-I-4 additions (2026-05-12):
+//   - `IncentiveProgressInfo` interface extended with `goalMode` discriminator
+//     + optional `goalDays`. `goal` field stays as a flat count for display.
+//   - `getIncentiveProgressInfo` unpacks the new `Goal` discriminated union.
+//   - `formatRollingWindow` ported from Manager 1:1 (signature adapted to
+//     accept ISO strings since App stores window dates as strings).
+//   - `computeCurrentWindowProgress` new helper — counts qualifying trips in
+//     the CURRENT Y-day window (`[today - (days-1), today]`, clamped to
+//     startDate). NOT "best window so far" — corrected 2026-05-12 per user
+//     direction (driver-facing metric, not eval question). Falls back to
+//     seeded `currentCount` if compute returns 0 (prototype simplification —
+//     `seedTrips` may not have enough density).
 // =============================================================================
 
 import type {
+  Goal,
   IncentiveType,
   DriverIncentiveProgress,
 } from "./incentives";
-import { incentiveDefinitions, driverIncentiveProgress } from "./incentives";
+import {
+  incentiveDefinitions,
+  driverIncentiveProgress,
+  seedTrips,
+} from "./incentives";
 import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 
 // -----------------------------------------------------------------------------
@@ -76,6 +94,12 @@ export const INCENTIVE_PILL_COLORS_MUTED: Record<IncentiveType, { bg: string; te
 // PROGRESS HELPERS
 // -----------------------------------------------------------------------------
 
+/**
+ * App-I-4 (v6): extended with mode discriminator + optional window days so
+ * display components can render mode-aware captions + the explicit
+ * rolling-window date chip. `goal` stays as a flat count for the progress
+ * bar (mode-agnostic at the bar level).
+ */
 export interface IncentiveProgressInfo {
   incentiveType: IncentiveType;
   name: string;
@@ -85,6 +109,13 @@ export interface IncentiveProgressInfo {
   bonusAmount: number;
   isComplete: boolean;
   description: string;
+  /** App-I-4: discriminator carried from `IncentiveDefinition.goal.type`. */
+  goalMode: Goal["type"];
+  /** App-I-4: only set when `goalMode === "rolling-window"`. */
+  goalDays?: number;
+  /** App-I-4: ISO datetime strings — needed by `formatRollingWindow` consumers. */
+  startDate: string;
+  endDate: string;
 }
 
 export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgressInfo | null {
@@ -93,19 +124,48 @@ export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgress
 
   const progress = driverIncentiveProgress.find(p => p.incentiveId === definition.id);
 
-  const currentCount = progress?.currentCount ?? 0;
-  const goal = definition.goal;
-  const remainingCount = Math.max(0, goal - currentCount);
+  // App-I-4: unpack the discriminated Goal union.
+  const goalCount = definition.goal.count;
+  const goalMode = definition.goal.type;
+  const goalDays = definition.goal.type === "rolling-window" ? definition.goal.days : undefined;
+
+  // App-I-4: for rolling-window incentives, compute the CURRENT window count
+  // from seeded trips (NOT "best window so far"). Per user direction
+  // 2026-05-12: the driver-facing metric is "what's my count in the current
+  // 7-day window right now?" — the window slides forward each day. Fall back
+  // to the seeded `currentCount` if the live computation surfaces 0 due to
+  // sparse seed trip density.
+  let currentCount = progress?.currentCount ?? 0;
+  if (goalMode === "rolling-window" && goalDays != null) {
+    const computed = computeCurrentWindowProgress(
+      type,
+      goalCount,
+      goalDays,
+      definition.startDate,
+      definition.endDate,
+    );
+    if (computed.done > 0) {
+      currentCount = computed.done;
+    }
+    // else: fall through to seeded `currentCount` (prototype simplification —
+    // TODO: when real backend wires in, remove this fallback).
+  }
+
+  const remainingCount = Math.max(0, goalCount - currentCount);
 
   return {
     incentiveType: type,
     name: definition.title,
     currentCount,
-    goal,
+    goal: goalCount,
     remainingCount,
     bonusAmount: definition.bonusAmount,
     isComplete: progress?.isComplete ?? false,
     description: definition.description,
+    goalMode,
+    goalDays,
+    startDate: definition.startDate,
+    endDate: definition.endDate,
   };
 }
 
@@ -195,4 +255,153 @@ export function getWeeklyPayoutData(): WeeklyPayoutData {
  */
 export function getQualifyingTripsCount(type: IncentiveType): number {
   return mockRequestTrips.filter((t) => t.incentiveTypes.includes(type)).length;
+}
+
+// -----------------------------------------------------------------------------
+// ROLLING-WINDOW HELPERS  (App-I-4, ported from Manager P-11 + P-11.1)
+// -----------------------------------------------------------------------------
+
+const ROLLING_SHORT_MONTH = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** Short "MMM D" label for rolling-window range chips. */
+function formatRollingWindowDateShort(d: Date): string {
+  return `${ROLLING_SHORT_MONTH[d.getMonth()]} ${d.getDate()}`;
+}
+
+/**
+ * App-I-4 — Rolling-window dates that slide forward each day.
+ * Ported from Manager `lib/data/incentives.ts::formatRollingWindow`
+ * (P-11.1, 2026-05-12). Identical semantic; signature accepts ISO datetime
+ * strings (App stores window dates as strings rather than Date objects).
+ *
+ * Returns the current applicable `from`/`to` dates for a rolling-window
+ * incentive, given the campaign window + today's date. Returns `null` for
+ * total-mode goals OR for rolling-window incentives that haven't started
+ * yet (today < startDate). For ended campaigns the pointer clamps to
+ * endDate so drivers see the FINAL window when reviewing closed incentives.
+ *
+ * Examples (assume goal.days = 7):
+ *   - Active mid-campaign on 2026-05-12 → from = 2026-05-06, to = 2026-05-12
+ *   - Active early-campaign (campaign started 2026-05-10, today 2026-05-12)
+ *       → from = 2026-05-10 (clamped to startDate), to = 2026-05-12 (partial window)
+ *   - Upcoming (today < startDate) → null
+ *   - Ended (today > endDate) → from = endDate - 6d, to = endDate
+ *
+ * **Treatment goal (per user direction 2026-05-12):** the App must render
+ * this MORE explicitly than the Manager preview's muted caption — bordered
+ * chip with leading calendar icon, not text-only treatment.
+ */
+export function formatRollingWindow(
+  goal: Goal,
+  startDateIso: string,
+  endDateIso: string,
+  today: Date = new Date(),
+): { fromIso: string; toIso: string; fromLabel: string; toLabel: string } | null {
+  if (goal.type !== "rolling-window") return null;
+
+  const startDate = new Date(startDateIso);
+  const endDate = new Date(endDateIso);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+
+  const todayMs = today.getTime();
+  const startMs = startDate.getTime();
+  const endMs = endDate.getTime();
+  if (todayMs < startMs) return null;
+
+  // Pointer = today, clamped to endDate so ended campaigns show the final window.
+  const pointerMs = Math.min(todayMs, endMs);
+  // Window start = pointer - (days - 1), clamped to startDate so early-campaign
+  // partial windows don't read pre-campaign dates.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const targetFromMs = pointerMs - (goal.days - 1) * ONE_DAY_MS;
+  const fromMs = Math.max(targetFromMs, startMs);
+
+  const fromDate = new Date(fromMs);
+  const toDate = new Date(pointerMs);
+  return {
+    fromIso: fromDate.toISOString(),
+    toIso: toDate.toISOString(),
+    fromLabel: formatRollingWindowDateShort(fromDate),
+    toLabel: formatRollingWindowDateShort(toDate),
+  };
+}
+
+/**
+ * App-I-4 — CURRENT-window progress helper for rolling-window incentives.
+ *
+ * Counts completed trips that match the incentive type AND fall within the
+ * **current** rolling window — i.e., `[today - (days - 1), today]`, clamped
+ * to `[startDate, endDate]`. This is the driver-facing metric: "what's my
+ * count in the last Y days right now?" The window slides forward each day.
+ *
+ * **NOT "best window so far."** Per user direction 2026-05-12 the prototype
+ * shows the current window while in-progress; on completion, the system
+ * would freeze the chip to the window where the driver completed (V1 simpler
+ * path: existing `progress.isComplete` badge + opacity treatment serves as
+ * the completion indicator; freezing the chip to the completion-window is a
+ * future enhancement that would require a `completedWindowFromIso`/`ToIso`
+ * field on `DriverIncentiveProgress`).
+ *
+ * Returns `{ done: 0, remaining: count }` when no qualifying trips are
+ * found in the current window — the caller (typically
+ * `getIncentiveProgressInfo`) can fall back to the seeded
+ * `DriverIncentiveProgress.currentCount` for prototype demos where
+ * `seedTrips` lacks density in the last Y days.
+ *
+ * **Note (V1 simplification):** `Trip.date` is a human-readable string like
+ * `"May 4, 2026"`. We parse with `new Date(date)` — works for this seed
+ * format but fragile in general. Real backend would carry ISO datetime
+ * strings on completed-trip records.
+ */
+export function computeCurrentWindowProgress(
+  type: IncentiveType,
+  count: number,
+  days: number,
+  startDateIso: string,
+  endDateIso: string,
+  today: Date = new Date(),
+): { done: number; remaining: number } {
+  const startMs = new Date(startDateIso).getTime();
+  const endMs = new Date(endDateIso).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return { done: 0, remaining: count };
+  }
+  const pointerMs = Math.min(today.getTime(), endMs);
+  if (pointerMs < startMs) return { done: 0, remaining: count };
+
+  // Current window = [pointer - (days - 1), pointer], clamped to startDate.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const targetFromMs = pointerMs - (days - 1) * ONE_DAY_MS;
+  const winStartMs = Math.max(targetFromMs, startMs);
+  const winEndMs = pointerMs;
+
+  let done = 0;
+  for (const t of seedTrips) {
+    if (t.status !== "completed") continue;
+    if (!t.incentiveTypes.includes(type)) continue;
+    const parsed = new Date(t.date).getTime();
+    if (!Number.isFinite(parsed)) continue;
+    if (parsed < winStartMs || parsed > winEndMs) continue;
+    done++;
+  }
+
+  return {
+    done: Math.min(done, count),
+    remaining: Math.max(0, count - done),
+  };
 }
