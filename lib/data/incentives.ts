@@ -66,7 +66,15 @@ export interface IncentiveDefinition {
   color: string;                   // Hex — pill bg color
   enabled: boolean;                // Admin toggle
   sortOrder: number;               // ASC; lower = higher in list
+  // Empty array = ALL markets eligible (matches Manager P-10 read semantics, 2026-05-12).
+  // App does NOT filter on this field today: `CurrentDriver` carries no `market` field
+  // and the dashboard renders every enabled incentive regardless of scope. This is a
+  // pure passthrough read. If filter logic is ever added (App-I-4 / future), use the
+  // length-zero shortcut so empty = All is preserved:
+  //   `marketScope.length === 0 || marketScope.includes(driver.market)`
   marketScope: string[];           // Admin-editable markets (e.g. ['Atlanta'])
+  // Empty array = ALL clients eligible. Same passthrough convention as `marketScope`;
+  // see comment above for the length-zero filter shortcut.
   clientScope: string[];           // Admin-editable clients (e.g. ['Verida', 'MTM'])
   qualifyingCriteria: string;      // Human-readable criteria
   iconName?: string;               // Optional icon identifier
