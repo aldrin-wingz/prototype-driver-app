@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CalendarRange, ChevronRight, Clock } from "lucide-react";
+import Link from "next/link";
+import { CalendarRange, ChevronRight, Clock, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Carousel,
@@ -135,11 +136,27 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
   // chip so both chips share the same row under the progress bar.
   const endsIn = formatEndsIn(progress.endDate);
 
+  // App-I-6 (2026-05-12): outer wrapper converted from `<button>` →
+  // `<div role="button">` so a nested "View history" `<Link>` doesn't
+  // produce invalid HTML (button-in-button). Existing tap-to-filter
+  // behavior is preserved via `onClick` + `onKeyDown`. The history Link
+  // stops propagation so it doesn't accidentally trigger the filter tap.
+  const handleCardTap = () => onTap(progress.incentiveType);
+  const handleCardKey: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleCardTap();
+    }
+  };
+
   return (
-    <button
-      onClick={() => onTap(progress.incentiveType)}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleCardTap}
+      onKeyDown={handleCardKey}
       className={cn(
-        "w-full rounded-xl border bg-white p-4 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]",
+        "w-full cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981] focus-visible:ring-offset-2",
         progress.isComplete && "opacity-80"
       )}
     >
@@ -252,7 +269,24 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
           <ChevronRight className="h-5 w-5 text-gray-400" />
         </div>
       </div>
-    </button>
+
+      {/* App-I-6 (2026-05-12): "View history" tap target. Distinct from
+          the existing tap-to-filter behavior on the card body. Uses
+          stopPropagation so it doesn't trigger the outer card tap. */}
+      <div className="mt-3 flex items-center justify-end border-t border-gray-100 pt-2">
+        <Link
+          href={`/incentives/${progress.incentiveId}/history`}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-xs font-medium text-[#10B981] hover:opacity-80"
+          aria-label={`View history for ${progress.name}`}
+        >
+          <History className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>View history</span>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+    </div>
   );
 }
 

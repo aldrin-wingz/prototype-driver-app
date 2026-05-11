@@ -109,6 +109,11 @@ export const INCENTIVE_PILL_COLORS_MUTED: Record<IncentiveType, { bg: string; te
  */
 export interface IncentiveProgressInfo {
   incentiveType: IncentiveType;
+  /** App-I-6: the canonical IncentiveDefinition.id (e.g. `inc-pp-001`).
+   *  Used by the "View history" link on `<IncentiveCard>` to route to
+   *  `/incentives/[id]/history`. Distinct from `incentiveType` which is
+   *  the variant discriminator (e.g. `peak-hours`). */
+  incentiveId: string;
   name: string;
   currentCount: number;
   goal: number;
@@ -162,6 +167,7 @@ export function getIncentiveProgressInfo(type: IncentiveType): IncentiveProgress
 
   return {
     incentiveType: type,
+    incentiveId: definition.id,
     name: definition.title,
     currentCount,
     goal: goalCount,
