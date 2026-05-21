@@ -14,6 +14,8 @@ Design system and reusable React components for Wingz projects. Use this repo as
 
 Full guide: **[docs/HOW-TO-USE.md](docs/HOW-TO-USE.md)**
 
+**Non-dev prototyping (PM/design):** **[docs/NON_DEV_PROTOTYPING_GUIDE.MD](docs/NON_DEV_PROTOTYPING_GUIDE.MD)** — daily workflow, local preview, Vercel link, Cursor skills (`/prep-my-day`, `/start-working`).
+
 ## Contents
 
 | Area | Location | Description |
