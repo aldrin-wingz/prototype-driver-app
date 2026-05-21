@@ -209,12 +209,30 @@ export interface WeeklyPayoutData {
 }
 
 /**
- * Get all incentive progress items, sorted by sortOrder ASC (then in-progress before completed).
+ * Get all ACTIVE incentive progress items, sorted by sortOrder ASC (then in-progress
+ * before completed).
+ *
+ * App-I-6.2 (2026-05-12): past (ended) definitions are filtered out at source.
+ * Past incentives may share an `IncentiveType` discriminator with an active
+ * one (e.g. a March "Loyalty Streak" past entry alongside the current
+ * "Loyalty Streak" active entry); without this filter `getIncentiveProgressInfo`
+ * — which resolves by type via `find` — returns the active def twice and
+ * the React key collides. Past entries surface on the Past tab via
+ * `getPastOutcomesFor` instead.
  */
 export function getAllIncentiveProgress(): IncentiveProgressInfo[] {
-  const sortedDefinitions = [...incentiveDefinitions].sort((a, b) =>
-    a.sortOrder - b.sortOrder
-  );
+  const now = Date.now();
+  const sortedDefinitions = [...incentiveDefinitions]
+    // 2026-05-15 polish: drop paused incentives (`enabled === false`) so they
+    // act as if they never existed for the driver. Mirrors the Manager-side
+    // `enabled` flag added the same day.
+    .filter((def) => def.enabled !== false)
+    .filter((def) => {
+      const end = new Date(def.endDate).getTime();
+      if (!Number.isFinite(end)) return true;
+      return end >= now;
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const progressItems = sortedDefinitions
     .map(def => getIncentiveProgressInfo(def.type))
@@ -459,7 +477,12 @@ export function formatEndsIn(
   const ms = end.getTime() - today.getTime();
   const days = Math.ceil(ms / ONE_DAY_MS);
 
-  if (days <= 0) return { copy: "Ended", tone: "ended" };
+  // App-I-6.2 (2026-05-12): for past dates, include the end date in the
+  // copy (e.g. "Ended Apr 25") so the Recently Ended cards on `/incentives`
+  // surface when each campaign closed at a glance.
+  if (days <= 0) {
+    return { copy: `Ended ${formatRollingWindowDateShort(end)}`, tone: "ended" };
+  }
   if (days <= 7) {
     return {
       copy: `Ends in ${days} day${days !== 1 ? "s" : ""}`,

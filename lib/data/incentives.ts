@@ -31,9 +31,10 @@
 // Skipped on the App side (v4 was a Manager-only change — App doesn't model
 // `triggerConfigs[]` arrays; it carries a single human-readable `trigger`
 // string for App-UX display only). v5 catalog adds (Driver Targeting) are
-// Manager-only too — App doesn't filter by driverTargeting at runtime (see
-// App-I-3 audit 2026-05-12; PRD flag — Market/Client + driver-target are
-// admin-side analytics, NOT driver-side gating in v1).
+// Manager-only — driver-targeting is admin metadata, never surfaced on the
+// App. App-MVP-2 (2026-05-14): the driverTargeting field was removed from
+// `IncentiveDefinition` entirely; this parallels how marketScope/clientScope
+// stay admin-only (App reads them passively per App-I-3 audit).
 //
 // **App-only fields preserved as documented subset extensions:**
 //   - `qualifyingCriteria: string` — human-readable description used in the
@@ -124,6 +125,13 @@ export interface IncentiveDefinition {
                                    // PRD flag: admin-side analytics, NOT driver-side gating in v1.
   clientScope: string[];           // Admin-editable clients (e.g. ['Verida', 'MTM'])
                                    // Empty array = ALL clients eligible. Same passthrough note.
+  /**
+   * 2026-05-15 polish: pause flag mirroring the Manager schema. When
+   * `enabled === false` the incentive is filtered out of the App's
+   * dashboard carousel + `/incentives` list — drivers see it as if it
+   * never existed. Optional + defaults to true on legacy records.
+   */
+  enabled?: boolean;
   /** App-only convenience field: human-readable summary of trip criteria.
    *  Manager v6 has structured `tripTargeting` arrays — App keeps the string. */
   qualifyingCriteria: string;
@@ -273,7 +281,7 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     bonusAmount: 50,
     startDate: SEED_WINDOW_START,
     endDate: SEED_WINDOW_END,
-    color: '#10B981',
+    color: '#8B5CF6',
     sortOrder: 10,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -290,7 +298,7 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     bonusAmount: 50,
     startDate: SEED_LONG_WINDOW_START,
     endDate: SEED_LONG_WINDOW_END,
-    color: '#EAB308',
+    color: '#8B5CF6',
     sortOrder: 20,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -305,8 +313,11 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     goal: { type: 'total', count: 8 },
     bonusAmount: 30,
     startDate: SEED_WINDOW_START,
-    endDate: SEED_WINDOW_END,
-    color: '#06B6D4',
+    // App-I-6.2 demo (2026-05-12): shortened endDate so this card renders
+    // the urgent "Ends in N days" amber chip treatment (today = 2026-05-12;
+    // endDate ≤ 7 days out triggers the urgent tone).
+    endDate: '2026-05-17T23:59:59Z',
+    color: '#8B5CF6',
     sortOrder: 30,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -338,7 +349,7 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     bonusAmount: 30,
     startDate: SEED_WINDOW_START,
     endDate: SEED_WINDOW_END,
-    color: '#94A3B8',
+    color: '#8B5CF6',
     sortOrder: 50,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -354,7 +365,7 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     bonusAmount: 50,
     startDate: SEED_WINDOW_START,
     endDate: SEED_WINDOW_END,
-    color: '#EC4899',
+    color: '#8B5CF6',
     sortOrder: 60,
     marketScope: ['Atlanta'],
     clientScope: ['MTM'],
@@ -371,7 +382,7 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     bonusAmount: 10,
     startDate: SEED_LONG_WINDOW_START,
     endDate: SEED_LONG_WINDOW_END,
-    color: '#3B82F6',
+    color: '#8B5CF6',
     sortOrder: 70,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
@@ -387,12 +398,73 @@ export const incentiveDefinitions: IncentiveDefinition[] = [
     bonusAmount: 10,
     startDate: SEED_WINDOW_START,
     endDate: SEED_WINDOW_END,
-    color: '#F59E0B',
+    color: '#8B5CF6',
     sortOrder: 80,
     marketScope: ['Atlanta'],
     clientScope: ['Verida', 'MTM'],
     qualifyingCriteria: 'Rides on 5 consecutive days',
     trigger: 'consecutive-days',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // PAST (ENDED) INCENTIVES  (App-I-6.2, 2026-05-12)
+  //
+  // Campaign windows are in the past relative to today (2026-05-12). The
+  // `/incentives` page filters these OUT of the Active tab and renders them
+  // on the Past tab via `seedPastOutcomes` (lib/data/past-outcomes.ts).
+  // Each carries minimal `driverTargeting` so the frozen rides view at
+  // `/incentives/[id]/rides` shows a coherent criteria block.
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Earned outcome — older than 30 days (lives on the all-time Earned section).
+  {
+    id: 'inc-past-001',
+    type: 'loyalty-streak',
+    title: 'Loyalty Streak — March',
+    description: 'Completed 5 consecutive-day trips in March.',
+    goal: { type: 'total', count: 5 },
+    bonusAmount: 10,
+    startDate: '2026-03-01T00:00:00Z',
+    endDate: '2026-03-31T23:59:59Z',
+    color: '#8B5CF6',
+    sortOrder: 1000,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: 'Rides on 5 consecutive days',
+    trigger: 'consecutive-days',
+  },
+  // Earned outcome — within last 30 days.
+  {
+    id: 'inc-past-002',
+    type: 'early-bird',
+    title: 'Early Bird — April',
+    description: 'Completed 8 trips before 9am in April.',
+    goal: { type: 'total', count: 8 },
+    bonusAmount: 30,
+    startDate: '2026-04-01T00:00:00Z',
+    endDate: '2026-04-30T23:59:59Z',
+    color: '#8B5CF6',
+    sortOrder: 1010,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: '8 trips before 9am',
+    trigger: 'before-9am',
+  },
+  // Recently Ended — Missed goal. Ended within last 30 days.
+  {
+    id: 'inc-past-003',
+    type: 'weekend-warrior',
+    title: 'Weekend Warrior — Late April',
+    description: 'Reached 5 of 8 weekend trips before the campaign ended.',
+    goal: { type: 'total', count: 8 },
+    bonusAmount: 50,
+    startDate: '2026-04-13T00:00:00Z',
+    endDate: '2026-04-25T23:59:59Z',
+    color: '#8B5CF6',
+    sortOrder: 1020,
+    marketScope: ['Atlanta'],
+    clientScope: ['Verida', 'MTM'],
+    qualifyingCriteria: 'Trips on Saturday or Sunday',
+    trigger: 'weekend-trip',
   },
 ];
 
@@ -429,12 +501,14 @@ export const driverIncentiveProgress: DriverIncentiveProgress[] = [
     lastQualifyingTripId: 'trip-eb-007',
   },
   {
+    // App-I-6.1.1 (2026-05-12): bumped 3 → 6 so White Glove demos the
+    // earned (goal-hit) state on the list view.
     incentiveId: 'inc-wg-001',
-    currentCount: 3,
+    currentCount: 6,
     goal: 6,
-    isComplete: false,
-    bonusEarned: 0,
-    lastQualifyingTripId: 'trip-wg-003',
+    isComplete: true,
+    bonusEarned: 50,
+    lastQualifyingTripId: 'trip-wg-006',
   },
   {
     incentiveId: 'inc-hh-001',

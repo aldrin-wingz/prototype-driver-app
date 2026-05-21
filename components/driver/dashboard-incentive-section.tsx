@@ -3,8 +3,12 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarRange, ChevronRight, Clock, History } from "lucide-react";
+import {
+  ChevronRight,
+  Hourglass,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Carousel,
   CarouselContent,
@@ -14,13 +18,11 @@ import {
 import { cn } from "@/lib/utils";
 import {
   formatEndsIn,
-  formatRollingWindow,
   getAllIncentiveProgress,
   getQualifyingTripsCount,
-  INCENTIVE_PILL_COLORS,
   type IncentiveProgressInfo,
 } from "@/lib/data/incentive-utils";
-import type { IncentiveType } from "@/lib/data/incentives";
+import { incentiveDefinitions, type IncentiveType } from "@/lib/data/incentives";
 
 // -----------------------------------------------------------------------------
 // SHARED: View All Link
@@ -69,31 +71,20 @@ function ProgressMeter({ currentCount, goal, mode = "total", windowDays }: Progr
           style={{ width: `${Math.min(completedPercent, 100)}%` }}
         />
       </div>
-      <div className="flex items-center gap-1 text-xs">
+      <div className="text-xs">
         {mode === "rolling-window" && windowDays != null ? (
-          <>
-            {/* App-I-4 (corrected 2026-05-12 per user feedback): label reads
-                "Current Y-day window" not "Best Y-day window". The chip dates
-                slide forward each day and the count reflects qualifying trips
-                in the CURRENT window — driver-facing metric, not eval question.
-                On completion, the existing "Completed" badge + opacity serves
-                as the lock; future enhancement freezes the chip to the
-                completion window via a stored snapshot. */}
-            <span className="font-medium text-gray-700">
-              Current {windowDays}-day window:
-            </span>
-            <span className="font-medium text-gray-700">{currentCount} done</span>
-            {remainingCount > 0 && (
-              <span className="text-gray-400">· {remainingCount} needed</span>
-            )}
-          </>
+          // App-I-6.2 (review fix 2026-05-12): tightened to plain English.
+          // "Current 7-day window: 4 done · 1 needed" → "4 of 5 in last 7 days".
+          <span className="font-medium text-gray-700">
+            {currentCount} of {goal} in last {windowDays} days
+          </span>
         ) : (
-          <>
+          <span>
             <span className="font-medium text-gray-700">{currentCount} done</span>
             {remainingCount > 0 && (
-              <span className="text-gray-400">· {remainingCount} to go</span>
+              <span className="text-gray-400"> · {remainingCount} to go</span>
             )}
-          </>
+          </span>
         )}
       </div>
     </div>
@@ -110,67 +101,95 @@ interface IncentiveCardProps {
   onTap: (type: IncentiveType) => void;
   /** Kept for API parity; v1 only renders the full body. */
   variant?: "full";
+  /**
+   * App-I-6.2 (2026-05-12): when true, the campaign window has closed.
+   * The "Available trips · Tap to filter" CTA hides (no new trips can
+   * count), and the tap handler is suppressed (card is read-only — only
+   * "View rides" remains a live link to the frozen end-state view).
+   */
+  isEnded?: boolean;
+  /**
+   * App-I-6.2 (2026-05-12): outcome at campaign close. App-MVP-2 strip
+   * (2026-05-14) — `missed-criterion` is no longer reachable (per-criterion
+   * eligibility subsystem retired); kept in the type union for now to
+   * preserve the card prop API. Forces the frozen end-state opacity styling
+   * and hides the "Available Rides" button.
+   */
+  endedOutcome?: "earned" | "missed-goal" | "missed-criterion";
 }
 
-function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
-  const colors = INCENTIVE_PILL_COLORS[progress.incentiveType];
+function IncentiveCard({
+  progress,
+  onTap,
+  isEnded = false,
+}: IncentiveCardProps) {
   const availableCount = getQualifyingTripsCount(progress.incentiveType);
 
-  // App-I-4 (P-11.1 hook 2026-05-12): dynamic rolling-window range. Returns
-  // null for total mode + upcoming campaigns. Window slides daily as the
-  // device clock advances. Treatment is intentionally MORE prominent than
-  // Manager preview's muted caption per user direction — bordered chip with
-  // leading calendar icon directly under the progress bar.
-  const rollingWindow = formatRollingWindow(
-    progress.goalMode === "rolling-window" && progress.goalDays != null
-      ? { type: "rolling-window", count: progress.goal, days: progress.goalDays }
-      : { type: "total", count: progress.goal },
-    progress.startDate,
-    progress.endDate,
+  const incentiveDef = incentiveDefinitions.find(
+    (d) => d.id === progress.incentiveId,
   );
 
   // App-I-5 (2026-05-12): Dynamic ends-in indicator. Reads `endDate` only;
   // returns urgent (≤7 days, amber) / neutral (>7 days, muted) / ended.
   // Independent of rolling-window mode — total-mode cards show it too.
-  // Renders next to (or in place of, for total-mode) the rolling-window
-  // chip so both chips share the same row under the progress bar.
+  // Renders as a single muted subtitle line (amber when urgent) under the
+  // progress meter — the bordered chip treatment was dropped in the
+  // App-I-6.2 review simplification.
   const endsIn = formatEndsIn(progress.endDate);
 
-  // App-I-6 (2026-05-12): outer wrapper converted from `<button>` →
-  // `<div role="button">` so a nested "View history" `<Link>` doesn't
-  // produce invalid HTML (button-in-button). Existing tap-to-filter
-  // behavior is preserved via `onClick` + `onKeyDown`. The history Link
-  // stops propagation so it doesn't accidentally trigger the filter tap.
-  const handleCardTap = () => onTap(progress.incentiveType);
-  const handleCardKey: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      handleCardTap();
-    }
-  };
+  // App-I-6.2 (2026-05-12 review fix): card body is no longer a tap target —
+  // two explicit footer buttons replace the whole-card tap + mid-card "Tap to
+  // filter" chip + bottom "View rides" link. Available Rides → request filter
+  // (primary green; hidden on ended campaigns); Your Rides → per-incentive
+  // rides view (secondary outline). Card surface is read-only summary.
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={handleCardTap}
-      onKeyDown={handleCardKey}
       className={cn(
-        "w-full cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981] focus-visible:ring-offset-2",
-        progress.isComplete && "opacity-80"
+        "w-full rounded-xl border bg-white p-4 text-left shadow-sm",
+        (progress.isComplete || isEnded) && "opacity-80"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
+          {/* App-I-6.2 (layout v4 2026-05-12): title pill + ends-in always
+              share the same row. Calm ends-in renders as plain muted text;
+              urgent ends-in promotes to an amber pill with Hourglass icon
+              so the urgency visibly demands attention while staying in the
+              same slot. App-MVP-2 (2026-05-14): the per-card status pill
+              (formerly rendered below the progress meter) was retired
+              alongside the per-criterion eligibility subsystem. */}
+          <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             <Badge
               variant="outline"
-              className={cn("text-xs font-medium", colors.bg, colors.text, colors.border)}
+              className="text-xs font-medium"
+              style={
+                incentiveDef
+                  ? {
+                      backgroundColor: `${incentiveDef.color}1a`,
+                      color: incentiveDef.color,
+                      borderColor: `${incentiveDef.color}40`,
+                    }
+                  : undefined
+              }
             >
               {progress.name}
             </Badge>
-            {progress.isComplete && (
-              <span className="text-xs font-medium text-[#10B981]">Completed</span>
+            {endsIn.tone === "urgent" ? (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800"
+                aria-label={endsIn.copy}
+              >
+                <Hourglass className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{endsIn.copy}</span>
+              </span>
+            ) : (
+              <span
+                className="text-xs font-medium text-gray-500"
+                aria-label={endsIn.copy}
+              >
+                {endsIn.copy}
+              </span>
             )}
           </div>
           <p className="mb-3 text-sm text-gray-600">{progress.description}</p>
@@ -181,80 +200,6 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
             mode={progress.goalMode}
             windowDays={progress.goalDays}
           />
-
-          {/* App-I-4 (P-11.1 hook) + App-I-5: chip row under the progress bar.
-              Rolling-window date chip (when applicable) sits beside the
-              ends-in indicator. Total-mode cards render only the ends-in
-              chip. Flex-wrap keeps the layout intact on narrow screens.
-              Ends-in chip always renders for any incentive that surfaces
-              on the dashboard so drivers see campaign timing at a glance. */}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {/* App-I-4 (P-11.1): EXPLICIT rolling-window date chip. Only
-                  renders for rolling-window mode AND today >= startDate.
-                  Treatment intentionally more prominent than Manager preview
-                  (bordered chip with calendar icon vs text-only). */}
-              {rollingWindow ? (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-md border border-[#10B981]/30 bg-[#10B981]/5 px-2 py-1 text-xs font-medium text-[#10B981]"
-                  aria-label={`Current rolling window: ${rollingWindow.fromLabel} to ${rollingWindow.toLabel}`}
-                >
-                  <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>
-                    Window: {rollingWindow.fromLabel} – {rollingWindow.toLabel}
-                  </span>
-                </span>
-              ) : null}
-
-              {/* App-I-5 (2026-05-12): Dynamic ends-in indicator. Tone-based
-                  treatment: urgent = amber (≤7 days, "Ends in N days"),
-                  neutral = muted gray (>7 days, "Ends MMM DD"), ended = gray
-                  defensive. Always renders for active/ended incentives so
-                  drivers see campaign timing at a glance. */}
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium",
-                  endsIn.tone === "urgent" &&
-                    "border-amber-300 bg-amber-50 text-amber-700",
-                  endsIn.tone === "neutral" &&
-                    "border-gray-200 bg-gray-50 text-gray-600",
-                  endsIn.tone === "ended" &&
-                    "border-gray-300 bg-gray-100 text-gray-500"
-                )}
-                aria-label={endsIn.copy}
-              >
-                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{endsIn.copy}</span>
-              </span>
-            </div>
-
-          <div
-            className={cn(
-              "mt-3 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium",
-              availableCount > 0
-                ? "bg-[#10B981]/10 text-[#10B981]"
-                : "bg-gray-100 text-gray-500"
-            )}
-            aria-label={
-              availableCount > 0
-                ? `${availableCount} qualifying trips available — tap to filter`
-                : "No qualifying trips right now — tap to refresh"
-            }
-          >
-            {availableCount > 0 ? (
-              <>
-                <span className="font-semibold">{availableCount}</span>
-                <span>{availableCount === 1 ? "trip" : "trips"} available</span>
-                <span aria-hidden="true">·</span>
-                <span>Tap to filter</span>
-              </>
-            ) : (
-              <>
-                <span>No trips available right now</span>
-                <span aria-hidden="true">·</span>
-                <span>Tap to refresh</span>
-              </>
-            )}
-          </div>
         </div>
 
         <div className="flex flex-col items-end justify-between self-stretch">
@@ -266,25 +211,45 @@ function IncentiveCard({ progress, onTap }: IncentiveCardProps) {
           >
             ${progress.bonusAmount}
           </span>
-          <ChevronRight className="h-5 w-5 text-gray-400" />
         </div>
       </div>
 
-      {/* App-I-6 (2026-05-12): "View history" tap target. Distinct from
-          the existing tap-to-filter behavior on the card body. Uses
-          stopPropagation so it doesn't trigger the outer card tap. */}
-      <div className="mt-3 flex items-center justify-end border-t border-gray-100 pt-2">
-        <Link
-          href={`/incentives/${progress.incentiveId}/history`}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-xs font-medium text-[#10B981] hover:opacity-80"
-          aria-label={`View history for ${progress.name}`}
+      {/* App-MVP-2 (2026-05-14): per-criterion eligibility stripped —
+          Completed Rides is a plain outline button (no status-tone tinting
+          or status-icon prefix). Two-button footer: Completed Rides (left,
+          per-incentive frozen rides view) + Available Rides (right,
+          request filter; hidden on ended campaigns). */}
+      <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3">
+        <Button
+          asChild
+          type="button"
+          size="sm"
+          variant="outline"
+          className="flex-1 border-gray-300 text-gray-800 hover:bg-gray-50"
         >
-          <History className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>View history</span>
-          <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+          <Link
+            href={`/incentives/${progress.incentiveId}/rides`}
+            aria-label={`Completed Rides for ${progress.name}`}
+          >
+            <span>Completed Rides</span>
+          </Link>
+        </Button>
+        {!isEnded ? (
+          <Button
+            type="button"
+            size="sm"
+            className="flex-1 bg-[#10B981] text-white hover:bg-[#0F9F76]"
+            onClick={() => onTap(progress.incentiveType)}
+            aria-label={`Available Rides for ${progress.name}${availableCount > 0 ? ` (${availableCount})` : ""}`}
+          >
+            <span>Available Rides</span>
+            {availableCount > 0 ? (
+              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-[#10B981]">
+                {availableCount}
+              </span>
+            ) : null}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -361,7 +326,14 @@ function IncentiveCarousel({
 
 function DashboardCardSectionVariant() {
   const router = useRouter();
-  const progressItems = getAllIncentiveProgress();
+  // App-I-6.2 (2026-05-12): filter ended incentives out of the dashboard
+  // carousel — past campaigns surface only on the `/incentives` Past tab.
+  const now = Date.now();
+  const progressItems = getAllIncentiveProgress().filter((item) => {
+    const end = new Date(item.endDate).getTime();
+    if (!Number.isFinite(end)) return true;
+    return end >= now;
+  });
 
   const handleTap = (type: IncentiveType) => {
     router.push(`/requests?incentive=${type}`);
