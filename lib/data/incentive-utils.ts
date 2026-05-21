@@ -222,11 +222,10 @@ export interface WeeklyPayoutData {
  */
 export function getAllIncentiveProgress(): IncentiveProgressInfo[] {
   const now = Date.now();
+  // 2026-05-21: `enabled !== false` filter removed alongside Pause/Resume
+  // deprecation (schema v6→v7 drops `enabled`). Sort by `sortOrder` stays
+  // (sortOrder retained as eng-only field).
   const sortedDefinitions = [...incentiveDefinitions]
-    // 2026-05-15 polish: drop paused incentives (`enabled === false`) so they
-    // act as if they never existed for the driver. Mirrors the Manager-side
-    // `enabled` flag added the same day.
-    .filter((def) => def.enabled !== false)
     .filter((def) => {
       const end = new Date(def.endDate).getTime();
       if (!Number.isFinite(end)) return true;

@@ -125,13 +125,6 @@ export interface IncentiveDefinition {
                                    // PRD flag: admin-side analytics, NOT driver-side gating in v1.
   clientScope: string[];           // Admin-editable clients (e.g. ['Verida', 'MTM'])
                                    // Empty array = ALL clients eligible. Same passthrough note.
-  /**
-   * 2026-05-15 polish: pause flag mirroring the Manager schema. When
-   * `enabled === false` the incentive is filtered out of the App's
-   * dashboard carousel + `/incentives` list — drivers see it as if it
-   * never existed. Optional + defaults to true on legacy records.
-   */
-  enabled?: boolean;
   /** App-only convenience field: human-readable summary of trip criteria.
    *  Manager v6 has structured `tripTargeting` arrays — App keeps the string. */
   qualifyingCriteria: string;
