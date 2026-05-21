@@ -1,7 +1,7 @@
 {
-  "name": "@wingz/react-component-registry",
+  "name": "prototype-driver-app",
   "version": "0.1.0",
-  "description": "Wingz design system and reusable React components for driver portal, agent portal, dispatch tool, post-hire compliance, in-app announcements, and prototypes",
+  "description": "Prototype driver app for Wingz",
   "private": true,
   "scripts": {
     "dev": "next dev",
