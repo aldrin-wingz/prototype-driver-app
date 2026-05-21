@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "description": "Prototype driver app for Wingz",
   "private": true,
+  "packageManager": "bun@1.2.17",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --turbo",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && next build",
     "start": "next start",
     "lint": "next lint"
   },

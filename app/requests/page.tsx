@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import { Header } from "@/components/driver/header";
@@ -11,31 +12,26 @@ import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 import { useToast } from "@/hooks/use-toast";
 import type { IncentiveType } from "@/lib/data/incentives";
 
-export default function RequestsPage() {
+function RequestsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  // Read ?incentive= deep-link param from dashboard IncentiveCard tap
   const incentiveParam = searchParams.get("incentive") as IncentiveType | null;
 
-  // Initialize filter state from URL param on first render
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [appliedFilters, setAppliedFilters] = React.useState<RequestFilters>(() => ({
     incentiveType: incentiveParam ?? undefined,
   }));
 
-  // Derive filtered trips from appliedFilters
   const filteredTrips = React.useMemo(() => {
     let result = mockRequestTrips;
-    // Filter by incentive type if set
     if (appliedFilters.incentiveType) {
       result = result.filter((t) => t.incentiveTypes.includes(appliedFilters.incentiveType as IncentiveType));
     }
     return result;
   }, [appliedFilters]);
 
-  // When URL param changes (e.g. navigating back and forth), re-sync
   React.useEffect(() => {
     if (incentiveParam) {
       setAppliedFilters({ incentiveType: incentiveParam });
@@ -46,7 +42,6 @@ export default function RequestsPage() {
 
   const handleFilterUpdate = (filters: RequestFilters) => {
     setAppliedFilters(filters);
-    // Clear URL param when user manually updates via modal
     router.replace("/requests", { scroll: false });
   };
 
@@ -61,8 +56,8 @@ export default function RequestsPage() {
 
   return (
     <div className="flex min-h-screen flex-col pb-20">
-      <Header 
-        title="Requests" 
+      <Header
+        title="Requests"
         showFilter={true}
         showRefresh={true}
         onFilterClick={handleFilterClick}
@@ -116,8 +111,26 @@ export default function RequestsPage() {
           </div>
         )}
       </main>
-      
+
       <BottomNav />
     </div>
+  );
+}
+
+export default function RequestsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col pb-20">
+          <Header title="Requests" showFilter={true} showRefresh={true} />
+          <main className="flex flex-1 items-center justify-center p-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#10B981]" />
+          </main>
+          <BottomNav />
+        </div>
+      }
+    >
+      <RequestsPageContent />
+    </Suspense>
   );
 }
