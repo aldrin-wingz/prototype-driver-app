@@ -892,7 +892,7 @@ export const mockCompletedTrips: Trip[] = [
     rider: "Casey P.",
     client: "Verida",
     passengerCount: 1,
-    distance: "",
+    distance: "22.4 mi",
     totalRevenue: 124.50,
     notes: "Standing weekly transport",
     legs: [
@@ -926,7 +926,7 @@ export const mockCompletedTrips: Trip[] = [
     rider: "Jordan S.",
     client: "Verida",
     passengerCount: 1,
-    distance: "",
+    distance: "17.1 mi",
     totalRevenue: 97.50,
     notes: "",
     legs: [
@@ -960,7 +960,7 @@ export const mockCompletedTrips: Trip[] = [
     rider: "Jamie L.",
     client: "MTM",
     passengerCount: 2,
-    distance: "",
+    distance: "21.6 mi",
     totalRevenue: 123.00,
     notes: "Weekend appointment",
     legs: [
