@@ -1,45 +1,38 @@
-# Smart rebase — examples (prototype-driver-app)
+# Smart-rebase — examples (prototype-driver-app)
 
-**Default base:** `origin/main` (not `develop`).
+## Default: rebase onto main
 
-## Example A: Feature branch behind main
-
-User on `pm/incentives-tweaks`, main has Vercel/Suspense fixes.
+User: “/smart-rebase” or “rebase onto main”
 
 ```bash
 git fetch origin main
 git rebase origin/main
-```
-
-If `app/requests/page.tsx` conflicts:
-
-- **Keep** the `Suspense` wrapper from `main` (required for Vercel build).
-- Merge in the user’s filter/UI changes from the feature branch inside `RequestsPageContent`.
-
-```bash
-git add app/requests/page.tsx
-git rebase --continue
+# resolve conflicts if any
 bun run build
-git push --force-with-lease origin pm/incentives-tweaks
+git push --force-with-lease origin <branch>   # only if branch was already pushed
 ```
 
----
+## Non-dev said “get latest” only
 
-## Example B: Non-dev — do not rebase
+Do **not** rebase. Run **/prep-my-day** instead (`git pull` on current branch).
 
-User: “GitHub says my branch has conflicts.”
+If their PR shows conflicts with `main`, tell them to ask engineering—or only run smart-rebase if they explicitly ask.
 
-**Tell user:** Ask engineering, or confirm they want **smart-rebase** explicitly. Default for PMs: **/prep-my-day** only updates their branch from remote, not merge `main` in.
+## Conflict: Suspense on requests vs PM UI edit
 
----
+- Keep `Suspense` wrapper from `main` (needed for Vercel/`useSearchParams`).
+- Keep PM copy/layout changes from the feature branch.
+- Merge both; never drop Suspense just to keep a UI tweak.
 
-## Example C: Rebase onto a specific commit
+## Conflict: Home page — WalletCard vs incentives section
 
-User: `smart-rebase base=339efa8`
+- Keep `WalletCard` mount if the feature is wallet work.
+- Keep incentive carousel / section changes from the other side if still valid.
+- Ensure imports for both exist.
 
-```bash
-git fetch origin
-git rebase 339efa8
-```
+## After rebase
 
-Use when they name a known good commit on `main`.
+Plain language for the PM:
+
+- “Your branch was replayed on top of latest `main`.”
+- “If this branch was already on GitHub, we need a special push (`--force-with-lease`)—ask before doing it if you’re unsure.”

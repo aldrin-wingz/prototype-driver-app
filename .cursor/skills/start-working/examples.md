@@ -1,29 +1,22 @@
 # /start-working — examples (prototype-driver-app)
 
-## Example A: Typical non-dev morning
+## Happy path
 
-User: “/start-working” or “start working”
+User: “start working” / “/start-working”
 
-```bash
-cd /path/to/prototype-driver-app
-bun install
-bun run dev   # background
-```
+1. Confirm repo root (`package.json` present)
+2. `bun install`
+3. `bun run dev` in background
+4. Share Home URL + note wallet/incentives screens if relevant
+5. Remind how to stop (`Ctrl+C`)
 
-**Tell user:**
+## Port already in use
 
-```text
-Dev server is starting. When it's ready, open http://localhost:3000/ (Home).
-Other screens: /incentives, /requests, /my-rides — see docs/NON_DEV_PROTOTYPING_GUIDE.MD.
-Press Ctrl+C in the terminal to stop.
-Deployed preview: https://prototype-driver-app.vercel.app/
-```
+Dev log shows `Local: http://localhost:3002`.
 
----
+Tell the user to open **3002**, not 3000. Do not kill other apps unless they ask.
 
-## Example B: Zip import — broken SWC
-
-User copied project from zip; dev fails with `turbo.createProject` or code signature error.
+## Broken zip / SWC error
 
 ```bash
 rm -rf node_modules .next
@@ -31,33 +24,12 @@ bun install
 bun run dev
 ```
 
-**Tell user:** “Dependencies were reinstalled—don't copy node_modules from zips.”
+Explain: never copy `node_modules` from a zip—always reinstall on their Mac.
 
----
+## After prep-my-day changed lockfile
 
-## Example C: After /prep-my-day changed lockfile
+Always run `bun install` before `bun run dev` when `package.json` or `bun.lock` changed on pull.
 
-```bash
-bun install
-bun run dev
-```
+## User only wants preview (skip install)
 
-**Tell user:** “Dependencies updated after your pull—I reinstalled and restarted the preview.”
-
----
-
-## Example D: Dev already running
-
-**Tell user:** “A dev server may already be running—try http://localhost:3000/ first (or the port in the terminal). To restart, stop the old server (Ctrl+C) and run **/start-working** again.”
-
----
-
-## Example E: Install only
-
-User: “start-working install only”
-
-```bash
-bun install
-```
-
-Skip `bun run dev` unless they ask to start the server.
+If `node_modules` exists and they asked to skip install, start `bun run dev` only. If it fails missing modules, run install then retry.

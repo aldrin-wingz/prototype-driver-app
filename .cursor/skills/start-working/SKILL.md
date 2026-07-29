@@ -84,6 +84,10 @@ Default URLs (local preview only):
 | Options | http://localhost:3000/options |
 | Incentives | http://localhost:3000/incentives |
 | Ride history | http://localhost:3000/ride-history |
+| Wallet | http://localhost:3000/wallet |
+| Weekly Earnings | http://localhost:3000/weekly-earnings |
+| Payouts | http://localhost:3000/payouts |
+| Earnings Activity | http://localhost:3000/earnings-activity |
 
 Use the port from the terminal if not 3000.
 

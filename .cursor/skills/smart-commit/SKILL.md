@@ -49,7 +49,7 @@ git diff --stat             # unstaged
 git log -8 --oneline        # match repo message style
 ```
 
-Read enough of the diff to label **themes** (data, driver UI, incentives page, docs). Skim imports: later commits must not depend on files not committed yet.
+Read enough of the diff to label **themes** (data, driver UI, incentives page, wallet/payouts, docs). Skim imports: later commits must not depend on files not committed yet.
 
 ### 2. Plan groups (rules)
 
@@ -60,16 +60,17 @@ Read enough of the diff to label **themes** (data, driver UI, incentives page, d
 | **Feature vertical slice** | `lib/data/*` → driver components → `app/*` route |
 | **Avoid drive-by** | Unrelated refactors stay out of feature commits. |
 | **Planning docs** | `PROTOTYPE-BIBLE.md` / `PROTOTYPE-TRACKER.md` in dedicated `docs:` or `chore:` commits when changed |
+| **Same file, two concerns** | Use `git add -p <file>` or note combined concerns in the message body. |
 
 **Typical prototype-driver-app layers** (use only what applies):
 
-1. `chore(deps)` — `package.json`, `bun.lock`
-2. `feat(data)` / `fix(data)` — `lib/data/incentives.ts`, `incentive-utils.ts`, `past-outcomes.ts`
-3. `feat(driver)` — `components/driver/*`
-4. `feat(incentives)` — `app/incentives/*`, rides view
-5. `feat(requests)` / `fix(requests)` — `app/requests/*` (keep Suspense wrapper if touching page)
-6. `docs` — `PROTOTYPE-*.md`, `docs/*`
-7. `chore(cursor)` — `.cursor/skills/*` (only when user wants skills in repo)
+1. `feat(data)` / `fix(data)` — `lib/data/*`, `lib/driver-data/*`
+2. `feat(driver)` — shared `components/driver/*` (cards, sheets, pills)
+3. `feat(incentives)` — `/incentives` pages + rides view
+4. `feat(wallet)` / `feat(payouts)` — wallet card, `/wallet`, `/weekly-earnings`, `/payouts`, `/earnings-activity`
+5. `feat(rides)` — ride card / ride detail / my-rides / requests
+6. `docs:` — `PROTOTYPE-*`, `docs/NON_DEV_PROTOTYPING_GUIDE.MD`, `.cursor/skills/**`
+7. `chore:` — `package.json`, `next.config.mjs`, Vercel-related build fixes
 
 ### 3. Unstage and smart-commit in order
 
@@ -84,7 +85,8 @@ git add <paths>   # or git add -p <file> for partial
 git commit -m "$(cat <<'EOF'
 <type>(<scope>): short imperative summary
 
-Optional body: why, not a file list.
+Optional body: why, not a file list. Note combined concerns if one
+file spans topics.
 EOF
 )"
 ```
@@ -98,14 +100,14 @@ git log --oneline -15
 
 ### 4. Commit message format
 
-Match recent history on this repo (e.g. `App-MVP-2 ✅ …` or conventional):
-
-- **Type**: `feat`, `fix`, `refactor`, `chore`, `docs`
-- **Scope**: `incentives`, `driver`, `data`, `requests`
+- **Type**: `feat`, `fix`, `refactor`, `chore`, `docs`, `test` (match recent history on the branch).
+- **Scope**: area (`data`, `driver`, `incentives`, `wallet`, `payouts`, `rides`).
 - **Subject**: imperative, ≤72 chars; **body** explains why when non-obvious.
 - Do **not** amend unless user rules allow and HEAD is yours unpushed.
 
 ### 5. Verify
+
+Run what the commits touched:
 
 ```bash
 bun run build
@@ -115,9 +117,10 @@ bun run build
 
 | Situation | Prefer |
 |-----------|--------|
-| Data + UI for one incentive feature | 2 commits: data → UI |
-| Multiple unrelated pages | Separate commits per page/flow |
-| `.cursor/skills` + app code | Separate `chore(cursor)` commit |
+| New wallet data + WalletCard + Home mount | 2–3 commits: data → component → page |
+| Tracker + bible only | One `docs:` commit |
+| Suspense / build fix + unrelated UI | Split — keep build fix alone |
+| 10 files all “rename RIDES label” | One `refactor(driver)` commit |
 
 ## When to suggest something else
 
@@ -130,10 +133,11 @@ bun run build
 ## Anti-patterns
 
 - One commit titled “WIP” or “misc updates” with 30 files.
-- Committing UI before data/types it imports.
+- Committing UI before mock data / helpers it imports.
+- Splitting only by directory (`app/` vs `components/`) when themes cross folders.
 - Amending after a failed hook—**new commit** instead.
 - Creating commits without user request.
-- Committing `.env`, `.vercel`, `node_modules`.
+- Committing `node_modules`, `.next`, or `.env`.
 
 ## More examples
 

@@ -15,7 +15,7 @@ Plain-language guide for PMs and designers prototyping the **Wingz Driver Incent
 | **Live preview (deployed)** | https://prototype-driver-app.vercel.app/ |
 | **Planning docs** | `PROTOTYPE-BIBLE.md`, `PROTOTYPE-TRACKER.md` |
 
-This is **not** production `wingz-driver-portal`. It is a focused prototype for driver incentives UX.
+This is **not** production `wingz-driver-portal`. It is a focused prototype for driver incentives UX plus in-app wallet / balance (payouts) surfaces.
 
 ---
 
@@ -29,6 +29,8 @@ This is **not** production `wingz-driver-portal`. It is a focused prototype for 
 | **smart-rebase** | Engineers only — rebase onto `main` / fix PR conflicts |
 
 Say the skill name in Cursor chat (e.g. “/prep-my-day” or “start working”).
+
+Skills live in `.cursor/skills/` — open this folder as the Cursor workspace root so they appear.
 
 ---
 
@@ -101,6 +103,10 @@ After **/start-working**, open:
 | **Options** | http://localhost:3000/options |
 | **Incentives** | http://localhost:3000/incentives |
 | **Ride history** | http://localhost:3000/ride-history |
+| **Wallet** | http://localhost:3000/wallet |
+| **Weekly Earnings** | http://localhost:3000/weekly-earnings |
+| **Payouts** | http://localhost:3000/payouts |
+| **Earnings Activity** | http://localhost:3000/earnings-activity |
 | **Component showcase** | http://localhost:3000/components |
 
 If port **3000** is busy, Next.js may use **3002** (or another port)—check the terminal output for `Local: http://localhost:XXXX`.
@@ -192,6 +198,9 @@ This prototype uses **mock data**. You usually do **not** need `.env` for local 
 | Goal | Location |
 |------|----------|
 | Incentive cards / dashboard | `components/driver/dashboard-incentive-section.tsx`, `app/page.tsx` |
+| Wallet card on Home | `components/driver/wallet-card.tsx`, `app/page.tsx` |
+| Wallet / payouts screens | `app/wallet`, `app/weekly-earnings`, `app/payouts`, `app/earnings-activity` |
+| Wallet mock data | `lib/data/wallet.ts`, `lib/data/payout.ts` |
 | Incentives list page | `app/incentives/page.tsx` |
 | Per-incentive rides view | `app/incentives/[id]/rides/page.tsx`, `components/driver/incentive-rides-view.tsx` |
 | Mock incentive data | `lib/data/incentives.ts`, `lib/data/incentive-utils.ts` |

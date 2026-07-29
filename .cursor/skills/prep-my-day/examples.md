@@ -1,57 +1,30 @@
 # /prep-my-day — examples (prototype-driver-app)
 
-## Example A: Start of day on a prototype branch
+## Happy path
 
-User on `pm/incentives-copy`, has no uncommitted changes.
+User: “prep my day” / “/prep-my-day”
 
-```bash
-git status
-git fetch --all --prune
-git pull
-git status
-```
+1. `git status` + current branch (`pm/wallet-copy` or similar)
+2. `git fetch --all --prune`
+3. `git pull`
+4. Report: “You’re on `pm/wallet-copy`. Pulled 2 commits from GitHub.” or “Already up to date.”
+5. Suggest **/start-working** next.
 
-**Tell user:** “Your branch `pm/incentives-copy` is up to date with GitHub. Run **/start-working** to open the preview.”
+## Uncommitted work
 
----
+User has local edits.
 
-## Example B: Pull brought new commits
+1. Warn: pull may conflict or mix with uncommitted work.
+2. Offer: **smart-commit** first, or stash → pull → stash pop (only if they agree).
+3. Do not discard their prototype work.
 
-After `git pull`:
+## They said “get latest develop / main into my branch”
 
-```text
-Updating abc1234..def5678
-Fast-forward
- lib/data/incentives.ts | 12 +++----
-```
+That is **not** prep-my-day alone. Explain:
 
-**Tell user:** “GitHub had updates on your branch. Data files changed—run **/start-working** in case dependencies changed too.”
+- **/prep-my-day** = update the branch you’re on with its own remote.
+- Catching up with shared `main` = **smart-rebase** or ask engineering.
 
----
+## Pull conflict
 
-## Example C: Uncommitted work — ask first
-
-`git status` shows modified files.
-
-**Do not pull blindly.** Tell user:
-
-```text
-You have uncommitted changes. Options:
-1) smart-commit first, then /prep-my-day
-2) stash (I can stash, pull, then restore)—only if you want
-3) discard local changes—only if you're sure
-```
-
----
-
-## Example D: User said “get latest” but meant main
-
-User: “Get the latest from main.”
-
-**Clarify:** Prep-my-day only updates **your current branch**. To put `main`’s changes into a feature branch, that’s **rebase/merge** (engineering or **smart-rebase**). Do not silently rebase.
-
----
-
-## Example E: Merge conflict on pull
-
-**Stop.** Message user: ask engineering; do not auto-merge for non-dev prototype flows.
+Stop. Plain language: “Git couldn’t combine your branch with GitHub. Ask engineering—don’t guess.”

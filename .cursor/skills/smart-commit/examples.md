@@ -14,7 +14,18 @@ User changed mock incentives and dashboard cards.
 
 ---
 
-## Example B: New rides view route
+## Example B: Wallet / balance surfaces (3–4 commits)
+
+| Order | Message |
+|-------|---------|
+| 1 | `feat(data): add wallet and payout mock data` — `lib/data/wallet.ts`, `lib/data/payout.ts`, mock-trips distance tweaks |
+| 2 | `feat(driver): add wallet card and payout UI components` — `wallet-card`, `page-help-sheet`, earnings cards, marks |
+| 3 | `feat(wallet): add wallet, weekly earnings, and payouts routes` — `app/wallet`, `app/weekly-earnings`, `app/payouts`, `app/earnings-activity` |
+| 4 | `feat(rides): support completed/sent-back ride detail` — `ride-detail-layout`, `app/my-rides/[id]` |
+
+---
+
+## Example C: New rides view route
 
 | Order | Message |
 |-------|---------|
@@ -24,7 +35,7 @@ User changed mock incentives and dashboard cards.
 
 ---
 
-## Example C: Vercel / config fix (keep separate from UI)
+## Example D: Vercel / config fix (keep separate from UI)
 
 | Order | Message |
 |-------|---------|
@@ -35,11 +46,11 @@ Do not mix Suspense fix with unrelated UI tweaks.
 
 ---
 
-## Example D: Cursor skills + guide
+## Example E: Cursor skills + guide
 
 | Order | Message |
 |-------|---------|
-| 1 | `docs: add non-dev prototyping guide and Cursor skills` — `docs/NON_DEV_PROTOTYPING_GUIDE.MD`, `.cursor/skills/**` |
+| 1 | `docs: refresh non-dev Cursor skills and prototyping guide` — `docs/NON_DEV_PROTOTYPING_GUIDE.MD`, `.cursor/skills/**` |
 
 ---
 
