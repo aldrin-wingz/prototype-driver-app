@@ -15,14 +15,17 @@ import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
 
-type DetailState = "before-taken" | "needs-action";
+type DetailState = "before-taken" | "needs-action" | "completed";
 
 interface RideDetailLayoutProps {
   trip: Trip;
   state: DetailState;
   backHref: string;
+  /** Optional banner rendered at the top of the scroll area (e.g. the sent-back penalty notice). */
+  banner?: ReactNode;
 }
 
 function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; border: string } {
@@ -115,10 +118,15 @@ function LegCard({
  * inline chips row alongside the status pill. The above-metadata-card banner
  * surface and the variant-switch were stripped in I-0.
  */
-export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
+export function RideDetailLayout({ trip, state, backHref, banner }: RideDetailLayoutProps) {
   const router = useRouter();
 
-  const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
+  const subtitle =
+    state === "before-taken"
+      ? "Will-Call Ride"
+      : state === "completed"
+        ? "Completed Ride"
+        : "Accepted Ride";
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -148,9 +156,10 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
       <div
         className={cn(
           "flex-1 overflow-y-auto",
-          state === "before-taken" ? "pb-28" : "pb-44"
+          state === "before-taken" ? "pb-28" : state === "needs-action" ? "pb-44" : "pb-8"
         )}
       >
+        {banner}
         {/* Map preview */}
         <div className="relative h-64 w-full bg-[#1e3a4c]">
           <iframe
@@ -263,6 +272,23 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
                 ))}
             </div>
           )}
+
+          {state === "completed" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full bg-[#D1FAE5] px-3 py-1 text-xs font-medium text-[#047857]">
+                Completed
+              </span>
+              {hasIncentives &&
+                activeIncentiveTypes.map((incentiveType) => (
+                  <ProgramContributionIndicator
+                    key={incentiveType}
+                    incentiveType={incentiveType}
+                    isCompleted={true}
+                    context="detail"
+                  />
+                ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -285,7 +311,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </span>
           </div>
         </div>
-      ) : (
+      ) : state === "needs-action" ? (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <div className="flex items-center justify-around border-b border-gray-100 px-4 py-3">
             <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#10B981]">
@@ -315,7 +341,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
