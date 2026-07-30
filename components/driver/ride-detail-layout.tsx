@@ -9,15 +9,41 @@ import {
   Users,
   RotateCcw,
   Info,
+  Check,
+  Circle,
+  Navigation,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
 import { cn } from "@/lib/utils";
-import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
+import {
+  getLegStage,
+  getMissingSwipes,
+  getNextSwipe,
+  hasMissingSwipes,
+  type Trip,
+  type TripLeg,
+  type TimeAnchorType,
+  type LegSwipeProgress,
+} from "@/lib/driver-data/mock-trips";
 
-type DetailState = "before-taken" | "needs-action";
+type DetailState = "before-taken" | "needs-action" | "in-progress";
+
+/** Driver-facing label + display order for each swipe mark. */
+const SWIPE_ROWS: Array<{ key: keyof LegSwipeProgress; label: string }> = [
+  { key: "arrivedAt", label: "Arrived" },
+  { key: "pickedUpAt", label: "Picked up" },
+  { key: "droppedOffAt", label: "Dropped off" },
+];
+
+const NEXT_SWIPE_LABEL: Record<"arrive" | "pick-up" | "drop-off", string> = {
+  arrive: "Swipe When You Arrive",
+  "pick-up": "Swipe to Pick Up Rider",
+  "drop-off": "Swipe to Drop Off Rider",
+};
 
 interface RideDetailLayoutProps {
   trip: Trip;
@@ -39,10 +65,77 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; 
   }
 }
 
+/**
+ * Swipe record for one leg — the three marks with their times, and an explicit
+ * callout for any swipe that was skipped.
+ *
+ * A skipped swipe is the entry point for the Trip Update support case: it is
+ * shown as a problem the driver can fix, not silently omitted.
+ */
+function LegSwipeRecord({ leg }: { leg: TripLeg }) {
+  const progress = leg.progress;
+  if (!progress) return null;
+
+  const missing = getMissingSwipes(leg);
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Swipes
+      </p>
+
+      <dl className="space-y-1.5">
+        {SWIPE_ROWS.map(({ key, label }) => {
+          const time = progress[key];
+          const isMissing = missing.includes(key);
+
+          return (
+            <div key={key} className="flex items-center justify-between gap-2">
+              <dt className="flex items-center gap-1.5 text-sm">
+                {time ? (
+                  <Check className="h-3.5 w-3.5 flex-shrink-0 text-[#10B981]" />
+                ) : isMissing ? (
+                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-[#D97706]" />
+                ) : (
+                  <Circle className="h-3.5 w-3.5 flex-shrink-0 text-gray-300" />
+                )}
+                <span className={isMissing ? "text-[#92400E]" : "text-gray-700"}>
+                  {label}
+                </span>
+              </dt>
+              <dd
+                className={cn(
+                  "text-sm font-medium",
+                  time
+                    ? "text-gray-900"
+                    : isMissing
+                      ? "text-[#92400E]"
+                      : "text-gray-400"
+                )}
+              >
+                {time ?? (isMissing ? "Not recorded" : "—")}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+
+      {missing.length > 0 && (
+        <p className="mt-2.5 border-t border-gray-100 pt-2.5 text-xs text-[#92400E]">
+          {missing.length === 1 ? "A swipe is" : "Swipes are"} missing on this leg.
+          Use <span className="font-semibold">Trip Update</span> in the ride
+          options to send the correct {missing.length === 1 ? "time" : "times"}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function LegCard({
   leg,
   isFirst,
   isLast,
+  state,
 }: {
   leg: TripLeg;
   isFirst: boolean;
@@ -102,6 +195,8 @@ function LegCard({
           <p className="mt-1 text-sm text-gray-700">{leg.address.split(",")[0]}</p>
           <p className="text-sm text-gray-600">{leg.address}</p>
           <p className="text-sm text-gray-500">{leg.county}</p>
+
+          {state === "in-progress" && <LegSwipeRecord leg={leg} />}
         </div>
       </div>
     </div>
@@ -118,7 +213,20 @@ function LegCard({
 export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
   const router = useRouter();
 
-  const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
+  const subtitle =
+    state === "before-taken"
+      ? "Will-Call Ride"
+      : state === "in-progress"
+        ? "Ride In Progress"
+        : "Accepted Ride";
+
+  // The leg the driver is working, and the swipe expected next on it.
+  const activeLeg = trip.legs.find((leg) => getLegStage(leg) !== "completed");
+  const nextSwipe = activeLeg ? getNextSwipe(activeLeg) : null;
+  const tripHasMissingSwipes = hasMissingSwipes(trip);
+  // No next swipe available AND a gap in the sequence => the ride is stuck on
+  // the missing swipe, not finished.
+  const isBlockedBySwipe = !nextSwipe && tripHasMissingSwipes;
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -247,6 +355,29 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </div>
           )}
 
+          {state === "in-progress" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full bg-[#D1FAE5] px-3 py-1 text-xs font-medium text-[#065F46]">
+                In Progress
+              </span>
+              {tripHasMissingSwipes && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-medium text-[#92400E]">
+                  <AlertTriangle className="h-3 w-3" />
+                  Missing swipe
+                </span>
+              )}
+              {hasIncentives &&
+                activeIncentiveTypes.map((incentiveType) => (
+                  <ProgramContributionIndicator
+                    key={incentiveType}
+                    incentiveType={incentiveType}
+                    isCompleted={false}
+                    context="detail"
+                  />
+                ))}
+            </div>
+          )}
+
           {state === "needs-action" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
@@ -283,6 +414,51 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             <span className="relative z-10 pl-8 text-sm font-bold uppercase text-white">
               Swipe to Accept
             </span>
+          </div>
+        </div>
+      ) : state === "in-progress" ? (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+          <div className="flex items-center justify-around border-b border-gray-100 px-4 py-3">
+            <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-gray-300">
+              <Phone className="h-5 w-5 text-gray-600" />
+            </button>
+            <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-gray-300">
+              <MessageSquare className="h-5 w-5 text-gray-600" />
+            </button>
+            <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-gray-300">
+              <Navigation className="h-5 w-5 text-gray-600" />
+            </button>
+            {/* TODO(step 6): becomes the ride options menu trigger — container
+                pattern pending reference screenshots. */}
+            <span className="text-sm font-medium text-gray-700">More</span>
+          </div>
+
+          <div className="px-4 py-4">
+            {nextSwipe ? (
+              <div className="relative flex h-14 items-center justify-center overflow-hidden rounded-full bg-[#10B981]">
+                <div className="absolute left-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md">
+                  <ChevronRight className="h-5 w-5 text-[#10B981]" />
+                </div>
+                <span className="text-sm font-bold uppercase text-white">
+                  {NEXT_SWIPE_LABEL[nextSwipe]}
+                </span>
+              </div>
+            ) : isBlockedBySwipe ? (
+              // The gap in the swipe sequence is what stops this ride closing
+              // out. Point the driver at the fix rather than at a dead end.
+              <div className="flex h-14 items-center justify-center gap-2 rounded-full bg-[#F59E0B]">
+                <AlertTriangle className="h-5 w-5 text-white" />
+                <span className="text-sm font-bold uppercase text-white">
+                  Trip Update Needed
+                </span>
+              </div>
+            ) : (
+              <div className="flex h-14 items-center justify-center rounded-full bg-gray-100">
+                <span className="text-sm font-semibold text-gray-500">
+                  All legs complete
+                </span>
+              </div>
+            )}
           </div>
         </div>
       ) : (

@@ -20,15 +20,21 @@ export default function MyRideDetailPage({ params }: PageProps) {
     notFound();
   }
   
-  // Determine state based on trip status
-  // needs-action and in-progress both use the "needs-action" detail state
-  const state = trip.status === "upcoming" ? "before-taken" : "needs-action";
-  
+  // Map trip status onto the detail state. `in-progress` used to be collapsed
+  // into "needs-action"; it now has its own state so the swipe progress and the
+  // support entry points can render.
+  const state =
+    trip.status === "upcoming"
+      ? "before-taken"
+      : trip.status === "in-progress"
+        ? "in-progress"
+        : "needs-action";
+
   return (
-    <RideDetailLayout 
-      trip={trip} 
-      state={state} 
-      backHref="/my-rides" 
+    <RideDetailLayout
+      trip={trip}
+      state={state}
+      backHref="/my-rides"
     />
   );
 }
