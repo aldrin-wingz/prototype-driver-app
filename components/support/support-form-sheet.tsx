@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Clock, AlertTriangle, Info } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -174,7 +174,23 @@ export function SupportFormSheet({
     setAppSupplied(suppliedIds(initialValues ?? {}));
   }
 
+  /**
+   * Latched so one tap cannot leave two records behind.
+   *
+   * Cancel and the X call `handleClose` directly, and the Drawer reports the same
+   * close through its own `onOpenChange` — so a single Cancel arrived here twice,
+   * and `saveDraft` mints a new id when it isn't given one. That showed up as the
+   * same draft listed twice in Support Requests. Cleared whenever the sheet opens.
+   */
+  const closing = useRef(false);
+
+  useEffect(() => {
+    if (open) closing.current = false;
+  }, [open]);
+
   function handleClose() {
+    if (closing.current) return;
+    closing.current = true;
     if (isDirty(values)) onSaveDraft?.(values);
     onOpenChange(false);
     reset();
@@ -182,6 +198,9 @@ export function SupportFormSheet({
 
   function handleSubmit() {
     if (!canSubmit) return;
+    // Latched too, so the close that follows a submit cannot also file a draft of
+    // the values that were just sent.
+    closing.current = true;
     onSubmit(values);
     reset();
   }

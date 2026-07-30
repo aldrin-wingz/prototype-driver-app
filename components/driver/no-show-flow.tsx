@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
@@ -98,8 +98,24 @@ export function NoShowFlow({
 
   // Opening resolves the branch immediately: a refusal shows up front rather than
   // after the driver has signed for nothing. A re-open starts over.
-  const current: Step =
-    open && step === null ? entryStepFor(resolveNoShowOutcome(trip, leg)) : step;
+  //
+  // A closed flow is on no step at all — checked first, so a step left behind by
+  // the previous run cannot decide what the next open shows.
+  const current: Step = open
+    ? (step ?? entryStepFor(resolveNoShowOutcome(trip, leg)))
+    : null;
+
+  // Closing discards where the driver was, so the step cannot outlive the flow
+  // and pre-empt the branch check on the next open.
+  useEffect(() => {
+    if (!open) setStep(null);
+  }, [open]);
+
+  // Read by the dismissal guard below rather than `current` itself — vaul reports
+  // a close through the callback it captured while the sheet was open, so a guard
+  // closing over `current` sees the step the flow has already left.
+  const stepRef = useRef<Step>(null);
+  stepRef.current = current;
 
   // The issue is normally hidden, so it has to be force-included as an option —
   // otherwise the locked dropdown holds a value it cannot render a label for.
@@ -110,6 +126,24 @@ export function NoShowFlow({
   function close() {
     setStep(null);
     onOpenChange(false);
+  }
+
+  /**
+   * A sheet closing only ends the flow if the flow is still on that step.
+   *
+   * The blocked → form handoff closes the blocked sheet, and vaul reports that
+   * through the same `onOpenChange(false)` a swipe-down uses — and it reports it
+   * BEFORE running the handler that caused it, so the two are indistinguishable
+   * until the step has moved on. Hence the deferred check. Reproduced in
+   * `reach-out-flow`, where the same shape stopped the flow advancing at all.
+   */
+  function dismissFrom(...steps: Step[]) {
+    return (next: boolean) => {
+      if (next) return;
+      setTimeout(() => {
+        if (steps.includes(stepRef.current)) close();
+      }, 0);
+    };
   }
 
   /** The proven-wait path: nothing to ask beyond the attestation, so send it. */
@@ -129,23 +163,27 @@ export function NoShowFlow({
     issue: ISSUE_RIDER_NO_SHOW,
   };
 
+  // Remembered rather than derived from `current`, because both variants share one
+  // sheet and the step moves on before that sheet finishes animating out. Deriving
+  // it meant tapping "Submit Form" made the sheet flash the OTHER refusal's copy on
+  // its way off screen.
+  const blockedVariant = useRef<"left" | "waiting">("left");
+  if (current === "blocked-left") blockedVariant.current = "left";
+  if (current === "blocked-waiting") blockedVariant.current = "waiting";
+
   return (
     <>
       <SignatureSheet
         open={current === "signature"}
-        onOpenChange={(next) => {
-          if (!next) close();
-        }}
+        onOpenChange={dismissFrom("signature")}
         riderName={trip.rider}
         onSigned={submitDirectly}
       />
 
       <NoShowBlockedSheet
         open={current === "blocked-left" || current === "blocked-waiting"}
-        onOpenChange={(next) => {
-          if (!next) close();
-        }}
-        variant={current === "blocked-left" ? "left" : "waiting"}
+        onOpenChange={dismissFrom("blocked-left", "blocked-waiting")}
+        variant={blockedVariant.current}
         clientLabel={
           trip.market
             ? `${trip.client} ${MARKET_NAMES[trip.market]}`
@@ -160,9 +198,7 @@ export function NoShowFlow({
           supportCase={supportCase}
           open
           initialValues={initialValues}
-          onOpenChange={(next) => {
-            if (!next) close();
-          }}
+          onOpenChange={dismissFrom("form")}
           onSaveDraft={(values) => {
             close();
             saveDraft({
