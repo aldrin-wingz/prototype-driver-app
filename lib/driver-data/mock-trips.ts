@@ -14,6 +14,35 @@ export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress"
 export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "scheduled";
 
 /**
+ * The market a trip belongs to.
+ *
+ * New with the Rider No-Show case, which is the first rule that varies by market
+ * rather than by client alone. Nothing before this needed geography, so it is
+ * optional — an absent market means "not one of the markets with a special rule".
+ */
+export type MarketCode = "GA" | "FL" | "NC" | "TN";
+
+/**
+ * What the app can prove about the driver's presence at the pick-up.
+ *
+ * Seeded, not measured — the real app reads this from telematics. Following the
+ * repo's data-driven convention, the interesting cases are seeded rather than
+ * computed: a `null` dwell means the app found NO proof of the wait, which is
+ * what turns a one-tap no-show into a form the driver has to fill in.
+ *
+ * Deliberately a sibling of `progress` rather than a fourth swipe mark, because
+ * "arrived but nobody came out" is not something the driver swipes.
+ */
+export interface LegPresenceEvidence {
+  /** Is the driver's device at the pick-up right now? */
+  atPickup: boolean;
+  /** Confirmed minutes spent at the pick-up. `null` = could not be established. */
+  dwellMinutes: number | null;
+  /** Clock time the app recorded arrival, when it has one. */
+  arrivedAt: string | null;
+}
+
+/**
  * The three swipes a driver makes to move a leg forward.
  *
  * Sequence per reference screenshots `s-01a/b/c`:
@@ -57,6 +86,13 @@ export interface TripLeg {
    * carry it, so the existing seeded trips are unaffected.
    */
   progress?: LegSwipeProgress;
+  /**
+   * What the app knows about the driver's presence at this leg's pick-up.
+   *
+   * Only legs that could plausibly file a no-show carry it. Absent means the app
+   * knows nothing, which is treated the same as no proof.
+   */
+  presence?: LegPresenceEvidence;
 }
 
 /**
@@ -162,6 +198,13 @@ export interface Trip {
   date: string;
   rider: string;
   client: string;
+  /**
+   * Market this trip runs in. Optional — only seeded where a rule depends on it.
+   *
+   * Geography was previously inferrable only from `leg.address` / `leg.county`
+   * free text, which is not something a rule should parse.
+   */
+  market?: MarketCode;
   passengerCount: number;
   distance: string;
   totalRevenue: number;
@@ -1005,16 +1048,20 @@ export const mockNeedsActionTrips: Trip[] = [
 
 // Mock in-progress trips — rides the driver has accepted and is working.
 //
-// Exactly three, one per swipe stage, so each state in the sequence is
+// The first three cover one swipe stage each, so every state in the sequence is
 // reachable from the In Progress tab:
 //
 //   1049800370 — nothing swiped yet         → "Accepted Ride", CTA SWIPE TO START
 //   1049800371 — started, not picked up     → "Active Ride",   CTA PICK UP MEMBER
 //   1049800372 — picked up, not dropped off → "Ride",          CTA DROP OFF MEMBER
 //
-// All three replicate reference screenshots s-01a / s-01b / s-01c: same ride
+// Those three replicate reference screenshots s-01a / s-01b / s-01c: same ride
 // shape (one A leg = Est Pick-up Time row + Appointment Time row), same
 // Carrollton GA geography, differing only in swipe state.
+//
+// The rides after them (1049800373+) exist for the Rider No-Show branches and
+// vary by client, market and seeded presence evidence instead — see the block
+// comment where they start.
 //
 // NOTE: there is deliberately no ride here with a MISSING swipe, so the
 // "Trip Update Needed" path has nothing to demo on right now. The support case
@@ -1027,6 +1074,7 @@ export const mockInProgressTrips: Trip[] = [
     date: "Tue, Jul 8, 2026",
     rider: "Adele Ferguson",
     client: "Verida",
+    market: "GA",
     passengerCount: 1,
     distance: "",
     totalRevenue: 52.52,
@@ -1069,6 +1117,7 @@ export const mockInProgressTrips: Trip[] = [
     date: "Tue, Jul 8, 2026",
     rider: "Rowan Whitfield",
     client: "Verida",
+    market: "GA",
     passengerCount: 1,
     distance: "",
     totalRevenue: 47.80,
@@ -1088,6 +1137,13 @@ export const mockInProgressTrips: Trip[] = [
           startedAt: "12:58 PM",
           pickedUpAt: null,
           droppedOffAt: null,
+        },
+        // Waited past the 10-minute threshold and the app can prove it, so a
+        // no-show here submits without a form.
+        presence: {
+          atPickup: true,
+          dwellMinutes: 14,
+          arrivedAt: "1:06 PM",
         },
       },
       {
@@ -1111,6 +1167,7 @@ export const mockInProgressTrips: Trip[] = [
     date: "Tue, Jul 8, 2026",
     rider: "Marisol Vega",
     client: "Verida",
+    market: "GA",
     passengerCount: 1,
     distance: "",
     totalRevenue: 61.15,
@@ -1139,6 +1196,217 @@ export const mockInProgressTrips: Trip[] = [
         time: "4:10 PM",
         address: "310 Dialysis Center Dr, Carrollton, GA 30117",
         county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== Rider No-Show branches — one ride per outcome =====
+  //
+  // The no-show branch is decided by seeded `presence` evidence plus the client's
+  // on-site policy, so CHOOSING A RIDE IS HOW YOU PICK A BRANCH. Every one of these
+  // is at stage `started` (en route, not yet picked up), which is the only stage
+  // where a no-show makes sense — see `canFileNoShow`.
+  //
+  //   1049800373 — Alivi FL,   no proof of the wait     → form, no error
+  //   1049800374 — Verida TN,  at pick-up, 13 min       → submits normally
+  //   1049800375 — Verida TN,  left after 22 min        → error + Submit Form
+  //   1049800376 — Verida TN,  at pick-up, only 4 min   → error, NO form
+  //
+  // The two Verida TN rides exist because Verida Tennessee still requires the
+  // no-show to be filed FROM the pick-up; everywhere else only the wait matters.
+  {
+    id: "1049800373",
+    date: "Fri, Jul 31, 2026",
+    rider: "Terrance Boudreaux",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 44.20,
+    notes: "Gate code 4417",
+    legs: [
+      {
+        id: "1049800373",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "10:20 AM",
+        address: "2915 Cleveland Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 44.20,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "10:04 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // The whole point of the form path: the driver waited and left, and the
+        // app cannot establish any of it. `null` dwell = no proof found.
+        presence: {
+          atPickup: false,
+          dwellMinutes: null,
+          arrivedAt: null,
+        },
+      },
+      {
+        id: "1049800373-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:00 AM",
+        address: "13685 Doctors Way, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800374",
+    date: "Fri, Jul 31, 2026",
+    rider: "Lorraine Pickett",
+    client: "Verida",
+    market: "TN",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 38.65,
+    notes: "",
+    legs: [
+      {
+        id: "1049800374",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:45 AM",
+        address: "1808 Buchanan St, Nashville, TN 37208",
+        county: "Davidson County",
+        revenue: 38.65,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "9:31 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // Both on-site conditions satisfied, so even Verida TN submits without
+        // a form.
+        presence: {
+          atPickup: true,
+          dwellMinutes: 13,
+          arrivedAt: "9:48 AM",
+        },
+      },
+      {
+        id: "1049800374-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:30 AM",
+        address: "1211 Medical Center Dr, Nashville, TN 37232",
+        county: "Davidson County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "1049800375",
+    date: "Fri, Jul 31, 2026",
+    rider: "Curtis Vandiver",
+    client: "Verida",
+    market: "TN",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 41.90,
+    notes: "Call on arrival — member uses a walker",
+    legs: [
+      {
+        id: "1049800375",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "8:30 AM",
+        address: "3384 Overton Crossing St, Memphis, TN 38127",
+        county: "Shelby County",
+        revenue: 41.90,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "8:12 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // Waited more than long enough, then drove off — the exact case that has
+        // no path forward today. Verida TN blocks it, but now offers the form.
+        presence: {
+          atPickup: false,
+          dwellMinutes: 22,
+          arrivedAt: "8:31 AM",
+        },
+      },
+      {
+        id: "1049800375-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:15 AM",
+        address: "1265 Union Ave, Memphis, TN 38104",
+        county: "Shelby County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "1049800376",
+    date: "Fri, Jul 31, 2026",
+    rider: "Josephine Hardaway",
+    client: "Verida",
+    market: "TN",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 36.40,
+    notes: "",
+    legs: [
+      {
+        id: "1049800376",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "2:50 PM",
+        address: "922 Gallatin Pike S, Madison, TN 37115",
+        county: "Davidson County",
+        revenue: 36.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "2:38 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // Still standing at the pick-up with the wait unfinished. The honest
+        // answer is "wait" — a form here would just be a way to skip it.
+        presence: {
+          atPickup: true,
+          dwellMinutes: 4,
+          arrivedAt: "2:57 PM",
+        },
+      },
+      {
+        id: "1049800376-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "3:30 PM",
+        address: "500 Hospital Dr, Madison, TN 37115",
+        county: "Davidson County",
         revenue: 0,
       },
     ],
