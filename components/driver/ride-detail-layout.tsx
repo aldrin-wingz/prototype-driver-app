@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft,
   RefreshCw,
@@ -32,6 +34,10 @@ import {
   type LegSwipeProgress,
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
+import { RideOptionsMenu } from "./ride-options-menu";
+import { SupportFormSheet } from "@/components/support/support-form-sheet";
+import { supportCases, getSupportCase } from "@/lib/support-data/case-registry";
+import type { SupportCallout, SupportCaseDefinition } from "@/types/support";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
 
@@ -55,6 +61,64 @@ const SWIPE_CTA: Record<
   "pick-up": { label: "PICK UP MEMBER", bg: "bg-[#10B981]", icon: PersonStanding },
   "drop-off": { label: "DROP OFF MEMBER", bg: "bg-[#EC4899]", icon: CheckCircle2 },
 };
+
+/** Parse a mock-data clock string ("3:19 PM") into minutes since midnight. */
+function parseClock(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(value.trim());
+  if (!match) return null;
+
+  const [, rawHour, rawMinute, meridiem] = match;
+  let hour = Number(rawHour) % 12;
+  if (meridiem.toUpperCase() === "PM") hour += 12;
+  return hour * 60 + Number(rawMinute);
+}
+
+/**
+ * The context block for a case — what the app already knows, echoed back.
+ *
+ * Derived from trip data rather than hardcoded, so the callout stays honest: a
+ * ride that is not late does not claim to be. Mirrors reference screenshot
+ * `s-02a`, where the block reads "Scheduled time: 3:19 PM / 63 mins late".
+ */
+function buildCallout(
+  caseId: string,
+  trip: Trip,
+  leg: TripLeg | undefined
+): SupportCallout | undefined {
+  if (caseId !== "late-pickup-reason" || !leg) return undefined;
+
+  const scheduled = parseClock(leg.time);
+  const pickedUp = leg.progress?.pickedUpAt
+    ? parseClock(leg.progress.pickedUpAt)
+    : null;
+  const minutesLate =
+    scheduled !== null && pickedUp !== null ? pickedUp - scheduled : null;
+
+  if (minutesLate !== null && minutesLate > 0) {
+    return {
+      tone: "danger",
+      title: `Scheduled time: ${leg.time}`,
+      detail: `${minutesLate} min${minutesLate === 1 ? "" : "s"} late`,
+    };
+  }
+
+  return {
+    tone: "info",
+    title: `Scheduled time: ${leg.time}`,
+    detail: pickedUp === null ? "Pickup not recorded yet" : "Picked up on time",
+  };
+}
+
+/** One-line recap of what was submitted, for the confirmation toast. */
+function summariseValues(
+  supportCase: SupportCaseDefinition,
+  values: Record<string, string>
+): string {
+  return supportCase.fields
+    .filter((field) => (values[field.id] ?? "").trim().length > 0)
+    .map((field) => `${field.label.replace(" (optional)", "")}: ${values[field.id]}`)
+    .join(" · ");
+}
 
 /**
  * Header title per swipe stage, per reference screenshots:
@@ -258,6 +322,7 @@ function LegCard({
  */
 export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
   const router = useRouter();
+  const { toast } = useToast();
 
   // The leg the driver is working, and the swipe expected next on it. Only legs
   // that carry a `progress` object take part in the swipe sequence — the
@@ -280,6 +345,12 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
       : state === "in-progress"
         ? getInProgressSubtitle(activeStage)
         : "Accepted Ride";
+
+  // Support surfaces: `More` opens the options menu, picking a case opens its
+  // form sheet. Only one is on screen at a time.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openCaseId, setOpenCaseId] = useState<string | null>(null);
+  const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -494,11 +565,13 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               <MessageSquare className="h-6 w-6 fill-[#1F2937] text-[#1F2937]" />
             </button>
             <span className="w-px self-stretch bg-gray-100" />
-            {/* TODO(step 6): becomes the ride options menu trigger — awaiting a
-                reference capture of the open menu to pin down the container. */}
-            <div className="flex flex-1 items-center justify-center py-3">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="flex flex-1 items-center justify-center py-3"
+            >
               <span className="text-sm font-semibold text-[#1F2937]">More</span>
-            </div>
+            </button>
           </div>
 
           <div className="px-4 py-4">
@@ -577,6 +650,38 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </button>
           </div>
         </div>
+      )}
+
+      <RideOptionsMenu
+        cases={supportCases}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        onSelectCase={(caseId) => {
+          setMenuOpen(false);
+          setOpenCaseId(caseId);
+        }}
+      />
+
+      {openCase && (
+        <SupportFormSheet
+          supportCase={openCase}
+          callout={buildCallout(openCase.id, trip, activeLeg)}
+          open
+          onOpenChange={(next) => {
+            if (!next) setOpenCaseId(null);
+          }}
+          onSubmit={(values) => {
+            setOpenCaseId(null);
+            // Prototype: no backend. Surface the outcome so the flow is
+            // verifiable end to end; persisting the request into a trackable
+            // pending-review state is the next step.
+            toast({
+              title:
+                openCase.successMessage ?? "Submitted. Support will follow up.",
+              description: summariseValues(openCase, values),
+            });
+          }}
+        />
       )}
     </div>
   );
