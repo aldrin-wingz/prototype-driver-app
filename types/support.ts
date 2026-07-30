@@ -14,7 +14,32 @@
  * new branch in the renderer plus an entry here — cheap. Building types nothing
  * uses is speculative, so we don't.
  */
-export type SupportFieldType = "select" | "textarea" | "text" | "time";
+export type SupportFieldType =
+  | "select"
+  | "textarea"
+  | "text"
+  | "time"
+  | "date"
+  | "number"
+  | "file";
+
+/**
+ * Where a field's value comes from when the app already knows it.
+ *
+ * This is the point of moving these forms in-app: the web form makes drivers
+ * retype the leg id, the pick-up date, their own email address and every
+ * timestamp the app already recorded. Anything resolvable here arrives prefilled
+ * so the driver only supplies what is genuinely new.
+ */
+export type SupportPrefillSource =
+  | "issueType"
+  | "driverEmail"
+  | "pickupDate"
+  | "legPositionLetter"
+  | "legId"
+  | "enRouteTime"
+  | "pickupTime"
+  | "dropOffTime";
 
 export interface SupportFieldOption {
   value: string;
@@ -40,6 +65,13 @@ export interface SupportField {
    * "please specify" box that appears when Reason is "Other".
    */
   showIf?: { field: string; equals: string[] };
+  /** Resolve this field's initial value from the ride rather than the driver. */
+  prefillFrom?: SupportPrefillSource;
+  /**
+   * The field is context the driver should see but not change (leg id, their own
+   * email). Rendered read-only when a prefilled value resolved.
+   */
+  locked?: boolean;
 }
 
 /** Tint of the context callout above the fields. */
@@ -67,6 +99,11 @@ export interface SupportCaseDefinition {
   id: string;
   /** Driver-facing sheet title, e.g. "Late pickup reason". */
   title: string;
+  /**
+   * The value this case maps to in the web form's "Please choose your issue
+   * below" dropdown, when it replaces an existing web-form submission.
+   */
+  issueType?: string;
   /** One-line description for the options menu row. */
   summary?: string;
   category: "Trip Issue" | "Pay" | "Rider" | "Vehicle" | "App";

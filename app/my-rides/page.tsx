@@ -6,13 +6,15 @@ import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
 import { cn } from "@/lib/utils";
-import { 
-  mockInProgressTrips, 
-  mockNeedsActionTrips, 
-  mockUpcomingTrips 
+import {
+  mockInProgressTrips,
+  mockNeedsActionTrips,
+  mockUpcomingTrips,
+  type Trip,
 } from "@/lib/driver-data/mock-trips";
+import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 
-type TabValue = "in-progress" | "needs-action" | "upcoming";
+type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
 
 interface TabConfig {
   value: TabValue;
@@ -23,26 +25,65 @@ interface TabConfig {
 export default function MyRidesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabValue>("needs-action");
-  
-  const tabs: TabConfig[] = [
-    { value: "in-progress", label: "In Progress", count: mockInProgressTrips.length },
-    { value: "needs-action", label: "Needs Action", count: mockNeedsActionTrips.length },
-    { value: "upcoming", label: "Upcoming", count: mockUpcomingTrips.length },
+  const { pendingRequests } = useRideFlow();
+
+  // A ride waiting on Support MOVES to Pending — it does not appear in both
+  // places. Otherwise the driver cannot tell which rides still need them.
+  const pendingIds = new Set(pendingRequests.map((request) => request.tripId));
+  const withoutPending = (trips: Trip[]) =>
+    trips.filter((trip) => !pendingIds.has(trip.id));
+
+  const allRides = [
+    ...mockInProgressTrips,
+    ...mockNeedsActionTrips,
+    ...mockUpcomingTrips,
   ];
-  
+  // Carry the pending status onto the card itself. Ride Details spells it out,
+  // but a card in the Pending tab that looks like any other card is a miss.
+  const pendingTrips = allRides
+    .filter((trip) => pendingIds.has(trip.id))
+    .map((trip) => ({
+      ...trip,
+      pills: [
+        { label: "Waiting on Support", variant: "attention" as const },
+        ...trip.pills,
+      ],
+    }));
+
+  const tabs: TabConfig[] = [
+    {
+      value: "in-progress",
+      label: "In Progress",
+      count: withoutPending(mockInProgressTrips).length,
+    },
+    {
+      value: "needs-action",
+      label: "Needs Action",
+      count: withoutPending(mockNeedsActionTrips).length,
+    },
+    {
+      value: "upcoming",
+      label: "Upcoming",
+      count: withoutPending(mockUpcomingTrips).length,
+    },
+    { value: "pending", label: "Pending", count: pendingTrips.length },
+  ];
+
   const getTripsForTab = (tab: TabValue) => {
     switch (tab) {
       case "in-progress":
-        return mockInProgressTrips;
+        return withoutPending(mockInProgressTrips);
       case "needs-action":
-        return mockNeedsActionTrips;
+        return withoutPending(mockNeedsActionTrips);
       case "upcoming":
-        return mockUpcomingTrips;
+        return withoutPending(mockUpcomingTrips);
+      case "pending":
+        return pendingTrips;
       default:
         return [];
     }
   };
-  
+
   const currentTrips = getTripsForTab(activeTab);
   
   return (
@@ -56,7 +97,7 @@ export default function MyRidesPage() {
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
             className={cn(
-              "relative flex-1 px-4 py-3 text-sm font-medium transition-colors",
+              "relative flex-1 px-2 py-3 text-[13px] font-medium leading-tight transition-colors",
               activeTab === tab.value
                 ? "text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
@@ -81,7 +122,11 @@ export default function MyRidesPage() {
       <main className="flex-1 space-y-4 p-4">
         {currentTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-gray-500">No rides in this category</p>
+            <p className="text-gray-500">
+              {activeTab === "pending"
+                ? "No rides waiting on Support."
+                : "No rides in this category"}
+            </p>
           </div>
         ) : (
           currentTrips.map((trip) => (

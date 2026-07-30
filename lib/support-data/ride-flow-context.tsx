@@ -13,12 +13,26 @@ export type RideConfirmation =
   /** Driver could not reach the rider but is going to the pickup anyway. */
   | "going-anyway";
 
+/** A support request the driver has submitted and is waiting on. */
+export interface PendingSupportRequest {
+  tripId: string;
+  caseId: string;
+  caseTitle: string;
+  values: Record<string, string>;
+  submittedAt: string;
+}
+
 interface RideFlowValue {
   getConfirmation: (tripId: string) => RideConfirmation;
   setConfirmation: (tripId: string, value: RideConfirmation) => void;
   /** Decline messages already sent to Support, keyed by trip id. */
   getDeclineMessage: (tripId: string) => string | undefined;
   setDeclineMessage: (tripId: string, message: string) => void;
+  /** The pending support request for a ride, if it has one. */
+  getPendingRequest: (tripId: string) => PendingSupportRequest | undefined;
+  /** All pending requests — drives the My Rides "Pending" tab. */
+  pendingRequests: PendingSupportRequest[];
+  submitRequest: (request: Omit<PendingSupportRequest, "submittedAt">) => void;
 }
 
 const RideFlowContext = createContext<RideFlowValue | null>(null);
@@ -41,6 +55,9 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [declineMessages, setDeclineMessages] = useState<
     Record<string, string>
   >({});
+  const [requests, setRequests] = useState<
+    Record<string, PendingSupportRequest>
+  >({});
 
   const value = useMemo<RideFlowValue>(
     () => ({
@@ -50,8 +67,20 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       getDeclineMessage: (tripId) => declineMessages[tripId],
       setDeclineMessage: (tripId, message) =>
         setDeclineMessages((previous) => ({ ...previous, [tripId]: message })),
+      getPendingRequest: (tripId) => requests[tripId],
+      pendingRequests: Object.values(requests),
+      submitRequest: (request) =>
+        setRequests((previous) => ({
+          ...previous,
+          [request.tripId]: {
+            ...request,
+            // No real clock needed for a prototype, and a fixed label keeps
+            // screenshots stable.
+            submittedAt: "Just now",
+          },
+        })),
     }),
-    [confirmations, declineMessages]
+    [confirmations, declineMessages, requests]
   );
 
   return (

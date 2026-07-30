@@ -11,13 +11,20 @@ import {
   X,
   Reply,
   FileText,
+  AlarmClockOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
 import { supportCases, getSupportCase } from "@/lib/support-data/case-registry";
 import { buildCalloutForCase } from "@/lib/support/build-callout";
-import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
+import { buildPrefilledValues } from "@/lib/support/prefill";
+import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import {
+  getLegStage,
+  type Trip,
+  type LegSwipeStage,
+} from "@/lib/driver-data/mock-trips";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -112,9 +119,27 @@ const PRODUCTION_TILES: OptionTile[] = [
     icon: Reply,
     variant: "filled",
     color: DRIVER_GOLD,
-    fullWidth: true,
   },
 ];
+
+/**
+ * Missed Pickup — the in-app replacement for the Zendesk "Trip Data update" web
+ * form. Sits beside Send Back Trip so it reads as a peer of the other ride
+ * actions rather than a bolt-on.
+ *
+ * Only offered mid-ride (started or picked up). Before the ride starts there is
+ * no swipe to have missed, and once every leg is done the correction belongs to
+ * a completed ride, which is a different case.
+ */
+const MISSED_PICKUP_TILE: OptionTile = {
+  id: "missed-pickup",
+  label: "Missed Pickup",
+  icon: AlarmClockOff,
+  variant: "filled",
+  color: DRIVER_NAVY,
+};
+
+const MISSED_PICKUP_STAGES: LegSwipeStage[] = ["started", "picked-up"];
 
 function TileIcon({ tile }: { tile: OptionTile }) {
   const Icon = tile.icon;
@@ -199,9 +224,26 @@ export function MoreOptionsScreen({
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
 
+  const { getPendingRequest, submitRequest } = useRideFlow();
+  const pending = getPendingRequest(trip.id);
+
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
+  const activeStage = activeLeg ? getLegStage(activeLeg) : null;
+
+  // Missed Pickup only belongs mid-ride, and only once — a ride already waiting
+  // on Support should not let the driver file a second request.
+  const showMissedPickup =
+    !pending && activeStage !== null && MISSED_PICKUP_STAGES.includes(activeStage);
+
+  const gridTiles: OptionTile[] = showMissedPickup
+    ? [...PRODUCTION_TILES, MISSED_PICKUP_TILE]
+    : // Without Missed Pickup the grid has an odd count, so Send Back Trip takes
+      // the full width and centres, per capture s-03a.
+      PRODUCTION_TILES.map((tile) =>
+        tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
+      );
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -230,7 +272,7 @@ export function MoreOptionsScreen({
       </header>
 
       <div className="grid grid-cols-2 border-t border-[#F0F0F0]">
-        {PRODUCTION_TILES.map((tile, index) => (
+        {gridTiles.map((tile, index) => (
           <div
             key={tile.id}
             className={cn(
@@ -241,7 +283,14 @@ export function MoreOptionsScreen({
             )}
             style={tile.fullWidth ? { gridColumn: "span 2" } : undefined}
           >
-            <Tile tile={tile} onSelect={handleProductionTile} />
+            <Tile
+              tile={tile}
+              onSelect={
+                tile.id === MISSED_PICKUP_TILE.id
+                  ? () => setOpenCaseId("missed-pickup")
+                  : handleProductionTile
+              }
+            />
           </div>
         ))}
       </div>
@@ -261,7 +310,10 @@ export function MoreOptionsScreen({
         </p>
 
         <div className="mt-4 space-y-2">
-          {supportCases.map((supportCase) => {
+          {/* Cases already promoted to a real grid tile are not repeated here. */}
+          {supportCases
+            .filter((supportCase) => supportCase.id !== MISSED_PICKUP_TILE.id)
+            .map((supportCase) => {
             const isAvailable = supportCase.buildState !== "not-yet";
 
             return (
@@ -317,21 +369,31 @@ export function MoreOptionsScreen({
       {openCase && (
         <SupportFormSheet
           supportCase={openCase}
-          callout={buildCalloutForCase(openCase.id, activeLeg)}
+          callout={buildCalloutForCase(
+            openCase.id,
+            activeLeg,
+            Object.values(
+              buildPrefilledValues(openCase, trip, activeLeg)
+            ).filter((value) => value.length > 0).length
+          )}
           open
           onOpenChange={(next) => {
             if (!next) setOpenCaseId(null);
           }}
+          initialValues={buildPrefilledValues(openCase, trip, activeLeg)}
           onSubmit={(values) => {
             setOpenCaseId(null);
-            toast({
-              title:
-                openCase.successMessage ?? "Submitted. Support will follow up.",
-              description: Object.entries(values)
-                .filter(([, value]) => value.trim().length > 0)
-                .map(([key, value]) => `${key}: ${value}`)
-                .join(" · "),
+            submitRequest({
+              tripId: trip.id,
+              caseId: openCase.id,
+              caseTitle: openCase.title,
+              values,
             });
+            toast({
+              title: openCase.successMessage ?? "Sent to Support",
+              description: "This ride has moved to Pending while Support reviews it.",
+            });
+            router.push(backHref);
           }}
         />
       )}

@@ -22,8 +22,19 @@ export function parseClock(value: string): number | null {
  */
 export function buildCalloutForCase(
   caseId: string,
-  leg: TripLeg | undefined
+  leg: TripLeg | undefined,
+  prefilledCount?: number
 ): SupportCallout | undefined {
+  if (caseId === "missed-pickup") {
+    // States the value proposition on the screen the driver is looking at: the
+    // web form makes them retype all of this.
+    return {
+      tone: "info",
+      title: `${prefilledCount ?? 0} fields filled from this ride`,
+      detail: "Add why the swipe was missed, then submit.",
+    };
+  }
+
   if (caseId !== "late-pickup-reason" || !leg) return undefined;
 
   const scheduled = parseClock(leg.time);

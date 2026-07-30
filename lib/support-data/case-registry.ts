@@ -59,27 +59,125 @@ export const latePickupReasonCase: SupportCaseDefinition = {
 };
 
 /**
- * CASE-01 — Trip Update.
+ * CASE-01 — Missed Pickup.
  *
- * ⚠️ Not in prototype yet. The field list is still to come from the support
- * lead / user, and the runtime renders whatever that list says. Declared here
- * with an empty field set so the options menu can show the row in its real
- * place without implying the form works.
+ * Replaces the Zendesk web form "Submit a request → Trip Data update"
+ * (reference captures `s-05a/b/c`). Field list, labels, help text and required
+ * markers are taken from that form verbatim.
+ *
+ * The whole argument for moving it in-app is the `prefillFrom` column: the web
+ * form makes drivers retype their own email, the pick-up date, the leg position
+ * letter, the leg id and every timestamp the app already recorded. Here all of
+ * that arrives filled, and the only genuinely empty required field is the one
+ * the app cannot know — why the swipe was missed.
  */
-export const tripUpdateCase: SupportCaseDefinition = {
-  id: "trip-update",
-  title: "Trip Update",
-  summary: "Correct trip details, including a swipe you missed",
+export const missedPickupCase: SupportCaseDefinition = {
+  id: "missed-pickup",
+  title: "Missed Pickup",
+  issueType: "Trip Data update",
+  summary: "Send the times for a swipe you missed on this ride",
   category: "Trip Issue",
-  buildState: "not-yet",
-  submitLabel: "Submit Update",
+  buildState: "in-prototype",
+  submitLabel: "Submit",
   resolution: "cs-queue",
-  fields: [],
+  successMessage: "Sent to Support",
+  zendeskEquivalent: "Submit a request → Trip Data update",
+  fields: [
+    {
+      id: "issue",
+      type: "text",
+      label: "Issue",
+      prefillFrom: "issueType",
+      locked: true,
+      required: true,
+    },
+    {
+      id: "email",
+      type: "text",
+      label: "Your email address",
+      prefillFrom: "driverEmail",
+      locked: true,
+      required: true,
+    },
+    {
+      id: "pickupDate",
+      type: "date",
+      label: "Pick-up Date",
+      helpText: "The actual pick-up date.",
+      prefillFrom: "pickupDate",
+      required: true,
+    },
+    {
+      id: "legPositionLetter",
+      type: "text",
+      label: "Leg Position Letter",
+      helpText: "Position of the leg that needs to be updated.",
+      prefillFrom: "legPositionLetter",
+      locked: true,
+      required: true,
+    },
+    {
+      id: "legId",
+      type: "text",
+      label: "Leg ID",
+      helpText: "The leg that needs to be updated.",
+      prefillFrom: "legId",
+      locked: true,
+      required: true,
+    },
+    {
+      id: "enRouteTime",
+      type: "time",
+      label: "En-route Time",
+      helpText: 'The time you swiped "Start ride" and began driving to pick-up.',
+      prefillFrom: "enRouteTime",
+    },
+    {
+      id: "pickupTime",
+      type: "time",
+      label: "Pick-up Time",
+      helpText: "The time you picked up the member.",
+      prefillFrom: "pickupTime",
+    },
+    {
+      id: "pickupOdometer",
+      type: "number",
+      label: "Pick-up Odometer (optional)",
+      helpText: "Leave blank if the app did not ask for a reading.",
+    },
+    {
+      id: "dropOffTime",
+      type: "time",
+      label: "Drop-off Time",
+      helpText: "The time you dropped off the member.",
+      prefillFrom: "dropOffTime",
+    },
+    {
+      id: "dropOffOdometer",
+      type: "number",
+      label: "Drop-off Odometer (optional)",
+      helpText: "Leave blank if the app did not ask for a reading.",
+    },
+    {
+      id: "reason",
+      type: "textarea",
+      label: "Why weren't you able to swipe this trip?",
+      placeholder: "Tell us briefly why you weren't able to swipe during the ride.",
+      required: true,
+      maxLength: 500,
+    },
+    {
+      id: "attachment",
+      type: "file",
+      label: "Attachments (optional)",
+      helpText: "Add a photo or screenshot if it helps explain.",
+    },
+  ],
 };
 
 export const supportCases: SupportCaseDefinition[] = [
   latePickupReasonCase,
-  tripUpdateCase,
+  missedPickupCase,
 ];
 
 export function getSupportCase(id: string): SupportCaseDefinition | undefined {

@@ -17,6 +17,7 @@ import {
   PersonStanding,
   CheckCircle2,
   CornerUpRight,
+  Hourglass,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -285,7 +286,8 @@ export function RideDetailLayout({
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { getConfirmation, setConfirmation } = useRideFlow();
+  const { getConfirmation, setConfirmation, getPendingRequest } = useRideFlow();
+  const pendingRequest = getPendingRequest(trip.id);
 
   // Confirming a ride moves it out of "needs action": it becomes an accepted
   // ride awaiting its first swipe. The seeded status stays untouched — the
@@ -386,6 +388,24 @@ export function RideDetailLayout({
             </div>
           )}
         </div>
+
+        {pendingRequest && (
+          <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
+            <div className="flex items-start gap-3">
+              <Hourglass className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#92400E]">
+                  Waiting on Support
+                </p>
+                <p className="mt-0.5 text-sm text-[#92400E]">
+                  Your {pendingRequest.caseTitle} request was sent{" "}
+                  {pendingRequest.submittedAt.toLowerCase()}. Support is
+                  reviewing it — nothing more is needed from you.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Trip metadata card */}
         <Card className="mx-4 mt-4 rounded-xl bg-white p-4 shadow-md">
@@ -550,7 +570,14 @@ export function RideDetailLayout({
           </div>
 
           <div className="px-4 py-4">
-            {nextSwipe ? (
+            {pendingRequest ? (
+              <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
+                <Hourglass className="h-5 w-5 text-[#92400E]" />
+                <span className="text-sm font-bold uppercase text-[#92400E]">
+                  Pending Support Review
+                </span>
+              </div>
+            ) : nextSwipe ? (
               (() => {
                 const cta = SWIPE_CTA[nextSwipe];
                 const CtaIcon = cta.icon;

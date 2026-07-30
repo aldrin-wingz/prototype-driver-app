@@ -52,19 +52,24 @@ const CALLOUT_TONE: Record<
 export function SupportFormSheet({
   supportCase,
   callout,
+  initialValues,
   open,
   onOpenChange,
   onSubmit,
 }: {
   supportCase: SupportCaseDefinition;
   callout?: SupportCallout;
+  /** Values the app already knows, so the driver only supplies what is new. */
+  initialValues?: Record<string, string>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: Record<string, string>) => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    emptyValues(supportCase.fields)
-  );
+  const blank = () => ({
+    ...emptyValues(supportCase.fields),
+    ...(initialValues ?? {}),
+  });
+  const [values, setValues] = useState<Record<string, string>>(blank);
 
   const visibleFields = supportCase.fields.filter((field) =>
     isFieldVisible(field, values)
@@ -79,13 +84,13 @@ export function SupportFormSheet({
 
   function handleClose() {
     onOpenChange(false);
-    setValues(emptyValues(supportCase.fields));
+    setValues(blank());
   }
 
   function handleSubmit() {
     if (!canSubmit) return;
     onSubmit(values);
-    setValues(emptyValues(supportCase.fields));
+    setValues(blank());
   }
 
   const tone = callout ? CALLOUT_TONE[callout.tone] : null;
@@ -93,9 +98,11 @@ export function SupportFormSheet({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="rounded-t-3xl border-0 px-6 pb-8">
-        <div className="mx-auto w-full max-w-md">
-          <div className="flex items-start justify-between pt-2">
+      <DrawerContent className="flex max-h-[92vh] flex-col rounded-t-3xl border-0 px-6 pb-8">
+        {/* Header and footer stay put; only the fields scroll. A long form must
+            never push its Submit button off screen. */}
+        <div className="mx-auto flex w-full min-h-0 max-w-md flex-col">
+          <div className="flex flex-shrink-0 items-start justify-between pt-2">
             <DrawerTitle className="text-2xl font-bold text-gray-900">
               {supportCase.title}
             </DrawerTitle>
@@ -112,7 +119,7 @@ export function SupportFormSheet({
           {callout && tone && CalloutIcon && (
             <div
               className={cn(
-                "mt-5 flex items-start gap-3 rounded-xl border px-4 py-3.5",
+                "mt-5 flex flex-shrink-0 items-start gap-3 rounded-xl border px-4 py-3.5",
                 tone.bg,
                 tone.border
               )}
@@ -131,7 +138,7 @@ export function SupportFormSheet({
             </div>
           )}
 
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
             {visibleFields.map((field) => (
               <SupportFieldRenderer
                 key={field.id}
@@ -142,7 +149,7 @@ export function SupportFormSheet({
             ))}
           </div>
 
-          <div className="mt-8 grid grid-cols-[1fr_1.4fr] gap-4">
+          <div className="mt-6 grid flex-shrink-0 grid-cols-[1fr_1.4fr] gap-4 border-t border-gray-100 pt-5">
             <Button
               type="button"
               variant="outline"
