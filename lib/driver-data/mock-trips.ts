@@ -205,6 +205,15 @@ export interface Trip {
    * free text, which is not something a rule should parse.
    */
   market?: MarketCode;
+  /**
+   * The member's number as the app has it on file.
+   *
+   * Optional, and the gap is meaningful rather than unfinished seeding: a driver
+   * who reports a number as unreachable is sometimes reporting that there was no
+   * number to call. A trip without one prefills nothing, so the driver types
+   * what they tried instead.
+   */
+  riderPhone?: string;
   passengerCount: number;
   distance: string;
   totalRevenue: number;
@@ -1008,6 +1017,8 @@ export const mockNeedsActionTrips: Trip[] = [
     date: "Thu, Jul 31, 2026",
     rider: "KALLIYAH TYSON",
     client: "Alivi",
+    market: "FL",
+    riderPhone: "+1 (239) 555-0148",
     passengerCount: 4,
     distance: "",
     totalRevenue: 26.29,
@@ -1082,6 +1093,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Adele Ferguson",
     client: "Verida",
     market: "GA",
+    riderPhone: "+1 (770) 555-0132",
     passengerCount: 1,
     distance: "",
     totalRevenue: 52.52,
@@ -1126,6 +1138,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Rowan Whitfield",
     client: "Verida",
     market: "GA",
+    riderPhone: "+1 (770) 555-0187",
     passengerCount: 1,
     distance: "",
     totalRevenue: 47.80,
@@ -1176,6 +1189,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Marisol Vega",
     client: "Verida",
     market: "GA",
+    riderPhone: "+1 (678) 555-0294",
     passengerCount: 1,
     distance: "",
     totalRevenue: 61.15,
@@ -1237,6 +1251,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Terrance Boudreaux",
     client: "Alivi",
     market: "FL",
+    riderPhone: "+1 (239) 555-0311",
     passengerCount: 1,
     distance: "",
     totalRevenue: 44.20,
@@ -1286,6 +1301,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Lorraine Pickett",
     client: "Verida",
     market: "TN",
+    riderPhone: "+1 (615) 555-0176",
     passengerCount: 1,
     distance: "",
     totalRevenue: 38.65,
@@ -1335,6 +1351,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Curtis Vandiver",
     client: "Verida",
     market: "TN",
+    riderPhone: "+1 (901) 555-0263",
     passengerCount: 1,
     distance: "",
     totalRevenue: 41.90,
@@ -1384,6 +1401,7 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Josephine Hardaway",
     client: "Verida",
     market: "TN",
+    riderPhone: "+1 (615) 555-0409",
     passengerCount: 1,
     distance: "",
     totalRevenue: 36.40,

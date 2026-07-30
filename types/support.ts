@@ -65,6 +65,13 @@ export type SupportPrefillSource =
   | "issueType"
   | "driverEmail"
   | "riderName"
+  /**
+   * The member's number as the app has it on file.
+   *
+   * Resolves to `""` when the trip carries none, which leaves the field editable
+   * so the driver can say what they actually tried.
+   */
+  | "riderPhone"
   | "pickupDate"
   | "legPositionLetter"
   | "legId"

@@ -50,6 +50,8 @@ function resolve(
       return DRIVER_EMAIL;
     case "riderName":
       return trip.rider;
+    case "riderPhone":
+      return trip.riderPhone ?? "";
     case "pickupDate":
       return toDateInputValue(trip.date);
     case "legPositionLetter":
