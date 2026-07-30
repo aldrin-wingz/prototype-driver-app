@@ -6,17 +6,20 @@ export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "s
 /**
  * The three swipes a driver makes to move a leg forward.
  *
+ * Sequence per reference screenshots `s-01a/b/c`:
+ *   SWIPE TO START  →  PICK UP MEMBER  →  DROP OFF MEMBER
+ *
  * Each value is the time the driver swiped, or `null` when that swipe never
  * happened. A `null` mark IS the "forgot to swipe" condition — the Trip Update
  * support case exists to correct it. Following the repo convention, the gap is
  * SEEDED in mock data rather than derived from clocks or logic.
  */
 export interface LegSwipeProgress {
-  /** Swiped "I've arrived" at the pickup location. */
-  arrivedAt: string | null;
-  /** Swiped "rider picked up" — starts the leg. */
+  /** Swiped "start" — the driver begins the leg / heads to pickup. */
+  startedAt: string | null;
+  /** Swiped "pick up member". */
   pickedUpAt: string | null;
-  /** Swiped "rider dropped off" — completes the leg. */
+  /** Swiped "drop off member" — completes the leg. */
   droppedOffAt: string | null;
 }
 
@@ -29,8 +32,19 @@ export interface TripLeg {
   county: string;
   revenue: number;
   /**
-   * Swipe state for this leg. Optional — only legs on in-progress rides carry
-   * it, so the existing seeded trips are unaffected.
+   * Leg identifier shown in the timeline marker and the swipe CTA sub-line
+   * ("A Leg"), per reference screenshots.
+   */
+  legCode?: "A" | "B" | "C" | "D";
+  /**
+   * Revenue caption shown to the right of the time, e.g. "Accepted by you".
+   * Per reference screenshots this replaces the stacked revenue display on
+   * accepted/active rides.
+   */
+  revenueNote?: string;
+  /**
+   * Swipe state for this leg. Optional — only legs the driver has accepted
+   * carry it, so the existing seeded trips are unaffected.
    */
   progress?: LegSwipeProgress;
 }
@@ -45,13 +59,13 @@ export interface TripLeg {
  */
 export type LegSwipeStage =
   | "not-started"
-  | "arrived"
+  | "started"
   | "picked-up"
   | "blocked"
   | "completed";
 
 /** Which swipe a driver is expected to make next on a leg. */
-export type NextSwipe = "arrive" | "pick-up" | "drop-off" | null;
+export type NextSwipe = "start" | "pick-up" | "drop-off" | null;
 
 /** Derive a leg's stage from its swipe marks. */
 export function getLegStage(leg: TripLeg): LegSwipeStage {
@@ -61,7 +75,7 @@ export function getLegStage(leg: TripLeg): LegSwipeStage {
   if (getMissingSwipes(leg).length > 0) return "blocked";
   if (p.droppedOffAt) return "completed";
   if (p.pickedUpAt) return "picked-up";
-  if (p.arrivedAt) return "arrived";
+  if (p.startedAt) return "started";
   return "not-started";
 }
 
@@ -76,7 +90,7 @@ export function getMissingSwipes(leg: TripLeg): Array<keyof LegSwipeProgress> {
   if (!p) return [];
 
   const missing: Array<keyof LegSwipeProgress> = [];
-  if (!p.arrivedAt && (p.pickedUpAt || p.droppedOffAt)) missing.push("arrivedAt");
+  if (!p.startedAt && (p.pickedUpAt || p.droppedOffAt)) missing.push("startedAt");
   if (!p.pickedUpAt && p.droppedOffAt) missing.push("pickedUpAt");
   return missing;
 }
@@ -95,8 +109,8 @@ export function hasMissingSwipes(trip: Trip): boolean {
 export function getNextSwipe(leg: TripLeg): NextSwipe {
   switch (getLegStage(leg)) {
     case "not-started":
-      return "arrive";
-    case "arrived":
+      return "start";
+    case "started":
       return "pick-up";
     case "picked-up":
       return "drop-off";
@@ -976,53 +990,59 @@ export const mockNeedsActionTrips: Trip[] = [
   },
 ];
 
-// Mock in-progress trips — rides the driver is actively working.
+// Mock in-progress trips — rides the driver has accepted and is working.
 //
-// Seeded for the In-App Support Requests prototype. Two rides on purpose:
-//   IP-001 — swipes in order, nothing missing. The control case.
-//   IP-002 — B-leg was dropped off but NEVER picked up. This is the
-//            "forgot to swipe" gap the Trip Update support case corrects.
+// Exactly three, one per swipe stage, so each state in the sequence is
+// reachable from the In Progress tab:
 //
-// Per repo convention the gap is DATA-DRIVEN: IP-002 simply omits `pickedUpAt`.
-// No component computes it from clocks.
+//   1049800370 — nothing swiped yet         → "Accepted Ride", CTA SWIPE TO START
+//   1049800371 — started, not picked up     → "Active Ride",   CTA PICK UP MEMBER
+//   1049800372 — picked up, not dropped off → "Ride",          CTA DROP OFF MEMBER
+//
+// All three replicate reference screenshots s-01a / s-01b / s-01c: same ride
+// shape (one A leg = Est Pick-up Time row + Appointment Time row), same
+// Carrollton GA geography, differing only in swipe state.
+//
+// NOTE: there is deliberately no ride here with a MISSING swipe, so the
+// "Trip Update Needed" path has nothing to demo on right now. The support case
+// will need such a seed when the Trip Update form is built — see
+// `getMissingSwipes`, which stays in place and is exercised by that path.
 export const mockInProgressTrips: Trip[] = [
+  // ===== s-01a — Accepted Ride: nothing swiped yet =====
   {
-    id: "1000891447203",
-    date: "Thu, Apr 30, 2026",
-    rider: "MARCUS T.",
+    id: "1049800370",
+    date: "Tue, Jul 8, 2026",
+    rider: "Adele Ferguson",
     client: "Verida",
     passengerCount: 1,
     distance: "",
-    totalRevenue: 68.40,
-    notes: "Rider uses a walker — allow extra loading time",
+    totalRevenue: 52.52,
+    notes: "",
     legs: [
       {
-        id: "1000891447203",
+        id: "1049800370",
+        legCode: "A",
         type: "est-pickup",
         label: "Est Pick-up Time",
-        time: "9:15 AM",
-        address: "412 Sycamore Dr, Marietta, GA 30060",
-        county: "Cobb County",
-        revenue: 34.20,
+        time: "11:00 AM",
+        address: "780 Bankhead Hwy, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 52.52,
+        revenueNote: "Accepted by you",
         progress: {
-          arrivedAt: "9:11 AM",
-          pickedUpAt: "9:18 AM",
-          droppedOffAt: "9:52 AM",
-        },
-      },
-      {
-        id: "1000891447203-b",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "1:30 PM",
-        address: "Emory Dialysis at Candler, 1266 Clifton Rd NE, Atlanta, GA 30322",
-        county: "DeKalb County",
-        revenue: 34.20,
-        progress: {
-          arrivedAt: "1:24 PM",
+          startedAt: null,
           pickedUpAt: null,
           droppedOffAt: null,
         },
+      },
+      {
+        id: "1049800370-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:42 AM",
+        address: "160 Clinic Ave, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
       },
     ],
     status: "in-progress",
@@ -1030,45 +1050,83 @@ export const mockInProgressTrips: Trip[] = [
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
+  // ===== s-01b — Active Ride: started, heading to pickup =====
   {
-    id: "1000891502876",
-    date: "Thu, Apr 30, 2026",
-    rider: "DELORES H.",
+    id: "1049800371",
+    date: "Tue, Jul 8, 2026",
+    rider: "Rowan Whitfield",
     client: "Verida",
     passengerCount: 1,
     distance: "",
-    totalRevenue: 52.00,
-    notes: "Gate code 4412 at the pickup address",
+    totalRevenue: 47.80,
+    notes: "",
     legs: [
       {
-        id: "1000891502876",
-        type: "scheduled",
-        label: "Scheduled Pick-up Time",
-        time: "7:45 AM",
-        address: "8 Hollow Creek Way, Lawrenceville, GA 30044",
-        county: "Gwinnett County",
-        revenue: 26.00,
+        id: "1049800371",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "1:15 PM",
+        address: "1204 Maple St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 47.80,
+        revenueNote: "Accepted by you",
         progress: {
-          arrivedAt: "7:39 AM",
-          pickedUpAt: "7:47 AM",
-          droppedOffAt: "8:21 AM",
+          startedAt: "12:58 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
         },
       },
       {
-        // ⚠️ Forgot-to-swipe seed: dropped off, but the pickup swipe never
-        // registered. `getMissingSwipes` reports `pickedUpAt`.
-        id: "1000891502876-b",
-        type: "wait-for-call",
-        label: "Est Pick-up Time - Wait For Call",
-        time: "11:00 AM",
-        address: "Gwinnett Medical Center, 1000 Medical Center Blvd, Lawrenceville, GA 30046",
-        county: "Gwinnett County",
-        revenue: 26.00,
+        id: "1049800371-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:00 PM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  // ===== s-01c — Ride: member on board, heading to drop-off =====
+  {
+    id: "1049800372",
+    date: "Tue, Jul 8, 2026",
+    rider: "Marisol Vega",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 61.15,
+    notes: "Rider prefers front passenger seat",
+    legs: [
+      {
+        id: "1049800372",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "3:30 PM",
+        address: "88 Lovvorn Rd, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 61.15,
+        revenueNote: "Accepted by you",
         progress: {
-          arrivedAt: "11:06 AM",
-          pickedUpAt: null,
-          droppedOffAt: "11:48 AM",
+          startedAt: "3:19 PM",
+          pickedUpAt: "3:34 PM",
+          droppedOffAt: null,
         },
+      },
+      {
+        id: "1049800372-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "4:10 PM",
+        address: "310 Dialysis Center Dr, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
       },
     ],
     status: "in-progress",

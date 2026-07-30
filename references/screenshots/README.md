@@ -18,6 +18,28 @@ Reference captures of the **existing production Wingz NEMT Driver App**. These a
 | `i-4/` | 04a/04b/05a/05b | Ride detail callout variants apply to both Before Taken and Needs Action states. |
 | `i-5/` | 02a, 02b, 11 (Filter Requests Modal) | Existing filter pattern is a bottom-anchored modal — the incentive filter extends this modal. |
 
+## Support slice packs (`s-*`)
+
+Captures for the **In-App Support Requests** prototype use `s-*` slots so they never collide with the `01a`–`11` incentives numbering. New captures are dropped in `inbox/` and filed from there — see `inbox/README.md`.
+
+| Slot | Filename | Screen | What it pins down |
+|------|----------|--------|-------------------|
+| s-01a | `s-01a - Ride Details - Accepted Ride - Swipe To Start.webp` | Accepted ride, nothing swiped | Header reads `#<id> - Accepted Ride`. CTA **SWIPE TO START / A Leg** on near-black `#1F2937`, car glyph in a white circle |
+| s-01b | `s-01b - Ride Details - Active Ride - Pick Up Member.webp` | Started, en route to pickup | Header reads `#<id> - Active Ride`. CTA **PICK UP MEMBER / A Leg** on green `#10B981`, person glyph |
+| s-01c | `s-01c - Ride Details - Ride - Drop Off Member.webp` | Member on board | Header reads `#<id> - Ride`. CTA **DROP OFF MEMBER / A Leg** on pink `#EC4899`, check glyph |
+
+**Step pack:** `by-step/s-1/` holds all three.
+
+Shared anatomy these three establish for the in-progress detail surface:
+- **Swipe sequence is Start → Pick Up → Drop Off.** There is no "arrived" swipe.
+- **Header title changes per swipe stage** — `Accepted Ride` → `Active Ride` → `Ride`.
+- **Action row is 4 controls + More**, split into equal cells by vertical hairlines: green ring w/ turn arrow, pink ring w/ turn arrow, solid navy phone, solid navy chat, then `More` as plain text.
+- **Leg fare sits on the time row**, right-aligned, as `$52.52 Accepted by you` — not stacked beneath.
+- One "A Leg" = **two timeline rows** (Est Pick-up Time + Appointment Time). The swipe sequence belongs to the leg, anchored on the pickup row.
+- **No swipe history is shown.** The prototype's `SWIPES` block is net-new, added so a driver can see a missing swipe; it renders only once a swipe exists or one was skipped.
+
+Still needed: the **open `More` menu** (blocks the ride options menu build — container pattern is undecided), and the swipe control's own interaction.
+
 ## Naming convention
 
 Canonical filenames follow `<slot>(<sub>) - <Surface> - <Detail>.png`:
