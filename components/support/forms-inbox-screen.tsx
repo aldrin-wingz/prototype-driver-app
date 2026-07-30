@@ -41,6 +41,8 @@ const PREVIEW_FIELDS = [
   "comments",
   "tripRequestNotes",
   "noShowContactDetails",
+  "cantReachDetails",
+  "declinedDetails",
   // Last resort: a Trip Request with no notes is still identifiable by who it
   // names, which is the only field it actually requires.
   "member",

@@ -1,5 +1,7 @@
 import {
   getIssueOptions,
+  ISSUE_CONFIRM_CANT_REACH,
+  ISSUE_CONFIRM_DECLINED,
   ISSUE_GENERAL,
   ISSUE_MISSED_SWIPE,
   ISSUE_PAYMENT,
@@ -93,6 +95,46 @@ const ONLY_GENERAL = { field: "issue", equals: [ISSUE_GENERAL] };
 const ONLY_PAYMENT = { field: "issue", equals: [ISSUE_PAYMENT] };
 const ONLY_TRIP_REQUEST = { field: "issue", equals: [ISSUE_TRIP_REQUEST] };
 const ONLY_RIDER_NO_SHOW = { field: "issue", equals: [ISSUE_RIDER_NO_SHOW] };
+const ONLY_CONFIRM_CANT_REACH = {
+  field: "issue",
+  equals: [ISSUE_CONFIRM_CANT_REACH],
+};
+const ONLY_CONFIRM_DECLINED = {
+  field: "issue",
+  equals: [ISSUE_CONFIRM_DECLINED],
+};
+
+/**
+ * What the driver heard when they called.
+ *
+ * The distinction Support acts on is whether the number is bad or the member is
+ * simply not picking up: a disconnected line needs the record fixed, an unanswered
+ * one needs someone else to try. "No number on file" is last because it is the one
+ * answer that says the app failed the driver rather than the other way round.
+ */
+const CALL_OUTCOME_OPTIONS: SupportFieldOption[] = [
+  { value: "rang-no-answer", label: "Rang, no answer" },
+  { value: "voicemail", label: "Went to voicemail" },
+  { value: "disconnected", label: "Number was disconnected or invalid" },
+  { value: "wrong-person", label: "Someone else answered" },
+  { value: "no-number", label: "There was no number on file" },
+];
+
+/**
+ * How the member got the decline to the driver.
+ *
+ * Second-hand declines are the reason this is asked. A caregiver or a facility
+ * telling the driver "she isn't going today" is the common case, and it is not the
+ * same evidence as the member saying it themselves — Support should be able to see
+ * which one they are acting on.
+ */
+const DECLINED_CHANNEL_OPTIONS: SupportFieldOption[] = [
+  { value: "call", label: "On a call" },
+  { value: "text", label: "By text message" },
+  { value: "family", label: "Through a family member or caregiver" },
+  { value: "facility", label: "Through the facility" },
+  { value: "in-person", label: "In person" },
+];
 
 /**
  * How the driver tried to reach the member.
@@ -433,6 +475,154 @@ export function buildSupportFormCase({
         helpText:
           "By signing, you confirm the member was not present at the pick-up.",
         showIf: ONLY_RIDER_NO_SHOW,
+      },
+
+      // ---- Trip Confirmation — Can't Reach Member -------------------------
+      //
+      // Reached from "Number can not be reached" in the reach-out-to-confirm
+      // flow. The number is the point of this form: if it is dead, Support needs
+      // to see which number the driver had before they can fix the record, and
+      // until then the ride's own banner keeps telling the next driver to call it.
+      //
+      // Neither confirmation form takes a signature. The attestation belongs to
+      // Rider No-Show, where the driver is asserting something they alone
+      // witnessed at a pick-up; here they are reporting a call that did not
+      // connect, and asking them to sign for that would be ceremony.
+      //
+      // Note the leg picker carries NO `legScope`. It must default to "all":
+      // these forms are filed from a needs-action ride, which is not in
+      // `mockInProgressTrips`, so an "in-progress" scope would find the prefilled
+      // leg ineligible and blank it (see `withinScope` in lib/support/prefill).
+      {
+        id: "cantReachLegId",
+        type: "leg-picker",
+        label: "Which trip?",
+        required: true,
+        showIf: ONLY_CONFIRM_CANT_REACH,
+        prefillFrom: "legId",
+        lockWhenPrefilled: true,
+        lockedBadge: "From this ride",
+      },
+      {
+        id: "cantReachPhone",
+        type: "text",
+        label: "Number you tried",
+        placeholder: "The number you called",
+        required: true,
+        prefillFrom: "riderPhone",
+        // Locked when we have one, because then it is evidence of what the app
+        // told the driver to call. When the trip carries no number the prefill
+        // resolves empty, nothing locks, and the driver types what they tried —
+        // which is the honest handling of "there was nothing to call".
+        lockWhenPrefilled: true,
+        lockedBadge: "On file",
+        helpText: "The number we have for this member.",
+        showIf: ONLY_CONFIRM_CANT_REACH,
+      },
+      {
+        id: "cantReachOutcome",
+        type: "select",
+        label: "What happened when you called?",
+        placeholder: "Select what you heard",
+        required: true,
+        options: CALL_OUTCOME_OPTIONS,
+        showIf: ONLY_CONFIRM_CANT_REACH,
+      },
+      {
+        id: "cantReachAttempts",
+        type: "stepper",
+        label: "How many times did you try?",
+        required: true,
+        // No default, same reasoning as the no-show wait: a number already in the
+        // box is an answer the driver never gave.
+        min: 1,
+        max: 10,
+        showIf: ONLY_CONFIRM_CANT_REACH,
+      },
+      {
+        id: "cantReachLastTriedAt",
+        type: "time",
+        label: "When did you last try?",
+        required: true,
+        helpText: "So Support knows how fresh this is before they call.",
+        showIf: ONLY_CONFIRM_CANT_REACH,
+      },
+      {
+        id: "cantReachDetails",
+        type: "textarea",
+        label: "Tell us what happened",
+        placeholder:
+          "Anything Support should know — who answered, what the recording said, whether you left a message.",
+        required: true,
+        maxLength: 500,
+        showIf: ONLY_CONFIRM_CANT_REACH,
+      },
+      {
+        id: "cantReachProof",
+        type: "file",
+        label: "Attach proof",
+        required: true,
+        requiredNotEnforced: true,
+        helpText: "A call log or screenshot showing your attempts.",
+        showIf: ONLY_CONFIRM_CANT_REACH,
+      },
+
+      // ---- Trip Confirmation — Rider Declined -----------------------------
+      //
+      // Reached from the Rider-declined popup. Production went straight from that
+      // popup to a chat message, which handed Support an unevidenced claim about a
+      // member for a ride with revenue attached. These five questions are what
+      // turn "the member declined" into something Support can act on.
+      //
+      // No phone field here on purpose: the number worked, so it is not evidence.
+      // It is evidence only when it fails, which is the case above.
+      {
+        id: "declinedLegId",
+        type: "leg-picker",
+        label: "Which trip?",
+        required: true,
+        showIf: ONLY_CONFIRM_DECLINED,
+        prefillFrom: "legId",
+        // Its own field rather than shared, for the same reason as the no-show
+        // picker: it must stay pinned to the ride the driver filed from.
+        lockWhenPrefilled: true,
+        lockedBadge: "From this ride",
+      },
+      {
+        id: "declinedHow",
+        type: "select",
+        label: "How did the member tell you?",
+        placeholder: "Select how you heard",
+        required: true,
+        options: DECLINED_CHANNEL_OPTIONS,
+        showIf: ONLY_CONFIRM_DECLINED,
+      },
+      {
+        id: "declinedAt",
+        type: "time",
+        label: "When did they tell you?",
+        required: true,
+        showIf: ONLY_CONFIRM_DECLINED,
+      },
+      {
+        id: "declinedDetails",
+        type: "textarea",
+        label: "What did the member say?",
+        placeholder:
+          "Their words as best you remember, and whether they still need a ride another day.",
+        required: true,
+        maxLength: 500,
+        showIf: ONLY_CONFIRM_DECLINED,
+      },
+      {
+        id: "declinedProof",
+        type: "file",
+        label: "Attach proof",
+        required: true,
+        requiredNotEnforced: true,
+        helpText:
+          "A screenshot of the message, or a call log showing the conversation.",
+        showIf: ONLY_CONFIRM_DECLINED,
       },
     ],
   };

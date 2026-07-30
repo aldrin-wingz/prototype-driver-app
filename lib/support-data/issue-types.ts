@@ -50,11 +50,10 @@ export const ISSUE_CONFIRM_DECLINED = "confirm-declined";
 /**
  * The support issues a driver can file, in dropdown order.
  *
- * Supplied by the user 2026-07-31 as the real list. The two Trip Confirmation
- * entries are registered but hidden: they belong to the "I reached out to confirm"
- * flow already built in `reach-out-sheet.tsx`, and how a form fits into that flow
- * has not been explained yet. Registering them now means the flow can be attached
- * later without renumbering anything.
+ * Supplied by the user 2026-07-31 as the real list. Three entries are hidden
+ * rather than absent: they are reached from a flow that decides which of them
+ * applies, so offering them in the dropdown would let a driver skip the decision
+ * that is the point of the flow.
  */
 export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   {
@@ -106,19 +105,19 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     value: ISSUE_CONFIRM_CANT_REACH,
     label: "Trip Confirmation — Can't Reach Member",
     description:
-      "For a trip you tried to confirm but couldn't reach the member about.",
+      "Tell Support what number you tried and what happened, so they can reach the member or fix the number.",
     visibility: "hidden",
-    buildState: "not-yet",
-    note: "Entered from the reach-out-to-confirm flow, not the dropdown. Behaviour still to be explained.",
+    buildState: "in-prototype",
+    note: "Entered from \"Number can not be reached\" in the reach-out-to-confirm flow, not the dropdown. The only case whose ask is help REACHING a member rather than help removing a ride.",
   },
   {
     value: ISSUE_CONFIRM_DECLINED,
     label: "Trip Confirmation — Rider Declined",
     description:
-      "For a member who told you they no longer need the trip.",
+      "Tell Support how the member declined, so they can take this ride off your manifest.",
     visibility: "hidden",
-    buildState: "not-yet",
-    note: "Entered from the Rider-declined popup, not the dropdown. Behaviour still to be explained.",
+    buildState: "in-prototype",
+    note: "Entered from the Rider-declined popup, not the dropdown. The form sits between the popup and the chat template, so the claim arrives evidenced.",
   },
 ];
 
