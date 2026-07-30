@@ -39,6 +39,10 @@ const PREVIEW_FIELDS = [
   "paymentDetails",
   "reason",
   "comments",
+  "tripRequestNotes",
+  // Last resort: a Trip Request with no notes is still identifiable by who it
+  // names, which is the only field it actually requires.
+  "member",
 ];
 
 function previewOf(record: SupportFormRecord): string | undefined {
@@ -144,9 +148,27 @@ function SubmittedFormSheet({
 }) {
   const supportCase = buildSupportFormCase();
   const trip = tripLabelOf(record);
+  // Repeater rows live under flattened `${id}.${index}.${rowField}` keys, so they
+  // need expanding here or a Trip Request's legs would show as nothing at all.
   const rows = supportCase.fields
     .filter((field) => field.type !== "notice" && field.id !== "issue")
-    .map((field) => ({ label: field.label, value: record.values[field.id] }))
+    .flatMap((field) => {
+      if (field.type !== "leg-repeater") {
+        return [{ label: field.label, value: record.values[field.id] }];
+      }
+      return Object.entries(record.values)
+        .filter(([key]) => key.startsWith(`${field.id}.`))
+        .map(([key, value]) => {
+          const [, index, rowFieldId] = key.split(".");
+          const rowField = field.rowFields?.find((f) => f.id === rowFieldId);
+          return {
+            label: `${field.rowLabel ?? "Row"} ${Number(index) + 1} · ${
+              rowField?.label ?? rowFieldId
+            }`,
+            value,
+          };
+        });
+    })
     .filter((row) => row.value?.trim());
 
   return (
@@ -210,7 +232,7 @@ function SubmittedFormSheet({
 }
 
 /**
- * My Forms — the Forms menu behind the header's clipboard icon.
+ * Support Requests — the menu behind the header's clipboard icon.
  *
  * The point of this screen is that a support request does not have to be about a
  * trip. Everything reachable before it was gated behind opening a ride, so a
@@ -252,7 +274,7 @@ export function FormsInboxScreen() {
           <ChevronLeft className="h-7 w-7" />
         </button>
         <h1 className="flex-1 pr-7 text-center text-xl font-bold text-gray-900">
-          My Forms
+          Support Requests
         </h1>
       </header>
 
@@ -358,7 +380,7 @@ export function FormsInboxScreen() {
             setActiveTab("drafts");
             toast({
               title: "Saved to drafts",
-              description: "Pick it back up from My Forms whenever.",
+              description: "Pick it back up from Support Requests whenever.",
             });
           }}
           onSubmit={(values) => {

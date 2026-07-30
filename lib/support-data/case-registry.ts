@@ -44,6 +44,8 @@ export const latePickupReasonCase: SupportCaseDefinition = {
   id: "late-pickup-reason",
   title: "Late pickup reason",
   summary: "Explain a late pickup that affects your on-time performance",
+  description:
+    "This pick-up ran late, which counts against your on-time performance. Tell us why so it can be reviewed.",
   category: "Trip Issue",
   buildState: "in-prototype",
   submitLabel: "Save Reason",
@@ -89,10 +91,11 @@ const PAYMENT_CATEGORIES: SupportFieldOption[] = [
 const ONLY_MISSED_SWIPE = { field: "issue", equals: [ISSUE_MISSED_SWIPE] };
 const ONLY_GENERAL = { field: "issue", equals: [ISSUE_GENERAL] };
 const ONLY_PAYMENT = { field: "issue", equals: [ISSUE_PAYMENT] };
+const ONLY_TRIP_REQUEST = { field: "issue", equals: [ISSUE_TRIP_REQUEST] };
 /** Issues that are registered but whose questions are not specified yet. */
 const ONLY_NOT_YET = {
   field: "issue",
-  equals: [ISSUE_TRIP_REQUEST, ISSUE_RIDER_NO_SHOW],
+  equals: [ISSUE_RIDER_NO_SHOW],
 };
 
 export const SUPPORT_FORM_CASE_ID = "support-form";
@@ -124,6 +127,9 @@ export function buildSupportFormCase(): SupportCaseDefinition {
     id: SUPPORT_FORM_CASE_ID,
     title: "Submit Support Form",
     summary: "Send Support a request",
+    // Only ever seen before an issue is picked; after that the issue's own
+    // description takes over.
+    description: "Pick the issue that fits and we'll only ask what we need to.",
     category: "Trip Issue",
     buildState: "in-prototype",
     submitLabel: "Submit",
@@ -170,6 +176,76 @@ export function buildSupportFormCase(): SupportCaseDefinition {
         required: true,
         maxLength: 1000,
         showIf: ONLY_PAYMENT,
+      },
+
+      // ---- Trip Request --------------------------------------------------
+      //
+      // The only case that is NOT about a trip in the system. A member has told
+      // the driver about upcoming rides that haven't landed yet, and the driver
+      // wants them assigned when they do. Every detail is optional because the
+      // driver sometimes has leg ids and times and sometimes only a name — a
+      // required field here would just block the requests we most want.
+      {
+        id: "member",
+        type: "member-picker",
+        label: "Which member?",
+        placeholder: "Search members you've driven recently",
+        // The one thing we do insist on: without a member there is nothing for
+        // Support to match incoming trips against.
+        required: true,
+        helpText: "Members you've driven in the last 30 days.",
+        prefillFrom: "riderName",
+        lockWhenPrefilled: true,
+        lockedBadge: "From this ride",
+        showIf: ONLY_TRIP_REQUEST,
+      },
+      {
+        id: "expectedLegs",
+        type: "stepper",
+        label: "How many rides do you expect?",
+        helpText: "Sets up that many ride rows below.",
+        // This field IS the row count — the repeater below reads and writes it —
+        // so the number here and the rows shown cannot drift apart.
+        defaultValue: "1",
+        min: 1,
+        max: 8,
+        showIf: ONLY_TRIP_REQUEST,
+      },
+      {
+        id: "tripLegs",
+        type: "leg-repeater",
+        label: "Ride details (optional)",
+        helpText:
+          "Fill in whatever the member gave you. Blank rows are fine — Support will match on the member.",
+        addRowLabel: "Add another ride",
+        rowLabel: "Ride",
+        rowCountFrom: "expectedLegs",
+        max: 8,
+        showIf: ONLY_TRIP_REQUEST,
+        rowFields: [
+          {
+            id: "legId",
+            type: "text",
+            // "Ride ID" per the driver-facing rename, though the value is still
+            // the system's leg id — which is what Support will look it up by.
+            label: "Ride ID (optional)",
+            placeholder: "e.g. 1930447",
+          },
+          {
+            id: "pickupAt",
+            type: "datetime",
+            label: "Pick-up date & time (optional)",
+          },
+        ],
+      },
+      {
+        id: "tripRequestNotes",
+        type: "textarea",
+        label: "Anything else? (optional)",
+        placeholder:
+          "Standing order, recurring appointment, anything else the member told you.",
+        maxLength: 500,
+        showIf: ONLY_TRIP_REQUEST,
       },
 
       // ---- Missed Swipe --------------------------------------------------

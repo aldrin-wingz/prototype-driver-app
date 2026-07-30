@@ -1,5 +1,15 @@
 import type { IncentiveType } from "@/lib/data/incentives";
 
+/**
+ * The day the prototype pretends it is.
+ *
+ * Seeded rather than read off the clock, following the repo's data-driven
+ * convention: anything that windows on "the last N days" has to give the same
+ * answer in a demo next month as it does today. Matches the dates already used by
+ * the needs-action ride.
+ */
+export const MOCK_TODAY = "2026-07-31";
+
 export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress" | "completed";
 export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "scheduled";
 
@@ -1143,6 +1153,165 @@ export const mockInProgressTrips: Trip[] = [
 // `CURRENT-COMP-*` are dated within the current pay period (Apr 28–May 4, 2026)
 // so the dashboard's EarningsCard can sum the current period's completed trips.
 export const mockCompletedTrips: Trip[] = [
+  // === RECENT (July 2026) — the member history the Trip Request case reads ===
+  //
+  // A Trip Request is for rides a member told the driver about that aren't in the
+  // app yet, so its member selector offers members the driver has actually driven
+  // in the last 30 days. `RECENT-COMP-005` sits deliberately OUTSIDE that window
+  // (Jun 25, more than 30 days before MOCK_TODAY) so the cutoff excludes something
+  // visible rather than being decorative. KALLIYAH TYSON appears twice on purpose,
+  // to exercise the per-member trip count.
+  {
+    id: "RECENT-COMP-001",
+    date: "Mon, Jul 27, 2026",
+    rider: "MARCUS WHITFIELD",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 68.40,
+    notes: "",
+    legs: [
+      {
+        id: "1928814",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "7:45 AM",
+        address: "118 Bradley St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 34.20,
+      },
+      {
+        id: "1928815",
+        legCode: "B",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "1:15 PM",
+        address: "Tanner Medical Center, 705 Dixie St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 34.20,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-002",
+    date: "Fri, Jul 24, 2026",
+    rider: "DENISE ALVARADO",
+    client: "Alivi",
+    passengerCount: 2,
+    distance: "",
+    totalRevenue: 52.16,
+    notes: "Member uses a walker",
+    legs: [
+      {
+        id: "1930447",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "10:30 AM",
+        address: "2411 Ortiz Ave, Fort Myers, FL 33905",
+        county: "Lee County",
+        revenue: 26.08,
+      },
+      {
+        id: "1930448",
+        legCode: "B",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "2:00 PM",
+        address: "Lee Health Coconut Point, 23450 Via Coconut Point, Estero, FL 33928",
+        county: "Lee County",
+        revenue: 26.08,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-003",
+    date: "Sat, Jul 18, 2026",
+    rider: "KALLIYAH TYSON",
+    client: "Alivi",
+    passengerCount: 4,
+    distance: "",
+    totalRevenue: 26.29,
+    notes: "",
+    legs: [
+      {
+        id: "1929902",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:40 AM",
+        address: "3702 Broadway Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 26.29,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-004",
+    date: "Mon, Jul 6, 2026",
+    rider: "KALLIYAH TYSON",
+    client: "Alivi",
+    passengerCount: 4,
+    distance: "",
+    totalRevenue: 26.29,
+    notes: "",
+    legs: [
+      {
+        id: "1927331",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:40 AM",
+        address: "3702 Broadway Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 26.29,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-005",
+    date: "Thu, Jun 25, 2026",
+    rider: "HAROLD NIXON",
+    client: "MTM",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 41.75,
+    notes: "",
+    legs: [
+      {
+        id: "1921180",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "11:00 AM",
+        address: "980 Powder Springs St, Smyrna, GA 30080",
+        county: "Cobb County",
+        revenue: 41.75,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
   // === CURRENT PERIOD (Apr 28–May 4, 2026): 3 trips totaling $342.50 ===
   {
     id: "CURRENT-COMP-001",

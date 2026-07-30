@@ -377,7 +377,7 @@ export function MoreOptionsScreen({
             });
             toast({
               title: "Saved to drafts",
-              description: "Pick it back up from My Forms whenever.",
+              description: "Pick it back up from Support Requests whenever.",
             });
           }}
           onSubmit={(values) => {
@@ -393,7 +393,7 @@ export function MoreOptionsScreen({
               title: openCase.successMessage ?? "Sent to Support",
               description: context.tripId
                 ? "This ride has moved to Pending while Support reviews it."
-                : "It's in Pending review under My Forms.",
+                : "It's in Pending Review under Support Requests.",
             });
             router.push(backHref);
           }}

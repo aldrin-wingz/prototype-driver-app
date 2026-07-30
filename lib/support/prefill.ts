@@ -1,4 +1,5 @@
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
+import { getLegOptions } from "@/lib/support-data/leg-options";
 import type {
   SupportCaseDefinition,
   SupportField,
@@ -47,6 +48,8 @@ function resolve(
       return supportCase.issueType ?? supportCase.title;
     case "driverEmail":
       return DRIVER_EMAIL;
+    case "riderName":
+      return trip.rider;
     case "pickupDate":
       return toDateInputValue(trip.date);
     case "legPositionLetter":
@@ -62,6 +65,22 @@ function resolve(
   }
 }
 
+/**
+ * Drop a prefilled leg the field's own picker wouldn't offer.
+ *
+ * Opening the form from a ride prefills that ride's leg, but a scoped picker only
+ * offers legs the issue actually applies to — a missed swipe needs a trip that is
+ * under way. Prefilling an ineligible leg would let the driver file against a ride
+ * that hasn't started, which the picker itself forbids.
+ */
+function withinScope(field: SupportField, value: string): string {
+  if (field.type !== "leg-picker" || !field.legScope || !value) return value;
+  const eligible = getLegOptions(field.legScope).some(
+    (option) => option.legId === value
+  );
+  return eligible ? value : "";
+}
+
 /** Initial form values for a case, with everything the app knows filled in. */
 export function buildPrefilledValues(
   supportCase: SupportCaseDefinition,
@@ -71,7 +90,12 @@ export function buildPrefilledValues(
   return Object.fromEntries(
     supportCase.fields.map((field) => [
       field.id,
-      field.prefillFrom ? resolve(field.prefillFrom, trip, leg, supportCase) : "",
+      field.prefillFrom
+        ? withinScope(field, resolve(field.prefillFrom, trip, leg, supportCase))
+        : // Fall back to the field's own default rather than blank — otherwise
+          // opening the form from a ride wipes defaults like "one ride row", and
+          // the stepper and the rows below it disagree.
+          (field.defaultValue ?? ""),
     ])
   );
 }

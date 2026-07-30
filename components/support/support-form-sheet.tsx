@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { SupportFieldRenderer } from "./support-field-renderer";
 import { TripSummaryBanner } from "./trip-summary-banner";
 import { findLegOption } from "@/lib/support-data/leg-options";
+import { getIssueDescription } from "@/lib/support-data/issue-types";
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
   canSubmitCase,
@@ -81,6 +82,24 @@ export function SupportFormSheet({
   });
   const [values, setValues] = useState<Record<string, string>>(blank);
 
+  /**
+   * Fields whose current value came from the app, not the driver.
+   *
+   * `lockWhenPrefilled` has to mean "we already know this", not "this has a
+   * value" — otherwise picking a member from the search would lock the driver out
+   * of changing their mind. Tracked as a set rather than inferred, because the
+   * same field can be app-supplied on one leg and empty on the next.
+   */
+  const suppliedIds = (source: Record<string, string>) =>
+    new Set(
+      Object.entries(source)
+        .filter(([, value]) => value.trim().length > 0)
+        .map(([id]) => id)
+    );
+  const [appSupplied, setAppSupplied] = useState<Set<string>>(() =>
+    suppliedIds(initialValues ?? {})
+  );
+
   // The leg the driver picked drives the summary banner and every timestamp we
   // can fill. Re-derive on change rather than only at mount.
   const selectedLeg = values.legId ? findLegOption(values.legId) : undefined;
@@ -89,8 +108,25 @@ export function SupportFormSheet({
     if (!selectedLeg) return;
     const derived = deriveFromLeg(supportCase, selectedLeg.trip, selectedLeg.leg);
     setValues((previous) => ({ ...previous, ...derived }));
+    // A timestamp the newly picked leg has is app-supplied; one it doesn't have
+    // stops being, so the driver can fill it in.
+    setAppSupplied((previous) => {
+      const next = new Set(previous);
+      for (const [id, value] of Object.entries(derived)) {
+        if (value.trim()) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
     // Keyed on the leg id so this runs once per selection, not every render.
   }, [selectedLeg?.legId]);
+
+  // The chosen issue's purpose line wins over the case's own, since the issue is
+  // what determines which form the driver is actually filling in.
+  const description =
+    (values.issue ? getIssueDescription(values.issue) : undefined) ??
+    supportCase.description ??
+    supportCase.summary;
 
   const visibleFields = supportCase.fields.filter((field) =>
     isFieldVisible(field, values)
@@ -102,6 +138,13 @@ export function SupportFormSheet({
 
   function setValue(id: string, value: string) {
     setValues((previous) => ({ ...previous, [id]: value }));
+    // The driver touched it, so it is theirs now.
+    setAppSupplied((previous) => {
+      if (!previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
   }
 
   /**
@@ -118,16 +161,21 @@ export function SupportFormSheet({
     );
   }
 
+  function reset() {
+    setValues(blank());
+    setAppSupplied(suppliedIds(initialValues ?? {}));
+  }
+
   function handleClose() {
     if (isDirty(values)) onSaveDraft?.(values);
     onOpenChange(false);
-    setValues(blank());
+    reset();
   }
 
   function handleSubmit() {
     if (!canSubmit) return;
     onSubmit(values);
-    setValues(blank());
+    reset();
   }
 
   const tone = callout ? CALLOUT_TONE[callout.tone] : null;
@@ -161,6 +209,15 @@ export function SupportFormSheet({
             </button>
           </div>
 
+          {/* Purpose reminder. Quiet grey body copy, deliberately NOT a callout —
+              the tinted callout below carries warnings, and the two must not read
+              as the same kind of thing. */}
+          {description && (
+            <p className="mt-2 flex-shrink-0 text-sm leading-relaxed text-gray-500">
+              {description}
+            </p>
+          )}
+
           {callout && tone && CalloutIcon && (
             <div
               className={cn(
@@ -189,8 +246,13 @@ export function SupportFormSheet({
                 <SupportFieldRenderer
                   field={field}
                   value={values[field.id] ?? ""}
-                  locked={Boolean(field.lockWhenPrefilled)}
+                  locked={
+                    Boolean(field.lockWhenPrefilled) &&
+                    appSupplied.has(field.id)
+                  }
                   onChange={(value) => setValue(field.id, value)}
+                  values={values}
+                  setValue={setValue}
                 />
                 {/* The summary sits directly under the picker that produced it. */}
                 {field.type === "leg-picker" && selectedLeg && (

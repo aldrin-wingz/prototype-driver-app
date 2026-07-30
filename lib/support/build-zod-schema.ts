@@ -78,5 +78,7 @@ export function canSubmitCase(
 
 /** Blank starting values for a case, so inputs stay controlled from mount. */
 export function emptyValues(fields: SupportField[]): Record<string, string> {
-  return Object.fromEntries(fields.map((field) => [field.id, ""]));
+  return Object.fromEntries(
+    fields.map((field) => [field.id, field.defaultValue ?? ""])
+  );
 }

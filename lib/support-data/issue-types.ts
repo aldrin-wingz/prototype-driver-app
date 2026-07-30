@@ -22,6 +22,14 @@ export type IssueVisibility =
 export interface SupportIssueType {
   value: string;
   label: string;
+  /**
+   * One line at the top of the form saying what it is for.
+   *
+   * The issue dropdown swaps an entire field set beneath it, so without this the
+   * driver has to infer the purpose from the field labels — and picks the wrong
+   * issue when two of them sound close.
+   */
+  description: string;
   visibility: IssueVisibility;
   buildState: SupportBuildState;
   /** Why it isn't freely selectable, or what still has to be decided. */
@@ -52,25 +60,32 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   {
     value: ISSUE_GENERAL,
     label: "General",
+    description:
+      "Anything that doesn't fit the other options. Tell us what's happening and Support will pick it up.",
     visibility: "always",
     buildState: "in-prototype",
   },
   {
     value: ISSUE_PAYMENT,
     label: "Payment Related",
+    description:
+      "Questions about your pay — when a payout lands, an amount that looks wrong, or a trip you weren't paid for.",
     visibility: "always",
     buildState: "in-prototype",
   },
   {
     value: ISSUE_TRIP_REQUEST,
     label: "Trip Request",
+    description:
+      "For upcoming trips a member has told you about that aren't in the app yet. Send what you know and Support will assign them to you once they come in.",
     visibility: "always",
-    buildState: "not-yet",
-    note: "Field set not specified yet.",
+    buildState: "in-prototype",
   },
   {
     value: ISSUE_MISSED_SWIPE,
     label: "Missed Swipe",
+    description:
+      "For a trip you drove but couldn't swipe at the time. Anything the app already recorded is filled in — just add the times that are missing.",
     visibility: "in-progress-only",
     buildState: "in-prototype",
     note: "Applies anywhere from en-route to drop-off; whatever the app recorded arrives prefilled.",
@@ -78,6 +93,8 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   {
     value: ISSUE_RIDER_NO_SHOW,
     label: "Rider No-Show",
+    description:
+      "For a member who wasn't there at pick-up after you waited.",
     visibility: "in-progress-only",
     buildState: "not-yet",
     note: "Field set not specified yet. Note the app already has a Member No-Show action in More Options — the two need reconciling.",
@@ -85,6 +102,8 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   {
     value: ISSUE_CONFIRM_CANT_REACH,
     label: "Trip Confirmation — Can't Reach Member",
+    description:
+      "For a trip you tried to confirm but couldn't reach the member about.",
     visibility: "hidden",
     buildState: "not-yet",
     note: "Entered from the reach-out-to-confirm flow, not the dropdown. Behaviour still to be explained.",
@@ -92,6 +111,8 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   {
     value: ISSUE_CONFIRM_DECLINED,
     label: "Trip Confirmation — Rider Declined",
+    description:
+      "For a member who told you they no longer need the trip.",
     visibility: "hidden",
     buildState: "not-yet",
     note: "Entered from the Rider-declined popup, not the dropdown. Behaviour still to be explained.",
@@ -133,4 +154,8 @@ export function getIssueOptions(): SupportFieldOption[] {
 /** The plain label, for records and lists that shouldn't carry the flag suffix. */
 export function getIssueLabel(value: string): string {
   return getIssueType(value)?.label ?? value;
+}
+
+export function getIssueDescription(value: string): string | undefined {
+  return getIssueType(value)?.description;
 }

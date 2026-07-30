@@ -22,8 +22,21 @@ export type SupportFieldType =
   | "date"
   | "number"
   | "file"
+  /** One control for a date AND a time. */
+  | "datetime"
+  /** A number with − / + buttons either side. */
+  | "stepper"
   /** Searchable picker over the driver's own legs. Selecting one drives prefill. */
   | "leg-picker"
+  /** Searchable picker over members the driver has driven recently. */
+  | "member-picker"
+  /**
+   * A repeating row group, e.g. one row per expected leg.
+   *
+   * Its columns come from `rowFields`. The runtime's only composite type — every
+   * other field owns exactly one value.
+   */
+  | "leg-repeater"
   /**
    * Not an input — a block of copy standing in for a field set that isn't built.
    *
@@ -44,6 +57,7 @@ export type SupportFieldType =
 export type SupportPrefillSource =
   | "issueType"
   | "driverEmail"
+  | "riderName"
   | "pickupDate"
   | "legPositionLetter"
   | "legId"
@@ -88,6 +102,37 @@ export interface SupportField {
    */
   legScope?: LegScope;
   /**
+   * For `leg-repeater` — the columns making up one row.
+   *
+   * Row values live in the flat values map under `${field.id}.${index}.${rowFieldId}`,
+   * and the row count under `${field.id}Count`. Flat keys rather than nested
+   * objects, so drafts, prefill and the submitted-form view all keep working
+   * against one `Record<string, string>`.
+   */
+  rowFields?: SupportField[];
+  /** For `leg-repeater` — label on the add-another-row button. */
+  addRowLabel?: string;
+  /** For `leg-repeater` — what one row is called, e.g. "Ride" → "Ride 1". */
+  rowLabel?: string;
+  /**
+   * For `leg-repeater` — the field that HOLDS the row count.
+   *
+   * Not a copy of the count, the count itself: the repeater reads and writes this
+   * key, so a stepper bound to the same field and the Add / remove controls can
+   * never disagree. Without it the repeater falls back to its own `${id}Count`.
+   */
+  rowCountFrom?: string;
+  /** For `stepper` and `number` — bounds on the value. */
+  min?: number;
+  max?: number;
+  /**
+   * Starting value when the form opens blank.
+   *
+   * Not the same as a prefill: a prefill comes from the ride, this is just the
+   * sensible place to start (one ride row, rather than none).
+   */
+  defaultValue?: string;
+  /**
    * Lock this field once a prefilled value resolves.
    *
    * Used for values the app already recorded — a swipe time we hold is context,
@@ -95,6 +140,13 @@ export interface SupportField {
    * timestamps are known changes with the selected leg.
    */
   lockWhenPrefilled?: boolean;
+  /**
+   * Badge shown beside the label while locked.
+   *
+   * Defaults to "Already recorded", which is right for a timestamp the app
+   * captured but wrong for something taken off the ride the driver opened.
+   */
+  lockedBadge?: string;
 }
 
 /** Tint of the context callout above the fields. */
@@ -129,6 +181,14 @@ export interface SupportCaseDefinition {
   issueType?: string;
   /** One-line description for the options menu row. */
   summary?: string;
+  /**
+   * Purpose line at the top of the sheet.
+   *
+   * For the general support form this is only the fallback shown before an issue
+   * is chosen — once one is, the issue's own description replaces it, because a
+   * form whose field set swaps needs a purpose that swaps with it.
+   */
+  description?: string;
   category: "Trip Issue" | "Pay" | "Rider" | "Vehicle" | "App";
   buildState: SupportBuildState;
   /** Label on the primary footer button — case-specific ("Save Reason"). */
