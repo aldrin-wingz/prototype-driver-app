@@ -37,6 +37,11 @@ import {
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
 import { getSupportCase } from "@/lib/support-data/case-registry";
 import { buildCalloutForCase } from "@/lib/support/build-callout";
+import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import {
+  ReachOutSheet,
+  RiderDeclinedSheet,
+} from "./reach-out-sheet";
 import type { SupportCaseDefinition } from "@/types/support";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
@@ -273,9 +278,23 @@ function LegCard({
  * inline chips row alongside the status pill. The above-metadata-card banner
  * surface and the variant-switch were stripped in I-0.
  */
-export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
+export function RideDetailLayout({
+  trip,
+  state: seededState,
+  backHref,
+}: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { getConfirmation, setConfirmation } = useRideFlow();
+
+  // Confirming a ride moves it out of "needs action": it becomes an accepted
+  // ride awaiting its first swipe. The seeded status stays untouched — the
+  // transition lives in session state, so a reload returns to the demo start.
+  const confirmation = getConfirmation(trip.id);
+  const state: DetailState =
+    seededState === "needs-action" && confirmation === "confirmed"
+      ? "in-progress"
+      : seededState;
 
   // The leg the driver is working, and the swipe expected next on it. Only legs
   // that carry a `progress` object take part in the swipe sequence — the
@@ -303,6 +322,10 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
   // form sheet. Only one is on screen at a time.
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
+
+  // "I Reached Out to Confirm" flow.
+  const [reachOutOpen, setReachOutOpen] = useState(false);
+  const [declinedOpen, setDeclinedOpen] = useState(false);
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -587,22 +610,78 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-gray-300">
               <MessageSquare className="h-5 w-5 text-gray-600" />
             </button>
-            <span className="text-sm font-medium text-gray-700">More</span>
+            <button
+              type="button"
+              onClick={() => router.push(`/my-rides/${trip.id}/more`)}
+              className="text-sm font-medium text-gray-700"
+            >
+              More
+            </button>
           </div>
 
           <div className="px-4 py-4">
-            <button className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg">
+            <button
+              type="button"
+              onClick={() => setReachOutOpen(true)}
+              className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
+            >
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
                 <Phone className="h-5 w-5" />
               </div>
               <div className="text-left">
                 <p className="text-sm font-bold uppercase">I Reached Out to Confirm</p>
-                <p className="text-xs opacity-90">A Leg</p>
+                <p className="text-xs opacity-90">
+                  {activeLeg?.legCode ? `${activeLeg.legCode} Leg` : "A Leg"}
+                </p>
               </div>
             </button>
           </div>
         </div>
       )}
+
+      <ReachOutSheet
+        open={reachOutOpen}
+        onOpenChange={setReachOutOpen}
+        onNext={(choice) => {
+          setReachOutOpen(false);
+
+          if (choice === "declined") {
+            // Declining opens its own follow-up rather than resolving here.
+            setDeclinedOpen(true);
+            return;
+          }
+
+          if (choice === "confirmed") {
+            // The ride becomes an accepted ride awaiting its first swipe — the
+            // detail state flips to in-progress on the next render.
+            setConfirmation(trip.id, "confirmed");
+            toast({
+              title: "Confirmed with the rider",
+              description: "This ride is ready to start.",
+            });
+            return;
+          }
+
+          // "No, but I will go to the pickup as scheduled" — per the flow this
+          // just closes. No state change, no confirmation, nothing to announce:
+          // the ride stays exactly as it was so the driver can try again.
+        }}
+      />
+
+      <RiderDeclinedSheet
+        open={declinedOpen}
+        onOpenChange={setDeclinedOpen}
+        onChatWithSupport={() => {
+          setDeclinedOpen(false);
+          setConfirmation(trip.id, "declined");
+          router.push(`/my-rides/${trip.id}/support-chat`);
+        }}
+        onNeedsTransportation={() => {
+          // Walks back to the three options rather than resolving anything.
+          setDeclinedOpen(false);
+          setReachOutOpen(true);
+        }}
+      />
 
 
       {openCase && (

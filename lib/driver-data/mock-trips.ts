@@ -916,75 +916,56 @@ export const mockUpcomingTrips: Trip[] = [
 ];
 
 // Mock needs action trips
+// Mock needs-action trips — ONE ride, unconfirmed.
+//
+// A single ride on purpose: it is the subject of the "I Reached Out to Confirm"
+// flow, and having one keeps the state transitions unambiguous while
+// prototyping. Data shape follows reference captures s-04a/b/c — Alivi client,
+// multi-passenger, two legs whose ids are cited verbatim in the support-chat
+// template message.
+//
+// The first leg carries an all-null `progress` so that once the ride is
+// confirmed it renders as an accepted ride awaiting its first swipe
+// ("SWIPE TO START") rather than falling through to "All legs complete".
 export const mockNeedsActionTrips: Trip[] = [
   {
-    id: "1000883298451",
-    date: "Sun, Mar 15, 2026",
-    rider: "WINDY PRECISE",
-    client: "Verida",
-    passengerCount: 1,
+    id: "260731-780322",
+    date: "Thu, Jul 31, 2026",
+    rider: "KALLIYAH TYSON",
+    client: "Alivi",
+    passengerCount: 4,
     distance: "",
-    totalRevenue: 45.25,
-    notes: "FOR TESTING PURPOSES ONLY",
+    totalRevenue: 26.29,
+    notes: "Rider has not answered two confirmation calls",
     legs: [
       {
-        id: "1000883298451",
+        id: "1931025",
+        legCode: "A",
         type: "est-pickup",
         label: "Est Pick-up Time",
-        time: "10:00 PM",
-        address: "Braselton Return, 33 Golden Eagle Pkwy, Braselton, GA 30517",
-        county: "Jackson County",
-        revenue: 45.25,
+        time: "9:40 AM",
+        address: "3820 Palm Beach Blvd, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 26.29,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
       },
       {
-        id: "1000883298451-b",
+        id: "1931026",
         type: "appointment",
         label: "Appointment Time",
-        time: "10:46 PM",
-        address: "1920 Briarcliff Rd NE, Atlanta, GA 30329",
-        county: "DeKalb County",
+        time: "10:25 AM",
+        address: "16271 Bass Rd, Fort Myers, FL 33908",
+        county: "Lee County",
         revenue: 0,
       },
     ],
     status: "needs-action",
-    pills: [
-      { label: "Not Confirmed", variant: "danger" },
-    ],
-    // Was: ["weekend-warrior", "early-bird"] — early-bird is completed; weekend-warrior is gold
-    incentiveTypes: ["weekend-warrior"],
-    clientEnrolledInIncentives: true,
-  },
-  {
-    id: "NA-002",
-    date: "Wed, Feb 25, 2026",
-    rider: "Chichi Cormy MTM",
-    client: "MTM",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 47.90,
-    notes: "Pick Up: 1254652260 Z1BRV8QHQO...",
-    legs: [
-      {
-        id: "leg-1",
-        type: "scheduled",
-        label: "Scheduled Pick-up Time",
-        time: "10:00 PM",
-        address: "777 MTM Blvd, Alexandria, VA",
-        county: "Alexandria city County",
-        revenue: 23.95,
-      },
-      {
-        id: "leg-2",
-        type: "scheduled",
-        label: "Scheduled Pick-up Time",
-        time: "9:00 PM",
-        address: "666 Return St, Alexandria, VA",
-        county: "Alexandria city County",
-        revenue: 23.95,
-      },
-    ],
-    status: "needs-action",
-    pills: [],
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
