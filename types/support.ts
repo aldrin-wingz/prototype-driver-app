@@ -22,6 +22,13 @@ export type SupportFieldType =
   | "date"
   | "number"
   | "file"
+  /**
+   * Draw-to-sign attestation.
+   *
+   * Belongs LAST in a field set: the driver is signing for what they just filled
+   * in, so anything after it would be signed for before it was written.
+   */
+  | "signature"
   /** One control for a date AND a time. */
   | "datetime"
   /** A number with − / + buttons either side. */

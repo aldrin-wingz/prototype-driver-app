@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Paperclip, Search, Check, Trash2, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SignaturePad } from "@/components/ui/signature-pad";
 import {
   Select,
   SelectContent,
@@ -211,6 +212,39 @@ function MemberPicker({
         </div>
       )}
     </div>
+  );
+}
+
+/** The stored value of a drawn signature. Shown as-is in the submitted-form view. */
+const SIGNED = "Signed";
+
+/**
+ * Draw-to-sign field.
+ *
+ * A signature has to be drawn in THIS session, so a stored value with a blank pad
+ * is cleared on mount. Otherwise reopening a draft would leave Submit enabled with
+ * no signature visible anywhere — the one field where trusting saved state would
+ * let a driver submit an attestation they never made.
+ */
+function SignatureField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const cleared = useRef(false);
+
+  useEffect(() => {
+    if (cleared.current) return;
+    cleared.current = true;
+    if (value) onChange("");
+    // Mount only — a later value is one the driver just drew.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <SignaturePad onSignedChange={(signed) => onChange(signed ? SIGNED : "")} />
   );
 }
 
@@ -454,6 +488,10 @@ export function SupportFieldRenderer({
 
       {field.type === "stepper" && (
         <Stepper field={field} value={value} onChange={onChange} />
+      )}
+
+      {field.type === "signature" && (
+        <SignatureField value={value} onChange={onChange} />
       )}
 
       {field.type === "leg-repeater" && values && setValue && (

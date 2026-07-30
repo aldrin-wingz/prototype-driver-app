@@ -423,6 +423,17 @@ export function buildSupportFormCase({
         helpText: "A call log or screenshot showing you tried to reach them.",
         showIf: ONLY_RIDER_NO_SHOW,
       },
+      {
+        // LAST, deliberately. The driver is attesting to the answers above, so a
+        // field after the signature would be signed for before it was written.
+        id: "noShowSignature",
+        type: "signature",
+        label: "Sign to confirm",
+        required: true,
+        helpText:
+          "By signing, you confirm the member was not present at the pick-up.",
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
     ],
   };
 }

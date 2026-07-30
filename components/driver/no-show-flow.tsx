@@ -15,11 +15,34 @@ import {
   buildNoShowFormMessage,
   buildNoShowMessage,
 } from "@/lib/support/build-no-show-message";
-import { resolveNoShowOutcome } from "@/lib/driver-data/no-show-rules";
+import {
+  resolveNoShowOutcome,
+  type NoShowOutcome,
+} from "@/lib/driver-data/no-show-rules";
 import type { MarketCode, Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 
 /** Where the driver is in the flow. */
 type Step = "signature" | "blocked-left" | "blocked-waiting" | "form" | null;
+
+/**
+ * The first thing the driver sees, per outcome.
+ *
+ * Only the proven-wait path opens on the signature, because it is the only one
+ * where signing is the entire submission. Everything else either asks questions
+ * first or refuses outright.
+ */
+function entryStepFor(outcome: NoShowOutcome): Step {
+  switch (outcome) {
+    case "submit":
+      return "signature";
+    case "form":
+      return "form";
+    case "blocked-left":
+      return "blocked-left";
+    case "blocked-waiting":
+      return "blocked-waiting";
+  }
+}
 
 /**
  * Spelled-out market names for driver-facing copy.
@@ -42,9 +65,16 @@ const MARKET_NAMES: Record<MarketCode, string> = {
  * questions the app can already answer, and a driver who has since driven off
  * should not be refused outright, which is what happens today.
  *
- * Order matches production: signature FIRST, then the check. Signing before being
- * told no is what makes a refusal read as policy rather than as the app having
- * quietly decided they were never eligible.
+ * **The check runs first, before anything is asked of the driver.** Production
+ * signs first and then refuses, which is work collected for nothing: if the answer
+ * is already no, there is no reason to make someone sign. So this resolves the
+ * outcome on open and only then collects what that outcome actually needs.
+ *
+ * Where the signature ends up follows from that. A refusal collects none. A form
+ * carries it as the last field, because the driver is attesting to the answers they
+ * just gave. And the proven-wait path has no form, so the signature sheet IS the
+ * submission — note that proving the wait is not the same as proving the member was
+ * absent, which is precisely what the driver is signing for.
  *
  * The branch itself lives in `resolveNoShowOutcome`, driven by seeded presence
  * evidence and the client's on-site policy — see `lib/driver-data/no-show-rules`.
@@ -66,9 +96,10 @@ export function NoShowFlow({
   const { saveDraft, submitForm, appendSupportMessage } = useRideFlow();
   const [step, setStep] = useState<Step>(null);
 
-  // Opening always starts at the signature; a re-open after a refusal starts over
-  // rather than resuming mid-flow.
-  const current: Step = open && step === null ? "signature" : step;
+  // Opening resolves the branch immediately: a refusal shows up front rather than
+  // after the driver has signed for nothing. A re-open starts over.
+  const current: Step =
+    open && step === null ? entryStepFor(resolveNoShowOutcome(trip, leg)) : step;
 
   // The issue is normally hidden, so it has to be force-included as an option —
   // otherwise the locked dropdown holds a value it cannot render a label for.
@@ -81,7 +112,7 @@ export function NoShowFlow({
     onOpenChange(false);
   }
 
-  /** The proven-wait path: nothing to ask, so send it and open the chat. */
+  /** The proven-wait path: nothing to ask beyond the attestation, so send it. */
   function submitDirectly() {
     close();
     appendSupportMessage(trip.id, buildNoShowMessage(trip, leg));
@@ -90,16 +121,6 @@ export function NoShowFlow({
       description: "We've sent Support the details to remove this ride.",
     });
     router.push(`/my-rides/${trip.id}/support-chat`);
-  }
-
-  function handleSigned() {
-    const outcome = resolveNoShowOutcome(trip, leg);
-
-    if (outcome === "submit") {
-      submitDirectly();
-      return;
-    }
-    setStep(outcome === "form" ? "form" : outcome);
   }
 
   const initialValues = {
@@ -116,7 +137,7 @@ export function NoShowFlow({
           if (!next) close();
         }}
         riderName={trip.rider}
-        onSigned={handleSigned}
+        onSigned={submitDirectly}
       />
 
       <NoShowBlockedSheet

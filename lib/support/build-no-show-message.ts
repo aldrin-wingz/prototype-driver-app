@@ -53,6 +53,9 @@ export function buildNoShowFormMessage(
     // Only mentioned when there is one — the attachment is unenforced in the
     // prototype, and an empty "Attachment:" line would read as a lost upload.
     proof && `Attachment: ${proof}`,
+    // The attestation is the formally meaningful part, and chat is what Support
+    // reads first, so it says so here rather than only in the filed request.
+    values.noShowSignature?.trim() && "Driver signed the no-show attestation.",
   ].filter(Boolean) as string[];
 
   return [
