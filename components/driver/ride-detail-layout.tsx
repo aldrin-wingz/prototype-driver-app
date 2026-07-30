@@ -39,6 +39,7 @@ import { SupportFormSheet } from "@/components/support/support-form-sheet";
 import { getSupportCase } from "@/lib/support-data/case-registry";
 import { buildCalloutForCase } from "@/lib/support/build-callout";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import { buildDeclineMessage } from "@/lib/support/build-decline-message";
 import {
   ReachOutSheet,
   RiderDeclinedSheet,
@@ -286,7 +287,12 @@ export function RideDetailLayout({
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { getConfirmation, setConfirmation, getPendingRequest } = useRideFlow();
+  const {
+    getConfirmation,
+    setConfirmation,
+    getPendingRequest,
+    appendSupportMessage,
+  } = useRideFlow();
   const pendingRequest = getPendingRequest(trip.id);
 
   // Confirming a ride moves it out of "needs action": it becomes an accepted
@@ -701,6 +707,10 @@ export function RideDetailLayout({
         onChatWithSupport={() => {
           setDeclinedOpen(false);
           setConfirmation(trip.id, "declined");
+          // Written here rather than by the chat screen on arrival, so the
+          // template belongs to the flow that produced it — opening a ride's chat
+          // without declining should show no decline message.
+          appendSupportMessage(trip.id, buildDeclineMessage(trip));
           router.push(`/my-rides/${trip.id}/support-chat`);
         }}
         onNeedsTransportation={() => {

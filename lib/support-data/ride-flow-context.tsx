@@ -63,9 +63,21 @@ export interface PendingSupportRequest {
 interface RideFlowValue {
   getConfirmation: (tripId: string) => RideConfirmation;
   setConfirmation: (tripId: string, value: RideConfirmation) => void;
-  /** Decline messages already sent to Support, keyed by trip id. */
-  getDeclineMessage: (tripId: string) => string | undefined;
-  setDeclineMessage: (tripId: string, message: string) => void;
+  /**
+   * Templates the app has already sent into a ride's support chat, in order.
+   *
+   * A list rather than one slot per trip, because more than one flow writes here
+   * now — a declined trip and a no-show can both happen on the same ride, and the
+   * second must not overwrite the first.
+   */
+  getSupportMessages: (tripId: string) => string[];
+  /**
+   * Send a template into a ride's support chat.
+   *
+   * Ignores a message already present for that trip, so re-entering a flow (or a
+   * component remounting) cannot post it twice.
+   */
+  appendSupportMessage: (tripId: string, message: string) => void;
 
   /** Every form the driver has started, newest first. */
   formRecords: SupportFormRecord[];
@@ -100,8 +112,8 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [confirmations, setConfirmations] = useState<
     Record<string, RideConfirmation>
   >({});
-  const [declineMessages, setDeclineMessages] = useState<
-    Record<string, string>
+  const [supportMessages, setSupportMessages] = useState<
+    Record<string, string[]>
   >({});
   const [records, setRecords] = useState<SupportFormRecord[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
@@ -139,9 +151,13 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       getConfirmation: (tripId) => confirmations[tripId] ?? "unconfirmed",
       setConfirmation: (tripId, next) =>
         setConfirmations((previous) => ({ ...previous, [tripId]: next })),
-      getDeclineMessage: (tripId) => declineMessages[tripId],
-      setDeclineMessage: (tripId, message) =>
-        setDeclineMessages((previous) => ({ ...previous, [tripId]: message })),
+      getSupportMessages: (tripId) => supportMessages[tripId] ?? [],
+      appendSupportMessage: (tripId, message) =>
+        setSupportMessages((previous) => {
+          const existing = previous[tripId] ?? [];
+          if (existing.includes(message)) return previous;
+          return { ...previous, [tripId]: [...existing, message] };
+        }),
 
       formRecords: records,
       drafts: records.filter((record) => record.state === "draft"),
@@ -162,7 +178,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         };
       },
     };
-  }, [confirmations, declineMessages, records]);
+  }, [confirmations, supportMessages, records]);
 
   return (
     <RideFlowContext.Provider value={value}>

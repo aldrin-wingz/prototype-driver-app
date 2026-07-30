@@ -4,13 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Paperclip, Send } from "lucide-react";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import { buildDeclineMessage } from "@/lib/support/build-decline-message";
 import type { Trip } from "@/lib/driver-data/mock-trips";
 
 interface ChatMessage {
   id: string;
   from: "driver" | "support";
-  /** Preserves newlines, which the decline template relies on. */
+  /** Preserves newlines, which the templates rely on. */
   body: string;
   stamp?: string;
 }
@@ -37,12 +36,15 @@ const SEEDED_HISTORY: ChatMessage[] = [
 /**
  * Low-fidelity in-app support chat.
  *
- * Built for brainstorming, not fidelity — the point is to show that declining a
- * trip hands Support a COMPLETE, structured message with no typing from the
- * driver. Dark theme and bubble alignment follow `s-04c`.
+ * Built for brainstorming, not fidelity — the point is to show that a flow like
+ * declining a trip or filing a no-show hands Support a COMPLETE, structured
+ * message with no typing from the driver. Dark theme and bubble alignment follow
+ * `s-04c`.
  *
- * The decline template is auto-sent on arrival and remembered per trip, so
- * coming back does not duplicate it.
+ * This screen only DISPLAYS templates; the flow that produced one is what wrote
+ * it. That matters: the template used to be composed here and spliced in on
+ * arrival, so simply opening a ride's chat showed a decline message for a ride
+ * nobody had declined.
  */
 export function SupportChatScreen({
   trip,
@@ -52,17 +54,12 @@ export function SupportChatScreen({
   backHref: string;
 }) {
   const router = useRouter();
-  const { getDeclineMessage, setDeclineMessage } = useRideFlow();
+  const { getSupportMessages } = useRideFlow();
   const [draft, setDraft] = useState("");
   const [extraMessages, setExtraMessages] = useState<ChatMessage[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const template = buildDeclineMessage(trip);
-  const alreadySent = getDeclineMessage(trip.id);
-
-  useEffect(() => {
-    if (!alreadySent) setDeclineMessage(trip.id, template);
-  }, [alreadySent, setDeclineMessage, template, trip.id]);
+  const sentTemplates = getSupportMessages(trip.id);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -70,12 +67,12 @@ export function SupportChatScreen({
 
   const messages: ChatMessage[] = [
     ...SEEDED_HISTORY,
-    {
-      id: "decline-template",
-      from: "driver",
-      body: alreadySent ?? template,
+    ...sentTemplates.map((body, index) => ({
+      id: `template-${index}`,
+      from: "driver" as const,
+      body,
       stamp: "Sent · Just now",
-    },
+    })),
     ...extraMessages,
   ];
 
