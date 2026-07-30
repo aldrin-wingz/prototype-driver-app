@@ -3,6 +3,23 @@ import type { IncentiveType } from "@/lib/data/incentives";
 export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress" | "completed";
 export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "scheduled";
 
+/**
+ * The three swipes a driver makes to move a leg forward.
+ *
+ * Each value is the time the driver swiped, or `null` when that swipe never
+ * happened. A `null` mark IS the "forgot to swipe" condition — the Trip Update
+ * support case exists to correct it. Following the repo convention, the gap is
+ * SEEDED in mock data rather than derived from clocks or logic.
+ */
+export interface LegSwipeProgress {
+  /** Swiped "I've arrived" at the pickup location. */
+  arrivedAt: string | null;
+  /** Swiped "rider picked up" — starts the leg. */
+  pickedUpAt: string | null;
+  /** Swiped "rider dropped off" — completes the leg. */
+  droppedOffAt: string | null;
+}
+
 export interface TripLeg {
   id: string;
   type: TimeAnchorType;
@@ -11,6 +28,87 @@ export interface TripLeg {
   address: string;
   county: string;
   revenue: number;
+  /**
+   * Swipe state for this leg. Optional — only legs on in-progress rides carry
+   * it, so the existing seeded trips are unaffected.
+   */
+  progress?: LegSwipeProgress;
+}
+
+/**
+ * How far along a leg is, derived purely from which swipe marks are present.
+ *
+ * `blocked` is the important one: a leg whose marks are out of order (dropped
+ * off, but the pickup swipe never registered). It is NOT complete — the missing
+ * swipe is exactly what stops the trip from closing out, which is why the driver
+ * needs the Trip Update case.
+ */
+export type LegSwipeStage =
+  | "not-started"
+  | "arrived"
+  | "picked-up"
+  | "blocked"
+  | "completed";
+
+/** Which swipe a driver is expected to make next on a leg. */
+export type NextSwipe = "arrive" | "pick-up" | "drop-off" | null;
+
+/** Derive a leg's stage from its swipe marks. */
+export function getLegStage(leg: TripLeg): LegSwipeStage {
+  const p = leg.progress;
+  if (!p) return "not-started";
+  // A gap in the sequence blocks the leg regardless of how far it looks.
+  if (getMissingSwipes(leg).length > 0) return "blocked";
+  if (p.droppedOffAt) return "completed";
+  if (p.pickedUpAt) return "picked-up";
+  if (p.arrivedAt) return "arrived";
+  return "not-started";
+}
+
+/**
+ * Swipes that were skipped — a mark is missing while a LATER mark is present.
+ *
+ * This is the signal the Trip Update case acts on. A leg that simply hasn't got
+ * there yet returns nothing; only genuinely skipped swipes are reported.
+ */
+export function getMissingSwipes(leg: TripLeg): Array<keyof LegSwipeProgress> {
+  const p = leg.progress;
+  if (!p) return [];
+
+  const missing: Array<keyof LegSwipeProgress> = [];
+  if (!p.arrivedAt && (p.pickedUpAt || p.droppedOffAt)) missing.push("arrivedAt");
+  if (!p.pickedUpAt && p.droppedOffAt) missing.push("pickedUpAt");
+  return missing;
+}
+
+/** True when any swipe on any leg of this trip was skipped. */
+export function hasMissingSwipes(trip: Trip): boolean {
+  return trip.legs.some((leg) => getMissingSwipes(leg).length > 0);
+}
+
+/**
+ * The swipe the driver is expected to make next.
+ *
+ * Returns null when the leg is finished OR blocked — a driver cannot swipe past
+ * a gap in the sequence, they have to get the missing time corrected first.
+ */
+export function getNextSwipe(leg: TripLeg): NextSwipe {
+  switch (getLegStage(leg)) {
+    case "not-started":
+      return "arrive";
+    case "arrived":
+      return "pick-up";
+    case "picked-up":
+      return "drop-off";
+    case "blocked":
+    case "completed":
+      return null;
+  }
+}
+
+/** The leg a driver is currently working, i.e. the first not yet completed. */
+export function getActiveLeg(trip: Trip): TripLeg | undefined {
+  return trip.legs.find((leg) => getLegStage(leg) !== "completed");
 }
 
 export interface Trip {
@@ -878,8 +976,107 @@ export const mockNeedsActionTrips: Trip[] = [
   },
 ];
 
-// Mock in-progress trips
-export const mockInProgressTrips: Trip[] = [];
+// Mock in-progress trips — rides the driver is actively working.
+//
+// Seeded for the In-App Support Requests prototype. Two rides on purpose:
+//   IP-001 — swipes in order, nothing missing. The control case.
+//   IP-002 — B-leg was dropped off but NEVER picked up. This is the
+//            "forgot to swipe" gap the Trip Update support case corrects.
+//
+// Per repo convention the gap is DATA-DRIVEN: IP-002 simply omits `pickedUpAt`.
+// No component computes it from clocks.
+export const mockInProgressTrips: Trip[] = [
+  {
+    id: "1000891447203",
+    date: "Thu, Apr 30, 2026",
+    rider: "MARCUS T.",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 68.40,
+    notes: "Rider uses a walker — allow extra loading time",
+    legs: [
+      {
+        id: "1000891447203",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:15 AM",
+        address: "412 Sycamore Dr, Marietta, GA 30060",
+        county: "Cobb County",
+        revenue: 34.20,
+        progress: {
+          arrivedAt: "9:11 AM",
+          pickedUpAt: "9:18 AM",
+          droppedOffAt: "9:52 AM",
+        },
+      },
+      {
+        id: "1000891447203-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "1:30 PM",
+        address: "Emory Dialysis at Candler, 1266 Clifton Rd NE, Atlanta, GA 30322",
+        county: "DeKalb County",
+        revenue: 34.20,
+        progress: {
+          arrivedAt: "1:24 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "1000891502876",
+    date: "Thu, Apr 30, 2026",
+    rider: "DELORES H.",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 52.00,
+    notes: "Gate code 4412 at the pickup address",
+    legs: [
+      {
+        id: "1000891502876",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "7:45 AM",
+        address: "8 Hollow Creek Way, Lawrenceville, GA 30044",
+        county: "Gwinnett County",
+        revenue: 26.00,
+        progress: {
+          arrivedAt: "7:39 AM",
+          pickedUpAt: "7:47 AM",
+          droppedOffAt: "8:21 AM",
+        },
+      },
+      {
+        // ⚠️ Forgot-to-swipe seed: dropped off, but the pickup swipe never
+        // registered. `getMissingSwipes` reports `pickedUpAt`.
+        id: "1000891502876-b",
+        type: "wait-for-call",
+        label: "Est Pick-up Time - Wait For Call",
+        time: "11:00 AM",
+        address: "Gwinnett Medical Center, 1000 Medical Center Blvd, Lawrenceville, GA 30046",
+        county: "Gwinnett County",
+        revenue: 26.00,
+        progress: {
+          arrivedAt: "11:06 AM",
+          pickedUpAt: null,
+          droppedOffAt: "11:48 AM",
+        },
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+];
 
 // Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);
 // `CURRENT-COMP-*` are dated within the current pay period (Apr 28–May 4, 2026)
