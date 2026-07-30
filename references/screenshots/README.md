@@ -28,7 +28,29 @@ Captures for the **In-App Support Requests** prototype use `s-*` slots so they n
 | s-01b | `s-01b - Ride Details - Active Ride - Pick Up Member.webp` | Started, en route to pickup | Header reads `#<id> - Active Ride`. CTA **PICK UP MEMBER / A Leg** on green `#10B981`, person glyph |
 | s-01c | `s-01c - Ride Details - Ride - Drop Off Member.webp` | Member on board | Header reads `#<id> - Ride`. CTA **DROP OFF MEMBER / A Leg** on pink `#EC4899`, check glyph |
 
-**Step pack:** `by-step/s-1/` holds all three.
+| s-02a | `s-02a - Form Request - Late Pickup Reason.png` | The app's existing "Late pickup reason" form | **The base pattern for every support form.** Bottom sheet w/ drag handle · bold title + ✕ · pink context callout (`Scheduled time` / `N mins late`) · required = red asterisk · optional-ness in the label text · Cancel (outline) + case-specific primary · **primary DISABLED while required fields are empty** (which is why "Save Reason" is muted green) |
+| s-03a | `s-03a - More Options - Grid.jpg` | The screen behind `More` | **Full pushed page, not a sheet.** Back chevron + centred "More Options", no bottom nav. Two-column icon grid, hairline dividers, odd last tile full-width. 7 actions: Map to Pickup · Map to Drop-off · Call Member or Support · Email Support · Add Event To Calendar · Member No-Show · Send Back Trip |
+
+**Step packs:** `by-step/s-1/` (three swipe stages) · `by-step/s-2/` (form pattern) · `by-step/s-3/` (More Options).
+
+### Sampled colours
+
+Taken from the captures directly rather than eyeballed, and codified in `constants/driver-app-colors.ts`. Several differ from the template defaults, so prefer these on replicated surfaces:
+
+| Token | Value | Where |
+|---|---|---|
+| Navy | `#303068` | all plain glyphs — phone, chat, mail, calendar. **Indigo, not charcoal** |
+| Teal | `#00B090` | pickup-side ring + PICK UP MEMBER CTA |
+| Rose | `#E05878` | drop-off-side ring |
+| Rose deep | `#D85878` | filled Member No-Show circle |
+| Gold | `#E0C878` | filled Send Back Trip circle |
+| Ink | `#282828` | SWIPE TO START CTA fill |
+| Drop-off | `#E06078` | DROP OFF MEMBER CTA fill |
+| Divider | `#F0F0F0` | grid hairlines |
+
+### Icon fidelity gap
+
+`s-03a` shows the plain glyphs as SOLID shapes. Lucide is stroke-based, so filling only works for single closed paths — the phone fills correctly, but filling the mail or calendar collapses their interior detail into a blob. Those two are stroked at a heavier weight instead. Exact solid versions would need hand-drawn SVG.
 
 Shared anatomy these three establish for the in-progress detail surface:
 - **Swipe sequence is Start → Pick Up → Drop Off.** There is no "arrived" swipe.

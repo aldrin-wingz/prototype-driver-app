@@ -34,10 +34,10 @@ import {
   type LegSwipeProgress,
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
-import { RideOptionsMenu } from "./ride-options-menu";
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
-import { supportCases, getSupportCase } from "@/lib/support-data/case-registry";
-import type { SupportCallout, SupportCaseDefinition } from "@/types/support";
+import { getSupportCase } from "@/lib/support-data/case-registry";
+import { buildCalloutForCase } from "@/lib/support/build-callout";
+import type { SupportCaseDefinition } from "@/types/support";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
 
@@ -57,57 +57,10 @@ const SWIPE_CTA: Record<
   "start" | "pick-up" | "drop-off",
   { label: string; bg: string; icon: typeof Car }
 > = {
-  start: { label: "SWIPE TO START", bg: "bg-[#1F2937]", icon: Car },
-  "pick-up": { label: "PICK UP MEMBER", bg: "bg-[#10B981]", icon: PersonStanding },
-  "drop-off": { label: "DROP OFF MEMBER", bg: "bg-[#EC4899]", icon: CheckCircle2 },
+  start: { label: "SWIPE TO START", bg: "bg-[#282828]", icon: Car },
+  "pick-up": { label: "PICK UP MEMBER", bg: "bg-[#00B090]", icon: PersonStanding },
+  "drop-off": { label: "DROP OFF MEMBER", bg: "bg-[#E06078]", icon: CheckCircle2 },
 };
-
-/** Parse a mock-data clock string ("3:19 PM") into minutes since midnight. */
-function parseClock(value: string): number | null {
-  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(value.trim());
-  if (!match) return null;
-
-  const [, rawHour, rawMinute, meridiem] = match;
-  let hour = Number(rawHour) % 12;
-  if (meridiem.toUpperCase() === "PM") hour += 12;
-  return hour * 60 + Number(rawMinute);
-}
-
-/**
- * The context block for a case — what the app already knows, echoed back.
- *
- * Derived from trip data rather than hardcoded, so the callout stays honest: a
- * ride that is not late does not claim to be. Mirrors reference screenshot
- * `s-02a`, where the block reads "Scheduled time: 3:19 PM / 63 mins late".
- */
-function buildCallout(
-  caseId: string,
-  trip: Trip,
-  leg: TripLeg | undefined
-): SupportCallout | undefined {
-  if (caseId !== "late-pickup-reason" || !leg) return undefined;
-
-  const scheduled = parseClock(leg.time);
-  const pickedUp = leg.progress?.pickedUpAt
-    ? parseClock(leg.progress.pickedUpAt)
-    : null;
-  const minutesLate =
-    scheduled !== null && pickedUp !== null ? pickedUp - scheduled : null;
-
-  if (minutesLate !== null && minutesLate > 0) {
-    return {
-      tone: "danger",
-      title: `Scheduled time: ${leg.time}`,
-      detail: `${minutesLate} min${minutesLate === 1 ? "" : "s"} late`,
-    };
-  }
-
-  return {
-    tone: "info",
-    title: `Scheduled time: ${leg.time}`,
-    detail: pickedUp === null ? "Pickup not recorded yet" : "Picked up on time",
-  };
-}
 
 /** One-line recap of what was submitted, for the confirmation toast. */
 function summariseValues(
@@ -348,7 +301,6 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
 
   // Support surfaces: `More` opens the options menu, picking a case opens its
   // form sheet. Only one is on screen at a time.
-  const [menuOpen, setMenuOpen] = useState(false);
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
 
@@ -546,31 +498,31 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
               hairlines, per reference screenshots s-01a/b/c. */}
           <div className="flex items-stretch border-b border-t border-gray-100">
             <button className="flex flex-1 items-center justify-center py-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#10B981]">
-                <CornerUpRight className="h-5 w-5 text-[#10B981]" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#00B090]">
+                <CornerUpRight className="h-5 w-5 fill-[#00B090] text-[#00B090]" />
               </span>
             </button>
             <span className="w-px self-stretch bg-gray-100" />
             <button className="flex flex-1 items-center justify-center py-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#EC4899]">
-                <CornerUpRight className="h-5 w-5 text-[#EC4899]" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E05878]">
+                <CornerUpRight className="h-5 w-5 fill-[#E05878] text-[#E05878]" />
               </span>
             </button>
             <span className="w-px self-stretch bg-gray-100" />
             <button className="flex flex-1 items-center justify-center py-3">
-              <Phone className="h-6 w-6 fill-[#1F2937] text-[#1F2937]" />
+              <Phone className="h-6 w-6 fill-[#303068] text-[#303068]" />
             </button>
             <span className="w-px self-stretch bg-gray-100" />
             <button className="flex flex-1 items-center justify-center py-3">
-              <MessageSquare className="h-6 w-6 fill-[#1F2937] text-[#1F2937]" />
+              <MessageSquare className="h-6 w-6 fill-[#303068] text-[#303068]" />
             </button>
             <span className="w-px self-stretch bg-gray-100" />
             <button
               type="button"
-              onClick={() => setMenuOpen(true)}
+              onClick={() => router.push(`/my-rides/${trip.id}/more`)}
               className="flex flex-1 items-center justify-center py-3"
             >
-              <span className="text-sm font-semibold text-[#1F2937]">More</span>
+              <span className="text-sm font-semibold text-[#303068]">More</span>
             </button>
           </div>
 
@@ -587,7 +539,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
                     )}
                   >
                     <span className="absolute left-1.5 top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 items-center justify-center rounded-full bg-white">
-                      <CtaIcon className="h-6 w-6 text-[#1F2937]" />
+                      <CtaIcon className="h-6 w-6 text-[#303068]" />
                     </span>
                     <span className="flex flex-col items-center leading-tight">
                       <span className="text-sm font-medium uppercase tracking-wide text-white">
@@ -652,20 +604,11 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
         </div>
       )}
 
-      <RideOptionsMenu
-        cases={supportCases}
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        onSelectCase={(caseId) => {
-          setMenuOpen(false);
-          setOpenCaseId(caseId);
-        }}
-      />
 
       {openCase && (
         <SupportFormSheet
           supportCase={openCase}
-          callout={buildCallout(openCase.id, trip, activeLeg)}
+          callout={buildCalloutForCase(openCase.id, activeLeg)}
           open
           onOpenChange={(next) => {
             if (!next) setOpenCaseId(null);
