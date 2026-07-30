@@ -94,10 +94,13 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     value: ISSUE_RIDER_NO_SHOW,
     label: "Rider No-Show",
     description:
-      "For a member who wasn't there at pick-up after you waited.",
-    visibility: "in-progress-only",
-    buildState: "not-yet",
-    note: "Field set not specified yet. Note the app already has a Member No-Show action in More Options — the two need reconciling.",
+      "The app couldn't confirm your wait at the pick-up, so we need the details from you.",
+    // Hidden on purpose. The Member No-Show action decides whether a form is
+    // needed at all — most no-shows submit with no form — so letting a driver
+    // reach this from the dropdown would skip the check that is the whole point.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from the Member No-Show action in More Options, not the dropdown. That action IS this case's entry point — there is no separate Member No-Show case.",
   },
   {
     value: ISSUE_CONFIRM_CANT_REACH,
@@ -134,11 +137,17 @@ export const NOT_YET_ISSUE_VALUES = SUPPORT_ISSUE_TYPES.filter(
  * Computed rather than constant because availability moves: the in-progress-only
  * issues drop out when the driver has no live trip, which is what makes the
  * trip-independent Forms menu entry point safe to offer.
+ *
+ * `extraIssues` force-includes issues that are normally hidden. A flow that opens
+ * the form with its issue already chosen needs that issue present as an option —
+ * a selected value with no matching option renders as the placeholder, so the
+ * form would claim no issue was picked. Callers pass only what they just selected.
  */
-export function getIssueOptions(): SupportFieldOption[] {
+export function getIssueOptions(extraIssues: string[] = []): SupportFieldOption[] {
   const liveTrip = hasInProgressLegs();
 
   return SUPPORT_ISSUE_TYPES.filter((issue) => {
+    if (extraIssues.includes(issue.value)) return true;
     if (issue.visibility === "hidden") return false;
     if (issue.visibility === "in-progress-only") return liveTrip;
     return true;

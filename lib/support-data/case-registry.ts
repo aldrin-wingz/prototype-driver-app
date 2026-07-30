@@ -122,7 +122,18 @@ export const SUPPORT_FORM_CASE_ID = "support-form";
  *    schedule, appointment and status render as a summary banner rather than as
  *    fields to read past.
  */
-export function buildSupportFormCase(): SupportCaseDefinition {
+export function buildSupportFormCase({
+  includeIssues,
+}: {
+  /**
+   * Normally-hidden issues to offer anyway.
+   *
+   * A flow that opens this form with its issue already chosen has to pass that
+   * issue here, or the dropdown holds a value with no matching option and renders
+   * the placeholder instead of the label.
+   */
+  includeIssues?: string[];
+} = {}): SupportCaseDefinition {
   return {
     id: SUPPORT_FORM_CASE_ID,
     title: "Submit Support Form",
@@ -143,7 +154,12 @@ export function buildSupportFormCase(): SupportCaseDefinition {
         label: "Please choose your issue",
         placeholder: "Select an issue",
         required: true,
-        options: getIssueOptions(),
+        options: getIssueOptions(includeIssues),
+        // Only ever locked when a flow supplied the issue — the driver picking one
+        // themselves leaves it editable, since `appSupplied` is seeded from the
+        // caller's initial values and cleared the moment the driver touches it.
+        lockWhenPrefilled: true,
+        lockedBadge: "Chosen for you",
       },
 
       // ---- General -------------------------------------------------------

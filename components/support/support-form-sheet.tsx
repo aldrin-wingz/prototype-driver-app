@@ -102,7 +102,15 @@ export function SupportFormSheet({
 
   // The leg the driver picked drives the summary banner and every timestamp we
   // can fill. Re-derive on change rather than only at mount.
-  const selectedLeg = values.legId ? findLegOption(values.legId) : undefined;
+  //
+  // Read from whichever leg picker is currently VISIBLE rather than a fixed field
+  // id, because more than one issue owns a leg picker now and each needs its own
+  // (one locked to the ride it came from, one freely re-pickable).
+  const legField = supportCase.fields.find(
+    (field) => field.type === "leg-picker" && isFieldVisible(field, values)
+  );
+  const legValue = legField ? (values[legField.id] ?? "") : "";
+  const selectedLeg = legValue ? findLegOption(legValue) : undefined;
 
   useEffect(() => {
     if (!selectedLeg) return;

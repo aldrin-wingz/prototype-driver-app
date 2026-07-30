@@ -30,10 +30,12 @@ import type { SupportField } from "@/types/support";
 function LegPicker({
   field,
   value,
+  locked,
   onChange,
 }: {
   field: SupportField;
   value: string;
+  locked: boolean;
   onChange: (value: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -43,6 +45,23 @@ function LegPicker({
   // that has since moved on still displays what it names.
   const results = searchLegOptions(query, field.legScope).slice(0, 6);
   const selected = value ? findLegOption(value) : undefined;
+
+  // Some flows are about one specific ride and nothing else — a no-show filed from
+  // a ride must stay filed against that ride. Show it as settled context, the same
+  // as a locked member.
+  if (locked && selected) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+        <p className="text-base font-semibold text-gray-900">
+          {selected.leg.legCode ? `${selected.leg.legCode} Leg · ` : ""}
+          {selected.legId}
+        </p>
+        <p className="text-sm text-gray-500">
+          {selected.trip.rider} · {selected.trip.date} · {selected.leg.time}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -416,7 +435,12 @@ export function SupportFieldRenderer({
       </label>
 
       {field.type === "leg-picker" && (
-        <LegPicker field={field} value={value} onChange={onChange} />
+        <LegPicker
+          field={field}
+          value={value}
+          locked={isLocked}
+          onChange={onChange}
+        />
       )}
 
       {field.type === "member-picker" && (
@@ -436,27 +460,39 @@ export function SupportFieldRenderer({
         <LegRepeater field={field} values={values} setValue={setValue} />
       )}
 
-      {field.type === "select" && (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger
-            id={field.id}
-            className="h-14 rounded-xl border-gray-200 px-4 text-base data-[placeholder]:text-gray-400"
-          >
-            <SelectValue placeholder={field.placeholder ?? "Select an option"} />
-          </SelectTrigger>
-          <SelectContent>
-            {(field.options ?? []).map((option) => (
-              <SelectItem
-                key={option.value}
-                value={option.value}
-                className="text-base"
-              >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      {/* A locked select becomes a static row rather than a disabled dropdown —
+          same treatment as the locked member picker. A greyed-out control invites
+          a tap and then refuses it; a plain row reads as settled context, which is
+          what an issue the flow already chose actually is. */}
+      {field.type === "select" &&
+        (isLocked ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
+            <p className="text-base font-semibold text-gray-900">
+              {field.options?.find((option) => option.value === value)?.label ??
+                value}
+            </p>
+          </div>
+        ) : (
+          <Select value={value} onValueChange={onChange}>
+            <SelectTrigger
+              id={field.id}
+              className="h-14 rounded-xl border-gray-200 px-4 text-base data-[placeholder]:text-gray-400"
+            >
+              <SelectValue placeholder={field.placeholder ?? "Select an option"} />
+            </SelectTrigger>
+            <SelectContent>
+              {(field.options ?? []).map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className="text-base"
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ))}
 
       {field.type === "textarea" && (
         <Textarea

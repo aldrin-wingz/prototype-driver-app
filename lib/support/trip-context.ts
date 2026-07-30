@@ -20,8 +20,13 @@ export function resolveTripContext(
   supportCase: SupportCaseDefinition,
   values: Record<string, string>
 ): FormTripContext {
-  const picker = supportCase.fields.find((field) => field.type === "leg-picker");
-  if (!picker || !isFieldVisible(picker, values)) return {};
+  // The first VISIBLE picker, not simply the first one: issues that each own a
+  // leg picker would otherwise all resolve against whichever happened to be
+  // declared first, and every one of them but that issue would land with no trip.
+  const picker = supportCase.fields.find(
+    (field) => field.type === "leg-picker" && isFieldVisible(field, values)
+  );
+  if (!picker) return {};
 
   const legId = values[picker.id];
   const option = legId ? findLegOption(legId) : undefined;
