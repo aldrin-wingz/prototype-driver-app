@@ -39,11 +39,7 @@ import { SupportFormSheet } from "@/components/support/support-form-sheet";
 import { getSupportCase } from "@/lib/support-data/case-registry";
 import { buildCalloutForCase } from "@/lib/support/build-callout";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import { buildDeclineMessage } from "@/lib/support/build-decline-message";
-import {
-  ReachOutSheet,
-  RiderDeclinedSheet,
-} from "./reach-out-sheet";
+import { ReachOutFlow } from "./reach-out-flow";
 import type { SupportCaseDefinition } from "@/types/support";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
@@ -287,12 +283,7 @@ export function RideDetailLayout({
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const {
-    getConfirmation,
-    setConfirmation,
-    getPendingRequest,
-    appendSupportMessage,
-  } = useRideFlow();
+  const { getConfirmation, getPendingRequest } = useRideFlow();
   const pendingRequest = getPendingRequest(trip.id);
 
   // Confirming a ride moves it out of "needs action": it becomes an accepted
@@ -331,9 +322,8 @@ export function RideDetailLayout({
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
 
-  // "I Reached Out to Confirm" flow.
+  // "I Reached Out to Confirm" — `ReachOutFlow` owns every step past this point.
   const [reachOutOpen, setReachOutOpen] = useState(false);
-  const [declinedOpen, setDeclinedOpen] = useState(false);
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -378,7 +368,10 @@ export function RideDetailLayout({
             <div className="h-1 w-32 rounded-full bg-[#10B981]/60" />
           </div>
 
-          {state === "needs-action" && (
+          {/* Suppressed once Support has the ride: "please call the rider first"
+              and "nothing more is needed from you" cannot both be true, and the
+              driver who just filed the form is the one who would read both. */}
+          {state === "needs-action" && !pendingRequest && (
             <div className="absolute bottom-4 left-4 right-4">
               <div className="rounded-lg bg-[#FEE2E2] border border-[#F87171] px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -653,71 +646,42 @@ export function RideDetailLayout({
           </div>
 
           <div className="px-4 py-4">
-            <button
-              type="button"
-              onClick={() => setReachOutOpen(true)}
-              className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                <Phone className="h-5 w-5" />
+            {/* Same swap the in-progress region makes: once Support holds the
+                ride, re-offering the whole confirmation flow would invite a
+                second request for something already filed. */}
+            {pendingRequest ? (
+              <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
+                <Hourglass className="h-5 w-5 text-[#92400E]" />
+                <span className="text-sm font-bold uppercase text-[#92400E]">
+                  Pending Support Review
+                </span>
               </div>
-              <div className="text-left">
-                <p className="text-sm font-bold uppercase">I Reached Out to Confirm</p>
-                <p className="text-xs opacity-90">
-                  {activeLeg?.legCode ? `${activeLeg.legCode} Leg` : "A Leg"}
-                </p>
-              </div>
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setReachOutOpen(true)}
+                className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold uppercase">I Reached Out to Confirm</p>
+                  <p className="text-xs opacity-90">
+                    {activeLeg?.legCode ? `${activeLeg.legCode} Leg` : "A Leg"}
+                  </p>
+                </div>
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      <ReachOutSheet
+      <ReachOutFlow
+        trip={trip}
+        leg={activeLeg}
         open={reachOutOpen}
         onOpenChange={setReachOutOpen}
-        onNext={(choice) => {
-          setReachOutOpen(false);
-
-          if (choice === "declined") {
-            // Declining opens its own follow-up rather than resolving here.
-            setDeclinedOpen(true);
-            return;
-          }
-
-          if (choice === "confirmed") {
-            // The ride becomes an accepted ride awaiting its first swipe — the
-            // detail state flips to in-progress on the next render.
-            setConfirmation(trip.id, "confirmed");
-            toast({
-              title: "Confirmed with the rider",
-              description: "This ride is ready to start.",
-            });
-            return;
-          }
-
-          // "No, but I will go to the pickup as scheduled" — per the flow this
-          // just closes. No state change, no confirmation, nothing to announce:
-          // the ride stays exactly as it was so the driver can try again.
-        }}
-      />
-
-      <RiderDeclinedSheet
-        open={declinedOpen}
-        onOpenChange={setDeclinedOpen}
-        onChatWithSupport={() => {
-          setDeclinedOpen(false);
-          setConfirmation(trip.id, "declined");
-          // Written here rather than by the chat screen on arrival, so the
-          // template belongs to the flow that produced it — opening a ride's chat
-          // without declining should show no decline message.
-          appendSupportMessage(trip.id, buildDeclineMessage(trip));
-          router.push(`/my-rides/${trip.id}/support-chat`);
-        }}
-        onNeedsTransportation={() => {
-          // Walks back to the three options rather than resolving anything.
-          setDeclinedOpen(false);
-          setReachOutOpen(true);
-        }}
       />
 
 
