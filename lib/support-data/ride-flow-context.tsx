@@ -12,7 +12,15 @@ export type RideConfirmation =
   /** Rider declined. Awaiting Support removing it from the manifest. */
   | "declined"
   /** Driver could not reach the rider but is going to the pickup anyway. */
-  | "going-anyway";
+  | "going-anyway"
+  /**
+   * The number on file could not be reached at all. Awaiting Support reaching
+   * the member or fixing the number.
+   *
+   * Deliberately not the same as `going-anyway`: both describe a call that
+   * failed, but this one escalates and that one proceeds without help.
+   */
+  | "cant-reach";
 
 /** Whether a form is still the driver's, or now Support's. */
 export type SupportFormState = "draft" | "pending";

@@ -8,13 +8,24 @@ import { cn } from "@/lib/utils";
 import type { RideConfirmation } from "@/lib/support-data/ride-flow-context";
 
 /**
- * The three answers offered after the driver swipes "I Reached Out to Confirm".
- * Copy replicated verbatim from reference capture `s-04a`.
+ * The answers offered after the driver swipes "I Reached Out to Confirm".
+ *
+ * The first three are replicated verbatim from reference capture `s-04a`. The
+ * fourth is new: production offers no answer for "the number doesn't work", so a
+ * driver who called a disconnected line had to either claim the member declined
+ * or pick the option that files nothing. The bad number was never reported and
+ * so never fixed — while the ride's own banner told them to call it.
+ *
+ * ⚠️ Worth putting to the support lead: this label and "No, but I will go to the
+ * pickup as scheduled" both describe a failed call. What separates them is what
+ * happens next — one files a support request, one files nothing — and neither
+ * label says so.
  */
 const OPTIONS: Array<{ id: RideConfirmation; label: string }> = [
   { id: "confirmed", label: "Yes, I confirmed with the rider" },
   { id: "declined", label: "Rider declined the trip" },
   { id: "going-anyway", label: "No, but I will go to the pickup as scheduled" },
+  { id: "cant-reach", label: "Number can not be reached" },
 ];
 
 /**
@@ -107,19 +118,25 @@ export function ReachOutSheet({
 /**
  * "Rider declined the trip" — the follow-up when the driver picks option two.
  *
- * Replicates `s-04b`: centred teal badge, title, explanatory line, a primary
- * "Chat with Support" and a secondary "Rider Needs Transportation" that walks
- * back to the three options.
+ * Layout replicates `s-04b`: centred teal badge, title, explanatory line, a
+ * primary action and a secondary "Rider Needs Transportation" that walks back to
+ * the options.
+ *
+ * The copy deliberately departs from the capture. Production said "Please chat
+ * with support to remove it from your manifest" and went straight to chat, which
+ * handed Support an unevidenced claim about a member for a ride with revenue
+ * attached. A form now comes first, so the sheet says so — a button labelled
+ * "Chat with Support" that opens a form would be a small lie.
  */
 export function RiderDeclinedSheet({
   open,
   onOpenChange,
-  onChatWithSupport,
+  onContinue,
   onNeedsTransportation,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onChatWithSupport: () => void;
+  onContinue: () => void;
   onNeedsTransportation: () => void;
 }) {
   return (
@@ -146,16 +163,17 @@ export function RiderDeclinedSheet({
               Rider declined the trip
             </DrawerTitle>
             <p className="mt-3 text-lg font-semibold leading-snug text-gray-400">
-              Please chat with support to remove it from your manifest.
+              Support needs a few details before we can remove it from your
+              manifest.
             </p>
           </div>
 
           <Button
             type="button"
-            onClick={onChatWithSupport}
+            onClick={onContinue}
             className="mt-8 h-14 w-full rounded-xl bg-[#1ECFA0] text-lg font-bold text-white hover:bg-[#0FB88C]"
           >
-            Chat with Support
+            Continue
           </Button>
 
           <Button
