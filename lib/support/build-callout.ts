@@ -25,15 +25,9 @@ export function buildCalloutForCase(
   leg: TripLeg | undefined,
   prefilledCount?: number
 ): SupportCallout | undefined {
-  if (caseId === "missed-pickup") {
-    // States the value proposition on the screen the driver is looking at: the
-    // web form makes them retype all of this.
-    return {
-      tone: "info",
-      title: `${prefilledCount ?? 0} fields filled from this ride`,
-      detail: "Add why the swipe was missed, then submit.",
-    };
-  }
+  // The general support form has no callout — its `TripSummaryBanner` carries the
+  // same job, and it stays accurate when the driver picks a different leg.
+  if (caseId === "support-form") return undefined;
 
   if (caseId !== "late-pickup-reason" || !leg) return undefined;
 

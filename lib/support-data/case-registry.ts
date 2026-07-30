@@ -1,4 +1,7 @@
-import type { SupportCaseDefinition } from "@/types/support";
+import type {
+  SupportCaseDefinition,
+  SupportFieldOption,
+} from "@/types/support";
 
 /**
  * Late reason options — the final approved set of 9.
@@ -59,23 +62,46 @@ export const latePickupReasonCase: SupportCaseDefinition = {
 };
 
 /**
- * CASE-01 — Missed Pickup.
+ * The issue types offered by the general support form's dropdown.
  *
- * Replaces the Zendesk web form "Submit a request → Trip Data update"
- * (reference captures `s-05a/b/c`). Field list, labels, help text and required
- * markers are taken from that form verbatim.
- *
- * The whole argument for moving it in-app is the `prefillFrom` column: the web
- * form makes drivers retype their own email, the pick-up date, the leg position
- * letter, the leg id and every timestamp the app already recorded. Here all of
- * that arrives filled, and the only genuinely empty required field is the one
- * the app cannot know — why the swipe was missed.
+ * "Trip Data update" is the one we have a real spec for — it is the web form
+ * captured in `s-05a/b/c`. The rest are placeholders so the mechanism (choosing
+ * an issue swaps the field set) is visible without inventing a canonical list.
+ * The real dropdown's full option list still needs capturing.
  */
-export const missedPickupCase: SupportCaseDefinition = {
-  id: "missed-pickup",
-  title: "Missed Pickup",
-  issueType: "Trip Data update",
-  summary: "Send the times for a swipe you missed on this ride",
+export const TRIP_DATA_UPDATE = "Trip Data update";
+
+export const SUPPORT_ISSUES: SupportFieldOption[] = [
+  { value: TRIP_DATA_UPDATE, label: "Trip Data update (missed swipe)" },
+  { value: "rider-no-show", label: "Rider no-show — ⚠️ not in prototype yet" },
+  { value: "address-correction", label: "Address correction — ⚠️ not in prototype yet" },
+  { value: "pay-discrepancy", label: "Pay or mileage discrepancy — ⚠️ not in prototype yet" },
+];
+
+/** Only the Trip Data update field set is built, so gate on this value. */
+const ONLY_TRIP_DATA = { field: "issue", equals: [TRIP_DATA_UPDATE] };
+
+/**
+ * CASE-01 — the general support form.
+ *
+ * One form for every support request, not one per case. The issue dropdown swaps
+ * the field set beneath it, which is how the real web form behaves.
+ *
+ * The Trip Data update field set is for a trip the driver FORGOT TO SWIPE, and it
+ * applies at any point in the sequence — en-route, pick-up or drop-off. Whatever
+ * the app already recorded arrives locked; whatever it does not is left for the
+ * driver. So the same form asked at drop-off holds en-route and pick-up already,
+ * while asked mid-ride it holds only en-route.
+ *
+ * Leg selection drives everything: pick a leg and its letter, rider, schedule,
+ * appointment time and status render as a summary banner rather than as fields
+ * the driver has to read past.
+ */
+export const supportFormCase: SupportCaseDefinition = {
+  id: "support-form",
+  title: "Submit Support Form",
+  issueType: TRIP_DATA_UPDATE,
+  summary: "Send Support a request about one of your trips",
   category: "Trip Issue",
   buildState: "in-prototype",
   submitLabel: "Submit",
@@ -85,78 +111,61 @@ export const missedPickupCase: SupportCaseDefinition = {
   fields: [
     {
       id: "issue",
-      type: "text",
-      label: "Issue",
-      prefillFrom: "issueType",
-      locked: true,
+      type: "select",
+      label: "Please choose your issue",
+      placeholder: "Select an issue",
       required: true,
-    },
-    {
-      id: "email",
-      type: "text",
-      label: "Your email address",
-      prefillFrom: "driverEmail",
-      locked: true,
-      required: true,
-    },
-    {
-      id: "pickupDate",
-      type: "date",
-      label: "Pick-up Date",
-      helpText: "The actual pick-up date.",
-      prefillFrom: "pickupDate",
-      required: true,
-    },
-    {
-      id: "legPositionLetter",
-      type: "text",
-      label: "Leg Position Letter",
-      helpText: "Position of the leg that needs to be updated.",
-      prefillFrom: "legPositionLetter",
-      locked: true,
-      required: true,
+      options: SUPPORT_ISSUES,
     },
     {
       id: "legId",
-      type: "text",
-      label: "Leg ID",
-      helpText: "The leg that needs to be updated.",
-      prefillFrom: "legId",
-      locked: true,
+      type: "leg-picker",
+      label: "Which trip?",
+      placeholder: "Search your rides by leg ID, rider or date",
       required: true,
+      showIf: ONLY_TRIP_DATA,
+      prefillFrom: "legId",
     },
     {
       id: "enRouteTime",
       type: "time",
       label: "En-route Time",
-      helpText: 'The time you swiped "Start ride" and began driving to pick-up.',
+      helpText: 'When you started driving to the pick-up ("Start ride").',
       prefillFrom: "enRouteTime",
+      lockWhenPrefilled: true,
+      showIf: ONLY_TRIP_DATA,
     },
     {
       id: "pickupTime",
       type: "time",
       label: "Pick-up Time",
-      helpText: "The time you picked up the member.",
+      helpText: "When you picked up the member.",
       prefillFrom: "pickupTime",
+      lockWhenPrefilled: true,
+      showIf: ONLY_TRIP_DATA,
+    },
+    {
+      id: "dropOffTime",
+      type: "time",
+      label: "Drop-off Time",
+      helpText: "When you dropped off the member.",
+      prefillFrom: "dropOffTime",
+      lockWhenPrefilled: true,
+      showIf: ONLY_TRIP_DATA,
     },
     {
       id: "pickupOdometer",
       type: "number",
       label: "Pick-up Odometer (optional)",
       helpText: "Leave blank if the app did not ask for a reading.",
-    },
-    {
-      id: "dropOffTime",
-      type: "time",
-      label: "Drop-off Time",
-      helpText: "The time you dropped off the member.",
-      prefillFrom: "dropOffTime",
+      showIf: ONLY_TRIP_DATA,
     },
     {
       id: "dropOffOdometer",
       type: "number",
       label: "Drop-off Odometer (optional)",
       helpText: "Leave blank if the app did not ask for a reading.",
+      showIf: ONLY_TRIP_DATA,
     },
     {
       id: "reason",
@@ -165,19 +174,21 @@ export const missedPickupCase: SupportCaseDefinition = {
       placeholder: "Tell us briefly why you weren't able to swipe during the ride.",
       required: true,
       maxLength: 500,
+      showIf: ONLY_TRIP_DATA,
     },
     {
       id: "attachment",
       type: "file",
       label: "Attachments (optional)",
       helpText: "Add a photo or screenshot if it helps explain.",
+      showIf: ONLY_TRIP_DATA,
     },
   ],
 };
 
 export const supportCases: SupportCaseDefinition[] = [
   latePickupReasonCase,
-  missedPickupCase,
+  supportFormCase,
 ];
 
 export function getSupportCase(id: string): SupportCaseDefinition | undefined {

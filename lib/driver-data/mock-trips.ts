@@ -125,6 +125,28 @@ export function getActiveLeg(trip: Trip): TripLeg | undefined {
   return trip.legs.find((leg) => getLegStage(leg) !== "completed");
 }
 
+/**
+ * Driver-facing status for a leg, derived from its swipe marks.
+ *
+ * ⚠️ Provisional vocabulary. The real app's status names still need confirming —
+ * "Ready for pickup" in particular may be a distinct state we do not model,
+ * since our swipe sequence has no separate "arrived" mark.
+ */
+export function getLegStatusLabel(leg: TripLeg): string {
+  switch (getLegStage(leg)) {
+    case "not-started":
+      return "Not started";
+    case "started":
+      return "Enroute";
+    case "picked-up":
+      return "Onboard";
+    case "blocked":
+      return "Missing swipe";
+    case "completed":
+      return "Completed";
+  }
+}
+
 export interface Trip {
   id: string;
   date: string;

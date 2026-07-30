@@ -21,7 +21,9 @@ export type SupportFieldType =
   | "time"
   | "date"
   | "number"
-  | "file";
+  | "file"
+  /** Searchable picker over the driver's own legs. Selecting one drives prefill. */
+  | "leg-picker";
 
 /**
  * Where a field's value comes from when the app already knows it.
@@ -68,10 +70,13 @@ export interface SupportField {
   /** Resolve this field's initial value from the ride rather than the driver. */
   prefillFrom?: SupportPrefillSource;
   /**
-   * The field is context the driver should see but not change (leg id, their own
-   * email). Rendered read-only when a prefilled value resolved.
+   * Lock this field once a prefilled value resolves.
+   *
+   * Used for values the app already recorded — a swipe time we hold is context,
+   * not something the driver should retype. Evaluated per render, because which
+   * timestamps are known changes with the selected leg.
    */
-  locked?: boolean;
+  lockWhenPrefilled?: boolean;
 }
 
 /** Tint of the context callout above the fields. */

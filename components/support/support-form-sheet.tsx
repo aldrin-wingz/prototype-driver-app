@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Clock, AlertTriangle, Info } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SupportFieldRenderer } from "./support-field-renderer";
+import { TripSummaryBanner } from "./trip-summary-banner";
+import { findLegOption } from "@/lib/support-data/leg-options";
+import { deriveFromLeg } from "@/lib/support/prefill";
 import {
   areRequiredFieldsFilled,
   emptyValues,
@@ -70,6 +73,17 @@ export function SupportFormSheet({
     ...(initialValues ?? {}),
   });
   const [values, setValues] = useState<Record<string, string>>(blank);
+
+  // The leg the driver picked drives the summary banner and every timestamp we
+  // can fill. Re-derive on change rather than only at mount.
+  const selectedLeg = values.legId ? findLegOption(values.legId) : undefined;
+
+  useEffect(() => {
+    if (!selectedLeg) return;
+    const derived = deriveFromLeg(supportCase, selectedLeg.trip, selectedLeg.leg);
+    setValues((previous) => ({ ...previous, ...derived }));
+    // Keyed on the leg id so this runs once per selection, not every render.
+  }, [selectedLeg?.legId]);
 
   const visibleFields = supportCase.fields.filter((field) =>
     isFieldVisible(field, values)
@@ -140,12 +154,18 @@ export function SupportFormSheet({
 
           <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
             {visibleFields.map((field) => (
-              <SupportFieldRenderer
-                key={field.id}
-                field={field}
-                value={values[field.id] ?? ""}
-                onChange={(value) => setValue(field.id, value)}
-              />
+              <div key={field.id} className="space-y-3">
+                <SupportFieldRenderer
+                  field={field}
+                  value={values[field.id] ?? ""}
+                  locked={Boolean(field.lockWhenPrefilled)}
+                  onChange={(value) => setValue(field.id, value)}
+                />
+                {/* The summary sits directly under the picker that produced it. */}
+                {field.type === "leg-picker" && selectedLeg && (
+                  <TripSummaryBanner option={selectedLeg} />
+                )}
+              </div>
             ))}
           </div>
 

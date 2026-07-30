@@ -19,12 +19,9 @@ import { SupportFormSheet } from "@/components/support/support-form-sheet";
 import { supportCases, getSupportCase } from "@/lib/support-data/case-registry";
 import { buildCalloutForCase } from "@/lib/support/build-callout";
 import { buildPrefilledValues } from "@/lib/support/prefill";
+import { findLegOption } from "@/lib/support-data/leg-options";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import {
-  getLegStage,
-  type Trip,
-  type LegSwipeStage,
-} from "@/lib/driver-data/mock-trips";
+import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -123,23 +120,19 @@ const PRODUCTION_TILES: OptionTile[] = [
 ];
 
 /**
- * Missed Pickup — the in-app replacement for the Zendesk "Trip Data update" web
- * form. Sits beside Send Back Trip so it reads as a peer of the other ride
- * actions rather than a bolt-on.
+ * Submit Support Form — the in-app replacement for the Zendesk web form.
  *
- * Only offered mid-ride (started or picked up). Before the ride starts there is
- * no swipe to have missed, and once every leg is done the correction belongs to
- * a completed ride, which is a different case.
+ * Available on EVERY trip, not gated by swipe stage. A driver notices a missed
+ * swipe whenever they notice it, and the form's leg picker lets them file against
+ * any of their rides regardless of which one they opened this screen from.
  */
-const MISSED_PICKUP_TILE: OptionTile = {
-  id: "missed-pickup",
-  label: "Missed Pickup",
+const SUPPORT_FORM_TILE: OptionTile = {
+  id: "support-form",
+  label: "Submit Support Form",
   icon: AlarmClockOff,
   variant: "filled",
   color: DRIVER_NAVY,
 };
-
-const MISSED_PICKUP_STAGES: LegSwipeStage[] = ["started", "picked-up"];
 
 function TileIcon({ tile }: { tile: OptionTile }) {
   const Icon = tile.icon;
@@ -230,17 +223,12 @@ export function MoreOptionsScreen({
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
-  const activeStage = activeLeg ? getLegStage(activeLeg) : null;
-
-  // Missed Pickup only belongs mid-ride, and only once — a ride already waiting
-  // on Support should not let the driver file a second request.
-  const showMissedPickup =
-    !pending && activeStage !== null && MISSED_PICKUP_STAGES.includes(activeStage);
-
-  const gridTiles: OptionTile[] = showMissedPickup
-    ? [...PRODUCTION_TILES, MISSED_PICKUP_TILE]
-    : // Without Missed Pickup the grid has an odd count, so Send Back Trip takes
-      // the full width and centres, per capture s-03a.
+  // Hidden only while this ride already has a request in flight, so a driver
+  // cannot file twice against the same trip.
+  const gridTiles: OptionTile[] = !pending
+    ? [...PRODUCTION_TILES, SUPPORT_FORM_TILE]
+    : // Without the support tile the grid has an odd count, so Send Back Trip
+      // takes the full width and centres, per capture s-03a.
       PRODUCTION_TILES.map((tile) =>
         tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
       );
@@ -286,8 +274,8 @@ export function MoreOptionsScreen({
             <Tile
               tile={tile}
               onSelect={
-                tile.id === MISSED_PICKUP_TILE.id
-                  ? () => setOpenCaseId("missed-pickup")
+                tile.id === SUPPORT_FORM_TILE.id
+                  ? () => setOpenCaseId("support-form")
                   : handleProductionTile
               }
             />
@@ -312,7 +300,7 @@ export function MoreOptionsScreen({
         <div className="mt-4 space-y-2">
           {/* Cases already promoted to a real grid tile are not repeated here. */}
           {supportCases
-            .filter((supportCase) => supportCase.id !== MISSED_PICKUP_TILE.id)
+            .filter((supportCase) => supportCase.id !== SUPPORT_FORM_TILE.id)
             .map((supportCase) => {
             const isAvailable = supportCase.buildState !== "not-yet";
 
@@ -369,13 +357,7 @@ export function MoreOptionsScreen({
       {openCase && (
         <SupportFormSheet
           supportCase={openCase}
-          callout={buildCalloutForCase(
-            openCase.id,
-            activeLeg,
-            Object.values(
-              buildPrefilledValues(openCase, trip, activeLeg)
-            ).filter((value) => value.length > 0).length
-          )}
+          callout={buildCalloutForCase(openCase.id, activeLeg)}
           open
           onOpenChange={(next) => {
             if (!next) setOpenCaseId(null);
@@ -383,8 +365,14 @@ export function MoreOptionsScreen({
           initialValues={buildPrefilledValues(openCase, trip, activeLeg)}
           onSubmit={(values) => {
             setOpenCaseId(null);
+            // The leg picker lets the driver file against a DIFFERENT ride than
+            // the one they opened this screen from, so the request must follow
+            // the selected leg rather than the current trip.
+            const target = values.legId
+              ? findLegOption(values.legId)?.trip ?? trip
+              : trip;
             submitRequest({
-              tripId: trip.id,
+              tripId: target.id,
               caseId: openCase.id,
               caseTitle: openCase.title,
               values,

@@ -76,6 +76,26 @@ export function buildPrefilledValues(
   );
 }
 
+/**
+ * Values derived from a newly selected leg.
+ *
+ * Only fields that actually resolve to something are returned, so choosing a
+ * different leg overwrites the timestamps we now know while leaving the driver's
+ * own typing (the reason, odometer readings) alone.
+ */
+export function deriveFromLeg(
+  supportCase: SupportCaseDefinition,
+  trip: Trip,
+  leg: TripLeg
+): Record<string, string> {
+  const derived: Record<string, string> = {};
+  for (const field of supportCase.fields) {
+    if (!field.prefillFrom) continue;
+    derived[field.id] = resolve(field.prefillFrom, trip, leg, supportCase);
+  }
+  return derived;
+}
+
 /** Fields the driver still has to fill — the honest measure of remaining effort. */
 export function countFieldsLeft(
   fields: SupportField[],
