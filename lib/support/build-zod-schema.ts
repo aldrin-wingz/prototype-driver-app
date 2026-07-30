@@ -58,6 +58,24 @@ export function areRequiredFieldsFilled(
     .every((field) => (values[field.id] ?? "").trim().length > 0);
 }
 
+/**
+ * Whether the form can be sent at all.
+ *
+ * A visible `notice` blocks it outright: a notice stands in for a field set that
+ * does not exist, so there is nothing to submit. Without this the driver could
+ * send an empty request for an issue nobody has specified, which reads as a
+ * working flow and isn't one.
+ */
+export function canSubmitCase(
+  fields: SupportField[],
+  values: Record<string, string>
+): boolean {
+  const blocked = fields.some(
+    (field) => field.type === "notice" && isFieldVisible(field, values)
+  );
+  return !blocked && areRequiredFieldsFilled(fields, values);
+}
+
 /** Blank starting values for a case, so inputs stay controlled from mount. */
 export function emptyValues(fields: SupportField[]): Record<string, string> {
   return Object.fromEntries(fields.map((field) => [field.id, ""]));

@@ -10,7 +10,7 @@ import { TripSummaryBanner } from "./trip-summary-banner";
 import { findLegOption } from "@/lib/support-data/leg-options";
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
-  areRequiredFieldsFilled,
+  canSubmitCase,
   emptyValues,
   isFieldVisible,
 } from "@/lib/support/build-zod-schema";
@@ -59,6 +59,7 @@ export function SupportFormSheet({
   open,
   onOpenChange,
   onSubmit,
+  onSaveDraft,
 }: {
   supportCase: SupportCaseDefinition;
   callout?: SupportCallout;
@@ -67,6 +68,12 @@ export function SupportFormSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: Record<string, string>) => void;
+  /**
+   * Called on any dismissal that isn't a submit, when the driver has typed
+   * something. Nothing is thrown away by accident — a half-filled form becomes a
+   * draft in the Forms menu.
+   */
+  onSaveDraft?: (values: Record<string, string>) => void;
 }) {
   const blank = () => ({
     ...emptyValues(supportCase.fields),
@@ -89,14 +96,30 @@ export function SupportFormSheet({
     isFieldVisible(field, values)
   );
   // Per `s-02a`, the primary action sits disabled (muted green) until every
-  // required field has a value.
-  const canSubmit = areRequiredFieldsFilled(supportCase.fields, values);
+  // required field has a value — and stays disabled for an issue whose field set
+  // isn't built, since there is nothing to send.
+  const canSubmit = canSubmitCase(supportCase.fields, values);
 
   function setValue(id: string, value: string) {
     setValues((previous) => ({ ...previous, [id]: value }));
   }
 
+  /**
+   * Whether the driver has actually put something in.
+   *
+   * Compared against the starting values, not against blank — prefilled context
+   * the app supplied on its own is not the driver having typed anything, so
+   * opening a form and closing it again leaves no draft behind.
+   */
+  function isDirty(current: Record<string, string>) {
+    const start = blank();
+    return Object.keys(current).some(
+      (key) => (current[key] ?? "") !== (start[key] ?? "")
+    );
+  }
+
   function handleClose() {
+    if (isDirty(values)) onSaveDraft?.(values);
     onOpenChange(false);
     setValues(blank());
   }
@@ -111,7 +134,15 @@ export function SupportFormSheet({
   const CalloutIcon = tone?.Icon;
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    // Every route out of the sheet — swipe-down, overlay tap, Esc — goes through
+    // handleClose, so a draft is saved however the driver leaves.
+    <Drawer
+      open={open}
+      onOpenChange={(next) => {
+        if (next) onOpenChange(true);
+        else handleClose();
+      }}
+    >
       <DrawerContent className="flex max-h-[92vh] flex-col rounded-t-3xl border-0 px-6 pb-8">
         {/* Header and footer stay put; only the fields scroll. A long form must
             never push its Submit button off screen. */}

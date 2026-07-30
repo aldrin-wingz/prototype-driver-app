@@ -23,7 +23,15 @@ export type SupportFieldType =
   | "number"
   | "file"
   /** Searchable picker over the driver's own legs. Selecting one drives prefill. */
-  | "leg-picker";
+  | "leg-picker"
+  /**
+   * Not an input — a block of copy standing in for a field set that isn't built.
+   *
+   * An issue can be a real, registered support case while its questions are still
+   * unknown. Showing the notice keeps the issue visible in the dropdown without
+   * implying the flow behind it works.
+   */
+  | "notice";
 
 /**
  * Where a field's value comes from when the app already knows it.
@@ -48,6 +56,9 @@ export interface SupportFieldOption {
   label: string;
 }
 
+/** Which of the driver's legs a leg picker offers. */
+export type LegScope = "all" | "in-progress";
+
 export interface SupportField {
   id: string;
   type: SupportFieldType;
@@ -69,6 +80,13 @@ export interface SupportField {
   showIf?: { field: string; equals: string[] };
   /** Resolve this field's initial value from the ride rather than the driver. */
   prefillFrom?: SupportPrefillSource;
+  /**
+   * For `leg-picker` — which of the driver's legs are offered.
+   *
+   * `"in-progress"` restricts the picker to rides that are actually under way,
+   * for issues that only make sense on a live trip.
+   */
+  legScope?: LegScope;
   /**
    * Lock this field once a prefilled value resolves.
    *

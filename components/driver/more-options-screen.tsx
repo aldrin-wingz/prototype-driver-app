@@ -16,10 +16,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
-import { supportCases, getSupportCase } from "@/lib/support-data/case-registry";
+import {
+  supportCases,
+  getSupportCase,
+  SUPPORT_FORM_CASE_ID,
+} from "@/lib/support-data/case-registry";
 import { buildCalloutForCase } from "@/lib/support/build-callout";
 import { buildPrefilledValues } from "@/lib/support/prefill";
-import { findLegOption } from "@/lib/support-data/leg-options";
+import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
@@ -127,7 +131,7 @@ const PRODUCTION_TILES: OptionTile[] = [
  * any of their rides regardless of which one they opened this screen from.
  */
 const SUPPORT_FORM_TILE: OptionTile = {
-  id: "support-form",
+  id: SUPPORT_FORM_CASE_ID,
   label: "Submit Support Form",
   icon: AlarmClockOff,
   variant: "filled",
@@ -217,7 +221,7 @@ export function MoreOptionsScreen({
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
 
-  const { getPendingRequest, submitRequest } = useRideFlow();
+  const { getPendingRequest, saveDraft, submitForm } = useRideFlow();
   const pending = getPendingRequest(trip.id);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
@@ -299,7 +303,7 @@ export function MoreOptionsScreen({
 
         <div className="mt-4 space-y-2">
           {/* Cases already promoted to a real grid tile are not repeated here. */}
-          {supportCases
+          {supportCases()
             .filter((supportCase) => supportCase.id !== SUPPORT_FORM_TILE.id)
             .map((supportCase) => {
             const isAvailable = supportCase.buildState !== "not-yet";
@@ -363,23 +367,33 @@ export function MoreOptionsScreen({
             if (!next) setOpenCaseId(null);
           }}
           initialValues={buildPrefilledValues(openCase, trip, activeLeg)}
+          onSaveDraft={(values) => {
+            setOpenCaseId(null);
+            saveDraft({
+              caseId: openCase.id,
+              issue: values.issue ?? "",
+              ...resolveTripContext(openCase, values),
+              values,
+            });
+            toast({
+              title: "Saved to drafts",
+              description: "Pick it back up from My Forms whenever.",
+            });
+          }}
           onSubmit={(values) => {
             setOpenCaseId(null);
-            // The leg picker lets the driver file against a DIFFERENT ride than
-            // the one they opened this screen from, so the request must follow
-            // the selected leg rather than the current trip.
-            const target = values.legId
-              ? findLegOption(values.legId)?.trip ?? trip
-              : trip;
-            submitRequest({
-              tripId: target.id,
+            const context = resolveTripContext(openCase, values);
+            submitForm({
               caseId: openCase.id,
-              caseTitle: openCase.title,
+              issue: values.issue ?? "",
+              ...context,
               values,
             });
             toast({
               title: openCase.successMessage ?? "Sent to Support",
-              description: "This ride has moved to Pending while Support reviews it.",
+              description: context.tripId
+                ? "This ride has moved to Pending while Support reviews it."
+                : "It's in Pending review under My Forms.",
             });
             router.push(backHref);
           }}

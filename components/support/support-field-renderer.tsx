@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getLegStatusLabel } from "@/lib/driver-data/mock-trips";
-import { searchLegOptions } from "@/lib/support-data/leg-options";
+import { findLegOption, searchLegOptions } from "@/lib/support-data/leg-options";
 import type { SupportField } from "@/types/support";
 
 /**
@@ -34,8 +34,11 @@ function LegPicker({
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const results = searchLegOptions(query).slice(0, 6);
-  const selected = value ? searchLegOptions(value)[0] : undefined;
+  // Search is scoped — a missed swipe only applies to a trip that is under way —
+  // but the selected leg is looked up unscoped, so a draft filed against a ride
+  // that has since moved on still displays what it names.
+  const results = searchLegOptions(query, field.legScope).slice(0, 6);
+  const selected = value ? findLegOption(value) : undefined;
 
   return (
     <div className="space-y-2">
@@ -117,6 +120,23 @@ export function SupportFieldRenderer({
   onChange: (value: string) => void;
 }) {
   const isLocked = locked && Boolean(value);
+
+  // Not an input at all — a standing-in block where a field set would go. Uses
+  // the project's locked flag wording, so nobody reads it as "broken".
+  if (field.type === "notice") {
+    return (
+      <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3.5">
+        {/* The flag wording is the project's locked legend text, so it carries its
+            own ⚠️ — no second icon beside it. */}
+        <p className="text-base font-semibold text-gray-900">
+          ⚠️ Not in prototype yet
+        </p>
+        {field.helpText && (
+          <p className="mt-0.5 text-sm text-gray-600">{field.helpText}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">

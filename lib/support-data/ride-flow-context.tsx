@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
+import { getIssueLabel } from "./issue-types";
 
 /** Where a ride sits in the "reach out to confirm" flow. */
 export type RideConfirmation =
@@ -12,6 +13,43 @@ export type RideConfirmation =
   | "declined"
   /** Driver could not reach the rider but is going to the pickup anyway. */
   | "going-anyway";
+
+/** Whether a form is still the driver's, or now Support's. */
+export type SupportFormState = "draft" | "pending";
+
+/**
+ * One support form the driver has started.
+ *
+ * Keyed by its own id rather than by trip, because most issues aren't about a
+ * trip at all — a payment question or a general one has no leg to hang off. A
+ * form that DOES name a trip carries `tripId`, and only those surface on the
+ * ride itself and in My Rides → Pending.
+ */
+export interface SupportFormRecord {
+  id: string;
+  caseId: string;
+  /** Issue type value, e.g. `general`. */
+  issue: string;
+  /** Plain label for lists — never carries the not-in-prototype flag suffix. */
+  issueLabel: string;
+  tripId?: string;
+  legId?: string;
+  values: Record<string, string>;
+  state: SupportFormState;
+  /** Fixed label rather than a real clock, so screenshots stay stable. */
+  updatedAt: string;
+}
+
+/** What a caller supplies; the store fills in id, label, state and timestamp. */
+export interface SupportFormInput {
+  /** Pass an existing id to update that record — a draft becoming pending. */
+  id?: string;
+  caseId: string;
+  issue: string;
+  tripId?: string;
+  legId?: string;
+  values: Record<string, string>;
+}
 
 /** A support request the driver has submitted and is waiting on. */
 export interface PendingSupportRequest {
@@ -28,11 +66,21 @@ interface RideFlowValue {
   /** Decline messages already sent to Support, keyed by trip id. */
   getDeclineMessage: (tripId: string) => string | undefined;
   setDeclineMessage: (tripId: string, message: string) => void;
-  /** The pending support request for a ride, if it has one. */
+
+  /** Every form the driver has started, newest first. */
+  formRecords: SupportFormRecord[];
+  drafts: SupportFormRecord[];
+  pendingForms: SupportFormRecord[];
+  /**
+   * Save an in-progress form. Returns the record id so the caller can keep
+   * editing the same draft rather than creating a second one.
+   */
+  saveDraft: (input: SupportFormInput) => string;
+  /** Send a form to Support. Upserts, so a draft converts rather than duplicates. */
+  submitForm: (input: SupportFormInput) => string;
+  deleteForm: (id: string) => void;
+  /** The pending request for a ride, if it has one — drives the ride surfaces. */
   getPendingRequest: (tripId: string) => PendingSupportRequest | undefined;
-  /** All pending requests — drives the My Rides "Pending" tab. */
-  pendingRequests: PendingSupportRequest[];
-  submitRequest: (request: Omit<PendingSupportRequest, "submittedAt">) => void;
 }
 
 const RideFlowContext = createContext<RideFlowValue | null>(null);
@@ -55,33 +103,66 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [declineMessages, setDeclineMessages] = useState<
     Record<string, string>
   >({});
-  const [requests, setRequests] = useState<
-    Record<string, PendingSupportRequest>
-  >({});
+  const [records, setRecords] = useState<SupportFormRecord[]>([]);
+  // A counter, not a clock or a random source: ids stay predictable across a demo.
+  const nextId = useRef(1);
 
-  const value = useMemo<RideFlowValue>(
-    () => ({
+  const value = useMemo<RideFlowValue>(() => {
+    function upsert(input: SupportFormInput, state: SupportFormState): string {
+      const id = input.id ?? `form-${nextId.current++}`;
+      const record: SupportFormRecord = {
+        id,
+        caseId: input.caseId,
+        issue: input.issue,
+        issueLabel: getIssueLabel(input.issue),
+        tripId: input.tripId,
+        legId: input.legId,
+        values: input.values,
+        state,
+        updatedAt: "Just now",
+      };
+
+      setRecords((previous) => {
+        const index = previous.findIndex((candidate) => candidate.id === id);
+        if (index === -1) return [record, ...previous];
+        const next = [...previous];
+        next[index] = record;
+        return next;
+      });
+
+      return id;
+    }
+
+    const pendingForms = records.filter((record) => record.state === "pending");
+
+    return {
       getConfirmation: (tripId) => confirmations[tripId] ?? "unconfirmed",
       setConfirmation: (tripId, next) =>
         setConfirmations((previous) => ({ ...previous, [tripId]: next })),
       getDeclineMessage: (tripId) => declineMessages[tripId],
       setDeclineMessage: (tripId, message) =>
         setDeclineMessages((previous) => ({ ...previous, [tripId]: message })),
-      getPendingRequest: (tripId) => requests[tripId],
-      pendingRequests: Object.values(requests),
-      submitRequest: (request) =>
-        setRequests((previous) => ({
-          ...previous,
-          [request.tripId]: {
-            ...request,
-            // No real clock needed for a prototype, and a fixed label keeps
-            // screenshots stable.
-            submittedAt: "Just now",
-          },
-        })),
-    }),
-    [confirmations, declineMessages, requests]
-  );
+
+      formRecords: records,
+      drafts: records.filter((record) => record.state === "draft"),
+      pendingForms,
+      saveDraft: (input) => upsert(input, "draft"),
+      submitForm: (input) => upsert(input, "pending"),
+      deleteForm: (id) =>
+        setRecords((previous) => previous.filter((record) => record.id !== id)),
+      getPendingRequest: (tripId) => {
+        const match = pendingForms.find((record) => record.tripId === tripId);
+        if (!match) return undefined;
+        return {
+          tripId,
+          caseId: match.caseId,
+          caseTitle: match.issueLabel,
+          values: match.values,
+          submittedAt: match.updatedAt,
+        };
+      },
+    };
+  }, [confirmations, declineMessages, records]);
 
   return (
     <RideFlowContext.Provider value={value}>

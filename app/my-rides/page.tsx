@@ -25,11 +25,19 @@ interface TabConfig {
 export default function MyRidesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabValue>("needs-action");
-  const { pendingRequests } = useRideFlow();
+  const { pendingForms } = useRideFlow();
 
+  // Only a form that NAMES a trip moves a ride here. A general or payment
+  // question lives in the Forms menu instead — it isn't about a ride, so putting
+  // one in this tab would be a lie.
+  //
   // A ride waiting on Support MOVES to Pending — it does not appear in both
   // places. Otherwise the driver cannot tell which rides still need them.
-  const pendingIds = new Set(pendingRequests.map((request) => request.tripId));
+  const pendingIds = new Set(
+    pendingForms
+      .map((record) => record.tripId)
+      .filter((tripId): tripId is string => Boolean(tripId))
+  );
   const withoutPending = (trips: Trip[]) =>
     trips.filter((trip) => !pendingIds.has(trip.id));
 
