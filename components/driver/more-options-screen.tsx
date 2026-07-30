@@ -26,6 +26,8 @@ import { buildPrefilledValues } from "@/lib/support/prefill";
 import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
+import { canFileNoShow } from "@/lib/driver-data/no-show-rules";
+import { NoShowFlow } from "./no-show-flow";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -219,6 +221,7 @@ export function MoreOptionsScreen({
   const router = useRouter();
   const { toast } = useToast();
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
+  const [noShowOpen, setNoShowOpen] = useState(false);
   const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
 
   const { getPendingRequest, saveDraft, submitForm } = useRideFlow();
@@ -245,6 +248,37 @@ export function MoreOptionsScreen({
       title: tile?.label ?? "Action",
       description: "Not wired in the prototype — this is the production action.",
     });
+  }
+
+  /**
+   * Member No-Show is the Rider No-Show case's entry point.
+   *
+   * Only meaningful on a leg that is under way but not yet picked up: you cannot
+   * no-show a ride you never started, or a member already in the car. Saying which
+   * beats opening a flow that would refuse for a reason the driver can't see.
+   */
+  function handleNoShowTile() {
+    if (!activeLeg || !canFileNoShow(activeLeg)) {
+      toast({
+        title: "Member No-Show",
+        description:
+          "Available once you're on the way to the pick-up and haven't picked the member up yet.",
+      });
+      return;
+    }
+    setNoShowOpen(true);
+  }
+
+  function handleGridTile(id: string) {
+    if (id === SUPPORT_FORM_TILE.id) {
+      setOpenCaseId("support-form");
+      return;
+    }
+    if (id === "no-show") {
+      handleNoShowTile();
+      return;
+    }
+    handleProductionTile(id);
   }
 
   return (
@@ -275,14 +309,7 @@ export function MoreOptionsScreen({
             )}
             style={tile.fullWidth ? { gridColumn: "span 2" } : undefined}
           >
-            <Tile
-              tile={tile}
-              onSelect={
-                tile.id === SUPPORT_FORM_TILE.id
-                  ? () => setOpenCaseId("support-form")
-                  : handleProductionTile
-              }
-            />
+            <Tile tile={tile} onSelect={handleGridTile} />
           </div>
         ))}
       </div>
@@ -357,6 +384,15 @@ export function MoreOptionsScreen({
           })}
         </div>
       </section>
+
+      {activeLeg && (
+        <NoShowFlow
+          trip={trip}
+          leg={activeLeg}
+          open={noShowOpen}
+          onOpenChange={setNoShowOpen}
+        />
+      )}
 
       {openCase && (
         <SupportFormSheet
