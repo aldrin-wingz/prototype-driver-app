@@ -35,15 +35,19 @@ export function SignatureSheet({
   onSigned: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const observer = useRef<ResizeObserver | null>(null);
   const drawing = useRef(false);
   const [hasStroke, setHasStroke] = useState(false);
 
   /**
    * Size the backing store to the device's pixel ratio.
    *
-   * A canvas defaults to 300×150 CSS pixels stretched to fit, which renders a
-   * blurry, offset line — and the offset breaks the coordinate maths, not just
-   * the looks.
+   * A canvas defaults to a 300×150 backing store stretched to fit its box, which
+   * renders a blurry line — and worse, puts every pointer coordinate in a
+   * different space from the pixels, so the stroke lands away from the finger.
+   *
+   * No-ops when the size already matches, because resizing a canvas clears it and
+   * this runs from an observer that can fire mid-signature.
    */
   const resize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -53,8 +57,12 @@ export function SignatureSheet({
     if (rect.width === 0) return;
 
     const ratio = window.devicePixelRatio || 1;
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
+    const width = Math.round(rect.width * ratio);
+    const height = Math.round(rect.height * ratio);
+    if (canvas.width === width && canvas.height === height) return;
+
+    canvas.width = width;
+    canvas.height = height;
 
     const context = canvas.getContext("2d");
     if (!context) return;
@@ -65,16 +73,31 @@ export function SignatureSheet({
     context.strokeStyle = STROKE_COLOR;
   }, []);
 
-  // The canvas only exists once the drawer has mounted its content, so measure on
-  // open rather than on first render.
+  /**
+   * Measure the moment the canvas attaches, and again if its box changes.
+   *
+   * The drawer mounts its content only when it opens, so an effect keyed on `open`
+   * runs while the canvas does not yet exist — a callback ref is the only hook
+   * that fires at the right time. The observer then covers the open transition.
+   */
+  const attachCanvas = useCallback(
+    (node: HTMLCanvasElement | null) => {
+      observer.current?.disconnect();
+      canvasRef.current = node;
+      if (!node) return;
+
+      resize();
+      observer.current = new ResizeObserver(resize);
+      observer.current.observe(node);
+    },
+    [resize]
+  );
+
   useEffect(() => {
-    if (!open) return;
-    setHasStroke(false);
-    // One frame's grace for the drawer's open transition to settle, otherwise the
-    // rect is still mid-animation and the backing store is sized wrong.
-    const frame = requestAnimationFrame(resize);
-    return () => cancelAnimationFrame(frame);
-  }, [open, resize]);
+    if (open) setHasStroke(false);
+  }, [open]);
+
+  useEffect(() => () => observer.current?.disconnect(), []);
 
   function pointFrom(event: React.PointerEvent<HTMLCanvasElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -88,6 +111,9 @@ export function SignatureSheet({
     // Keeps the stroke following the finger even if it leaves the canvas, so a
     // signature that overshoots the box doesn't end mid-letter.
     event.currentTarget.setPointerCapture(event.pointerId);
+    // The drawer treats a downward drag as dismiss, and a signature is full of
+    // downward strokes — without this, signing swipes the sheet closed.
+    event.stopPropagation();
     drawing.current = true;
 
     const { x, y } = pointFrom(event);
@@ -105,12 +131,14 @@ export function SignatureSheet({
     const context = canvasRef.current?.getContext("2d");
     if (!context) return;
 
+    event.stopPropagation();
     const { x, y } = pointFrom(event);
     context.lineTo(x, y);
     context.stroke();
   }
 
-  function end() {
+  function end(event: React.PointerEvent<HTMLCanvasElement>) {
+    event.stopPropagation();
     drawing.current = false;
   }
 
@@ -149,12 +177,17 @@ export function SignatureSheet({
 
           <div className="mt-6">
             <canvas
-              ref={canvasRef}
+              ref={attachCanvas}
               onPointerDown={start}
               onPointerMove={move}
               onPointerUp={end}
               onPointerCancel={end}
               aria-label="Signature area"
+              // Tells the drawer this region is not a drag handle. Belt and braces
+              // with the stopPropagation above — either alone is enough, and a
+              // signature sheet that dismisses itself mid-stroke is bad enough to
+              // warrant both.
+              data-vaul-no-drag
               // `touch-none` is load-bearing on a phone: without it the browser
               // claims the gesture as a scroll and no stroke is ever drawn.
               className="h-44 w-full touch-none rounded-xl border border-dashed border-gray-300 bg-white"
