@@ -1063,6 +1063,13 @@ export const mockNeedsActionTrips: Trip[] = [
 // vary by client, market and seeded presence evidence instead — see the block
 // comment where they start.
 //
+// ⚠️ SCENARIO_PILL_NOTE — every ride in this array carries a PROTOTYPE-ONLY pill
+// naming which case it demos ("No-show · left location", "Missed Swipe demo", …).
+// These are demo scaffolding, NOT app data: the real app shows no such pill, and
+// they must be stripped before any capture that stands in for production. They
+// exist because the branch a no-show takes is decided by seeded evidence, so
+// without a label the seven rides here are indistinguishable on the list.
+//
 // NOTE: there is deliberately no ride here with a MISSING swipe, so the
 // "Trip Update Needed" path has nothing to demo on right now. The support case
 // will need such a seed when the Trip Update form is built — see
@@ -1107,7 +1114,8 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    // ⚠️ Prototype-only scenario label — see SCENARIO_PILL_NOTE below.
+    pills: [{ label: "No-show n/a · not started", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1157,7 +1165,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    pills: [{ label: "No-show · proven wait", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1200,7 +1208,11 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    // Two swipes recorded, so this is also where Missed Swipe demos its prefill.
+    pills: [
+      { label: "Missed Swipe demo", variant: "warning" },
+      { label: "No-show n/a · on board", variant: "neutral" },
+    ],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1264,7 +1276,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    pills: [{ label: "No-show · needs form", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
@@ -1313,7 +1325,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    pills: [{ label: "No-show · proven wait, on-site", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1362,7 +1374,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    pills: [{ label: "No-show · left location", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1411,7 +1423,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [],
+    pills: [{ label: "No-show · wait unfinished", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

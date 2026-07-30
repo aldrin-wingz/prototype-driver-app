@@ -24,7 +24,11 @@ interface TabConfig {
 
 export default function MyRidesPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabValue>("needs-action");
+  // ⚠️ Prototype-only default. In Progress holds one ride per support-case
+  // scenario, each labelled with a demo pill, so landing here makes every branch
+  // reachable in one tap. The real app's default tab is a product decision nobody
+  // has made — revert to "needs-action" before treating this as production.
+  const [activeTab, setActiveTab] = useState<TabValue>("in-progress");
   const { pendingForms } = useRideFlow();
 
   // Only a form that NAMES a trip moves a ride here. A general or payment
