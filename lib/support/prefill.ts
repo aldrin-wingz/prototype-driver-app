@@ -62,6 +62,10 @@ function resolve(
       return toTimeInputValue(leg?.progress?.pickedUpAt);
     case "dropOffTime":
       return toTimeInputValue(leg?.progress?.droppedOffAt);
+    case "arrivedAt":
+      // Blank when the app never established an arrival, which is exactly the
+      // case that makes the driver's own answer worth asking for.
+      return toTimeInputValue(leg?.presence?.arrivedAt);
   }
 }
 

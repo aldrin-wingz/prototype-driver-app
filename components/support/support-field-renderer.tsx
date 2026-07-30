@@ -560,6 +560,15 @@ export function SupportFieldRenderer({
       {field.helpText && !isLocked && (
         <p className="text-sm text-gray-500">{field.helpText}</p>
       )}
+
+      {/* Says outright that the asterisk above is real but unenforced here, using
+          the project's locked flag wording — otherwise a required field that lets
+          you submit without it reads as a bug in the gate. */}
+      {field.requiredNotEnforced && (
+        <p className="text-sm text-[#B45309]">
+          ⚠️ Required in the real flow — not enforced in the prototype
+        </p>
+      )}
     </div>
   );
 }

@@ -92,11 +92,21 @@ const ONLY_MISSED_SWIPE = { field: "issue", equals: [ISSUE_MISSED_SWIPE] };
 const ONLY_GENERAL = { field: "issue", equals: [ISSUE_GENERAL] };
 const ONLY_PAYMENT = { field: "issue", equals: [ISSUE_PAYMENT] };
 const ONLY_TRIP_REQUEST = { field: "issue", equals: [ISSUE_TRIP_REQUEST] };
-/** Issues that are registered but whose questions are not specified yet. */
-const ONLY_NOT_YET = {
-  field: "issue",
-  equals: [ISSUE_RIDER_NO_SHOW],
-};
+const ONLY_RIDER_NO_SHOW = { field: "issue", equals: [ISSUE_RIDER_NO_SHOW] };
+
+/**
+ * How the driver tried to reach the member.
+ *
+ * The last option matters as much as the first three: "I couldn't try" is a real
+ * answer — no phone number on the trip, a dead battery — and forcing a driver to
+ * claim an attempt they didn't make would make the whole record less trustworthy.
+ */
+const CONTACT_ATTEMPT_OPTIONS: SupportFieldOption[] = [
+  { value: "called", label: "I called them" },
+  { value: "texted", label: "I texted them" },
+  { value: "called-and-texted", label: "I called and texted" },
+  { value: "could-not", label: "I wasn't able to reach out" },
+];
 
 export const SUPPORT_FORM_CASE_ID = "support-form";
 
@@ -335,14 +345,83 @@ export function buildSupportFormCase({
         showIf: ONLY_MISSED_SWIPE,
       },
 
-      // ---- Registered, not specified -------------------------------------
+      // ---- Rider No-Show -------------------------------------------------
+      //
+      // Reached only from the Member No-Show action, and only when the app could
+      // NOT establish the 10-minute wait itself. So every question here is one the
+      // app would have answered on its own if it could — which is why they are all
+      // required: this form is the substitute for evidence, and a half-answered
+      // one is worth nothing to Support.
       {
-        id: "notYetNotice",
-        type: "notice",
-        label: "",
-        helpText:
-          "This issue is on the list, but its questions haven't been specified yet. Pick another issue, or send it as General for now.",
-        showIf: ONLY_NOT_YET,
+        id: "noShowLegId",
+        type: "leg-picker",
+        label: "Which trip?",
+        required: true,
+        showIf: ONLY_RIDER_NO_SHOW,
+        prefillFrom: "legId",
+        legScope: "in-progress",
+        // Its own field rather than sharing Missed Swipe's, because this one must
+        // stay pinned to the ride the driver filed from — a no-show is about a
+        // specific pick-up they physically attended.
+        lockWhenPrefilled: true,
+        lockedBadge: "From this ride",
+      },
+      {
+        id: "noShowArrivedAt",
+        type: "time",
+        label: "What time did you arrive at the pick-up?",
+        required: true,
+        prefillFrom: "arrivedAt",
+        helpText: "Prefilled when we have it — correct it if it's wrong.",
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+      {
+        id: "noShowWaitMinutes",
+        type: "stepper",
+        label: "How many minutes did you wait?",
+        required: true,
+        // No default: a stepper starting at a number would answer the question
+        // for them, and "0" would pass the required check by inaction.
+        min: 1,
+        max: 60,
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+      {
+        id: "noShowWaitLocation",
+        type: "text",
+        label: "Where did you wait?",
+        placeholder: "e.g. Parked in the driveway, front entrance",
+        required: true,
+        helpText: "How Support can tell you were at the right door.",
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+      {
+        id: "noShowContactAttempts",
+        type: "select",
+        label: "Did you try to reach the member?",
+        placeholder: "Select what you tried",
+        required: true,
+        options: CONTACT_ATTEMPT_OPTIONS,
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+      {
+        id: "noShowContactDetails",
+        type: "textarea",
+        label: "What happened when you tried?",
+        placeholder:
+          "Times you called or texted and how it went — no answer, voicemail, wrong number.",
+        required: true,
+        maxLength: 500,
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+      {
+        id: "noShowProof",
+        type: "file",
+        label: "Attach proof",
+        required: true,
+        requiredNotEnforced: true,
+        helpText: "A call log or screenshot showing you tried to reach them.",
+        showIf: ONLY_RIDER_NO_SHOW,
       },
     ],
   };

@@ -54,7 +54,14 @@ export function areRequiredFieldsFilled(
   values: Record<string, string>
 ): boolean {
   return fields
-    .filter((field) => field.required && isFieldVisible(field, values))
+    .filter(
+      (field) =>
+        field.required &&
+        // Required in the real flow, but the prototype must not hold a demo
+        // hostage to a file nobody has to hand.
+        !field.requiredNotEnforced &&
+        isFieldVisible(field, values)
+    )
     .every((field) => (values[field.id] ?? "").trim().length > 0);
 }
 

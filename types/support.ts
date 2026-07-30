@@ -63,7 +63,9 @@ export type SupportPrefillSource =
   | "legId"
   | "enRouteTime"
   | "pickupTime"
-  | "dropOffTime";
+  | "dropOffTime"
+  /** Arrival at the pick-up, when the app recorded one. */
+  | "arrivedAt";
 
 export interface SupportFieldOption {
   value: string;
@@ -83,6 +85,16 @@ export interface SupportField {
   /** Helper copy under the control. */
   helpText?: string;
   required?: boolean;
+  /**
+   * Required in the real flow, but not enforced here.
+   *
+   * For a field the live product would insist on that a prototype cannot
+   * reasonably demand — an uploaded file being the obvious one, since nobody
+   * walking through a demo has a call-log screenshot to hand. Keeps the asterisk
+   * so the real requirement is visible, and carries the project's flag wording in
+   * help text so a passable required field doesn't read as a bug.
+   */
+  requiredNotEnforced?: boolean;
   /** For `select`. */
   options?: SupportFieldOption[];
   /** Max length for free-text types. */
