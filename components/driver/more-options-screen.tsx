@@ -10,24 +10,17 @@ import {
   Calendar,
   X,
   Reply,
-  FileText,
   AlarmClockOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
-import {
-  supportCases,
-  getSupportCase,
-  SUPPORT_FORM_CASE_ID,
-} from "@/lib/support-data/case-registry";
-import { buildCalloutForCase } from "@/lib/support/build-callout";
+import { buildSupportFormCase } from "@/lib/support-data/case-registry";
+import { ISSUE_MISSED_SWIPE } from "@/lib/support-data/issue-types";
 import { buildPrefilledValues } from "@/lib/support/prefill";
 import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
-import { canFileNoShow } from "@/lib/driver-data/no-show-rules";
-import { NoShowFlow } from "./no-show-flow";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -126,15 +119,18 @@ const PRODUCTION_TILES: OptionTile[] = [
 ];
 
 /**
- * Submit Support Form — the in-app replacement for the Zendesk web form.
+ * Missed Swipe — the one support case v1 covers, and the only way into a form.
  *
- * Available on EVERY trip, not gated by swipe stage. A driver notices a missed
- * swipe whenever they notice it, and the form's leg picker lets them file against
- * any of their rides regardless of which one they opened this screen from.
+ * A tile rather than a dropdown entry: the driver opened this screen from a
+ * specific ride, so which trip the request is about is already settled. Tapping
+ * it goes straight to the form with the issue and the ride both filled in.
+ *
+ * Not gated by swipe stage. A driver notices a missed swipe whenever they notice
+ * it, which is not always the moment the app works out that a mark is missing.
  */
-const SUPPORT_FORM_TILE: OptionTile = {
-  id: SUPPORT_FORM_CASE_ID,
-  label: "Submit Support Form",
+const MISSED_SWIPE_TILE: OptionTile = {
+  id: "missed-swipe",
+  label: "Missed Swipe",
   icon: AlarmClockOff,
   variant: "filled",
   color: DRIVER_NAVY,
@@ -220,11 +216,9 @@ export function MoreOptionsScreen({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [openCaseId, setOpenCaseId] = useState<string | null>(null);
-  const [noShowOpen, setNoShowOpen] = useState(false);
-  const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
+  const [formOpen, setFormOpen] = useState(false);
 
-  const { getPendingRequest, saveDraft, submitForm } = useRideFlow();
+  const { getPendingRequest, submitForm } = useRideFlow();
   const pending = getPendingRequest(trip.id);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
@@ -233,12 +227,31 @@ export function MoreOptionsScreen({
   // Hidden only while this ride already has a request in flight, so a driver
   // cannot file twice against the same trip.
   const gridTiles: OptionTile[] = !pending
-    ? [...PRODUCTION_TILES, SUPPORT_FORM_TILE]
+    ? [...PRODUCTION_TILES, MISSED_SWIPE_TILE]
     : // Without the support tile the grid has an odd count, so Send Back Trip
       // takes the full width and centres, per capture s-03a.
       PRODUCTION_TILES.map((tile) =>
         tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
       );
+
+  /**
+   * The issue is chosen for the driver, and the form shows it locked.
+   *
+   * `includeIssues` is what puts Missed Swipe in the select's options at all — a
+   * selected value with no matching option renders as the placeholder, so the form
+   * would claim no issue was picked. Seeding `issue` in the initial values is what
+   * marks it app-supplied, which is what `lockWhenPrefilled` reads.
+   *
+   * The same seam takes a second case: register the issue, gate its fields on it,
+   * and hand it to a tile.
+   */
+  const missedSwipeCase = buildSupportFormCase({
+    includeIssues: [ISSUE_MISSED_SWIPE],
+  });
+  const initialValues = {
+    ...buildPrefilledValues(missedSwipeCase, trip, activeLeg),
+    issue: ISSUE_MISSED_SWIPE,
+  };
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -250,34 +263,13 @@ export function MoreOptionsScreen({
     });
   }
 
-  /**
-   * Member No-Show is the Rider No-Show case's entry point.
-   *
-   * Only meaningful on a leg that is under way but not yet picked up: you cannot
-   * no-show a ride you never started, or a member already in the car. Saying which
-   * beats opening a flow that would refuse for a reason the driver can't see.
-   */
-  function handleNoShowTile() {
-    if (!activeLeg || !canFileNoShow(activeLeg)) {
-      toast({
-        title: "Member No-Show",
-        description:
-          "Available once you're on the way to the pick-up and haven't picked the member up yet.",
-      });
-      return;
-    }
-    setNoShowOpen(true);
-  }
-
   function handleGridTile(id: string) {
-    if (id === SUPPORT_FORM_TILE.id) {
-      setOpenCaseId("support-form");
+    if (id === MISSED_SWIPE_TILE.id) {
+      setFormOpen(true);
       return;
     }
-    if (id === "no-show") {
-      handleNoShowTile();
-      return;
-    }
+    // Member No-Show included: it is a real production action and a candidate
+    // support case, but not one v1 covers, so it toasts like the rest.
     handleProductionTile(id);
   }
 
@@ -314,127 +306,27 @@ export function MoreOptionsScreen({
         ))}
       </div>
 
-      {/* ------------------------------------------------------------------
-          Prototype-only. NOT part of the production More Options screen.
-          Kept visually separated and explicitly labelled so this screen can be
-          shown to stakeholders without implying these entries ship today.
-         ------------------------------------------------------------------ */}
-      <section className="mt-6 border-t-4 border-dashed border-gray-200 px-4 pb-10 pt-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Prototype only — not in the app today
-        </p>
-        <p className="mt-1 text-sm text-gray-500">
-          In-app support requests being explored, so the forms are reachable for
-          review.
-        </p>
-
-        <div className="mt-4 space-y-2">
-          {/* Cases already promoted to a real grid tile are not repeated here. */}
-          {supportCases()
-            .filter((supportCase) => supportCase.id !== SUPPORT_FORM_TILE.id)
-            .map((supportCase) => {
-            const isAvailable = supportCase.buildState !== "not-yet";
-
-            return (
-              <button
-                key={supportCase.id}
-                type="button"
-                disabled={!isAvailable}
-                onClick={() => setOpenCaseId(supportCase.id)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-xl border p-4 text-left",
-                  isAvailable
-                    ? "border-gray-200 bg-white"
-                    : "border-gray-100 bg-gray-50"
-                )}
-              >
-                <FileText
-                  className={cn(
-                    "h-5 w-5 flex-shrink-0",
-                    isAvailable ? "text-gray-500" : "text-gray-300"
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={cn(
-                      "block text-base font-semibold",
-                      isAvailable ? "text-gray-900" : "text-gray-400"
-                    )}
-                  >
-                    {supportCase.title}
-                  </span>
-                  {supportCase.summary && (
-                    <span
-                      className={cn(
-                        "block text-sm",
-                        isAvailable ? "text-gray-500" : "text-gray-400"
-                      )}
-                    >
-                      {supportCase.summary}
-                    </span>
-                  )}
-                  {!isAvailable && (
-                    <span className="mt-1 inline-block rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-medium text-[#92400E]">
-                      ⚠️ Not in prototype yet
-                    </span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {activeLeg && (
-        <NoShowFlow
-          trip={trip}
-          leg={activeLeg}
-          open={noShowOpen}
-          onOpenChange={setNoShowOpen}
-        />
-      )}
-
-      {openCase && (
-        <SupportFormSheet
-          supportCase={openCase}
-          callout={buildCalloutForCase(openCase.id, activeLeg)}
-          open
-          onOpenChange={(next) => {
-            if (!next) setOpenCaseId(null);
-          }}
-          initialValues={buildPrefilledValues(openCase, trip, activeLeg)}
-          onSaveDraft={(values) => {
-            setOpenCaseId(null);
-            saveDraft({
-              caseId: openCase.id,
-              issue: values.issue ?? "",
-              ...resolveTripContext(openCase, values),
-              values,
-            });
-            toast({
-              title: "Saved to drafts",
-              description: "Pick it back up from Support Requests whenever.",
-            });
-          }}
-          onSubmit={(values) => {
-            setOpenCaseId(null);
-            const context = resolveTripContext(openCase, values);
-            submitForm({
-              caseId: openCase.id,
-              issue: values.issue ?? "",
-              ...context,
-              values,
-            });
-            toast({
-              title: openCase.successMessage ?? "Sent to Support",
-              description: context.tripId
-                ? "This ride has moved to Pending while Support reviews it."
-                : "It's in Pending Review under Support Requests.",
-            });
-            router.push(backHref);
-          }}
-        />
-      )}
+      <SupportFormSheet
+        supportCase={missedSwipeCase}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        initialValues={initialValues}
+        onSubmit={(values) => {
+          setFormOpen(false);
+          submitForm({
+            caseId: missedSwipeCase.id,
+            issue: ISSUE_MISSED_SWIPE,
+            ...resolveTripContext(missedSwipeCase, values),
+            values,
+          });
+          toast({
+            title: missedSwipeCase.successMessage ?? "Sent to Support",
+            description:
+              "This ride has moved to Pending while Support reviews it.",
+          });
+          router.push(backHref);
+        }}
+      />
     </div>
   );
 }
