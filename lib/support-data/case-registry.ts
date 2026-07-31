@@ -1,3 +1,4 @@
+import type { MissableSwipe } from "@/lib/driver-data/mock-trips";
 import { getIssueOptions, ISSUE_MISSED_SWIPE } from "./issue-types";
 import type { SupportCaseDefinition } from "@/types/support";
 
@@ -32,6 +33,7 @@ const SUPPORT_FORM_CASE_ID = "support-form";
  */
 export function buildSupportFormCase({
   includeIssues,
+  requireFields,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -42,7 +44,27 @@ export function buildSupportFormCase({
    * on the driver's behalf.
    */
   includeIssues?: string[];
+  /**
+   * Fields to mark required on top of what the case declares.
+   *
+   * Needed because for the time fields, whether an answer is required is a
+   * property of the RIDE, not of the field. A blank Drop-off Time on a ride still
+   * in progress is a swipe that isn't due yet and there is nothing to ask for; the
+   * same blank on a ride that already recorded a later mark is the gap the driver
+   * is filing about, and submitting without it sends Support a correction that
+   * corrects nothing. `getMissingSwipes` is what tells the two apart, so the
+   * caller resolves it against the leg and passes the answer in.
+   */
+  requireFields?: string[];
 } = {}): SupportCaseDefinition {
+  const required = new Set(requireFields ?? []);
+  const withRequired = (
+    fields: SupportCaseDefinition["fields"]
+  ): SupportCaseDefinition["fields"] =>
+    fields.map((field) =>
+      required.has(field.id) ? { ...field, required: true } : field
+    );
+
   return {
     id: SUPPORT_FORM_CASE_ID,
     title: "Submit Support Form",
@@ -56,7 +78,7 @@ export function buildSupportFormCase({
     resolution: "cs-queue",
     successMessage: "Sent to Support",
     zendeskEquivalent: "Submit a request",
-    fields: [
+    fields: withRequired([
       {
         id: "issue",
         type: "select",
@@ -146,6 +168,18 @@ export function buildSupportFormCase({
         helpText: "Add a photo or screenshot if it helps explain.",
         showIf: ONLY_MISSED_SWIPE,
       },
-    ],
+    ]),
   };
 }
+
+/**
+ * The form field that holds each swipe mark.
+ *
+ * Lets a caller turn `getMissingSwipes(leg)` into `requireFields`. Only the two
+ * marks a gap can land on are here — nothing follows a drop-off, so a missing
+ * drop-off is a swipe not yet due rather than a skipped one.
+ */
+export const TIME_FIELD_FOR_SWIPE: Record<MissableSwipe, string> = {
+  startedAt: "enRouteTime",
+  pickedUpAt: "pickupTime",
+};

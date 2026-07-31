@@ -15,12 +15,19 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SupportFormSheet } from "@/components/support/support-form-sheet";
-import { buildSupportFormCase } from "@/lib/support-data/case-registry";
+import {
+  buildSupportFormCase,
+  TIME_FIELD_FOR_SWIPE,
+} from "@/lib/support-data/case-registry";
 import { ISSUE_MISSED_SWIPE } from "@/lib/support-data/issue-types";
 import { buildPrefilledValues } from "@/lib/support/prefill";
 import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
+import {
+  getLegStage,
+  getMissingSwipes,
+  type Trip,
+} from "@/lib/driver-data/mock-trips";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -247,8 +254,15 @@ export function MoreOptionsScreen({
    */
   const missedSwipeCase = buildSupportFormCase({
     includeIssues: [ISSUE_MISSED_SWIPE],
+    // Whichever mark this leg actually skipped becomes required. Without this the
+    // driver can submit with the missing time still blank — a correction that
+    // corrects nothing — while making all three times required unconditionally
+    // would demand a drop-off time from a ride still on its way there.
+    requireFields: activeLeg
+      ? getMissingSwipes(activeLeg).map((mark) => TIME_FIELD_FOR_SWIPE[mark])
+      : [],
   });
-  const initialValues = {
+  const initialValues: Record<string, string> = {
     ...buildPrefilledValues(missedSwipeCase, trip, activeLeg),
     issue: ISSUE_MISSED_SWIPE,
   };
@@ -265,6 +279,21 @@ export function MoreOptionsScreen({
 
   function handleGridTile(id: string) {
     if (id === MISSED_SWIPE_TILE.id) {
+      // An empty prefilled leg means this ride is not one the form's own picker
+      // would accept — `legScope: "in-progress"` drops it, because a missed swipe
+      // is only actionable on a trip that is under way.
+      //
+      // Checked here rather than trusted, because opening the form anyway breaks
+      // the premise it is built on: with nothing to prefill, the locked "From this
+      // ride" card degrades into an open search box asking which trip the driver
+      // means — the one question arriving from a ride has already answered.
+      if (!initialValues.legId) {
+        toast({
+          title: "Missed Swipe",
+          description: "Available once this ride is under way.",
+        });
+        return;
+      }
       setFormOpen(true);
       return;
     }

@@ -8,7 +8,10 @@ import { cn } from "@/lib/utils";
 import { SupportFieldRenderer } from "./support-field-renderer";
 import { TripSummaryBanner } from "./trip-summary-banner";
 import { findLegOption } from "@/lib/support-data/leg-options";
-import { getIssueDescription } from "@/lib/support-data/issue-types";
+import {
+  getIssueDescription,
+  getIssueLabel,
+} from "@/lib/support-data/issue-types";
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
   canSubmitCase,
@@ -129,6 +132,18 @@ export function SupportFormSheet({
     supportCase.description ??
     supportCase.summary;
 
+  /**
+   * When the issue was chosen for the driver, the sheet takes that issue's name.
+   *
+   * They tapped something that named it, so a different name at the top of the
+   * sheet reads like they landed on the wrong thing. The case's own title is the
+   * fallback for a form where the issue is still an open question.
+   */
+  const title =
+    (appSupplied.has("issue") && values.issue
+      ? getIssueLabel(values.issue)
+      : undefined) ?? supportCase.title;
+
   const visibleFields = supportCase.fields.filter((field) =>
     isFieldVisible(field, values)
   );
@@ -186,7 +201,7 @@ export function SupportFormSheet({
         <div className="mx-auto flex w-full min-h-0 max-w-md flex-col">
           <div className="flex flex-shrink-0 items-start justify-between pt-2">
             <DrawerTitle className="text-2xl font-bold text-gray-900">
-              {supportCase.title}
+              {title}
             </DrawerTitle>
             <button
               type="button"

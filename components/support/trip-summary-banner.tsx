@@ -72,7 +72,7 @@ export function TripSummaryBanner({ option }: { option: LegOption }) {
           ] as const
         ).map(([key, label]) => {
           const recorded = leg.progress?.[key];
-          const isMissing = missing.includes(key);
+          const isMissing = missing.some((mark) => mark === key);
           return (
             <span
               key={key}

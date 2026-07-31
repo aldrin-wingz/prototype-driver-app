@@ -128,7 +128,7 @@ function LegSwipeRecord({ leg }: { leg: TripLeg }) {
       <dl className="space-y-1.5">
         {SWIPE_ROWS.map(({ key, label }) => {
           const time = progress[key];
-          const isMissing = missing.includes(key);
+          const isMissing = missing.some((mark) => mark === key);
 
           return (
             <div key={key} className="flex items-center justify-between gap-2">

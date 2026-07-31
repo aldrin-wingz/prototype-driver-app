@@ -99,16 +99,24 @@ export function getLegStage(leg: TripLeg): LegSwipeStage {
 }
 
 /**
+ * A mark that can be reported skipped.
+ *
+ * Not every mark can: "skipped" means a LATER mark is present, and nothing
+ * follows a drop-off. A blank drop-off is always a swipe not yet due.
+ */
+export type MissableSwipe = "startedAt" | "pickedUpAt";
+
+/**
  * Swipes that were skipped — a mark is missing while a LATER mark is present.
  *
  * This is the signal the Missed Swipe case acts on. A leg that simply hasn't got
  * there yet returns nothing; only genuinely skipped swipes are reported.
  */
-export function getMissingSwipes(leg: TripLeg): Array<keyof LegSwipeProgress> {
+export function getMissingSwipes(leg: TripLeg): MissableSwipe[] {
   const p = leg.progress;
   if (!p) return [];
 
-  const missing: Array<keyof LegSwipeProgress> = [];
+  const missing: MissableSwipe[] = [];
   if (!p.startedAt && (p.pickedUpAt || p.droppedOffAt)) missing.push("startedAt");
   if (!p.pickedUpAt && p.droppedOffAt) missing.push("pickedUpAt");
   return missing;
