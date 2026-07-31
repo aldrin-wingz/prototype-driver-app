@@ -1,5 +1,5 @@
 import { findLegOption } from "@/lib/support-data/leg-options";
-import { isFieldVisible } from "./build-zod-schema";
+import { isFieldVisible } from "./field-rules";
 import type { SupportCaseDefinition } from "@/types/support";
 
 /** The trip a submission is about, when it is about one at all. */

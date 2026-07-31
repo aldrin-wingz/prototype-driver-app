@@ -14,7 +14,7 @@ import {
   canSubmitCase,
   emptyValues,
   isFieldVisible,
-} from "@/lib/support/build-zod-schema";
+} from "@/lib/support/field-rules";
 import type {
   SupportCallout,
   SupportCalloutTone,

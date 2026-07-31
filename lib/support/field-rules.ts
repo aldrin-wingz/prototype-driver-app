@@ -1,37 +1,4 @@
-import { z } from "zod";
 import type { SupportField } from "@/types/support";
-
-/**
- * Build a zod schema from a case's field list.
- *
- * This is what makes a support case data rather than code: the field array is
- * the single source of truth for both rendering and validation, so the two can
- * never drift apart.
- */
-export function buildZodSchema(fields: SupportField[]) {
-  const shape: Record<string, z.ZodTypeAny> = {};
-
-  for (const field of fields) {
-    let rule = z.string();
-
-    if (field.maxLength) {
-      rule = rule.max(
-        field.maxLength,
-        `Keep this under ${field.maxLength} characters.`
-      );
-    }
-
-    // A conditional field can't be unconditionally required — it may not be on
-    // screen at all. `isFieldVisible` gates it, and the submit guard below
-    // re-checks required-ness against what is actually visible.
-    shape[field.id] =
-      field.required && !field.showIf
-        ? rule.min(1, "This field is required.")
-        : rule.optional().or(z.literal(""));
-  }
-
-  return z.object(shape);
-}
 
 /** Whether a field should render, given the form's current values. */
 export function isFieldVisible(
