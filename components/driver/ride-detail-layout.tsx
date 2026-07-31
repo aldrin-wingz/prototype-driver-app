@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft,
@@ -35,12 +34,7 @@ import {
   type LegSwipeProgress,
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
-import { SupportFormSheet } from "@/components/support/support-form-sheet";
-import { getSupportCase } from "@/lib/support-data/case-registry";
-import { buildCalloutForCase } from "@/lib/support/build-callout";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import { ReachOutFlow } from "./reach-out-flow";
-import type { SupportCaseDefinition } from "@/types/support";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
 
@@ -64,17 +58,6 @@ const SWIPE_CTA: Record<
   "pick-up": { label: "PICK UP MEMBER", bg: "bg-[#00B090]", icon: PersonStanding },
   "drop-off": { label: "DROP OFF MEMBER", bg: "bg-[#E06078]", icon: CheckCircle2 },
 };
-
-/** One-line recap of what was submitted, for the confirmation toast. */
-function summariseValues(
-  supportCase: SupportCaseDefinition,
-  values: Record<string, string>
-): string {
-  return supportCase.fields
-    .filter((field) => (values[field.id] ?? "").trim().length > 0)
-    .map((field) => `${field.label.replace(" (optional)", "")}: ${values[field.id]}`)
-    .join(" · ");
-}
 
 /**
  * Header title per swipe stage, per reference screenshots:
@@ -121,8 +104,8 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; 
  * Swipe record for one leg — the three marks with their times, and an explicit
  * callout for any swipe that was skipped.
  *
- * A skipped swipe is the entry point for the Trip Update support case: it is
- * shown as a problem the driver can fix, not silently omitted.
+ * A skipped swipe is what the Missed Swipe case exists for: it is shown as a
+ * problem the driver can fix, not silently omitted.
  */
 function LegSwipeRecord({ leg }: { leg: TripLeg }) {
   const progress = leg.progress;
@@ -181,7 +164,7 @@ function LegSwipeRecord({ leg }: { leg: TripLeg }) {
       {missing.length > 0 && (
         <p className="mt-2.5 border-t border-gray-100 pt-2.5 text-xs text-[#92400E]">
           {missing.length === 1 ? "A swipe is" : "Swipes are"} missing on this leg.
-          Use <span className="font-semibold">Trip Update</span> in the ride
+          Use <span className="font-semibold">Missed Swipe</span> in the ride
           options to send the correct {missing.length === 1 ? "time" : "times"}.
         </p>
       )}
@@ -278,22 +261,13 @@ function LegCard({
  */
 export function RideDetailLayout({
   trip,
-  state: seededState,
+  state,
   backHref,
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { getConfirmation, getPendingRequest } = useRideFlow();
+  const { getPendingRequest } = useRideFlow();
   const pendingRequest = getPendingRequest(trip.id);
-
-  // Confirming a ride moves it out of "needs action": it becomes an accepted
-  // ride awaiting its first swipe. The seeded status stays untouched — the
-  // transition lives in session state, so a reload returns to the demo start.
-  const confirmation = getConfirmation(trip.id);
-  const state: DetailState =
-    seededState === "needs-action" && confirmation === "confirmed"
-      ? "in-progress"
-      : seededState;
 
   // The leg the driver is working, and the swipe expected next on it. Only legs
   // that carry a `progress` object take part in the swipe sequence — the
@@ -316,14 +290,6 @@ export function RideDetailLayout({
       : state === "in-progress"
         ? getInProgressSubtitle(activeStage)
         : "Accepted Ride";
-
-  // Support surfaces: `More` opens the options menu, picking a case opens its
-  // form sheet. Only one is on screen at a time.
-  const [openCaseId, setOpenCaseId] = useState<string | null>(null);
-  const openCase = openCaseId ? getSupportCase(openCaseId) : undefined;
-
-  // "I Reached Out to Confirm" — `ReachOutFlow` owns every step past this point.
-  const [reachOutOpen, setReachOutOpen] = useState(false);
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -605,11 +571,13 @@ export function RideDetailLayout({
               })()
             ) : isBlockedBySwipe ? (
               // The gap in the swipe sequence is what stops this ride closing
-              // out. Point the driver at the fix rather than at a dead end.
+              // out — there is no next swipe to offer. Naming the problem, not
+              // the fix: the fix is the Missed Swipe tile behind More, and the
+              // leg's own swipe card says so.
               <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#F59E0B]">
                 <AlertTriangle className="h-5 w-5 text-white" />
                 <span className="text-sm font-bold uppercase text-white">
-                  Trip Update Needed
+                  Swipe Missing
                 </span>
               </div>
             ) : (
@@ -659,7 +627,16 @@ export function RideDetailLayout({
             ) : (
               <button
                 type="button"
-                onClick={() => setReachOutOpen(true)}
+                // A production action v1 does not cover. Saying so beats a dead
+                // tap that reads as a bug — the same treatment the More Options
+                // tiles give every unwired action.
+                onClick={() =>
+                  toast({
+                    title: "I Reached Out to Confirm",
+                    description:
+                      "Not wired in the prototype — this is the production action.",
+                  })
+                }
                 className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
@@ -677,35 +654,6 @@ export function RideDetailLayout({
         </div>
       )}
 
-      <ReachOutFlow
-        trip={trip}
-        leg={activeLeg}
-        open={reachOutOpen}
-        onOpenChange={setReachOutOpen}
-      />
-
-
-      {openCase && (
-        <SupportFormSheet
-          supportCase={openCase}
-          callout={buildCalloutForCase(openCase.id, activeLeg)}
-          open
-          onOpenChange={(next) => {
-            if (!next) setOpenCaseId(null);
-          }}
-          onSubmit={(values) => {
-            setOpenCaseId(null);
-            // Prototype: no backend. Surface the outcome so the flow is
-            // verifiable end to end; persisting the request into a trackable
-            // pending-review state is the next step.
-            toast({
-              title:
-                openCase.successMessage ?? "Submitted. Support will follow up.",
-              description: summariseValues(openCase, values),
-            });
-          }}
-        />
-      )}
     </div>
   );
 }
