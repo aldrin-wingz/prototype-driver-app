@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Clock, AlertTriangle, Info } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,6 @@ export function SupportFormSheet({
   open,
   onOpenChange,
   onSubmit,
-  onSaveDraft,
 }: {
   supportCase: SupportCaseDefinition;
   callout?: SupportCallout;
@@ -69,12 +68,6 @@ export function SupportFormSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: Record<string, string>) => void;
-  /**
-   * Called on any dismissal that isn't a submit, when the driver has typed
-   * something. Nothing is thrown away by accident — a half-filled form becomes a
-   * draft in the Forms menu.
-   */
-  onSaveDraft?: (values: Record<string, string>) => void;
 }) {
   const blank = () => ({
     ...emptyValues(supportCase.fields),
@@ -155,52 +148,23 @@ export function SupportFormSheet({
     });
   }
 
-  /**
-   * Whether the driver has actually put something in.
-   *
-   * Compared against the starting values, not against blank — prefilled context
-   * the app supplied on its own is not the driver having typed anything, so
-   * opening a form and closing it again leaves no draft behind.
-   */
-  function isDirty(current: Record<string, string>) {
-    const start = blank();
-    return Object.keys(current).some(
-      (key) => (current[key] ?? "") !== (start[key] ?? "")
-    );
-  }
-
   function reset() {
     setValues(blank());
     setAppSupplied(suppliedIds(initialValues ?? {}));
   }
 
   /**
-   * Latched so one tap cannot leave two records behind.
-   *
-   * Cancel and the X call `handleClose` directly, and the Drawer reports the same
-   * close through its own `onOpenChange` — so a single Cancel arrived here twice,
-   * and `saveDraft` mints a new id when it isn't given one. That showed up as the
-   * same draft listed twice in Support Requests. Cleared whenever the sheet opens.
+   * Every route out of the sheet lands here, including twice for one tap: Cancel
+   * and the X call it directly, and the Drawer reports the same close through its
+   * own `onOpenChange`. Safe, because closing and resetting are both idempotent.
    */
-  const closing = useRef(false);
-
-  useEffect(() => {
-    if (open) closing.current = false;
-  }, [open]);
-
   function handleClose() {
-    if (closing.current) return;
-    closing.current = true;
-    if (isDirty(values)) onSaveDraft?.(values);
     onOpenChange(false);
     reset();
   }
 
   function handleSubmit() {
     if (!canSubmit) return;
-    // Latched too, so the close that follows a submit cannot also file a draft of
-    // the values that were just sent.
-    closing.current = true;
     onSubmit(values);
     reset();
   }
@@ -209,8 +173,6 @@ export function SupportFormSheet({
   const CalloutIcon = tone?.Icon;
 
   return (
-    // Every route out of the sheet — swipe-down, overlay tap, Esc — goes through
-    // handleClose, so a draft is saved however the driver leaves.
     <Drawer
       open={open}
       onOpenChange={(next) => {
