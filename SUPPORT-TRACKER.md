@@ -2,7 +2,7 @@
 
 Build state for the in-app support layer. Read `SUPPORT-BIBLE.md` first for the rules; this file is what has been done and what is next.
 
-**Branch:** `luis/support/missed-swipe-v1` · tip `e5da4d6` · **nothing pushed**
+**Branch:** `luis/support/missed-swipe-v1` · tip `500f817` · **nothing pushed**
 **Parent (parked):** `luis/support/in-app-support-requests` · tip `05897c8` · 23 unpushed commits
 **Typecheck:** 0 errors. **Tests:** none exist — see the Bible §6.
 **Last updated:** 2026-08-01
@@ -38,7 +38,7 @@ The route there was not direct, and the shape of it matters. Slices 1–5 built 
 
 ### v1 — Missed Swipe alone · 2026-08-01 · ✅ complete
 
-Six layered commits off `05897c8`, each typechecking on its own.
+Eight layered commits off `05897c8`, each typechecking on its own.
 
 | Commit | What |
 |---|---|
@@ -49,6 +49,7 @@ Six layered commits off `05897c8`, each typechecking on its own.
 | `076e1e7` | Store reduced to submit-only; drafts and the `closing` latch removed with the hub that displayed them |
 | `0d3a334` | Two rides seeded with a genuine missing swipe; presence evidence and `riderPhone` removed; scenario pills relabelled |
 | `e5da4d6` | Three gaps closed that only browser verification found |
+| `500f817` | This file and `SUPPORT-BIBLE.md` — the item open since slice 1 |
 
 **14 files deleted, 10 modified.**
 
