@@ -50,8 +50,6 @@ function resolve(
       return DRIVER_EMAIL;
     case "riderName":
       return trip.rider;
-    case "riderPhone":
-      return trip.riderPhone ?? "";
     case "pickupDate":
       return toDateInputValue(trip.date);
     case "legPositionLetter":
@@ -64,10 +62,6 @@ function resolve(
       return toTimeInputValue(leg?.progress?.pickedUpAt);
     case "dropOffTime":
       return toTimeInputValue(leg?.progress?.droppedOffAt);
-    case "arrivedAt":
-      // Blank when the app never established an arrival, which is exactly the
-      // case that makes the driver's own answer worth asking for.
-      return toTimeInputValue(leg?.presence?.arrivedAt);
   }
 }
 

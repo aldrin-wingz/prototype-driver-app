@@ -23,35 +23,15 @@ export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "s
 export type MarketCode = "GA" | "FL" | "NC" | "TN";
 
 /**
- * What the app can prove about the driver's presence at the pick-up.
- *
- * Seeded, not measured — the real app reads this from telematics. Following the
- * repo's data-driven convention, the interesting cases are seeded rather than
- * computed: a `null` dwell means the app found NO proof of the wait, which is
- * what turns a one-tap no-show into a form the driver has to fill in.
- *
- * Deliberately a sibling of `progress` rather than a fourth swipe mark, because
- * "arrived but nobody came out" is not something the driver swipes.
- */
-export interface LegPresenceEvidence {
-  /** Is the driver's device at the pick-up right now? */
-  atPickup: boolean;
-  /** Confirmed minutes spent at the pick-up. `null` = could not be established. */
-  dwellMinutes: number | null;
-  /** Clock time the app recorded arrival, when it has one. */
-  arrivedAt: string | null;
-}
-
-/**
  * The three swipes a driver makes to move a leg forward.
  *
  * Sequence per reference screenshots `s-01a/b/c`:
  *   SWIPE TO START  →  PICK UP MEMBER  →  DROP OFF MEMBER
  *
  * Each value is the time the driver swiped, or `null` when that swipe never
- * happened. A `null` mark IS the "forgot to swipe" condition — the Trip Update
- * support case exists to correct it. Following the repo convention, the gap is
- * SEEDED in mock data rather than derived from clocks or logic.
+ * happened. A `null` mark with a LATER mark present IS the "forgot to swipe"
+ * condition — the Missed Swipe case exists to correct it. Following the repo
+ * convention, the gap is SEEDED here rather than derived from clocks or logic.
  */
 export interface LegSwipeProgress {
   /** Swiped "start" — the driver begins the leg / heads to pickup. */
@@ -86,13 +66,6 @@ export interface TripLeg {
    * carry it, so the existing seeded trips are unaffected.
    */
   progress?: LegSwipeProgress;
-  /**
-   * What the app knows about the driver's presence at this leg's pick-up.
-   *
-   * Only legs that could plausibly file a no-show carry it. Absent means the app
-   * knows nothing, which is treated the same as no proof.
-   */
-  presence?: LegPresenceEvidence;
 }
 
 /**
@@ -101,7 +74,7 @@ export interface TripLeg {
  * `blocked` is the important one: a leg whose marks are out of order (dropped
  * off, but the pickup swipe never registered). It is NOT complete — the missing
  * swipe is exactly what stops the trip from closing out, which is why the driver
- * needs the Trip Update case.
+ * needs the Missed Swipe case.
  */
 export type LegSwipeStage =
   | "not-started"
@@ -128,7 +101,7 @@ export function getLegStage(leg: TripLeg): LegSwipeStage {
 /**
  * Swipes that were skipped — a mark is missing while a LATER mark is present.
  *
- * This is the signal the Trip Update case acts on. A leg that simply hasn't got
+ * This is the signal the Missed Swipe case acts on. A leg that simply hasn't got
  * there yet returns nothing; only genuinely skipped swipes are reported.
  */
 export function getMissingSwipes(leg: TripLeg): Array<keyof LegSwipeProgress> {
@@ -166,11 +139,6 @@ export function getNextSwipe(leg: TripLeg): NextSwipe {
   }
 }
 
-/** The leg a driver is currently working, i.e. the first not yet completed. */
-export function getActiveLeg(trip: Trip): TripLeg | undefined {
-  return trip.legs.find((leg) => getLegStage(leg) !== "completed");
-}
-
 /**
  * Driver-facing status for a leg, derived from its swipe marks.
  *
@@ -205,15 +173,6 @@ export interface Trip {
    * free text, which is not something a rule should parse.
    */
   market?: MarketCode;
-  /**
-   * The member's number as the app has it on file.
-   *
-   * Optional, and the gap is meaningful rather than unfinished seeding: a driver
-   * who reports a number as unreachable is sometimes reporting that there was no
-   * number to call. A trip without one prefills nothing, so the driver types
-   * what they tried instead.
-   */
-  riderPhone?: string;
   passengerCount: number;
   distance: string;
   totalRevenue: number;
@@ -1018,7 +977,6 @@ export const mockNeedsActionTrips: Trip[] = [
     rider: "KALLIYAH TYSON",
     client: "Alivi",
     market: "FL",
-    riderPhone: "+1 (239) 555-0148",
     passengerCount: 4,
     distance: "",
     totalRevenue: 26.29,
@@ -1059,32 +1017,40 @@ export const mockNeedsActionTrips: Trip[] = [
 
 // Mock in-progress trips — rides the driver has accepted and is working.
 //
-// The first three cover one swipe stage each, so every state in the sequence is
-// reachable from the In Progress tab:
+// Two axes are seeded here, and they are not the same thing.
+//
+// The first is the swipe SEQUENCE — marks filling left to right with trailing
+// nulls, which is a ride progressing normally. Every stage is reachable from the
+// In Progress tab, so every CTA in the sequence can be seen:
 //
 //   1049800370 — nothing swiped yet         → "Accepted Ride", CTA SWIPE TO START
-//   1049800371 — started, not picked up     → "Active Ride",   CTA PICK UP MEMBER
+//   1049800374 — started, not picked up     → "Active Ride",   CTA PICK UP MEMBER
 //   1049800372 — picked up, not dropped off → "Ride",          CTA DROP OFF MEMBER
 //
-// Those three replicate reference screenshots s-01a / s-01b / s-01c: same ride
-// shape (one A leg = Est Pick-up Time row + Appointment Time row), same
-// Carrollton GA geography, differing only in swipe state.
+// 370 and 372 are the pair that replicates reference screenshots s-01a and s-01c
+// — same ride shape (one A leg = Est Pick-up Time row + Appointment Time row),
+// same Carrollton GA geography, differing only in swipe state. The `started`
+// stage that s-01b shows now sits on the TN rides, because the ride that used to
+// hold it here is one of the two carrying a gap.
 //
-// The rides after them (1049800373+) exist for the Rider No-Show branches and
-// vary by client, market and seeded presence evidence instead — see the block
-// comment where they start.
+// The second is a GAP — a mark absent while a later one is present, which no
+// amount of swiping can fix. `getMissingSwipes` reports it, `getLegStage` calls
+// it `blocked`, and `getNextSwipe` returns nothing, because there is nothing the
+// driver can do from the ride screen. This is the condition Missed Swipe exists
+// for, and each gap position asks for a different missing time:
+//
+//   1049800371 — en-route absent, pick-up recorded → form asks for En-route
+//   1049800373 — pick-up absent, drop-off recorded → form asks for Pick-up
+//
+// The rides after those vary by client and market as well, so the form is not
+// only ever exercised against Verida GA.
 //
 // ⚠️ SCENARIO_PILL_NOTE — every ride in this array carries a PROTOTYPE-ONLY pill
-// naming which case it demos ("No-show · left location", "Missed Swipe demo", …).
-// These are demo scaffolding, NOT app data: the real app shows no such pill, and
-// they must be stripped before any capture that stands in for production. They
-// exist because the branch a no-show takes is decided by seeded evidence, so
-// without a label the seven rides here are indistinguishable on the list.
-//
-// NOTE: there is deliberately no ride here with a MISSING swipe, so the
-// "Trip Update Needed" path has nothing to demo on right now. The support case
-// will need such a seed when the Trip Update form is built — see
-// `getMissingSwipes`, which stays in place and is exercised by that path.
+// naming what it demos ("Missed Swipe · en-route gap", …). These are demo
+// scaffolding, NOT app data: the real app shows no such pill, and they must be
+// stripped before any capture that stands in for production. They exist because
+// swipe state is invisible on the list, so without a label the seven rides here
+// are indistinguishable.
 export const mockInProgressTrips: Trip[] = [
   // ===== s-01a — Accepted Ride: nothing swiped yet =====
   {
@@ -1093,7 +1059,6 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Adele Ferguson",
     client: "Verida",
     market: "GA",
-    riderPhone: "+1 (770) 555-0132",
     passengerCount: 1,
     distance: "",
     totalRevenue: 52.52,
@@ -1127,18 +1092,17 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     // ⚠️ Prototype-only scenario label — see SCENARIO_PILL_NOTE below.
-    pills: [{ label: "No-show n/a · not started", variant: "neutral" }],
+    pills: [{ label: "Missed Swipe · nothing recorded", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-  // ===== s-01b — Active Ride: started, heading to pickup =====
+  // ===== Missed Swipe — the en-route mark is the one that never registered =====
   {
     id: "1049800371",
     date: "Tue, Jul 8, 2026",
     rider: "Rowan Whitfield",
     client: "Verida",
     market: "GA",
-    riderPhone: "+1 (770) 555-0187",
     passengerCount: 1,
     distance: "",
     totalRevenue: 47.80,
@@ -1154,17 +1118,14 @@ export const mockInProgressTrips: Trip[] = [
         county: "Carroll County",
         revenue: 47.80,
         revenueNote: "Accepted by you",
+        // The driver drove to the pick-up and collected the member, but the
+        // "start ride" swipe never registered. Nothing later can repair it: the
+        // sequence is past that point, so the ride is stuck reporting a pick-up
+        // it has no start for.
         progress: {
-          startedAt: "12:58 PM",
-          pickedUpAt: null,
+          startedAt: null,
+          pickedUpAt: "1:11 PM",
           droppedOffAt: null,
-        },
-        // Waited past the 10-minute threshold and the app can prove it, so a
-        // no-show here submits without a form.
-        presence: {
-          atPickup: true,
-          dwellMinutes: 14,
-          arrivedAt: "1:06 PM",
         },
       },
       {
@@ -1178,7 +1139,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "No-show · proven wait", variant: "success" }],
+    pills: [{ label: "Missed Swipe · en-route gap", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1189,7 +1150,6 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Marisol Vega",
     client: "Verida",
     market: "GA",
-    riderPhone: "+1 (678) 555-0294",
     passengerCount: 1,
     distance: "",
     totalRevenue: 61.15,
@@ -1222,36 +1182,25 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    // Two swipes recorded, so this is also where Missed Swipe demos its prefill.
-    pills: [
-      { label: "Missed Swipe demo", variant: "warning" },
-      { label: "No-show n/a · on board", variant: "neutral" },
-    ],
+    // No gap — the drop-off simply isn't due yet. This is the ride that proves a
+    // driver can file BEFORE the app works out anything is wrong, and the form
+    // opens with two marks locked and only Drop-off to supply.
+    pills: [{ label: "Missed Swipe · no gap yet", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Rider No-Show branches — one ride per outcome =====
+  // ===== The rest of the manifest =====
   //
-  // The no-show branch is decided by seeded `presence` evidence plus the client's
-  // on-site policy, so CHOOSING A RIDE IS HOW YOU PICK A BRANCH. Every one of these
-  // is at stage `started` (en route, not yet picked up), which is the only stage
-  // where a no-show makes sense — see `canFileNoShow`.
-  //
-  //   1049800373 — Alivi FL,   no proof of the wait     → form, no error
-  //   1049800374 — Verida TN,  at pick-up, 13 min       → submits normally
-  //   1049800375 — Verida TN,  left after 22 min        → error + Submit Form
-  //   1049800376 — Verida TN,  at pick-up, only 4 min   → error, NO form
-  //
-  // The two Verida TN rides exist because Verida Tennessee still requires the
-  // no-show to be filed FROM the pick-up; everywhere else only the wait matters.
+  // Beyond Verida GA, so the form is exercised against more than one client and
+  // market. 1049800373 carries the second gap position; the others are ordinary
+  // in-progress rides with the sequence intact.
   {
     id: "1049800373",
     date: "Fri, Jul 31, 2026",
     rider: "Terrance Boudreaux",
     client: "Alivi",
     market: "FL",
-    riderPhone: "+1 (239) 555-0311",
     passengerCount: 1,
     distance: "",
     totalRevenue: 44.20,
@@ -1267,17 +1216,13 @@ export const mockInProgressTrips: Trip[] = [
         county: "Lee County",
         revenue: 44.20,
         revenueNote: "Accepted by you",
+        // The mirror of 1049800371: the pick-up swipe is the one that never
+        // registered, and the driver went on to swipe the drop-off. So the form
+        // arrives with En-route and Drop-off locked and asks only for Pick-up.
         progress: {
           startedAt: "10:04 AM",
           pickedUpAt: null,
-          droppedOffAt: null,
-        },
-        // The whole point of the form path: the driver waited and left, and the
-        // app cannot establish any of it. `null` dwell = no proof found.
-        presence: {
-          atPickup: false,
-          dwellMinutes: null,
-          arrivedAt: null,
+          droppedOffAt: "10:51 AM",
         },
       },
       {
@@ -1291,7 +1236,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "No-show · needs form", variant: "warning" }],
+    pills: [{ label: "Missed Swipe · pick-up gap", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
@@ -1301,7 +1246,6 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Lorraine Pickett",
     client: "Verida",
     market: "TN",
-    riderPhone: "+1 (615) 555-0176",
     passengerCount: 1,
     distance: "",
     totalRevenue: 38.65,
@@ -1322,13 +1266,6 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        // Both on-site conditions satisfied, so even Verida TN submits without
-        // a form.
-        presence: {
-          atPickup: true,
-          dwellMinutes: 13,
-          arrivedAt: "9:48 AM",
-        },
       },
       {
         id: "1049800374-appt",
@@ -1341,7 +1278,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "No-show · proven wait, on-site", variant: "success" }],
+    pills: [{ label: "Sequence intact", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1351,7 +1288,6 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Curtis Vandiver",
     client: "Verida",
     market: "TN",
-    riderPhone: "+1 (901) 555-0263",
     passengerCount: 1,
     distance: "",
     totalRevenue: 41.90,
@@ -1372,13 +1308,6 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        // Waited more than long enough, then drove off — the exact case that has
-        // no path forward today. Verida TN blocks it, but now offers the form.
-        presence: {
-          atPickup: false,
-          dwellMinutes: 22,
-          arrivedAt: "8:31 AM",
-        },
       },
       {
         id: "1049800375-appt",
@@ -1391,7 +1320,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "No-show · left location", variant: "danger" }],
+    pills: [{ label: "Sequence intact", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1401,7 +1330,6 @@ export const mockInProgressTrips: Trip[] = [
     rider: "Josephine Hardaway",
     client: "Verida",
     market: "TN",
-    riderPhone: "+1 (615) 555-0409",
     passengerCount: 1,
     distance: "",
     totalRevenue: 36.40,
@@ -1422,13 +1350,6 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        // Still standing at the pick-up with the wait unfinished. The honest
-        // answer is "wait" — a form here would just be a way to skip it.
-        presence: {
-          atPickup: true,
-          dwellMinutes: 4,
-          arrivedAt: "2:57 PM",
-        },
       },
       {
         id: "1049800376-appt",
@@ -1441,7 +1362,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "No-show · wait unfinished", variant: "danger" }],
+    pills: [{ label: "Sequence intact", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
