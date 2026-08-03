@@ -34,7 +34,7 @@ Six other cases were built here (General, Payment Related, Trip Request, Rider N
 - **No real backend, no Zendesk integration, no auth.** Mock data only.
 - **No redesign of existing driver-app surfaces.** Support capability is layered onto them. The More Options grid, the ride detail, the header and the bottom nav stay as captured.
 - **No new bottom-nav tab.** Support is reached from a ride, not promoted to top-level navigation.
-- **No second entry point.** The Missed Swipe tile on a ride's More Options screen is the only way into a form. `/forms` and the header clipboard icon existed and were removed on purpose.
+- **No entry point that isn't a ride.** Two exist, both on a ride: the Missed Swipe tile behind `More`, and the detection prompt on the ride itself. Both go through `MissedSwipeForm` so they cannot drift. `/forms` and the header clipboard icon existed and were removed on purpose — a support form belongs to a trip.
 - **No speculative field types.** The runtime has 15; do not add a 16th until a specified case needs it.
 - **No case beyond the seven** in the Catalog until it has been specified.
 
@@ -79,6 +79,12 @@ That makes the swipe CTA already on screen the thing that tells the driver what 
 | SWIPE TO START | nothing | En-route, Pick-up, Drop-off |
 | PICK UP MEMBER | en-route | Pick-up, Drop-off |
 | DROP OFF MEMBER | en-route + pick-up | Drop-off |
+
+**⚠️ One case the app CAN raise itself — provisional.** Everything above is derived from swipe marks, which is why the driver has to initiate it: nothing in `progress` separates "has not got there yet" from "went, did it, could not swipe". **Location does.** A seeded `missedSwipeSignal` on a leg says the driver reached a waypoint, stayed long enough to have done the thing, and has since left with the swipe still owed — and a ride carrying one shows a **"Missed Swipe?"** prompt straight into the form, no More screen.
+
+Two rules that keep it honest, and both matter:
+- **The prompt sits above the swipe CTA and never replaces it.** The inference can be wrong; a false positive must not strand a driver who really is still en route. It asks, it does not assert.
+- **`getMissedSwipeSignal` gates on the implied swipe still being outstanding.** Once the driver swipes, evidence for a swipe we now have is noise.
 
 ⚠️ **There is no "gap" to detect, and an earlier version of this branch wrongly modelled one.** It treated a missed swipe as a mark absent while a LATER mark was present, and built a `blocked` stage, a "Missing swipe" chip and an amber SWIPE MISSING bar around detecting it. A driver cannot swipe out of order — marks fill left to right — so that state never occurs. The app cannot tell "not there yet" from "drove it but couldn't swipe"; only the driver can, which is why filing is a deliberate act and the bottom bar is always just the normal swipe CTA.
 
@@ -140,6 +146,7 @@ bun run typecheck
 | `1049800370` | SWIPE TO START | all three, nothing locked |
 | `1049800371` | PICK UP MEMBER | Pick-up + Drop-off; En-route locked at 12:58 |
 | `1049800372` | DROP OFF MEMBER | Drop-off only; En-route + Pick-up locked |
+| `1049800373` | PICK UP MEMBER **+ "Missed Swipe?" prompt** | same as `371` — the swipe state is identical, the seeded signal is the only difference |
 | `260731-780322` (Needs Action) | — | The tile refuses: *"Available once this ride is under way."* |
 
 A reload resets submitted requests. The seeded trips are never mutated.

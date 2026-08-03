@@ -28,9 +28,9 @@ The route there was not direct, and the shape of it matters. Slices 1–5 built 
 | Sheet | `components/support/support-form-sheet.tsx` | one sheet, any case. Titles itself with the locked issue |
 | Field renderer | `components/support/support-field-renderer.tsx` | **15 types**, 5 used by Missed Swipe |
 | Leg recap | `components/support/trip-summary-banner.tsx` | renders under any leg picker |
-| Entry point | `components/driver/more-options-screen.tsx` | the Missed Swipe tile + the only `SupportFormSheet` mount |
+| Entry points | `components/driver/more-options-screen.tsx` (tile behind `More`) · `components/driver/ride-detail-layout.tsx` (⚠️ provisional detection prompt) | both mount the shared `components/support/missed-swipe-form.tsx` |
 | Store | `lib/support-data/ride-flow-context.tsx` | `submitForm`, `pendingForms`, `getPendingRequest` |
-| Swipe model | `lib/driver-data/mock-trips.ts` | `LegSwipeProgress`, `getLegStage`, `getUnrecordedSwipes`, `SwipeMark` |
+| Swipe model | `lib/driver-data/mock-trips.ts` | `LegSwipeProgress`, `getLegStage`, `getUnrecordedSwipes`, `SwipeMark`, ⚠️ `MissedSwipeSignal` / `getMissedSwipeSignal` |
 
 **Field types: 15 available, 5 in use.** In use: `select`, `leg-picker`, `time`, `number`, `textarea`, `file` (6, counting the file attachment). Unused but kept as runtime: `text`, `date`, `datetime`, `stepper`, `signature`, `member-picker`, `leg-repeater`, `notice`. Do not delete them and do not add a 16th speculatively.
 
@@ -86,6 +86,16 @@ The real model is the complement of the ride's progress: **recorded marks lock, 
 It also answers an open question in the negative and for free: a **completed** leg has every mark recorded, so `getUnrecordedSwipes` returns nothing and it cannot file. Not a gap in v1 — a consequence of the model.
 
 Removed: `getMissingSwipes`, `hasMissingSwipes`, `MissableSwipe`, the `blocked` stage, `isBlockedBySwipe`, the SWIPE MISSING bar, the "Missing swipe" chip, the leg-card missing footer, and four in-progress rides. **348 deletions, 82 insertions.**
+
+### Detection use case · 2026-08-01 · `66844f4`
+
+⚠️ **Provisional — the detection rule is an assumption, not an agreed behaviour.**
+
+A fourth use case, and the first the app can raise on its own. `TripLeg` gains a seeded `missedSwipeSignal` (arrival, departure, dwell at a waypoint), and a ride carrying one shows a **"Missed Swipe?"** prompt above the action row that goes straight into the form — no More screen. New ride `1049800373` has the *same swipe state* as `371`, so the signal is provably the only difference.
+
+The prompt does not replace the swipe CTA, because the inference can be wrong and a false positive must not strand a driver who is genuinely still en route. `getMissedSwipeSignal` also gates on the implied swipe still being outstanding, so it disappears the moment the driver swipes.
+
+`MissedSwipeForm` extracted at the same time — with two entry points, the required fields, the locks and the store write must not be able to differ.
 
 ## Next
 
