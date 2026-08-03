@@ -88,7 +88,10 @@ export function buildSupportFormCase({
         required: true,
         options: getIssueOptions(includeIssues),
         lockWhenPrefilled: true,
-        lockedBadge: "Chosen for you",
+        // Explicitly no badge. This field is ALWAYS locked, so a badge explaining
+        // why states the obvious — and omitting the property instead would fall
+        // through to the "Already recorded" default, which belongs on a timestamp.
+        lockedBadge: null,
       },
 
       // ---- Missed Swipe --------------------------------------------------
@@ -133,20 +136,6 @@ export function buildSupportFormCase({
         helpText: "When you dropped off the member.",
         prefillFrom: "dropOffTime",
         lockWhenPrefilled: true,
-        showIf: ONLY_MISSED_SWIPE,
-      },
-      {
-        id: "pickupOdometer",
-        type: "number",
-        label: "Pick-up Odometer (optional)",
-        helpText: "Leave blank if the app did not ask for a reading.",
-        showIf: ONLY_MISSED_SWIPE,
-      },
-      {
-        id: "dropOffOdometer",
-        type: "number",
-        label: "Drop-off Odometer (optional)",
-        helpText: "Leave blank if the app did not ask for a reading.",
         showIf: ONLY_MISSED_SWIPE,
       },
       {

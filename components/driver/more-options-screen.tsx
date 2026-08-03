@@ -10,7 +10,7 @@ import {
   Calendar,
   X,
   Reply,
-  AlarmClockOff,
+  History,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -132,13 +132,14 @@ const PRODUCTION_TILES: OptionTile[] = [
  * specific ride, so which trip the request is about is already settled. Tapping
  * it goes straight to the form with the issue and the ride both filled in.
  *
- * Not gated by swipe stage. A driver notices a missed swipe whenever they notice
- * it, which is not always the moment the app works out that a mark is missing.
+ * `History` — a clock with a reverse arrow — because the action is correcting a
+ * time that has already passed. The previous `AlarmClockOff` read as an alarm
+ * being silenced, which is a different idea entirely.
  */
 const MISSED_SWIPE_TILE: OptionTile = {
   id: "missed-swipe",
   label: "Missed Swipe",
-  icon: AlarmClockOff,
+  icon: History,
   variant: "filled",
   color: DRIVER_NAVY,
 };

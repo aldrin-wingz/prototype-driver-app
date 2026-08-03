@@ -461,7 +461,10 @@ export function SupportFieldRenderer({
           {field.label}
           {field.required && <span className="ml-0.5 text-[#EF4444]">*</span>}
         </span>
-        {isLocked && (
+        {/* `undefined` takes the default; an explicit `null` opts out. Without
+            the distinction, dropping a field's badge silently falls back to
+            "Already recorded" — which is wrong on anything but a timestamp. */}
+        {isLocked && field.lockedBadge !== null && (
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-500">
             {field.lockedBadge ?? "Already recorded"}
           </span>

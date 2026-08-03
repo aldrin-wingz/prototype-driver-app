@@ -97,6 +97,8 @@ No runtime change. This is why `showIf` is kept on the Missed Swipe fields even 
 
 **⚠️ `legScope: "in-progress"` silently blanks a prefilled leg** whose ride is not in `mockInProgressTrips` — `withinScope` in `prefill.ts` drops it. The failure is quiet and looks like something else entirely: a locked "From this ride" card degrades into an open search box. **Test the invariant, not a proxy for it** — check the prefill survived, don't check whether the leg exists.
 
+**⚠️ `lockedBadge` has THREE states, not two.** Omitting it falls through to the default `"Already recorded"` — so removing a field's badge by deleting the property silently swaps it for a worse one. `null` is the opt-out. Caught in the browser after "Chosen for you" came back as "Already recorded" on the issue field.
+
 **⚠️ `getMemberOptions()` spans only completed rides in the last 30 days**, so a needs-action or in-progress rider cannot resolve in a `member-picker`. It renders an open search box holding an unresolvable value. Use a locked `text` field instead.
 
 **⚠️ A completed leg cannot file.** Every mark is recorded, so `getUnrecordedSwipes` returns nothing and there is nothing to correct — that is the answer to "should completed rides be correctable", and it falls out of the model rather than needing a rule. A ride awaiting member confirmation is out of scope for this case entirely.
@@ -113,7 +115,7 @@ Flagged so it cannot be mistaken for an agreed requirement:
 
 | Thing | Status |
 |---|---|
-| The **odometer** fields | Authored. Ask whether the real form asks for readings at all. |
+| ~~The odometer fields~~ | ✅ **Removed 2026-08-01.** Authored, never captured, and nobody asked for them. |
 | Time **validation** | None exists. A pick-up time before the recorded en-route time is currently accepted. |
 | **SLA** shown to the driver | Nothing is promised, because nothing is known. |
 | The `Submitted → In Review → Needs Info → Resolved / Rejected` ladder | Defined in the vault glossary, **not built**. v1 has one state: waiting on Support. |

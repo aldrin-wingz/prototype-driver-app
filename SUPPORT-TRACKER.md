@@ -20,7 +20,7 @@ The route there was not direct, and the shape of it matters. Slices 1–5 built 
 | Area | Files | State |
 |---|---|---|
 | Issue registry | `lib/support-data/issue-types.ts` | 1 issue: `missed-swipe`, `visibility: "hidden"` |
-| Case definition | `lib/support-data/case-registry.ts` | `buildSupportFormCase({ includeIssues, requireFields })` — 9 fields |
+| Case definition | `lib/support-data/case-registry.ts` | `buildSupportFormCase({ includeIssues, requireFields })` — 7 fields |
 | Prefill | `lib/support/prefill.ts` | 7 sources: issueType, driverEmail, riderName, pickupDate, legPositionLetter, legId, enRoute/pickup/dropOff times |
 | Field rules | `lib/support/field-rules.ts` | `isFieldVisible`, `areRequiredFieldsFilled`, `canSubmitCase`, `emptyValues` |
 | Trip context | `lib/support/trip-context.ts` | resolves `{tripId, legId}` from the visible leg picker |
@@ -89,7 +89,7 @@ Removed: `getMissingSwipes`, `hasMissingSwipes`, `MissableSwipe`, the `blocked` 
 
 ## Next
 
-1. **Get Missed Swipe's real spec from the support lead.** Priority order: (a) monthly volume, since the v1 business case rests on one case; (b) are the odometer fields real; (c) the real wording of the issue in the web form. ~~Completed rides~~ — answered, out of scope.
+1. **Get Missed Swipe's real spec from the support lead.** Priority order: (a) monthly volume, since the v1 business case rests on one case; (b) the real wording of the issue in the web form. ~~Completed rides~~ and ~~odometers~~ — both answered.
 2. **Decide case two**, and specify it before building it. The Catalog holds five candidates with worked specs.
 3. **Multi-leg trips** — the locked leg picker assumes one swipeable leg per trip. Needs a scoped-but-editable picker.
 4. **Time validation** — none exists.

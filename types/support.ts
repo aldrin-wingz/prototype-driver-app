@@ -161,9 +161,11 @@ export interface SupportField {
    * Badge shown beside the label while locked.
    *
    * Defaults to "Already recorded", which is right for a timestamp the app
-   * captured but wrong for something taken off the ride the driver opened.
+   * captured but wrong for something taken off the ride the driver opened. Set
+   * `null` to show no badge at all — on a field that is ALWAYS locked, a badge
+   * explaining why is stating the obvious.
    */
-  lockedBadge?: string;
+  lockedBadge?: string | null;
 }
 
 /** Tint of the context callout above the fields. */
