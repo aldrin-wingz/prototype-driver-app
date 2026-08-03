@@ -25,9 +25,7 @@ import { RevenueDisplay } from "./revenue-display";
 import { cn } from "@/lib/utils";
 import {
   getLegStage,
-  getMissingSwipes,
   getNextSwipe,
-  hasMissingSwipes,
   type Trip,
   type TripLeg,
   type TimeAnchorType,
@@ -73,8 +71,6 @@ function getInProgressSubtitle(stage: LegSwipeStage): string {
       return "Active Ride";
     case "picked-up":
       return "Ride";
-    case "blocked":
-      return "Ride";
     case "completed":
       return "Completed Ride";
   }
@@ -101,23 +97,19 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; 
 }
 
 /**
- * Swipe record for one leg — the three marks with their times, and an explicit
- * callout for any swipe that was skipped.
+ * Swipe record for one leg — which of the three marks have times against them.
  *
- * A skipped swipe is what the Missed Swipe case exists for: it is shown as a
- * problem the driver can fix, not silently omitted.
+ * Also a preview of the Missed Swipe form: a recorded mark arrives locked, a blank
+ * one is what the driver would be asked to supply.
  */
 function LegSwipeRecord({ leg }: { leg: TripLeg }) {
   const progress = leg.progress;
   if (!progress) return null;
 
-  const missing = getMissingSwipes(leg);
-
-  // Nothing swiped and nothing skipped — the record would be three empty rows,
-  // which is noise on a ride that simply has not started. The real app shows no
-  // swipe history at all; this block exists only to surface progress and gaps.
-  const hasAnySwipe = SWIPE_ROWS.some(({ key }) => progress[key]);
-  if (!hasAnySwipe && missing.length === 0) return null;
+  // Nothing swiped at all — three empty rows is noise on a ride that has not
+  // started, and the real app shows no swipe history. This block exists only to
+  // surface progress once there is some.
+  if (!SWIPE_ROWS.some(({ key }) => progress[key])) return null;
 
   return (
     <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
@@ -128,46 +120,29 @@ function LegSwipeRecord({ leg }: { leg: TripLeg }) {
       <dl className="space-y-1.5">
         {SWIPE_ROWS.map(({ key, label }) => {
           const time = progress[key];
-          const isMissing = missing.some((mark) => mark === key);
 
           return (
             <div key={key} className="flex items-center justify-between gap-2">
               <dt className="flex items-center gap-1.5 text-sm">
                 {time ? (
                   <Check className="h-3.5 w-3.5 flex-shrink-0 text-[#10B981]" />
-                ) : isMissing ? (
-                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-[#D97706]" />
                 ) : (
                   <Circle className="h-3.5 w-3.5 flex-shrink-0 text-gray-300" />
                 )}
-                <span className={isMissing ? "text-[#92400E]" : "text-gray-700"}>
-                  {label}
-                </span>
+                <span className="text-gray-700">{label}</span>
               </dt>
               <dd
                 className={cn(
                   "text-sm font-medium",
-                  time
-                    ? "text-gray-900"
-                    : isMissing
-                      ? "text-[#92400E]"
-                      : "text-gray-400"
+                  time ? "text-gray-900" : "text-gray-400"
                 )}
               >
-                {time ?? (isMissing ? "Not recorded" : "—")}
+                {time ?? "—"}
               </dd>
             </div>
           );
         })}
       </dl>
-
-      {missing.length > 0 && (
-        <p className="mt-2.5 border-t border-gray-100 pt-2.5 text-xs text-[#92400E]">
-          {missing.length === 1 ? "A swipe is" : "Swipes are"} missing on this leg.
-          Use <span className="font-semibold">Missed Swipe</span> in the ride
-          options to send the correct {missing.length === 1 ? "time" : "times"}.
-        </p>
-      )}
     </div>
   );
 }
@@ -279,10 +254,6 @@ export function RideDetailLayout({
     ? getLegStage(activeLeg)
     : "not-started";
   const nextSwipe = activeLeg ? getNextSwipe(activeLeg) : null;
-  const tripHasMissingSwipes = hasMissingSwipes(trip);
-  // No next swipe available AND a gap in the sequence => the ride is stuck on
-  // the missing swipe, not finished.
-  const isBlockedBySwipe = !nextSwipe && tripHasMissingSwipes;
 
   const subtitle =
     state === "before-taken"
@@ -444,12 +415,6 @@ export function RideDetailLayout({
               <span className="inline-block rounded-full bg-[#D1FAE5] px-3 py-1 text-xs font-medium text-[#065F46]">
                 In Progress
               </span>
-              {tripHasMissingSwipes && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-medium text-[#92400E]">
-                  <AlertTriangle className="h-3 w-3" />
-                  Missing swipe
-                </span>
-              )}
               {hasIncentives &&
                 activeIncentiveTypes.map((incentiveType) => (
                   <ProgramContributionIndicator
@@ -569,17 +534,6 @@ export function RideDetailLayout({
                   </div>
                 );
               })()
-            ) : isBlockedBySwipe ? (
-              // The gap in the swipe sequence is what stops this ride closing
-              // out — there is no next swipe to offer. Naming the problem, not
-              // the fix: the fix is the Missed Swipe tile behind More, and the
-              // leg's own swipe card says so.
-              <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#F59E0B]">
-                <AlertTriangle className="h-5 w-5 text-white" />
-                <span className="text-sm font-bold uppercase text-white">
-                  Swipe Missing
-                </span>
-              </div>
             ) : (
               <div className="flex h-16 items-center justify-center rounded-full bg-gray-100">
                 <span className="text-sm font-semibold text-gray-500">

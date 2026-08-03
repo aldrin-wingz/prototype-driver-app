@@ -25,7 +25,7 @@ import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   getLegStage,
-  getMissingSwipes,
+  getUnrecordedSwipes,
   type Trip,
 } from "@/lib/driver-data/mock-trips";
 import {
@@ -254,12 +254,12 @@ export function MoreOptionsScreen({
    */
   const missedSwipeCase = buildSupportFormCase({
     includeIssues: [ISSUE_MISSED_SWIPE],
-    // Whichever mark this leg actually skipped becomes required. Without this the
-    // driver can submit with the missing time still blank — a correction that
-    // corrects nothing — while making all three times required unconditionally
-    // would demand a drop-off time from a ride still on its way there.
+    // Every mark the app has no time for becomes required, because filing this
+    // form asserts the driver drove the leg and could not swipe it. So the CTA the
+    // ride is showing is what tells them what they will be asked: SWIPE TO START
+    // means all three, DROP OFF MEMBER means just the drop-off.
     requireFields: activeLeg
-      ? getMissingSwipes(activeLeg).map((mark) => TIME_FIELD_FOR_SWIPE[mark])
+      ? getUnrecordedSwipes(activeLeg).map((mark) => TIME_FIELD_FOR_SWIPE[mark])
       : [],
   });
   const initialValues: Record<string, string> = {

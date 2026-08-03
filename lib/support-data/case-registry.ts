@@ -1,4 +1,4 @@
-import type { MissableSwipe } from "@/lib/driver-data/mock-trips";
+import type { SwipeMark } from "@/lib/driver-data/mock-trips";
 import { getIssueOptions, ISSUE_MISSED_SWIPE } from "./issue-types";
 import type { SupportCaseDefinition } from "@/types/support";
 
@@ -48,12 +48,10 @@ export function buildSupportFormCase({
    * Fields to mark required on top of what the case declares.
    *
    * Needed because for the time fields, whether an answer is required is a
-   * property of the RIDE, not of the field. A blank Drop-off Time on a ride still
-   * in progress is a swipe that isn't due yet and there is nothing to ask for; the
-   * same blank on a ride that already recorded a later mark is the gap the driver
-   * is filing about, and submitting without it sends Support a correction that
-   * corrects nothing. `getMissingSwipes` is what tells the two apart, so the
-   * caller resolves it against the leg and passes the answer in.
+   * property of the RIDE, not of the field: a driver filing a Missed Swipe is
+   * saying they drove the leg and could not swipe it, so every mark the app has no
+   * time for is one only they can supply. The caller resolves
+   * `getUnrecordedSwipes(leg)` and passes the answer in.
    */
   requireFields?: string[];
 } = {}): SupportCaseDefinition {
@@ -175,11 +173,11 @@ export function buildSupportFormCase({
 /**
  * The form field that holds each swipe mark.
  *
- * Lets a caller turn `getMissingSwipes(leg)` into `requireFields`. Only the two
- * marks a gap can land on are here — nothing follows a drop-off, so a missing
- * drop-off is a swipe not yet due rather than a skipped one.
+ * Lets a caller turn `getUnrecordedSwipes(leg)` into `requireFields`, which is how
+ * the swipe CTA on the ride ends up deciding what the form asks for.
  */
-export const TIME_FIELD_FOR_SWIPE: Record<MissableSwipe, string> = {
+export const TIME_FIELD_FOR_SWIPE: Record<SwipeMark, string> = {
   startedAt: "enRouteTime",
   pickedUpAt: "pickupTime",
+  droppedOffAt: "dropOffTime",
 };

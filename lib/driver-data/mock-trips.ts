@@ -28,10 +28,12 @@ export type MarketCode = "GA" | "FL" | "NC" | "TN";
  * Sequence per reference screenshots `s-01a/b/c`:
  *   SWIPE TO START  →  PICK UP MEMBER  →  DROP OFF MEMBER
  *
- * Each value is the time the driver swiped, or `null` when that swipe never
- * happened. A `null` mark with a LATER mark present IS the "forgot to swipe"
- * condition — the Missed Swipe case exists to correct it. Following the repo
- * convention, the gap is SEEDED here rather than derived from clocks or logic.
+ * Each value is the time the driver swiped, or `null` when that swipe has not been
+ * made. Marks fill left to right; a driver cannot swipe out of order.
+ *
+ * A `null` mark is what Missed Swipe corrects. The data cannot tell "not there
+ * yet" from "drove it but could not swipe" — only the driver can, which is why
+ * filing is a deliberate act rather than something the app detects.
  */
 export interface LegSwipeProgress {
   /** Swiped "start" — the driver begins the leg / heads to pickup. */
@@ -71,16 +73,15 @@ export interface TripLeg {
 /**
  * How far along a leg is, derived purely from which swipe marks are present.
  *
- * `blocked` is the important one: a leg whose marks are out of order (dropped
- * off, but the pickup swipe never registered). It is NOT complete — the missing
- * swipe is exactly what stops the trip from closing out, which is why the driver
- * needs the Missed Swipe case.
+ * Marks fill left to right, always. A driver cannot swipe out of order, so there
+ * is no "gap" state to model — a blank mark simply has not been made yet, whether
+ * because the leg has not reached it or because the driver could not swipe. Both
+ * look identical in the data, and both are what Missed Swipe corrects.
  */
 export type LegSwipeStage =
   | "not-started"
   | "started"
   | "picked-up"
-  | "blocked"
   | "completed";
 
 /** Which swipe a driver is expected to make next on a leg. */
@@ -90,49 +91,35 @@ export type NextSwipe = "start" | "pick-up" | "drop-off" | null;
 export function getLegStage(leg: TripLeg): LegSwipeStage {
   const p = leg.progress;
   if (!p) return "not-started";
-  // A gap in the sequence blocks the leg regardless of how far it looks.
-  if (getMissingSwipes(leg).length > 0) return "blocked";
   if (p.droppedOffAt) return "completed";
   if (p.pickedUpAt) return "picked-up";
   if (p.startedAt) return "started";
   return "not-started";
 }
 
-/**
- * A mark that can be reported skipped.
- *
- * Not every mark can: "skipped" means a LATER mark is present, and nothing
- * follows a drop-off. A blank drop-off is always a swipe not yet due.
- */
-export type MissableSwipe = "startedAt" | "pickedUpAt";
+/** One of the three swipe marks. */
+export type SwipeMark = keyof LegSwipeProgress;
 
 /**
- * Swipes that were skipped — a mark is missing while a LATER mark is present.
+ * The marks with no time against them — exactly what Missed Swipe collects.
  *
- * This is the signal the Missed Swipe case acts on. A leg that simply hasn't got
- * there yet returns nothing; only genuinely skipped swipes are reported.
+ * The complement of what the app recorded, which is the whole rule: a recorded
+ * mark is locked in the form, an unrecorded one is required. So the swipe CTA the
+ * ride is currently showing tells the driver what the form will ask for —
+ * SWIPE TO START means all three, DROP OFF MEMBER means just the drop-off.
+ *
+ * A completed leg returns nothing, which is why it cannot file: every swipe
+ * happened.
  */
-export function getMissingSwipes(leg: TripLeg): MissableSwipe[] {
+export function getUnrecordedSwipes(leg: TripLeg): SwipeMark[] {
   const p = leg.progress;
   if (!p) return [];
-
-  const missing: MissableSwipe[] = [];
-  if (!p.startedAt && (p.pickedUpAt || p.droppedOffAt)) missing.push("startedAt");
-  if (!p.pickedUpAt && p.droppedOffAt) missing.push("pickedUpAt");
-  return missing;
+  return (["startedAt", "pickedUpAt", "droppedOffAt"] as SwipeMark[]).filter(
+    (mark) => !p[mark]
+  );
 }
 
-/** True when any swipe on any leg of this trip was skipped. */
-export function hasMissingSwipes(trip: Trip): boolean {
-  return trip.legs.some((leg) => getMissingSwipes(leg).length > 0);
-}
-
-/**
- * The swipe the driver is expected to make next.
- *
- * Returns null when the leg is finished OR blocked — a driver cannot swipe past
- * a gap in the sequence, they have to get the missing time corrected first.
- */
+/** The swipe the driver is expected to make next; null once the leg is done. */
 export function getNextSwipe(leg: TripLeg): NextSwipe {
   switch (getLegStage(leg)) {
     case "not-started":
@@ -141,7 +128,6 @@ export function getNextSwipe(leg: TripLeg): NextSwipe {
       return "pick-up";
     case "picked-up":
       return "drop-off";
-    case "blocked":
     case "completed":
       return null;
   }
@@ -162,8 +148,6 @@ export function getLegStatusLabel(leg: TripLeg): string {
       return "Enroute";
     case "picked-up":
       return "Onboard";
-    case "blocked":
-      return "Missing swipe";
     case "completed":
       return "Completed";
   }
@@ -1025,40 +1009,27 @@ export const mockNeedsActionTrips: Trip[] = [
 
 // Mock in-progress trips — rides the driver has accepted and is working.
 //
-// Two axes are seeded here, and they are not the same thing.
+// EXACTLY THREE, one per swipe CTA, because the CTA is what tells the driver what
+// the Missed Swipe form will ask for. Marks fill left to right, so whatever is
+// recorded is locked in the form and whatever is blank is required — the form's
+// questions are the complement of the ride's progress.
 //
-// The first is the swipe SEQUENCE — marks filling left to right with trailing
-// nulls, which is a ride progressing normally. Every stage is reachable from the
-// In Progress tab, so every CTA in the sequence can be seen:
+//   1049800370  nothing recorded    CTA SWIPE TO START    form asks: all three
+//   1049800371  en-route only       CTA PICK UP MEMBER    form asks: pick-up + drop-off
+//   1049800372  en-route + pick-up  CTA DROP OFF MEMBER   form asks: drop-off
 //
-//   1049800370 — nothing swiped yet         → "Accepted Ride", CTA SWIPE TO START
-//   1049800374 — started, not picked up     → "Active Ride",   CTA PICK UP MEMBER
-//   1049800372 — picked up, not dropped off → "Ride",          CTA DROP OFF MEMBER
+// These three also replicate reference screenshots s-01a / s-01b / s-01c: same
+// ride shape (one A leg = Est Pick-up Time row + Appointment Time row), same
+// Carrollton GA geography, differing only in swipe state.
 //
-// 370 and 372 are the pair that replicates reference screenshots s-01a and s-01c
-// — same ride shape (one A leg = Est Pick-up Time row + Appointment Time row),
-// same Carrollton GA geography, differing only in swipe state. The `started`
-// stage that s-01b shows now sits on the TN rides, because the ride that used to
-// hold it here is one of the two carrying a gap.
+// There is deliberately no fourth. A COMPLETED leg has every mark recorded, so it
+// has nothing to correct and cannot file — see `getUnrecordedSwipes`. A ride
+// awaiting member confirmation is out of scope for this case entirely.
 //
-// The second is a GAP — a mark absent while a later one is present, which no
-// amount of swiping can fix. `getMissingSwipes` reports it, `getLegStage` calls
-// it `blocked`, and `getNextSwipe` returns nothing, because there is nothing the
-// driver can do from the ride screen. This is the condition Missed Swipe exists
-// for, and each gap position asks for a different missing time:
-//
-//   1049800371 — en-route absent, pick-up recorded → form asks for En-route
-//   1049800373 — pick-up absent, drop-off recorded → form asks for Pick-up
-//
-// The rides after those vary by client and market as well, so the form is not
-// only ever exercised against Verida GA.
-//
-// ⚠️ SCENARIO_PILL_NOTE — every ride in this array carries a PROTOTYPE-ONLY pill
-// naming what it demos ("Missed Swipe · en-route gap", …). These are demo
-// scaffolding, NOT app data: the real app shows no such pill, and they must be
-// stripped before any capture that stands in for production. They exist because
-// swipe state is invisible on the list, so without a label the seven rides here
-// are indistinguishable.
+// ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
+// which case it demos. Demo scaffolding, NOT app data: the real app shows no such
+// pill, and they must be stripped before any capture that stands in for
+// production. They exist because swipe state is invisible on the ride list.
 export const mockInProgressTrips: Trip[] = [
   // ===== s-01a — Accepted Ride: nothing swiped yet =====
   {
@@ -1100,11 +1071,11 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     // ⚠️ Prototype-only scenario label — see SCENARIO_PILL_NOTE below.
-    pills: [{ label: "Missed Swipe · nothing recorded", variant: "neutral" }],
+    pills: [{ label: "Swipe to Start · form asks all three", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-  // ===== Missed Swipe — the en-route mark is the one that never registered =====
+  // ===== s-01b — Active Ride: en-route recorded, heading to the pick-up =====
   {
     id: "1049800371",
     date: "Tue, Jul 8, 2026",
@@ -1126,13 +1097,9 @@ export const mockInProgressTrips: Trip[] = [
         county: "Carroll County",
         revenue: 47.80,
         revenueNote: "Accepted by you",
-        // The driver drove to the pick-up and collected the member, but the
-        // "start ride" swipe never registered. Nothing later can repair it: the
-        // sequence is past that point, so the ride is stuck reporting a pick-up
-        // it has no start for.
         progress: {
-          startedAt: null,
-          pickedUpAt: "1:11 PM",
+          startedAt: "12:58 PM",
+          pickedUpAt: null,
           droppedOffAt: null,
         },
       },
@@ -1147,7 +1114,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Missed Swipe · en-route gap", variant: "warning" }],
+    pills: [{ label: "Pick Up Member · form asks pick-up + drop-off", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1193,187 +1160,11 @@ export const mockInProgressTrips: Trip[] = [
     // No gap — the drop-off simply isn't due yet. This is the ride that proves a
     // driver can file BEFORE the app works out anything is wrong, and the form
     // opens with two marks locked and only Drop-off to supply.
-    pills: [{ label: "Missed Swipe · no gap yet", variant: "neutral" }],
+    pills: [{ label: "Drop Off Member · form asks drop-off", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== The rest of the manifest =====
-  //
-  // Beyond Verida GA, so the form is exercised against more than one client and
-  // market. 1049800373 carries the second gap position; the others are ordinary
-  // in-progress rides with the sequence intact.
-  {
-    id: "1049800373",
-    date: "Fri, Jul 31, 2026",
-    rider: "Terrance Boudreaux",
-    client: "Alivi",
-    market: "FL",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 44.20,
-    notes: "Gate code 4417",
-    legs: [
-      {
-        id: "1049800373",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "10:20 AM",
-        address: "2915 Cleveland Ave, Fort Myers, FL 33901",
-        county: "Lee County",
-        revenue: 44.20,
-        revenueNote: "Accepted by you",
-        // The mirror of 1049800371: the pick-up swipe is the one that never
-        // registered, and the driver went on to swipe the drop-off. So the form
-        // arrives with En-route and Drop-off locked and asks only for Pick-up.
-        progress: {
-          startedAt: "10:04 AM",
-          pickedUpAt: null,
-          droppedOffAt: "10:51 AM",
-        },
-      },
-      {
-        id: "1049800373-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "11:00 AM",
-        address: "13685 Doctors Way, Fort Myers, FL 33912",
-        county: "Lee County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [{ label: "Missed Swipe · pick-up gap", variant: "warning" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: false,
-  },
-  {
-    id: "1049800374",
-    date: "Fri, Jul 31, 2026",
-    rider: "Lorraine Pickett",
-    client: "Verida",
-    market: "TN",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 38.65,
-    notes: "",
-    legs: [
-      {
-        id: "1049800374",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "9:45 AM",
-        address: "1808 Buchanan St, Nashville, TN 37208",
-        county: "Davidson County",
-        revenue: 38.65,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "9:31 AM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-      },
-      {
-        id: "1049800374-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "10:30 AM",
-        address: "1211 Medical Center Dr, Nashville, TN 37232",
-        county: "Davidson County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [{ label: "Sequence intact", variant: "neutral" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
-  {
-    id: "1049800375",
-    date: "Fri, Jul 31, 2026",
-    rider: "Curtis Vandiver",
-    client: "Verida",
-    market: "TN",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 41.90,
-    notes: "Call on arrival — member uses a walker",
-    legs: [
-      {
-        id: "1049800375",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "8:30 AM",
-        address: "3384 Overton Crossing St, Memphis, TN 38127",
-        county: "Shelby County",
-        revenue: 41.90,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "8:12 AM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-      },
-      {
-        id: "1049800375-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "9:15 AM",
-        address: "1265 Union Ave, Memphis, TN 38104",
-        county: "Shelby County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [{ label: "Sequence intact", variant: "neutral" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
-  {
-    id: "1049800376",
-    date: "Fri, Jul 31, 2026",
-    rider: "Josephine Hardaway",
-    client: "Verida",
-    market: "TN",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 36.40,
-    notes: "",
-    legs: [
-      {
-        id: "1049800376",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "2:50 PM",
-        address: "922 Gallatin Pike S, Madison, TN 37115",
-        county: "Davidson County",
-        revenue: 36.40,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "2:38 PM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-      },
-      {
-        id: "1049800376-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "3:30 PM",
-        address: "500 Hospital Dr, Madison, TN 37115",
-        county: "Davidson County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [{ label: "Sequence intact", variant: "neutral" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
 ];
 
 // Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);

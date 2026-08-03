@@ -1,12 +1,8 @@
 "use client";
 
-import { Check, Circle, AlertTriangle } from "lucide-react";
+import { Check, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  getLegStatusLabel,
-  getLegStage,
-  getMissingSwipes,
-} from "@/lib/driver-data/mock-trips";
+import { getLegStatusLabel, getLegStage } from "@/lib/driver-data/mock-trips";
 import type { LegOption } from "@/lib/support-data/leg-options";
 import { DRIVER_NAVY } from "@/constants/driver-app-colors";
 
@@ -21,7 +17,6 @@ import { DRIVER_NAVY } from "@/constants/driver-app-colors";
 export function TripSummaryBanner({ option }: { option: LegOption }) {
   const { trip, leg } = option;
   const stage = getLegStage(leg);
-  const missing = getMissingSwipes(leg);
   const appointment = trip.legs.find((candidate) => candidate.type === "appointment");
 
   const rows: Array<{ label: string; value: string }> = [
@@ -41,11 +36,9 @@ export function TripSummaryBanner({ option }: { option: LegOption }) {
         <span
           className={cn(
             "flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold",
-            stage === "blocked"
-              ? "bg-[#FEF3C7] text-[#92400E]"
-              : stage === "completed"
-                ? "bg-gray-200 text-gray-700"
-                : "bg-[#D1FAE5] text-[#065F46]"
+            stage === "completed"
+              ? "bg-gray-200 text-gray-700"
+              : "bg-[#D1FAE5] text-[#065F46]"
           )}
         >
           {getLegStatusLabel(leg)}
@@ -61,8 +54,9 @@ export function TripSummaryBanner({ option }: { option: LegOption }) {
         ))}
       </dl>
 
-      {/* Which swipes we already hold — this is what decides how much of the
-          form below is left for the driver to fill. */}
+      {/* Which swipes we already hold. This IS the rule for the form below: a
+          recorded mark arrives locked, a blank one is one the driver has to
+          supply. */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-200 pt-3">
         {(
           [
@@ -72,7 +66,6 @@ export function TripSummaryBanner({ option }: { option: LegOption }) {
           ] as const
         ).map(([key, label]) => {
           const recorded = leg.progress?.[key];
-          const isMissing = missing.some((mark) => mark === key);
           return (
             <span
               key={key}
@@ -81,13 +74,11 @@ export function TripSummaryBanner({ option }: { option: LegOption }) {
             >
               {recorded ? (
                 <Check className="h-3.5 w-3.5 text-[#00B090]" />
-              ) : isMissing ? (
-                <AlertTriangle className="h-3.5 w-3.5 text-[#D97706]" />
               ) : (
                 <Circle className="h-3.5 w-3.5 text-gray-300" />
               )}
               <span className={recorded ? "font-medium" : "text-gray-500"}>
-                {label} {recorded ?? (isMissing ? "missing" : "not yet")}
+                {label} {recorded ?? "to supply"}
               </span>
             </span>
           );
