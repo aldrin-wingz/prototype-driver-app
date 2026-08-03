@@ -64,13 +64,23 @@ ride detail banner + pill  ·  My Rides → Pending
 
 ## 5. Conventions that are load-bearing
 
-**Data-driven, not logic-driven.** `MOCK_TODAY` is a constant. Swipe gaps are *seeded* in `mock-trips.ts`, never computed from a clock. **Choosing a ride is how you pick a scenario** — that is the whole demo mechanic, and it is why the scenario pills exist.
+**Data-driven, not logic-driven.** `MOCK_TODAY` is a constant. Swipe state is *seeded* in `mock-trips.ts`, never computed from a clock. **Choosing a ride is how you pick a scenario** — that is the whole demo mechanic, and it is why the scenario pills exist.
 
 **`lockWhenPrefilled` means "the app supplied this", not "this has a value".** Tracked in an `appSupplied` set and cleared the moment the driver touches the field. The other reading locks a driver out of changing their own answer.
 
 **`requiredNotEnforced`** — required in the real flow, excluded from the submit gate, renders the ⚠️ flag. Not used by Missed Swipe; kept for cases that need it.
 
-**Whether a field is required can be a property of the RIDE.** For the time fields it is: the mark the app flagged as skipped is required, the mark not yet due is not. The entry point resolves `getMissingSwipes(leg)` and passes `requireFields` to the builder. Static either way is wrong — all three required demands a drop-off time from a ride still driving there; none required lets a driver submit a correction that corrects nothing.
+**Whether a field is required is a property of the RIDE, not the field.** A driver filing a Missed Swipe is asserting they drove the leg and could not swipe it, so **every mark with no time against it is required, and every recorded mark is locked.** The entry point resolves `getUnrecordedSwipes(leg)` and passes `requireFields` to the builder.
+
+That makes the swipe CTA already on screen the thing that tells the driver what the form will ask for:
+
+| CTA showing | Recorded | Form asks for |
+|---|---|---|
+| SWIPE TO START | nothing | En-route, Pick-up, Drop-off |
+| PICK UP MEMBER | en-route | Pick-up, Drop-off |
+| DROP OFF MEMBER | en-route + pick-up | Drop-off |
+
+⚠️ **There is no "gap" to detect, and an earlier version of this branch wrongly modelled one.** It treated a missed swipe as a mark absent while a LATER mark was present, and built a `blocked` stage, a "Missing swipe" chip and an amber SWIPE MISSING bar around detecting it. A driver cannot swipe out of order — marks fill left to right — so that state never occurs. The app cannot tell "not there yet" from "drove it but couldn't swipe"; only the driver can, which is why filing is a deliberate act and the bottom bar is always just the normal swipe CTA.
 
 **Every issue is `hidden`, and the issue field is always locked.** Every entry point knows its case before the form opens. The field stays because it is the seam: `includeIssues` puts the issue in the options so the locked control can render its label, and seeding `issue` in the initial values marks it app-supplied.
 
@@ -89,7 +99,7 @@ No runtime change. This is why `showIf` is kept on the Missed Swipe fields even 
 
 **⚠️ `getMemberOptions()` spans only completed rides in the last 30 days**, so a needs-action or in-progress rider cannot resolve in a `member-picker`. It renders an open search box holding an unresolvable value. Use a locked `text` field instead.
 
-**⚠️ No leg other than en-route or pick-up can be reported skipped.** Skipped means a *later* mark exists, and nothing follows a drop-off. `MissableSwipe` says so in the type.
+**⚠️ A completed leg cannot file.** Every mark is recorded, so `getUnrecordedSwipes` returns nothing and there is nothing to correct — that is the answer to "should completed rides be correctable", and it falls out of the model rather than needing a rule. A ride awaiting member confirmation is out of scope for this case entirely.
 
 **⚠️ Verification is browser-only. There is no test framework** — no vitest, no jest, no playwright, zero test files. `bun run typecheck` (`tsc --noEmit`) is the only automated check, and it must stay at 0.
 
@@ -107,7 +117,7 @@ Flagged so it cannot be mistaken for an agreed requirement:
 | Time **validation** | None exists. A pick-up time before the recorded en-route time is currently accepted. |
 | **SLA** shown to the driver | Nothing is promised, because nothing is known. |
 | The `Submitted → In Review → Needs Info → Resolved / Rejected` ladder | Defined in the vault glossary, **not built**. v1 has one state: waiting on Support. |
-| **Completed rides** | Not reachable. `RideDetailLayout` has no `completed` state and `legScope` excludes finished rides. This is the biggest gap in v1. |
+| **Completed rides** | ✅ **Answered: out of scope.** A completed leg swiped everything, so it has nothing to correct. Not a gap — the model says so. |
 | **Multi-leg trips** | The locked leg picker assumes one swipeable leg per trip. True of every seeded ride; not true in general. |
 
 ## 8. Running it
@@ -121,13 +131,14 @@ bun run typecheck
 
 **The demo path:** My Rides → In Progress → a ride → **More** → **Missed Swipe**.
 
-| Ride | Pill | What it shows |
+**Exactly three in-progress rides, one per swipe CTA:**
+
+| Ride | CTA on the ride | Form asks for |
 |---|---|---|
-| `1049800371` | Missed Swipe · en-route gap | Amber **SWIPE MISSING** bar, no swipe CTA. Form requires **En-route**, locks Pick-up. |
-| `1049800373` | Missed Swipe · pick-up gap | The mirror. Requires **Pick-up**, locks En-route and Drop-off. Alivi FL. |
-| `1049800372` | Missed Swipe · no gap yet | Nothing missing; filing before the app notices. Drop-off open but optional. |
-| `1049800370` | Missed Swipe · nothing recorded | Nothing locked. |
-| `260731-780322` | (Needs Action) | The tile refuses: *"Available once this ride is under way."* |
+| `1049800370` | SWIPE TO START | all three, nothing locked |
+| `1049800371` | PICK UP MEMBER | Pick-up + Drop-off; En-route locked at 12:58 |
+| `1049800372` | DROP OFF MEMBER | Drop-off only; En-route + Pick-up locked |
+| `260731-780322` (Needs Action) | — | The tile refuses: *"Available once this ride is under way."* |
 
 A reload resets submitted requests. The seeded trips are never mutated.
 
