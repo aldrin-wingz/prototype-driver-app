@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft,
@@ -16,6 +17,7 @@ import {
   PersonStanding,
   CheckCircle2,
   CornerUpRight,
+  ChevronRight,
   Hourglass,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -25,6 +27,7 @@ import { RevenueDisplay } from "./revenue-display";
 import { cn } from "@/lib/utils";
 import {
   getLegStage,
+  getMissedSwipeSignal,
   getNextSwipe,
   type Trip,
   type TripLeg,
@@ -33,6 +36,10 @@ import {
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import {
+  MissedSwipeForm,
+  buildMissedSwipe,
+} from "@/components/support/missed-swipe-form";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
 
@@ -254,6 +261,23 @@ export function RideDetailLayout({
     ? getLegStage(activeLeg)
     : "not-started";
   const nextSwipe = activeLeg ? getNextSwipe(activeLeg) : null;
+
+  /**
+   * ⚠️ Provisional. The app noticed the driver was at a waypoint and left it with
+   * the swipe still owed, so it can raise the question itself rather than waiting
+   * for the driver to find the tile behind `More`.
+   *
+   * Suppressed once a request is in flight — the ride is already with Support — and
+   * only ever offered when the form could actually be anchored to this ride.
+   */
+  const [missedSwipeOpen, setMissedSwipeOpen] = useState(false);
+  const signal = activeLeg ? getMissedSwipeSignal(activeLeg) : undefined;
+  const canFileMissedSwipe = Boolean(
+    buildMissedSwipe(trip, activeLeg).initialValues.legId
+  );
+  const showMissedSwipePrompt = Boolean(
+    signal && !pendingRequest && canFileMissedSwipe
+  );
 
   const subtitle =
     state === "before-taken"
@@ -499,6 +523,33 @@ export function RideDetailLayout({
             </button>
           </div>
 
+          {/* Detection prompt. Sits ABOVE the swipe CTA and never replaces it — the
+              inference can be wrong, and a driver who really is still en route must
+              still be able to swipe. So it asks; it does not assert. */}
+          {showMissedSwipePrompt && signal && (
+            <button
+              type="button"
+              onClick={() => setMissedSwipeOpen(true)}
+              className="flex w-full items-start gap-3 border-b border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-left"
+            >
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-[#92400E]">
+                  Missed Swipe?
+                </span>
+                <span className="block text-xs leading-relaxed text-[#92400E]">
+                  You were at the{" "}
+                  {signal.at === "pickup" ? "pick-up" : "drop-off"} from{" "}
+                  {signal.arrivedAt} to {signal.leftAt} ({signal.dwellMinutes} min)
+                  and have since left, but the{" "}
+                  {signal.at === "pickup" ? "pick-up" : "drop-off"} was never
+                  swiped. Tap to send Support the times.
+                </span>
+              </span>
+              <ChevronRight className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+            </button>
+          )}
+
           <div className="px-4 py-4">
             {pendingRequest ? (
               <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
@@ -608,6 +659,12 @@ export function RideDetailLayout({
         </div>
       )}
 
+      <MissedSwipeForm
+        trip={trip}
+        leg={activeLeg}
+        open={missedSwipeOpen}
+        onOpenChange={setMissedSwipeOpen}
+      />
     </div>
   );
 }

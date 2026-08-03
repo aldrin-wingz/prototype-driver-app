@@ -44,6 +44,38 @@ export interface LegSwipeProgress {
   droppedOffAt: string | null;
 }
 
+/**
+ * ⚠️ **PROVISIONAL — an assumption, not an agreed behaviour.**
+ *
+ * What the app noticed about the driver being at a waypoint and then leaving it,
+ * without the matching swipe. If a driver reached the pick-up, stayed long enough
+ * to have collected the member, and has since left the radius, then the swipe they
+ * still owe almost certainly did not fail to happen — it failed to register.
+ *
+ * That is the ONE circumstance in which the app can raise a missed swipe rather
+ * than waiting to be told, and it is why this is seeded evidence rather than
+ * anything derived from the swipe marks. Nothing in `progress` can distinguish
+ * "has not got there yet" from "went, did it, could not swipe"; only location can.
+ *
+ * Deliberately an inference the driver can decline. The prompt asks rather than
+ * asserts, and the normal swipe CTA stays available beside it — a false positive
+ * must not strand a driver who really is still en route.
+ *
+ * Real implementation would read this from telematics with a geofence and a dwell
+ * timer. The prototype has none of that, so, per the repo convention, the
+ * interesting case is SEEDED.
+ */
+export interface MissedSwipeSignal {
+  /** Which waypoint the driver was at and left. */
+  at: "pickup" | "dropoff";
+  /** Clock time the app saw them arrive. */
+  arrivedAt: string;
+  /** Clock time the app saw them leave the radius. */
+  leftAt: string;
+  /** Minutes between the two, as the app measured it. */
+  dwellMinutes: number;
+}
+
 export interface TripLeg {
   id: string;
   type: TimeAnchorType;
@@ -68,6 +100,13 @@ export interface TripLeg {
    * carry it, so the existing seeded trips are unaffected.
    */
   progress?: LegSwipeProgress;
+  /**
+   * Evidence that the driver was at a waypoint and left without swiping.
+   *
+   * Absent on almost every leg, because it is the exception: the app usually has
+   * no reason to think a swipe is owed. See `MissedSwipeSignal` — ⚠️ provisional.
+   */
+  missedSwipeSignal?: MissedSwipeSignal;
 }
 
 /**
@@ -117,6 +156,23 @@ export function getUnrecordedSwipes(leg: TripLeg): SwipeMark[] {
   return (["startedAt", "pickedUpAt", "droppedOffAt"] as SwipeMark[]).filter(
     (mark) => !p[mark]
   );
+}
+
+/**
+ * The waypoint signal worth showing the driver right now, if any.
+ *
+ * Gated on the swipe still being outstanding, because the signal is only ever an
+ * argument for a swipe the app has not received. Once the driver swipes, the
+ * evidence has been overtaken and the prompt would be noise.
+ *
+ * ⚠️ Provisional — see `MissedSwipeSignal`.
+ */
+export function getMissedSwipeSignal(leg: TripLeg): MissedSwipeSignal | undefined {
+  const signal = leg.missedSwipeSignal;
+  if (!signal) return undefined;
+
+  const owed: SwipeMark = signal.at === "pickup" ? "pickedUpAt" : "droppedOffAt";
+  return leg.progress?.[owed] ? undefined : signal;
 }
 
 /** The swipe the driver is expected to make next; null once the leg is done. */
@@ -1018,6 +1074,10 @@ export const mockNeedsActionTrips: Trip[] = [
 //   1049800371  en-route only       CTA PICK UP MEMBER    form asks: pick-up + drop-off
 //   1049800372  en-route + pick-up  CTA DROP OFF MEMBER   form asks: drop-off
 //
+// A fourth, `1049800373`, carries the same swipe state as 371 but adds a seeded
+// `missedSwipeSignal` — ⚠️ provisional. It is the one ride where the app raises the
+// question itself instead of waiting for the driver to find the tile behind More.
+//
 // These three also replicate reference screenshots s-01a / s-01b / s-01c: same
 // ride shape (one A leg = Est Pick-up Time row + Appointment Time row), same
 // Carrollton GA geography, differing only in swipe state.
@@ -1157,10 +1217,71 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    // No gap — the drop-off simply isn't due yet. This is the ride that proves a
-    // driver can file BEFORE the app works out anything is wrong, and the form
-    // opens with two marks locked and only Drop-off to supply.
+    // The drop-off is simply not due yet. This is the ride that proves a driver can
+    // file for a swipe the app has no reason to think is owed.
     pills: [{ label: "Drop Off Member · form asks drop-off", variant: "neutral" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== Detection — the app noticed, so the driver does not have to go hunting =====
+  //
+  // ⚠️ PROVISIONAL. Same swipe state as 1049800371 (en-route recorded, pick-up
+  // owed), so the swipe marks alone cannot tell the two rides apart. The ONLY
+  // difference is `missedSwipeSignal`: the app saw this driver reach the pick-up,
+  // stay eleven minutes — long enough to have collected the member — and then leave
+  // the radius. A driver still en route would not have done that.
+  //
+  // So this is the one ride where the app raises the question itself, and the prompt
+  // sits ABOVE the swipe CTA rather than replacing it: the inference can be wrong,
+  // and a driver who really is still driving must still be able to swipe.
+  {
+    id: "1049800373",
+    date: "Tue, Jul 8, 2026",
+    rider: "Desmond Okafor",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 53.40,
+    notes: "Apartment gate on the Cedar St side",
+    legs: [
+      {
+        id: "1049800373",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "10:20 AM",
+        address: "512 Cedar St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 53.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "10:06 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // Arrived, stayed long enough to load a member, then drove off — with the
+        // pick-up swipe still outstanding.
+        missedSwipeSignal: {
+          at: "pickup",
+          arrivedAt: "10:24 AM",
+          leftAt: "10:35 AM",
+          dwellMinutes: 11,
+        },
+      },
+      {
+        id: "1049800373-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:00 AM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Detected · left the pick-up unswiped", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

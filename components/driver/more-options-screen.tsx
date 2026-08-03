@@ -14,20 +14,12 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { SupportFormSheet } from "@/components/support/support-form-sheet";
 import {
-  buildSupportFormCase,
-  TIME_FIELD_FOR_SWIPE,
-} from "@/lib/support-data/case-registry";
-import { ISSUE_MISSED_SWIPE } from "@/lib/support-data/issue-types";
-import { buildPrefilledValues } from "@/lib/support/prefill";
-import { resolveTripContext } from "@/lib/support/trip-context";
+  MissedSwipeForm,
+  buildMissedSwipe,
+} from "@/components/support/missed-swipe-form";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import {
-  getLegStage,
-  getUnrecordedSwipes,
-  type Trip,
-} from "@/lib/driver-data/mock-trips";
+import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -226,7 +218,7 @@ export function MoreOptionsScreen({
   const { toast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
 
-  const { getPendingRequest, submitForm } = useRideFlow();
+  const { getPendingRequest } = useRideFlow();
   const pending = getPendingRequest(trip.id);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
@@ -242,31 +234,7 @@ export function MoreOptionsScreen({
         tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
       );
 
-  /**
-   * The issue is chosen for the driver, and the form shows it locked.
-   *
-   * `includeIssues` is what puts Missed Swipe in the select's options at all — a
-   * selected value with no matching option renders as the placeholder, so the form
-   * would claim no issue was picked. Seeding `issue` in the initial values is what
-   * marks it app-supplied, which is what `lockWhenPrefilled` reads.
-   *
-   * The same seam takes a second case: register the issue, gate its fields on it,
-   * and hand it to a tile.
-   */
-  const missedSwipeCase = buildSupportFormCase({
-    includeIssues: [ISSUE_MISSED_SWIPE],
-    // Every mark the app has no time for becomes required, because filing this
-    // form asserts the driver drove the leg and could not swipe it. So the CTA the
-    // ride is showing is what tells them what they will be asked: SWIPE TO START
-    // means all three, DROP OFF MEMBER means just the drop-off.
-    requireFields: activeLeg
-      ? getUnrecordedSwipes(activeLeg).map((mark) => TIME_FIELD_FOR_SWIPE[mark])
-      : [],
-  });
-  const initialValues: Record<string, string> = {
-    ...buildPrefilledValues(missedSwipeCase, trip, activeLeg),
-    issue: ISSUE_MISSED_SWIPE,
-  };
+  const { initialValues } = buildMissedSwipe(trip, activeLeg);
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -336,26 +304,12 @@ export function MoreOptionsScreen({
         ))}
       </div>
 
-      <SupportFormSheet
-        supportCase={missedSwipeCase}
+      <MissedSwipeForm
+        trip={trip}
+        leg={activeLeg}
         open={formOpen}
         onOpenChange={setFormOpen}
-        initialValues={initialValues}
-        onSubmit={(values) => {
-          setFormOpen(false);
-          submitForm({
-            caseId: missedSwipeCase.id,
-            issue: ISSUE_MISSED_SWIPE,
-            ...resolveTripContext(missedSwipeCase, values),
-            values,
-          });
-          toast({
-            title: missedSwipeCase.successMessage ?? "Sent to Support",
-            description:
-              "This ride has moved to Pending while Support reviews it.",
-          });
-          router.push(backHref);
-        }}
+        onSubmitted={() => router.push(backHref)}
       />
     </div>
   );
