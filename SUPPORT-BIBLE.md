@@ -2,7 +2,7 @@
 
 The durable rules for the in-app support layer on this branch. Read this before changing anything under `lib/support*`, `components/support/`, or the support entry point on a ride.
 
-**Branch:** `luis/support/missed-swipe-v1`
+**Branch:** `luis/support-form`
 **Scope:** one support case — **Missed Swipe**
 **Last updated:** 2026-08-01
 
@@ -130,12 +130,23 @@ Flagged so it cannot be mistaken for an agreed requirement:
 
 ## 8. Running it
 
+**Coming to this cold:**
+
 ```bash
-bun run dev   # port 3018, or use the `support-preview` launch config
-bun run typecheck
+git clone git@github.com:aldrin-wingz/prototype-driver-app.git
+cd prototype-driver-app
+git checkout luis/support-form
+bun install
+bun run dev          # http://localhost:3018
+```
+
+```bash
+bun run typecheck    # must stay at 0 — it is the only automated check that exists
 ```
 
 `bun run lint` is broken — `next lint` was removed in Next 16. Pre-existing, not worth fixing here.
+
+⚠️ **This is a prototype on mock data.** No backend, no auth, no Zendesk. A page reload resets every submitted request to the seeded state, and the seeded trips are never mutated. Nothing here is deployed — Vercel builds `main`, which this branch is not.
 
 **The demo path:** My Rides → In Progress → a ride → **More** → **Missed Swipe**.
 

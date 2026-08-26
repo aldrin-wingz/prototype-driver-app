@@ -2,8 +2,8 @@
 
 Build state for the in-app support layer. Read `SUPPORT-BIBLE.md` first for the rules; this file is what has been done and what is next.
 
-**Branch:** `luis/support/missed-swipe-v1` · tip `901b1e5` · **nothing pushed**
-**Parent (parked):** `luis/support/in-app-support-requests` · tip `05897c8` · 23 unpushed commits
+**Branch:** `luis/support-form` · tip `8176fc7` · **PUSHED**
+**Parent (parked):** `luis/support/in-app-support-requests` · tip `05897c8` · **local only**, 23 unpushed commits
 **Typecheck:** 0 errors. **Tests:** none exist — see the Bible §6.
 **Last updated:** 2026-08-01
 
@@ -104,4 +104,4 @@ The prompt does not replace the swipe CTA, because the inference can be wrong an
 3. **Multi-leg trips** — the locked leg picker assumes one swipeable leg per trip. Needs a scoped-but-editable picker.
 4. **Time validation** — none exists.
 5. **Stories → PRD.** Not started. `reverse-engineer-prototype` before `prd-finalizer`; it is a much smaller job now than it would have been with seven cases.
-6. **Push.** Nothing is pushed on either branch. Upstream is deliberately unset so a bare `git push` cannot target main.
+6. ~~**Push.**~~ ✅ `luis/support-form` pushed 2026-08-01 at `8176fc7`, tracking `origin/luis/support-form`. A bare `git push` now targets that branch, never main. The parked parent is still local only.
