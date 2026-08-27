@@ -1530,7 +1530,9 @@ export const mockInProgressTrips: Trip[] = [
     // 3 hours past the 9:30 AM appointment, so well clear of the 2-hour boundary
     // the threshold is written against.
     staleSince: { since: "12:30 PM", hoursAfterAppointment: 3 },
-    pills: [{ label: "Stale · 3 hrs past appointment, nothing swiped", variant: "danger" }],
+    // The app's own "Stale Trips" pill is prepended on the ride list, so this
+    // demo pill says what is distinctive rather than repeating it.
+    pills: [{ label: "Nothing swiped · 3 hrs past appointment", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
