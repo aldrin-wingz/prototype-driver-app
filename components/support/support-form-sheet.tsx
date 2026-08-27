@@ -18,6 +18,7 @@ import {
   emptyValues,
   isFieldVisible,
 } from "@/lib/support/field-rules";
+import { getTimeOrderWarnings } from "@/lib/support/time-order";
 import type {
   SupportCallout,
   SupportCalloutTone,
@@ -147,6 +148,16 @@ export function SupportFormSheet({
   const visibleFields = supportCase.fields.filter((field) =>
     isFieldVisible(field, values)
   );
+
+  /**
+   * Cautions about the times entered, keyed by field.
+   *
+   * Computed here because a warning depends on the whole set of values and the
+   * sheet is the only thing holding them. Deliberately kept out of
+   * `canSubmitCase` below — the driver was on the trip and we were not, so a
+   * time that looks impossible to us is a question, not a rejection.
+   */
+  const warnings = getTimeOrderWarnings(supportCase.fields, values);
   // Per `s-02a`, the primary action sits disabled (muted green) until every
   // required field has a value — and stays disabled for an issue whose field set
   // isn't built, since there is nothing to send.
@@ -254,6 +265,7 @@ export function SupportFormSheet({
                     Boolean(field.lockWhenPrefilled) &&
                     appSupplied.has(field.id)
                   }
+                  warning={warnings[field.id]}
                   onChange={(value) => setValue(field.id, value)}
                   values={values}
                   setValue={setValue}

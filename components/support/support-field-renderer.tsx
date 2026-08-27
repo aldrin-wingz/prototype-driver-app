@@ -415,6 +415,7 @@ export function SupportFieldRenderer({
   field,
   value,
   locked = false,
+  warning,
   onChange,
   values,
   setValue,
@@ -422,6 +423,15 @@ export function SupportFieldRenderer({
   field: SupportField;
   value: string;
   locked?: boolean;
+  /**
+   * A value-dependent caution about what the driver just entered.
+   *
+   * Passed in rather than derived here, because it depends on the OTHER fields'
+   * values and a renderer only sees its own. Advisory by construction: the
+   * renderer has no route to the submit gate, so a warning cannot become a block
+   * by accident.
+   */
+  warning?: string;
   onChange: (value: string) => void;
   /**
    * The whole form's values, for composite types only.
@@ -600,6 +610,13 @@ export function SupportFieldRenderer({
 
       {field.helpText && !isLocked && (
         <p className="text-sm text-gray-500">{field.helpText}</p>
+      )}
+
+      {/* Same amber as the unenforced-required line, because it is the same kind
+          of thing: something worth reading that is not stopping you. A red error
+          would claim the value is rejected, and it isn't. */}
+      {warning && (
+        <p className="text-sm text-[#B45309]">⚠️ {warning}</p>
       )}
 
       {/* Says outright that the asterisk above is real but unenforced here, using

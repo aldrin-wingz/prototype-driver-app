@@ -140,6 +140,20 @@ export function getLegStage(leg: TripLeg): LegSwipeStage {
 export type SwipeMark = keyof LegSwipeProgress;
 
 /**
+ * The three marks in the order they happen.
+ *
+ * Declared once because more than one rule depends on it: which marks are still
+ * unrecorded, and whether the times a driver types could have happened in the
+ * order they gave them. Two hand-written copies of this sequence would be two
+ * chances to disagree about the shape of a trip.
+ */
+export const SWIPE_SEQUENCE: SwipeMark[] = [
+  "startedAt",
+  "pickedUpAt",
+  "droppedOffAt",
+];
+
+/**
  * The marks with no time against them — exactly what Missed Swipe collects.
  *
  * The complement of what the app recorded, which is the whole rule: a recorded
@@ -153,9 +167,7 @@ export type SwipeMark = keyof LegSwipeProgress;
 export function getUnrecordedSwipes(leg: TripLeg): SwipeMark[] {
   const p = leg.progress;
   if (!p) return [];
-  return (["startedAt", "pickedUpAt", "droppedOffAt"] as SwipeMark[]).filter(
-    (mark) => !p[mark]
-  );
+  return SWIPE_SEQUENCE.filter((mark) => !p[mark]);
 }
 
 /**
