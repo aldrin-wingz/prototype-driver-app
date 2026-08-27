@@ -76,6 +76,79 @@ export interface MissedSwipeSignal {
   dwellMinutes: number;
 }
 
+/**
+ * ⚠️ **PROVISIONAL — proposed vocabulary, not something the app logs today.**
+ *
+ * Why a swipe the driver actually attempted was refused.
+ *
+ * Codes taken verbatim from the vault's own instrumentation ask
+ * (`Project - Event Explorer/Phase 1/References/Instrumentation Ask - Blocked Swipes.md`),
+ * which describes them as "a starting point, not a specification" — they are what
+ * Support already hears as causes, not fields that exist. Reusing them anyway,
+ * because a prototype inventing a second vocabulary for the same thing is how two
+ * teams end up disagreeing about what happened.
+ *
+ * ⚠️ **This is NOT the same thing as "lookback ran out".** The GPS lookback is an
+ * async BACKEND correction on completed trips: it searches for a nearby position
+ * and, finding none, *accepts* the far swipe. Nothing about it is a driver-app
+ * state. What the driver experiences is simply that the swipe was refused — which
+ * is what this models.
+ */
+export type SwipeBlockReason =
+  | "too_far_from_pickup"
+  | "too_early"
+  | "out_of_sequence"
+  | "odometer_missing"
+  | "odometer_invalid"
+  | "network_or_server_error";
+
+/**
+ * A swipe attempt the app turned down.
+ *
+ * Seeded, like every other interesting state here: nothing in the prototype
+ * advances a swipe mark at runtime, so there is no attempt to refuse. The rule it
+ * stands in for lives with the ride that carries it.
+ *
+ * ⚠️ Note what this deliberately is NOT: a ride status. The vault's ask is
+ * explicit — "please do not add a 'swipe rejected' ride status" — so a refusal is
+ * a fact about one attempt, layered on a leg that is otherwise ordinary.
+ */
+export interface SwipeBlock {
+  /** Which swipe was attempted and refused. */
+  mark: SwipeMark;
+  reason: SwipeBlockReason;
+  /**
+   * What to tell the driver, in their words rather than the code's.
+   *
+   * Seeded per ride so it can name the specifics — how far, how early — which is
+   * the difference between "we couldn't record that" and something the driver can
+   * act on.
+   */
+  detail: string;
+}
+
+/**
+ * ⚠️ **PROVISIONAL — greenfield. No definition of this exists anywhere yet.**
+ *
+ * A trip still sitting open long after it should have finished.
+ *
+ * The threshold the user gave is **2 hours after the appointment time**, and it is
+ * unvalidated against ops: nothing in the vault defines a stale trip, and the
+ * nearest neighbours key off *pickup* rather than the appointment. So the number
+ * is recorded here as data on the ride rather than as a rule in code, and the ride
+ * seeds its own answer.
+ *
+ * What it changes for the driver: up to the boundary a late trip is just a late
+ * trip and the normal swipe stands. Past it, the likelier story is that the trip
+ * was driven and never swiped — so the swipe becomes the way into the form.
+ */
+export interface StaleTrip {
+  /** Clock time the app decided this trip had gone stale. */
+  since: string;
+  /** How far past the appointment time that was, as the app measured it. */
+  hoursAfterAppointment: number;
+}
+
 export interface TripLeg {
   id: string;
   type: TimeAnchorType;
@@ -107,6 +180,12 @@ export interface TripLeg {
    * no reason to think a swipe is owed. See `MissedSwipeSignal` — ⚠️ provisional.
    */
   missedSwipeSignal?: MissedSwipeSignal;
+  /**
+   * A swipe the driver tried to make and the app refused.
+   *
+   * Absent on almost every leg. See `SwipeBlock` — ⚠️ provisional.
+   */
+  swipeBlock?: SwipeBlock;
 }
 
 /**
@@ -187,6 +266,34 @@ export function getMissedSwipeSignal(leg: TripLeg): MissedSwipeSignal | undefine
   return leg.progress?.[owed] ? undefined : signal;
 }
 
+/**
+ * The refusal worth showing the driver right now, if any.
+ *
+ * Gated on the refused swipe still being outstanding, for the same reason
+ * `getMissedSwipeSignal` is: a refusal only matters while the mark it blocked is
+ * still missing. If the driver retried and it took, the earlier refusal is history.
+ *
+ * ⚠️ Provisional — see `SwipeBlock`.
+ */
+export function getSwipeBlock(leg: TripLeg): SwipeBlock | undefined {
+  const block = leg.swipeBlock;
+  if (!block) return undefined;
+  return leg.progress?.[block.mark] ? undefined : block;
+}
+
+/**
+ * Whether this trip has gone stale.
+ *
+ * A predicate rather than a status check, because staleness is layered on top of
+ * a trip that is genuinely still in progress. Reading it as a status would take
+ * the in-progress screen away from the driver at exactly the moment they need it.
+ *
+ * ⚠️ Provisional — see `StaleTrip`.
+ */
+export function isStale(trip: Trip): boolean {
+  return Boolean(trip.staleSince);
+}
+
 /** The swipe the driver is expected to make next; null once the leg is done. */
 export function getNextSwipe(leg: TripLeg): NextSwipe {
   switch (getLegStage(leg)) {
@@ -244,6 +351,14 @@ export interface Trip {
   incentiveTypes: IncentiveType[];
   /** Whether this client/market is enrolled in incentive programs. */
   clientEnrolledInIncentives?: boolean;
+  /**
+   * Set when the app has decided this trip has gone stale.
+   *
+   * An OVERLAY on the trip's real status, never a replacement for it — a stale
+   * trip is still in progress, and the driver still needs the in-progress screen
+   * to do anything about it. See `StaleTrip` — ⚠️ provisional.
+   */
+  staleSince?: StaleTrip;
 }
 
 export interface TripPill {
@@ -1294,6 +1409,128 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     pills: [{ label: "Detected · left the pick-up unswiped", variant: "warning" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== Refused swipe — the driver tried, and the app said no =====
+  //
+  // ⚠️ PROVISIONAL. The natural moment to notice a missed swipe is when a driver
+  // reaches for the swipe and cannot use it, so this is the ride where the swipe
+  // itself becomes the way into the form. Nothing here simulates the attempt: the
+  // prototype never advances a swipe mark, so the OUTCOME is seeded, the same way
+  // `missedSwipeSignal` is.
+  //
+  // The distance is seeded at 1.4 miles deliberately. The vault contradicts itself
+  // about which distance actually refuses a swipe — logs enforce 1000 ft, one
+  // fixture says 100 ft, the hard block is 1 mile — so the demo picks a value that
+  // is past every candidate threshold rather than picking a side in an open
+  // question.
+  {
+    id: "1049800374",
+    date: "Tue, Jul 8, 2026",
+    rider: "Priya Raman",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 44.90,
+    notes: "Pick-up is behind the main building",
+    legs: [
+      {
+        id: "1049800374",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:05 AM",
+        address: "2210 Maple Ridge Rd, Villa Rica, GA 30180",
+        county: "Carroll County",
+        revenue: 44.90,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "8:47 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // The driver has the member on board and is standing at the address the
+        // app disagrees with. Retrying will keep failing, which is precisely why
+        // the refusal has to lead somewhere.
+        swipeBlock: {
+          mark: "pickedUpAt",
+          reason: "too_far_from_pickup",
+          detail:
+            "We had you 1.4 miles from the pick-up address, so the pick-up couldn't be recorded.",
+        },
+      },
+      {
+        id: "1049800374-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:45 AM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Refused swipe · too far from pick-up", variant: "danger" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== Stale trip — hours past its appointment with nothing swiped =====
+  //
+  // ⚠️ PROVISIONAL, and greenfield: nothing in the vault defines a stale trip.
+  //
+  // Nothing is recorded on this leg, so the CTA would normally read SWIPE TO
+  // START — and that is the point. A late trip keeps its normal swipe for as long
+  // as starting it is still plausible; hours past the appointment it is not, and
+  // the likelier story is a trip that was driven and never swiped. That is the
+  // whole reason the boundary exists, and why this ride still has to render the
+  // in-progress screen: staleness is an overlay on a trip that is genuinely still
+  // open, not a status of its own.
+  {
+    id: "1049800375",
+    date: "Tue, Jul 8, 2026",
+    rider: "Harold Bassett",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 58.25,
+    notes: "Wheelchair — ramp entrance on the north side",
+    legs: [
+      {
+        id: "1049800375",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "8:50 AM",
+        address: "119 Rockmart Rd, Villa Rica, GA 30180",
+        county: "Carroll County",
+        revenue: 58.25,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800375-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:30 AM",
+        address: "310 Dialysis Center Dr, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    // 3 hours past the 9:30 AM appointment, so well clear of the 2-hour boundary
+    // the threshold is written against.
+    staleSince: { since: "12:30 PM", hoursAfterAppointment: 3 },
+    pills: [{ label: "Stale · 3 hrs past appointment, nothing swiped", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
