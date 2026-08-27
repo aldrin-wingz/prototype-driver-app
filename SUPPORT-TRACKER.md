@@ -2,10 +2,10 @@
 
 Build state for the in-app support layer. Read `SUPPORT-BIBLE.md` first for the rules; this file is what has been done and what is next.
 
-**Branch:** `luis/support-form` · tip `8176fc7` · **PUSHED**
+**Branch:** `luis/support-form` · tip `203fcd5`
 **Parent (parked):** `luis/support/in-app-support-requests` · tip `05897c8` · **local only**, 23 unpushed commits
 **Typecheck:** 0 errors. **Tests:** none exist — see the Bible §6.
-**Last updated:** 2026-08-01
+**Last updated:** 2026-08-28
 
 ---
 
@@ -28,9 +28,11 @@ The route there was not direct, and the shape of it matters. Slices 1–5 built 
 | Sheet | `components/support/support-form-sheet.tsx` | one sheet, any case. Titles itself with the locked issue |
 | Field renderer | `components/support/support-field-renderer.tsx` | **15 types**, 5 used by Missed Swipe |
 | Leg recap | `components/support/trip-summary-banner.tsx` | renders under any leg picker |
-| Entry points | `components/driver/more-options-screen.tsx` (tile behind `More`) · `components/driver/ride-detail-layout.tsx` (⚠️ provisional detection prompt) | both mount the shared `components/support/missed-swipe-form.tsx` |
+| Field warnings | `lib/support/time-order.ts` | `getTimeOrderWarnings` — advisory only, **not** wired to the submit gate |
+| Entry points | `components/driver/more-options-screen.tsx` (tile behind `More`) · `components/driver/ride-detail-layout.tsx` (⚠️ provisional: detection prompt · refused swipe · stale trip, the last two on the swipe CTA) | all four mount the shared `components/support/missed-swipe-form.tsx` |
 | Store | `lib/support-data/ride-flow-context.tsx` | `submitForm`, `pendingForms`, `getPendingRequest` |
-| Swipe model | `lib/driver-data/mock-trips.ts` | `LegSwipeProgress`, `getLegStage`, `getUnrecordedSwipes`, `SwipeMark`, ⚠️ `MissedSwipeSignal` / `getMissedSwipeSignal` |
+| Swipe model | `lib/driver-data/mock-trips.ts` | `LegSwipeProgress`, `SWIPE_SEQUENCE`, `getLegStage`, `getUnrecordedSwipes`, `SwipeMark`, ⚠️ `MissedSwipeSignal` / `getMissedSwipeSignal`, ⚠️ `SwipeBlock` / `getSwipeBlock`, ⚠️ `StaleTrip` / `isStale` |
+| Ride list filing | `app/my-rides/page.tsx` | stale trips MOVE to Needs Action with a "Stale Trips" pill — an overlay, not a status |
 
 **Field types: 15 available, 5 in use.** In use: `select`, `leg-picker`, `time`, `number`, `textarea`, `file` (6, counting the file attachment). Unused but kept as runtime: `text`, `date`, `datetime`, `stepper`, `signature`, `member-picker`, `leg-repeater`, `notice`. Do not delete them and do not add a 16th speculatively.
 
@@ -97,11 +99,37 @@ The prompt does not replace the swipe CTA, because the inference can be wrong an
 
 `MissedSwipeForm` extracted at the same time — with two entry points, the required fields, the locks and the store write must not be able to differ.
 
+### Entry points at the moment of failure · 2026-08-28 · `6c26188` → `203fcd5`
+
+⚠️ **All of it provisional.** The threshold, the refusal reasons and every word of copy are assumptions or placeholders.
+
+The gap this closed: the prototype had no representation of the moments a missed swipe is actually *noticed*. A driver reaching for the swipe and finding it will not work is the natural trigger, and it led nowhere — the CTA was a decorative `<div>` with no handler, no `role` and no focus.
+
+| Commit | What |
+|---|---|
+| `6c26188` | Time-order warning. `SWIPE_SEQUENCE` now declared once and read by both `getUnrecordedSwipes` and the new check |
+| `0bf8ecd` | `SwipeBlock` and `StaleTrip` seeded; rides `1049800374` (refused at 1.4 mi) and `1049800375` (3 h past appointment, nothing swiped) |
+| `203fcd5` | The CTA becomes a real button with three outcomes; the stale banner; staleness filed into Needs Action as an overlay |
+
+**Four judgment calls worth keeping:**
+
+1. **The third branch is what makes the other two safe.** An ordinary ride toasts. That is what lets Swipe to Start stay an ordinary swipe at any lateness and only divert once the trip is stale — the user's rule, and it falls out of ordering the branches rather than needing a second rule.
+2. **A mark must not precede the LATEST mark ahead of it, not the nearest.** Comparing against the nearest predecessor silently misses a drop-off that clears a wrong pick-up but not the en-route time. The unit sweep included that exact case precisely because it is the one that separates the two implementations.
+3. **Staleness is an overlay, not a status** — and the vault's own instrumentation ask independently makes the same call for refused swipes (*"please do not add a 'swipe rejected' ride status"*). `trip.status` drives the detail screen, so a `needs-action` status would take the swipe region away at the moment the driver needs it.
+4. **"Lookback ran out" is not a driver-app state.** The vault is unambiguous: the GPS lookback is an async backend correction on *completed* trips that **accepts** a far swipe when it finds nothing nearby. The driver-facing state is that the swipe was refused, so that is what got modelled — using the vault's own reason codes rather than a second vocabulary.
+
+**A trap this cost:** an **enabled** Submit button measured back as the *disabled* colour. The pane tab is `visibilityState: "hidden"`, so CSS transitions are frozen and `getComputedStyle` returns pre-transition values. Would have been reported as a bug; injecting `transition: none !important` showed the correct colour. Now in the Bible §6.
+
+**Verified in the browser**, all six rides: the three unchanged CTAs toast, `373`'s prompt is untouched, `374` opens the form with en-route locked at 8:47, `375` shows the banner and `MISSED SWIPE?` over "Swipe to Start · A Leg" and asks for all three marks. Tab counts In Progress 5 / Needs Action 2. Submitting from `375` moved it to Pending and suppressed the banner. The warning fired with **Submit enabled** — and the gate held while drop-off was blank and released when it was filled, so it is answering requiredness rather than the warning. Console clean.
+
 ## Next
 
 1. **Get Missed Swipe's real spec from the support lead.** Priority order: (a) monthly volume, since the v1 business case rests on one case; (b) the real wording of the issue in the web form. ~~Completed rides~~ and ~~odometers~~ — both answered.
 2. **Decide case two**, and specify it before building it. The Catalog holds five candidates with worked specs.
 3. **Multi-leg trips** — the locked leg picker assumes one swipeable leg per trip. Needs a scoped-but-editable picker.
-4. **Time validation** — none exists.
-5. **Stories → PRD.** Not started. `reverse-engineer-prototype` before `prd-finalizer`; it is a much smaller job now than it would have been with seven cases.
-6. ~~**Push.**~~ ✅ `luis/support-form` pushed 2026-08-01 at `8176fc7`, tracking `origin/luis/support-form`. A bare `git push` now targets that branch, never main. The parked parent is still local only.
+4. ~~**Time validation**~~ — ✅ a non-blocking order warning ships. Still open: whether Support wants the discrepancy **recorded** on the request rather than only shown at entry. `getTimeOrderWarnings` already computes it, so storing a boolean is a one-liner.
+5. **Get the owed copy from Jeff** — the Stale Trips banner and the `MISSED SWIPE?` label are placeholders. Both carry `TODO(jeff)`.
+6. **Confirm the staleness rule with ops** — is it 2 hours, and is it after the **appointment** or after **pickup**? The vault's only comparable rule keys off pickup.
+7. **The Support side.** A submitted form has nowhere to land: the driver is told Support will handle it in the CS Tool, and no such surface exists. Next up on branch `luis/support-forms-portal` in the CS Tool repo.
+8. **Stories → PRD.** Not started. `reverse-engineer-prototype` before `prd-finalizer`; it is a much smaller job now than it would have been with seven cases.
+9. ~~**Push.**~~ ✅ `luis/support-form` tracks `origin/luis/support-form` (first pushed 2026-08-01, last at `3b0da41`). A bare `git push` targets that branch, never main. The parked parent is still local only.
