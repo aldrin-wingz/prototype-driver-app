@@ -1,39 +1,43 @@
-import type { SwipeMark } from "@/lib/driver-data/mock-trips";
-import { getIssueOptions, ISSUE_MISSED_SWIPE } from "./issue-types";
+import { getIssueOptions, ISSUE_RIDER_NO_SHOW } from "./issue-types";
 import type { SupportCaseDefinition } from "@/types/support";
 
 /**
  * Which issue owns a field.
  *
- * Always true while Missed Swipe is the only issue, and kept anyway — this is how
- * a field set declares what it belongs to. Case two arrives as its own `ONLY_*`
- * and its own block, with nothing to unpick here first.
+ * Always true while Rider No-Show is the only issue, and kept anyway — this is
+ * how a field set declares what it belongs to. Case two arrives as its own
+ * `ONLY_*` and its own block, with nothing to unpick here first.
  */
-const ONLY_MISSED_SWIPE = { field: "issue", equals: [ISSUE_MISSED_SWIPE] };
+const ONLY_RIDER_NO_SHOW = { field: "issue", equals: [ISSUE_RIDER_NO_SHOW] };
 
 const SUPPORT_FORM_CASE_ID = "support-form";
+
+/**
+ * The two time fields, in the order they must have happened.
+ *
+ * Read by `getTimeOrderWarnings` so a driver who says they left before they
+ * started waiting is told so. Declared here rather than in the checker, because
+ * which fields are a sequence is a property of the CASE — the checker is generic.
+ */
+export const WAIT_TIME_SEQUENCE = ["waitedFrom", "leftAt"];
 
 /**
  * The support form.
  *
  * One form for every support request, not one per case: the issue swaps the field
- * set beneath it, which is how the real web form behaves. v1 registers one issue,
- * so the form always renders the same set — but the shape is still the multi-issue
- * one, because the next case should cost a field block and nothing else.
+ * set beneath it, which is how the real web form behaves. This branch registers
+ * one issue, so the form always renders the same set — but the shape is still the
+ * multi-issue one, because the next case should cost a field block and nothing
+ * else.
  *
- * A builder rather than a constant so the issue's options are resolved per call.
- *
- * **Missed Swipe** — for a trip the driver drove but FORGOT TO SWIPE, applying
- * anywhere from en-route to drop-off. Whatever the app already recorded arrives
- * locked; whatever it does not is left for the driver. So the same form filed
- * after a missed pick-up holds en-route and drop-off already and asks only for the
- * one mark that is absent. The leg drives all of it, and its letter, rider,
- * schedule, appointment and status render as a summary banner rather than as
- * fields to read past.
+ * **Rider No-Show** — for a member who never came out. It exists because the
+ * production flow REFUSES rather than asks: a driver who waited, gave up and
+ * drove off is told no, and the only way forward is Zendesk. Every question here
+ * is one the app would have answered itself if it could, which is why the form
+ * only ever opens when it could not.
  */
 export function buildSupportFormCase({
   includeIssues,
-  requireFields,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -44,39 +48,21 @@ export function buildSupportFormCase({
    * on the driver's behalf.
    */
   includeIssues?: string[];
-  /**
-   * Fields to mark required on top of what the case declares.
-   *
-   * Needed because for the time fields, whether an answer is required is a
-   * property of the RIDE, not of the field: a driver filing a Missed Swipe is
-   * saying they drove the leg and could not swipe it, so every mark the app has no
-   * time for is one only they can supply. The caller resolves
-   * `getUnrecordedSwipes(leg)` and passes the answer in.
-   */
-  requireFields?: string[];
 } = {}): SupportCaseDefinition {
-  const required = new Set(requireFields ?? []);
-  const withRequired = (
-    fields: SupportCaseDefinition["fields"]
-  ): SupportCaseDefinition["fields"] =>
-    fields.map((field) =>
-      required.has(field.id) ? { ...field, required: true } : field
-    );
-
   return {
     id: SUPPORT_FORM_CASE_ID,
     title: "Submit Support Form",
     summary: "Send Support a request",
     // Only ever seen if no issue is set; otherwise the issue's own description
-    // takes over, and in v1 the issue is always set.
+    // takes over, and here the issue is always set.
     description: "Pick the issue that fits and we'll only ask what we need to.",
-    category: "Trip Issue",
+    category: "Rider",
     buildState: "in-prototype",
     submitLabel: "Submit",
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: "Submit a request",
-    fields: withRequired([
+    zendeskEquivalent: "Member no-show",
+    fields: [
       {
         id: "issue",
         type: "select",
@@ -94,79 +80,74 @@ export function buildSupportFormCase({
         lockedBadge: null,
       },
 
-      // ---- Missed Swipe --------------------------------------------------
+      // ---- Rider No-Show -------------------------------------------------
       {
         id: "legId",
         type: "leg-picker",
         label: "Which trip?",
         placeholder: "Search your rides by leg ID, rider or date",
         required: true,
-        showIf: ONLY_MISSED_SWIPE,
+        showIf: ONLY_RIDER_NO_SHOW,
         prefillFrom: "legId",
-        // A missed swipe is only actionable on a trip that is under way.
+        // A no-show is only actionable on a trip that is under way.
         legScope: "in-progress",
-        // Locked because the form is only ever opened from a ride. Leaving it
-        // open would let a driver standing on trip A file against trip B, which
-        // is not a correction anyone asked for.
+        // Locked because the form is only ever opened from a ride, and a no-show
+        // is about a specific pick-up the driver physically attended. Leaving it
+        // open would let a driver standing at trip A file against trip B.
         lockWhenPrefilled: true,
         lockedBadge: "From this ride",
       },
       {
-        id: "enRouteTime",
+        id: "waitedFrom",
         type: "time",
-        label: "En-route Time",
-        helpText: 'When you started driving to the pick-up ("Start ride").',
-        prefillFrom: "enRouteTime",
-        lockWhenPrefilled: true,
-        showIf: ONLY_MISSED_SWIPE,
-      },
-      {
-        id: "pickupTime",
-        type: "time",
-        label: "Pick-up Time",
-        helpText: "When you picked up the member.",
-        prefillFrom: "pickupTime",
-        lockWhenPrefilled: true,
-        showIf: ONLY_MISSED_SWIPE,
-      },
-      {
-        id: "dropOffTime",
-        type: "time",
-        label: "Drop-off Time",
-        helpText: "When you dropped off the member.",
-        prefillFrom: "dropOffTime",
-        lockWhenPrefilled: true,
-        showIf: ONLY_MISSED_SWIPE,
-      },
-      {
-        id: "reason",
-        type: "textarea",
-        label: "Why weren't you able to swipe this trip?",
-        placeholder:
-          "Tell us briefly why you weren't able to swipe during the ride.",
+        label: "What time did you start waiting?",
+        // The label is a question; the warning copy needs a noun phrase.
+        shortLabel: "time you started waiting",
+        helpText: "When you arrived at the pick-up.",
         required: true,
-        maxLength: 500,
-        showIf: ONLY_MISSED_SWIPE,
+        prefillFrom: "waitArrivedAt",
+        // ⚠️ NO `lockWhenPrefilled`, and that is the whole point — the inverse of
+        // a recorded swipe mark. What prefills here is the evidence we have just
+        // judged insufficient, so locking it would stop the driver correcting the
+        // one thing we are unsure about.
+        showIf: ONLY_RIDER_NO_SHOW,
       },
       {
-        id: "attachment",
-        type: "file",
-        label: "Attachments (optional)",
-        helpText: "Add a photo or screenshot if it helps explain.",
-        showIf: ONLY_MISSED_SWIPE,
+        id: "leftAt",
+        type: "time",
+        label: "What time did you leave?",
+        shortLabel: "time you left",
+        helpText: "When you gave up and drove off.",
+        required: true,
+        prefillFrom: "waitLeftAt",
+        showIf: ONLY_RIDER_NO_SHOW,
       },
-    ]),
+      {
+        id: "contactProof",
+        type: "file",
+        label: "Attach proof you tried to reach the member",
+        // Required in the real flow — a no-show without a contact attempt is not
+        // a no-show — but a prototype must not hold a demo hostage to a call-log
+        // screenshot nobody has to hand.
+        required: true,
+        requiredNotEnforced: true,
+        helpText: "A call log, a screenshot of your texts, anything showing you tried.",
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+      {
+        // LAST, deliberately. The driver is attesting to the answers above, so a
+        // field after the signature would be signed for before it was written.
+        //
+        // And it is here at all because proving the wait is not proving the member
+        // was absent: the app can know how long a driver sat there and still have
+        // no idea who failed to appear. That gap is what the signature covers.
+        id: "signature",
+        type: "signature",
+        label: "Sign to confirm",
+        helpText: "Sign to confirm the member did not come out for this ride.",
+        required: true,
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
+    ],
   };
 }
-
-/**
- * The form field that holds each swipe mark.
- *
- * Lets a caller turn `getUnrecordedSwipes(leg)` into `requireFields`, which is how
- * the swipe CTA on the ride ends up deciding what the form asks for.
- */
-export const TIME_FIELD_FOR_SWIPE: Record<SwipeMark, string> = {
-  startedAt: "enRouteTime",
-  pickedUpAt: "pickupTime",
-  droppedOffAt: "dropOffTime",
-};

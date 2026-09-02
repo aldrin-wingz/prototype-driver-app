@@ -27,10 +27,7 @@ import { RevenueDisplay } from "./revenue-display";
 import { cn } from "@/lib/utils";
 import {
   getLegStage,
-  getMissedSwipeSignal,
   getNextSwipe,
-  getSwipeBlock,
-  isStale,
   type Trip,
   type TripLeg,
   type TimeAnchorType,
@@ -38,10 +35,6 @@ import {
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import {
-  MissedSwipeForm,
-  buildMissedSwipe,
-} from "@/components/support/missed-swipe-form";
 
 type DetailState = "before-taken" | "needs-action" | "in-progress";
 
@@ -81,14 +74,6 @@ const SWIPE_CTA: Record<
   },
 };
 
-/**
- * The stale-trip label, replacing the swipe's own on the first line.
- *
- * ⚠️ Placeholder wording. The real copy for this whole surface is owed by Jeff —
- * see the Bible's provisional table. TODO(jeff): confirm the label and the banner
- * copy below it.
- */
-const STALE_CTA_LABEL = "MISSED SWIPE?";
 
 /**
  * Header title per swipe stage, per reference screenshots:
@@ -132,8 +117,8 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; 
 /**
  * Swipe record for one leg — which of the three marks have times against them.
  *
- * Also a preview of the Missed Swipe form: a recorded mark arrives locked, a blank
- * one is what the driver would be asked to supply.
+ * Context only on this branch — nothing here is editable. It is how a driver
+ * confirms they are looking at the leg they think they are.
  */
 function LegSwipeRecord({ leg }: { leg: TripLeg }) {
   const progress = leg.progress;
@@ -288,57 +273,17 @@ export function RideDetailLayout({
     : "not-started";
   const nextSwipe = activeLeg ? getNextSwipe(activeLeg) : null;
 
-  /**
-   * ⚠️ Provisional. The app noticed the driver was at a waypoint and left it with
-   * the swipe still owed, so it can raise the question itself rather than waiting
-   * for the driver to find the tile behind `More`.
-   *
-   * Suppressed once a request is in flight — the ride is already with Support — and
-   * only ever offered when the form could actually be anchored to this ride.
-   */
-  const [missedSwipeOpen, setMissedSwipeOpen] = useState(false);
-  const signal = activeLeg ? getMissedSwipeSignal(activeLeg) : undefined;
-  const canFileMissedSwipe = Boolean(
-    buildMissedSwipe(trip, activeLeg).initialValues.legId
-  );
-  const showMissedSwipePrompt = Boolean(
-    signal && !pendingRequest && canFileMissedSwipe
-  );
-
   const cta = nextSwipe ? SWIPE_CTA[nextSwipe] : null;
 
   /**
-   * The two states in which reaching for the swipe leads to the form instead.
+   * The swipe CTA is a real button, and on this branch it only ever toasts.
    *
-   * This is the moment a missed swipe is actually noticed — a driver trying to
-   * swipe and finding they can't — so it should not require finding a tile behind
-   * `More`. Both are ⚠️ provisional and both are SEEDED: nothing in the prototype
-   * advances a swipe mark, so there is no attempt to refuse and no clock to pass
-   * a threshold.
-   *
-   * `swipeBlock` is gated on the mark it refused still being unrecorded, so a
-   * driver who retried successfully gets their ordinary swipe back.
-   */
-  const stale = isStale(trip);
-  const swipeBlock = activeLeg ? getSwipeBlock(activeLeg) : undefined;
-  const swipeOpensForm = Boolean(
-    (stale || swipeBlock) && canFileMissedSwipe && !pendingRequest
-  );
-  const showStaleBanner = Boolean(stale && !pendingRequest);
-
-  /**
-   * What tapping the swipe does.
-   *
-   * On an ordinary ride, nothing: the real swipe belongs to a production flow this
-   * prototype does not carry, and saying so beats a dead tap that reads as a bug —
-   * the same treatment every unwired More Options tile gets. A refused or stale
-   * ride opens the Missed Swipe form instead.
+   * Nothing in the prototype advances a swipe mark, so the production swipe has
+   * no behaviour to stand in for. Saying so beats a dead tap that reads as a bug —
+   * the same treatment every unwired More Options tile gets. The way into a form
+   * on this branch is the Member No-Show tile, not this button.
    */
   function handleSwipeTap() {
-    if (swipeOpensForm) {
-      setMissedSwipeOpen(true);
-      return;
-    }
     toast({
       title: cta?.name ?? "Swipe",
       description: "Not wired in the prototype — this is the production action.",
@@ -589,67 +534,6 @@ export function RideDetailLayout({
             </button>
           </div>
 
-          {/* Stale-trip banner. Deliberately NOT tappable, unlike the detection
-              prompt below it: the swipe CTA itself is the way in on a stale trip,
-              so this explains why that button changed rather than competing with
-              it. Two amber controls doing the same thing would just be noise.
-
-              ⚠️ Placeholder copy — the real wording is owed by Jeff.
-              TODO(jeff): confirm this banner's copy and the CTA label above. */}
-          {showStaleBanner && trip.staleSince && (
-            <div className="flex items-start gap-3 border-b border-[#FDE68A] bg-[#FFFBEB] px-4 py-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-[#92400E]">
-                  This trip is still open
-                </p>
-                <p className="text-xs leading-relaxed text-[#92400E]">
-                  It&apos;s been {trip.staleSince.hoursAfterAppointment} hour
-                  {trip.staleSince.hoursAfterAppointment === 1 ? "" : "s"} since
-                  the{" "}
-                  {trip.legs.find((leg) => leg.type === "appointment")?.time ??
-                    "scheduled"}{" "}
-                  appointment
-                  {/* Both phrasings have to be true of the ride actually on
-                      screen — a banner that says "nothing has been swiped" on a
-                      part-swiped trip is worse than no banner. */}
-                  {activeStage === "not-started"
-                    ? " and nothing has been swiped"
-                    : " and this trip still isn't finished"}
-                  . If you drove it, tap the swipe below to send Support the
-                  times.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Detection prompt. Sits ABOVE the swipe CTA and never replaces it — the
-              inference can be wrong, and a driver who really is still en route must
-              still be able to swipe. So it asks; it does not assert. */}
-          {showMissedSwipePrompt && signal && (
-            <button
-              type="button"
-              onClick={() => setMissedSwipeOpen(true)}
-              className="flex w-full items-start gap-3 border-b border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-left"
-            >
-              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-[#92400E]">
-                  Missed Swipe?
-                </span>
-                <span className="block text-xs leading-relaxed text-[#92400E]">
-                  You were at the{" "}
-                  {signal.at === "pickup" ? "pick-up" : "drop-off"} from{" "}
-                  {signal.arrivedAt} to {signal.leftAt} ({signal.dwellMinutes} min)
-                  and have since left, but the{" "}
-                  {signal.at === "pickup" ? "pick-up" : "drop-off"} was never
-                  swiped. Tap to send Support the times.
-                </span>
-              </span>
-              <ChevronRight className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
-            </button>
-          )}
-
           <div className="px-4 py-4">
             {pendingRequest ? (
               <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
@@ -665,58 +549,28 @@ export function RideDetailLayout({
                   ? `${activeLeg.legCode} Leg`
                   : "";
                 return (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleSwipeTap}
-                      // Colour stays the stage's own even when the label changes:
-                      // the driver reads this button by colour before they read
-                      // the words, and which swipe is owed has not changed. The
-                      // amber banner above carries the exception.
-                      className={cn(
-                        "relative flex h-16 w-full items-center justify-center rounded-full",
-                        cta.bg
-                      )}
-                    >
-                      <span className="absolute left-1.5 top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 items-center justify-center rounded-full bg-white">
-                        <CtaIcon className="h-6 w-6 text-[#303068]" />
-                      </span>
-                      <span className="flex flex-col items-center leading-tight">
-                        <span className="text-sm font-medium uppercase tracking-wide text-white">
-                          {stale ? STALE_CTA_LABEL : cta.label}
-                        </span>
-                        {/* On a stale ride the swipe's own name moves down here
-                            rather than disappearing. The question leads, but the
-                            driver still has to be able to see which swipe they
-                            owe — the trip is genuinely still open. */}
-                        {stale ? (
-                          <span className="text-sm font-bold text-white">
-                            {[cta.name, legLine].filter(Boolean).join(" · ")}
-                          </span>
-                        ) : (
-                          legLine && (
-                            <span className="text-sm font-bold text-white">
-                              {legLine}
-                            </span>
-                          )
-                        )}
-                      </span>
-                    </button>
-
-                    {/* Why the swipe would not take. Sits under the button the
-                        driver just pressed, because a refusal with no reason
-                        reads as the app being broken — and retrying will keep
-                        failing. */}
-                    {swipeBlock && (
-                      <p className="mt-2.5 flex items-start gap-1.5 px-1 text-xs leading-relaxed text-[#B45309]">
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-                        <span>
-                          {swipeBlock.detail}
-                          {swipeOpensForm && " Tap to send Support the times."}
-                        </span>
-                      </p>
+                  <button
+                    type="button"
+                    onClick={handleSwipeTap}
+                    className={cn(
+                      "relative flex h-16 w-full items-center justify-center rounded-full",
+                      cta.bg
                     )}
-                  </>
+                  >
+                    <span className="absolute left-1.5 top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 items-center justify-center rounded-full bg-white">
+                      <CtaIcon className="h-6 w-6 text-[#303068]" />
+                    </span>
+                    <span className="flex flex-col items-center leading-tight">
+                      <span className="text-sm font-medium uppercase tracking-wide text-white">
+                        {cta.label}
+                      </span>
+                      {legLine && (
+                        <span className="text-sm font-bold text-white">
+                          {legLine}
+                        </span>
+                      )}
+                    </span>
+                  </button>
                 );
               })()
             ) : (
@@ -793,12 +647,6 @@ export function RideDetailLayout({
         </div>
       )}
 
-      <MissedSwipeForm
-        trip={trip}
-        leg={activeLeg}
-        open={missedSwipeOpen}
-        onOpenChange={setMissedSwipeOpen}
-      />
     </div>
   );
 }

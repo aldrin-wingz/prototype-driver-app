@@ -7,7 +7,6 @@ import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
 import { cn } from "@/lib/utils";
 import {
-  isStale,
   mockInProgressTrips,
   mockNeedsActionTrips,
   mockUpcomingTrips,
@@ -46,33 +45,6 @@ export default function MyRidesPage() {
   const withoutPending = (trips: Trip[]) =>
     trips.filter((trip) => !pendingIds.has(trip.id));
 
-  /**
-   * ⚠️ Provisional. A trip hours past its appointment needs the driver, so it
-   * belongs in Needs Action — and it MOVES there rather than appearing twice, for
-   * the same reason a pending ride moves to Pending: two copies and the driver
-   * cannot tell what still needs them.
-   *
-   * Staleness is an OVERLAY, not a status. Membership of a tab is array
-   * membership, but `trip.status` is what the detail screen reads, and a
-   * `needs-action` status renders the orange confirmation footer instead of the
-   * swipe region — which is the one thing a stale trip actually needs. So the
-   * trip keeps `status: "in-progress"` and only its filing changes. (The vault's
-   * own instrumentation ask makes the same call for refused swipes: do not turn
-   * an exceptional state into a status.)
-   */
-  const staleTrips = mockInProgressTrips.filter(isStale).map((trip) => ({
-    ...trip,
-    pills: [
-      { label: "Stale Trips", variant: "danger" as const },
-      ...trip.pills,
-    ],
-  }));
-  const staleIds = new Set(staleTrips.map((trip) => trip.id));
-  const inProgressTrips = mockInProgressTrips.filter(
-    (trip) => !staleIds.has(trip.id)
-  );
-  const needsActionTrips = [...mockNeedsActionTrips, ...staleTrips];
-
   const allRides = [
     ...mockInProgressTrips,
     ...mockNeedsActionTrips,
@@ -94,12 +66,12 @@ export default function MyRidesPage() {
     {
       value: "in-progress",
       label: "In Progress",
-      count: withoutPending(inProgressTrips).length,
+      count: withoutPending(mockInProgressTrips).length,
     },
     {
       value: "needs-action",
       label: "Needs Action",
-      count: withoutPending(needsActionTrips).length,
+      count: withoutPending(mockNeedsActionTrips).length,
     },
     {
       value: "upcoming",
@@ -112,11 +84,9 @@ export default function MyRidesPage() {
   const getTripsForTab = (tab: TabValue) => {
     switch (tab) {
       case "in-progress":
-        return withoutPending(inProgressTrips);
+        return withoutPending(mockInProgressTrips);
       case "needs-action":
-        // Pending is applied last, so a stale ride whose form has been filed
-        // moves on to Pending rather than sitting here as well.
-        return withoutPending(needsActionTrips);
+        return withoutPending(mockNeedsActionTrips);
       case "upcoming":
         return withoutPending(mockUpcomingTrips);
       case "pending":

@@ -41,7 +41,7 @@ function LegPicker({
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  // Search is scoped — a missed swipe only applies to a trip that is under way —
+  // Search is scoped — a no-show only applies to a trip that is under way —
   // but the selected leg is looked up unscoped, so a draft filed against a ride
   // that has since moved on still displays what it names.
   const results = searchLegOptions(query, field.legScope).slice(0, 6);

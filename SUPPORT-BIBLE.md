@@ -1,12 +1,14 @@
-# SUPPORT-BIBLE.md — In-App Support Requests
+# SUPPORT-BIBLE.md — Rider No-Show
 
 The durable rules for the in-app support layer on this branch. Read this before changing anything under `lib/support*`, `components/support/`, or the support entry point on a ride.
 
-**Branch:** `luis/support-form`
-**Scope:** one support case — **Missed Swipe**
-**Last updated:** 2026-08-28
+**Branch:** `luis/rider-no-show`
+**Scope:** one support case — **Rider No-Show**
+**Last updated:** 2026-09-03
 
-Vault companions: `Project - In-App Support Requests/Working Plan - In-App Support Requests.md` (live state, decisions log), `General Plan.md` (§5 delivery model), `References/Support Case Catalog.md` (per-case specs, including the six not in this branch).
+Sibling branch: `luis/support-form` carries **Missed Swipe** and nothing else. The two are deliberately separate prototypes over one runtime — see §2.
+
+Vault companions: `Project - In-App Support Requests/Working Plan - In-App Support Requests.md`, `General Plan.md` (§5 delivery model), `References/Support Case Catalog.md` (per-case specs).
 
 ---
 
@@ -14,45 +16,39 @@ Vault companions: `Project - In-App Support Requests/Working Plan - In-App Suppo
 
 The NEMT Driver App sends drivers to Zendesk when something goes wrong operationally. This layer moves that in-app: a support case becomes a **schema-driven form** rather than a bespoke screen, so covering more cases costs a data edit rather than a build.
 
-v1 proves that with one case. A driver who drove a leg but whose swipe never registered can correct the time from the ride itself, and the request lands in a pending-review state the driver can see.
+**The problem Rider No-Show solves is not "collect no-show details". It is that the current flow refuses submissions it shouldn't.** Today a driver waits at the pick-up, gives up, drives off, and only then taps Member No-Show — at which point the app hard-refuses and the only way forward is Zendesk. That is precisely the traffic this project exists to absorb.
+
+So the interesting design here is not the form. It is **when a form is needed at all.**
 
 ## 2. The one rule that governs this branch
 
 > **A case is in the prototype only once it has been agreed.**
 
-Six other cases were built here (General, Payment Related, Trip Request, Rider No-Show, and both Trip Confirmation cases) and then **deleted**, because none had been agreed with the support lead. They are not hidden behind a flag — flags on a whole case do not hold. A prototype is the most persuasive artifact in a project; anything in it reads as decided.
+This branch carries Rider No-Show and **no trace of anything else** — the sweep for `missed swipe` / `swipeBlock` / `staleSince` returns zero hits. A prototype is the most persuasive artifact in a project; anything in it reads as decided.
 
-- Their code is preserved on `luis/support/in-app-support-requests` (tip `05897c8`).
-- Their specs are preserved in `References/Support Case Catalog.md`, marked ⏸️ deferred.
-- Adding one back means specifying it first, then building it.
-
-**Do not re-add a case by cherry-picking it from the parent branch.** The point is the specification step, not the code.
+The parked branch `luis/support/in-app-support-requests` (tip `05897c8`) also has a Rider No-Show. **It was not cherry-picked, and must not be.** That version asked **seven** questions and had **five** outcome branches including two hard refusals plus a `Verida`+`TN` on-site rule. This one asks three and replaces the refusals with the form. Building the old one would have shipped decisions nobody made. Two constants were independently arrived at and match — `NO_SHOW_WAIT_MINUTES = 10`, and the en-route gate — which is confirmation, not a licence to copy the rest.
 
 ## 3. What NOT to build
 
-- **No agent- or Support-side screens.** What the agent sees when a request lands is out of scope; it belongs in the CS Tool, where the real one lives.
+- **No agent- or Support-side screens.** What the agent sees when a request lands belongs in the CS Tool.
 - **No real backend, no Zendesk integration, no auth.** Mock data only.
-- **No redesign of existing driver-app surfaces.** Support capability is layered onto them. The More Options grid, the ride detail, the header and the bottom nav stay as captured.
-- **No new bottom-nav tab.** Support is reached from a ride, not promoted to top-level navigation.
-- **No entry point that isn't a ride.** Four exist, every one of them on a ride: the Missed Swipe tile behind `More`, the detection prompt, a **refused swipe**, and a **stale trip**. All go through `MissedSwipeForm` so they cannot drift. `/forms` and the header clipboard icon existed and were removed on purpose — a support form belongs to a trip.
+- **No redesign of existing driver-app surfaces.** The More Options grid, the ride detail, the header and the bottom nav stay as captured.
+- **No new tile.** `Member No-Show` already existed and **IS** this case's front door. There is no separate Member No-Show case.
+- **No new bottom-nav tab**, and no entry point that isn't a ride.
 - **No speculative field types.** The runtime has 15; do not add a 16th until a specified case needs it.
-- **No case beyond the seven** in the Catalog until it has been specified.
 
 ## 4. Architecture
 
 ```
-FOUR entry points, all on a ride:
-  components/driver/more-options-screen.tsx    the Missed Swipe tile behind `More`
-  components/driver/ride-detail-layout.tsx     the detection prompt
-                                               a refused swipe   (tap the CTA)
-                                               a stale trip      (tap the CTA)
+components/driver/more-options-screen.tsx   the Member No-Show tile — the only entry point
         │
-        ▼
-components/support/missed-swipe-form.tsx    ONE shared mount, so required fields,
-        │                                   locks and the store write cannot drift
-        ├── lib/support-data/issue-types.ts     the issue registry (one entry: missed-swipe)
+        ├── lib/driver-data/no-show-rules.ts    the two guardrails
+        ├── lib/support-data/issue-types.ts     the issue registry (one entry: rider-no-show)
         ├── lib/support-data/case-registry.ts   buildSupportFormCase() — fields as data
         ├── lib/support/prefill.ts              what the app already knows
+        │
+        ▼
+components/support/rider-no-show-form.tsx   ONE mount: required fields, locks, store write
         │
         ▼
 components/support/support-form-sheet.tsx   the sheet — one component, any case
@@ -68,139 +64,121 @@ lib/support-data/ride-flow-context.tsx      in-session store: submitForm, getPen
 ride detail banner + pill  ·  My Rides → Pending
 ```
 
-**A case is data, not code.** `SupportCaseDefinition.fields` is a `SupportField[]`; the sheet renders whatever is in it. Nothing about Missed Swipe is hardcoded in a component.
+**A case is data, not code.** `SupportCaseDefinition.fields` is a `SupportField[]`; the sheet renders whatever is in it. Nothing about Rider No-Show is hardcoded in a component.
 
-## 5. Conventions that are load-bearing
+## 5. The two guardrails
 
-**Data-driven, not logic-driven.** `MOCK_TODAY` is a constant. Swipe state is *seeded* in `mock-trips.ts`, never computed from a clock. **Choosing a ride is how you pick a scenario** — that is the whole demo mechanic, and it is why the scenario pills exist.
+### Guardrail 1 — the trip has to be en-route
 
-**`lockWhenPrefilled` means "the app supplied this", not "this has a value".** Tracked in an `appSupplied` set and cleared the moment the driver touches the field. The other reading locks a driver out of changing their own answer.
+`canFileNoShow(leg)` is `getLegStage(leg) === "started"`. You cannot no-show a ride you never started, and you cannot no-show a member already in the car.
 
-**`requiredNotEnforced`** — required in the real flow, excluded from the submit gate, renders the ⚠️ flag. Not used by Missed Swipe; kept for cases that need it.
+**It hides the tile rather than disabling it.** A control that appears and then refuses is how the production flow earned its reputation; a control that is simply absent asks nothing of the driver. Removing it leaves an odd tile count, so `Send Back Trip` goes full-width — the rule already there for the pending state.
 
-**Whether a field is required is a property of the RIDE, not the field.** A driver filing a Missed Swipe is asserting they drove the leg and could not swipe it, so **every mark with no time against it is required, and every recorded mark is locked.** The entry point resolves `getUnrecordedSwipes(leg)` and passes `requireFields` to the builder.
+### Guardrail 2 — the wait has to be provable
 
-That makes the swipe CTA already on screen the thing that tells the driver what the form will ask for:
+At least **ten minutes**, within **one mile**, counted from the **scheduled pick-up time** onward.
 
-| CTA showing | Recorded | Form asks for |
-|---|---|---|
-| SWIPE TO START | nothing | En-route, Pick-up, Drop-off |
-| PICK UP MEMBER | en-route | Pick-up, Drop-off |
-| DROP OFF MEMBER | en-route + pick-up | Drop-off |
+**⚠️ Failing it is NOT an error.** What the app actually knows is that it *cannot confirm* the wait — which is not the same as knowing the driver did not wait. So we ask them instead. Passing it behaves as production does; only failing it opens a form.
 
-**⚠️ The swipe itself is an entry point — provisional.** The moment a driver actually notices a missed swipe is when they reach for the swipe and it will not work, so that moment must lead somewhere rather than requiring a tile behind `More`. The CTA is a real button with three outcomes, resolved in order:
+**⚠️ Seed the EVIDENCE, derive the VERDICT.** `NoShowWaitEvidence` carries what the app observed (`closestMiles`, `arrivedAt`, `leftAt`) and `resolveNoShowGate` derives the answer. This is a deliberate departure from seeding outcomes directly: the rule *is* the spec, so seeding the verdict would make `10` and `1` decorative and leave the three failing rides differing only by a label. Derived, each seeded ride genuinely exercises the rule.
 
-| Ride state | Tapping the swipe |
+Qualifying wait = the overlap of `[arrivedAt, leftAt]` with `[scheduled pick-up, ∞)`. That is what makes "after the pick-up time" a real condition rather than a phrase.
+
+**Three gaps, because the rule has three parts.** A driver told only "we couldn't confirm it" has no idea what to write:
+
+| Gap | What the app saw |
 |---|---|
-| `staleSince` set | Label reads **MISSED SWIPE?**, opens the form. Regardless of which swipe was next. |
-| `swipeBlock` on the next mark | Opens the form, with the refusal reason under the button |
-| neither | Toasts *"Not wired in the prototype"* — the convention every unwired action uses |
+| `never_near_pickup` | Never located within the radius — or never located at all |
+| `wait_too_short` | Within the radius, but under the required minutes |
+| `wait_before_pickup_time` | A long enough wait, but it ended before the scheduled pick-up |
 
-That third row is the reason the other two are safe. **A late trip keeps its ordinary swipe for as long as starting it is still plausible**, and only diverts once it is not — so Swipe to Start stays a swipe at any lateness up to the staleness boundary.
+An absent `waitEvidence` and a `null` `closestMiles` mean **no proof found** — deliberately not the same as "did not wait". That distinction is the entire reason this opens a form instead of a refusal.
 
-Two details that are load-bearing:
-- **The CTA keeps its stage colour even when the label changes.** A driver reads this button by colour before they read the words, and which swipe is owed has not changed. The amber banner above carries the exception.
-- **On a stale ride the swipe's own name moves to the second line, it does not disappear.** The question leads, but the trip is genuinely still open and the driver has to be able to see what they owe.
+## 6. The form
 
-**⚠️ Staleness is an OVERLAY, never a status.** Tab membership is array membership, but `trip.status` is what the detail screen reads — and a `needs-action` status renders the orange confirmation footer instead of the swipe region, which is the one thing a stale trip actually needs. So a stale trip keeps `status: "in-progress"` and only its filing changes: `app/my-rides/page.tsx` adds it to Needs Action with a "Stale Trips" pill and takes it out of In Progress, exactly as `pendingForms` already does for Pending. It **moves**, it does not appear twice — two copies and the driver cannot tell what still needs them.
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| Issue type | select | ✅ locked | The seam. `lockedBadge: null` |
+| Which trip? | leg-picker | ✅ locked | "From this ride", `legScope: "in-progress"` |
+| What time did you start waiting? | time | ✅ | Prefilled from `arrivedAt` where we have it |
+| What time did you leave? | time | ✅ | Prefilled from `leftAt` where we have it |
+| Attach proof you tried to reach the member | file | ⚠️ | `requiredNotEnforced` — asterisk plus the flag line |
+| Sign to confirm | signature | ✅ | **Last, always** |
 
-The same call applies to a refused swipe, and the vault's own instrumentation ask says so outright: *do not add a "swipe rejected" ride status.* A refusal is a fact about one attempt.
+**⚠️ The two time fields must NOT set `lockWhenPrefilled` — the exact inverse of a recorded swipe mark.** A swipe mark is fact, so it locks. What prefills here is *the evidence the gate has just judged insufficient*, so locking it would stop the driver correcting the one thing we are unsure about.
 
-**⚠️ "Lookback" is NOT a driver-app state.** The GPS lookback is an async **backend** correction on completed trips: it searches ±45 min for a position within 1000 ft and, finding none, **accepts** the far swipe. So "lookback can no longer handle it" describes nothing the driver ever sees. What they experience is that the swipe was refused — which is what `SwipeBlock` models, using the reason codes from the vault's own ask (`too_far_from_pickup`, `too_early`, `out_of_sequence`, `odometer_missing`, `odometer_invalid`, `network_or_server_error`) rather than a second vocabulary for the same thing.
+**The signature is last, always.** The driver is attesting to the answers above, so a field after it would be signed for before it was written. And it is present at all because **proving the wait is not proving the member was absent**: the app can know how long a driver sat there and still have no idea who failed to appear. That gap is what the signature covers.
 
-**Time order warns and never blocks.** `getTimeOrderWarnings` (`lib/support/time-order.ts`) flags a mark entered earlier than one ahead of it in the sequence. `canSubmitCase` does not read it, deliberately: the driver was on the trip and we were not, so a time that looks impossible to us is a question, not a rejection, and Support sees every value either way. Values are `"HH:MM"` 24-hour strings, so they compare **lexicographically = chronologically** — no parsing, no clock. ⚠️ Single-day only: a leg past midnight reads as backwards and warns wrongly. Not solved, because the form collects no date per mark — and harmless, because the warning gates nothing.
-
-A mark must not precede **any** mark ahead of it, which is the same as saying it must not precede the **latest** of them — so one comparison against the largest preceding value settles it. Comparing against the *nearest* predecessor instead silently misses a drop-off that clears a wrong pick-up but not the en-route time.
-
-**⚠️ One case the app CAN raise itself — provisional.** Everything above is derived from swipe marks, which is why the driver has to initiate it: nothing in `progress` separates "has not got there yet" from "went, did it, could not swipe". **Location does.** A seeded `missedSwipeSignal` on a leg says the driver reached a waypoint, stayed long enough to have done the thing, and has since left with the swipe still owed — and a ride carrying one shows a **"Missed Swipe?"** prompt straight into the form, no More screen.
-
-Two rules that keep it honest, and both matter:
-- **The prompt sits above the swipe CTA and never replaces it.** The inference can be wrong; a false positive must not strand a driver who really is still en route. It asks, it does not assert.
-- **`getMissedSwipeSignal` gates on the implied swipe still being outstanding.** Once the driver swipes, evidence for a swipe we now have is noise.
-
-⚠️ **There is no "gap" to detect, and an earlier version of this branch wrongly modelled one.** It treated a missed swipe as a mark absent while a LATER mark was present, and built a `blocked` stage, a "Missing swipe" chip and an amber SWIPE MISSING bar around detecting it. A driver cannot swipe out of order — marks fill left to right — so that state never occurs. The app cannot tell "not there yet" from "drove it but couldn't swipe"; only the driver can, which is why filing is a deliberate act and the bottom bar is always just the normal swipe CTA.
-
-**Every issue is `hidden`, and the issue field is always locked.** Every entry point knows its case before the form opens. The field stays because it is the seam: `includeIssues` puts the issue in the options so the locked control can render its label, and seeding `issue` in the initial values marks it app-supplied.
+**The sheet's callout names the gap.** A form that opens without saying which check failed reads as the app being difficult — and "we only saw 4 minutes" and "we never placed you there" call for different answers.
 
 **Adding case two:**
 1. Register an issue in `issue-types.ts`.
 2. Add a field block gated on `showIf: ONLY_<CASE>` in `case-registry.ts`.
-3. Add a tile that passes that issue via `includeIssues` + `initialValues.issue`.
+3. Add a tile (or reuse one) that passes that issue via `includeIssues` + `initialValues.issue`.
 
-No runtime change. This is why `showIf` is kept on the Missed Swipe fields even though it is now always true.
+No runtime change. This is why `showIf` is kept even though it is now always true.
 
-## 6. Traps, all of them paid for
+## 7. Traps, all of them paid for
 
-**⚠️ vaul fires `onOpenChange(false)` BEFORE the handler that caused it.** In a multi-sheet flow a hand-off and a dismissal are therefore indistinguishable at that instant — no synchronous comparison works, ref or otherwise. Defer the decision by a tick. v1 has no multi-sheet flow, but the next case may. **Instrument, don't theorise:** this cost several wrong hypotheses and a two-line ordered trace settled it in one run.
+**⚠️ `getTimeOrderWarnings` warns and never blocks.** `canSubmitCase` does not read it, deliberately: the driver was on the trip and we were not, so a time that looks impossible to us is a question, not a rejection. The sequence is passed in — which fields are ordered is a property of the CASE, not the checker.
 
-**⚠️ `legScope: "in-progress"` silently blanks a prefilled leg** whose ride is not in `mockInProgressTrips` — `withinScope` in `prefill.ts` drops it. The failure is quiet and looks like something else entirely: a locked "From this ride" card degrades into an open search box. **Test the invariant, not a proxy for it** — check the prefill survived, don't check whether the leg exists.
+**⚠️ A driver-facing label is often a question.** "What time did you leave?" reads fine above a control and badly quoted mid-sentence. `shortLabel` exists for prose; anything naming a field inside a sentence uses it.
 
-**⚠️ `lockedBadge` has THREE states, not two.** Omitting it falls through to the default `"Already recorded"` — so removing a field's badge by deleting the property silently swaps it for a worse one. `null` is the opt-out. Caught in the browser after "Chosen for you" came back as "Already recorded" on the issue field.
+**⚠️ vaul fires `onOpenChange(false)` BEFORE the handler that caused it.** In a multi-sheet flow a hand-off and a dismissal are indistinguishable at that instant. Defer by a tick. **Instrument, don't theorise.**
 
-**⚠️ `getMemberOptions()` spans only completed rides in the last 30 days**, so a needs-action or in-progress rider cannot resolve in a `member-picker`. It renders an open search box holding an unresolvable value. Use a locked `text` field instead.
+**⚠️ `legScope: "in-progress"` silently blanks a prefilled leg** whose ride is not in `mockInProgressTrips` — `withinScope` in `prefill.ts` drops it, and a locked "From this ride" card degrades into an open search box. **Test the invariant, not a proxy for it.**
 
-**⚠️ A completed leg cannot file.** Every mark is recorded, so `getUnrecordedSwipes` returns nothing and there is nothing to correct — that is the answer to "should completed rides be correctable", and it falls out of the model rather than needing a rule. A ride awaiting member confirmation is out of scope for this case entirely.
+**⚠️ `lockedBadge` has THREE states.** Omitting it falls through to `"Already recorded"`, so removing a badge by deleting the property silently swaps it for a worse one. `null` is the opt-out.
 
-**⚠️ Verification is browser-only. There is no test framework** — no vitest, no jest, no playwright, zero test files. `bun run typecheck` (`tsc --noEmit`) is the only automated check, and it must stay at 0.
+**⚠️ `getMemberOptions()` spans only completed rides in the last 30 days**, so an in-progress rider cannot resolve in a `member-picker`. Use a locked `text` field.
 
-**⚠️ The browser pane's tab is `visibilityState: "hidden"`, so CSS transitions are FROZEN.** `getComputedStyle` returns the value from *before* the transition, which fabricates bugs that are not there. Measured here: an **enabled** Submit button read back `rgb(110, 231, 183)` — the `disabled:bg-[#6EE7B7]` colour — while `submit.disabled` was `false`. Waiting does not help and `tabs_select` does not help. Inject `* { transition: none !important }` before measuring; it then read `rgb(16, 185, 129)` as it should.
+**⚠️ Verification is browser-only. There is no test framework** — `bun run typecheck` is the only automated check and must stay at 0. `bun run lint` is broken (`next lint` removed in Next 16).
 
-**Browser-tool gotchas:** synthetic clicks need a full pointer sequence (`pointerdown`/`mousedown`/`pointerup`/`mouseup`/`click`) dispatched via `javascript_tool`; React-controlled inputs need the native value setter plus an `input` event; two *dependent* clicks in one call fail because React has not re-rendered — split them; `navigate` needs `force: true` and sometimes lands on `/` anyway (use `location.href`); a Radix `Select` needs a genuine click at screenshot coordinates because the page can be transform-scaled. **`document.body.innerText` applies CSS `text-transform`** — it reads an uppercased pill as uppercase, so a check for "Pending Support Review" fails against it. `textContent` does not.
+**⚠️ A full page load resets the in-session store.** Checking that a filed ride moved to Pending must use client-side navigation (the back chevron is `router.push`); a `location.href` destroys the state you are trying to read. This cost a re-run.
 
-**The layout mounts the Radix `Toaster`**, so `toast` must come from `@/hooks/use-toast`. Importing from `sonner` typechecks and silently renders nothing.
+**⚠️ The browser pane's tab is `visibilityState: "hidden"`, so CSS transitions are FROZEN.** `getComputedStyle` returns pre-transition values and fabricates bugs. Inject `* { transition: none !important }` before measuring.
 
-## 7. Provisional — authored, not captured
+**Browser-tool gotchas:** synthetic clicks need a full pointer sequence; React-controlled inputs need the native value setter plus an `input` event; the signature pad needs `pointerdown` → several `pointermove` → `pointerup` on its `canvas`; two *dependent* clicks in one call fail because React has not re-rendered; **`document.body.innerText` applies CSS `text-transform`** — use `textContent`. Console errors persist across reloads in the MCP buffer, so open a fresh tab before concluding anything is broken.
 
-Flagged so it cannot be mistaken for an agreed requirement:
+**The layout mounts the Radix `Toaster`**, so `toast` must come from `@/hooks/use-toast`. Importing from `sonner` typechecks and renders nothing.
+
+## 8. Provisional — authored, not captured
 
 | Thing | Status |
 |---|---|
-| ~~The odometer fields~~ | ✅ **Removed 2026-08-01.** Authored, never captured, and nobody asked for them. |
-| Time **validation** | ✅ **Partly answered 2026-08-28.** A time entered out of order now warns, naming both values. It does **not** block — see §5. What is still open is whether Support wants it recorded as a flag on the request. |
-| **Stale Trips** banner copy and the `MISSED SWIPE?` label | ⚠️ **Placeholder — owed by Jeff.** Both carry `TODO(jeff)` in `ride-detail-layout.tsx`. The copy reads as final on purpose so a demo is not littered with markers; this row is the record that it is not. |
-| The **2-hour** staleness threshold | ⚠️ The user's number, unvalidated against ops — and nothing in the vault defines a stale trip at all. Also unconfirmed: "2 hrs after **appointment**" vs after **pickup**; the vault's only comparable rule keys off pickup. Seeded on the ride as data rather than written into code as a rule. |
-| **Which distance actually refuses a swipe** | ⚠️ The vault contradicts itself — logs enforce 1000 ft, one fixture says 100 ft, the hard block is 1 mile. Ride `1049800374` seeds 1.4 miles, past every candidate, so the demo does not have to pick a side. |
-| **SLA** shown to the driver | Nothing is promised, because nothing is known. |
-| The `Submitted → In Review → Needs Info → Resolved / Rejected` ladder | Defined in the vault glossary, **not built**. v1 has one state: waiting on Support. |
-| **Completed rides** | ✅ **Answered: out of scope.** A completed leg swiped everything, so it has nothing to correct. Not a gap — the model says so. |
-| **Multi-leg trips** | The locked leg picker assumes one swipeable leg per trip. True of every seeded ride; not true in general. |
+| The whole wait rule | ⚠️ **10 minutes / 1 mile / after the pick-up time** is the spec as given. Unvalidated against ops, and uniformity across clients and markets is unconfirmed. |
+| `NoShowWaitEvidence` | ⚠️ **Seeded.** The app has no geofence, dwell timer or coordinates. Stands in for telematics. |
+| The **on-site** rule | The parked branch required `Verida`+`TN` drivers to file *from* the pick-up. This branch drops it. Confirm that is intended. |
+| The **no-show fee** | `Driver Pay - No Show Fees paid to the driver` is market-dependent. The prototype touches pay nowhere. **Biggest unanswered question, and the one with money attached.** |
+| Whether filing **ends the ride** | The prototype deliberately does not touch seeded trip status. |
+| Whether the signature is **stored** | Strokes are captured and reported as "signed"; no image is kept, because nothing downstream reads one. |
 
-## 8. Running it
-
-**Coming to this cold:**
+## 9. Running it
 
 ```bash
 git clone git@github.com:aldrin-wingz/prototype-driver-app.git
 cd prototype-driver-app
-git checkout luis/support-form
+git checkout luis/rider-no-show
 bun install
 bun run dev          # http://localhost:3018
+bun run typecheck    # must stay at 0 — the only automated check that exists
 ```
 
-```bash
-bun run typecheck    # must stay at 0 — it is the only automated check that exists
-```
+⚠️ **This is a prototype on mock data.** No backend, no auth, no Zendesk. A page reload resets every submitted request. Nothing here is deployed — Vercel builds `main`.
 
-`bun run lint` is broken — `next lint` was removed in Next 16. Pre-existing, not worth fixing here.
+**The demo path:** My Rides → In Progress → a ride → **More** → **Member No-Show**.
 
-⚠️ **This is a prototype on mock data.** No backend, no auth, no Zendesk. A page reload resets every submitted request to the seeded state, and the seeded trips are never mutated. Nothing here is deployed — Vercel builds `main`, which this branch is not.
+**Six rides, one per outcome. Choosing a ride IS how you pick a scenario:**
 
-**The demo path:** My Rides → In Progress → a ride → **More** → **Missed Swipe**. Or skip `More` entirely: `1049800373` prompts, and on `1049800374` / `1049800375` the swipe button itself opens the form.
-
-**Six seeded rides — one per scenario. Choosing a ride IS how you pick a case.**
-
-| Ride | Where | CTA, and what tapping it does | Form asks for |
+| Ride | Stage | Seeded evidence | What you see |
 |---|---|---|---|
-| `1049800370` | In Progress | SWIPE TO START → toasts | all three, nothing locked |
-| `1049800371` | In Progress | PICK UP MEMBER → toasts | Pick-up + Drop-off; En-route locked at 12:58 |
-| `1049800372` | In Progress | DROP OFF MEMBER → toasts | Drop-off only; En-route + Pick-up locked |
-| `1049800373` | In Progress | PICK UP MEMBER → toasts, **but a "Missed Swipe?" prompt above it opens the form** | same as `371` — the swipe state is identical, the seeded signal is the only difference |
-| `1049800374` | In Progress | PICK UP MEMBER **→ opens the form**, refusal reason beneath | Pick-up + Drop-off; En-route locked at 8:47 |
-| `1049800375` | **Needs Action**, "Stale Trips" pill | **MISSED SWIPE?** / Swipe to Start · A Leg **→ opens the form**, amber banner above | all three, nothing locked |
-| `260731-780322` | Needs Action | — | The tile refuses: *"Available once this ride is under way."* |
+| `1049800370` | not started | — | **No tile** — can't no-show a ride never started |
+| `1049800371` | picked up | — | **No tile** — member already in the car |
+| `1049800372` | en-route | 12 min @ 0.3 mi, after pick-up | **Passes** → toast, no form |
+| `1049800373` | en-route | 4 min @ 0.2 mi | `wait_too_short` → form |
+| `1049800374` | en-route | never located | `never_near_pickup` → form |
+| `1049800375` | en-route | 18 min, all before pick-up | `wait_before_pickup_time` → form |
 
-⚠️ In Progress therefore shows **5**, not 6: `1049800375` moved to Needs Action rather than appearing in both.
-
-A reload resets submitted requests. The seeded trips are never mutated.
+`375` waits **18 minutes** — over the ten-minute bar — and still fails. That is on purpose: it is the only ride that can prove the "after the pick-up time" clause does its own work rather than riding along with the duration check.
 
 **One known console warning:** Radix `Missing 'Description' or 'aria-describedby'` on `DialogContent`. Pre-existing, from the drawer primitive.

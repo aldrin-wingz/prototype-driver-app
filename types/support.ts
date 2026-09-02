@@ -68,9 +68,10 @@ export type SupportPrefillSource =
   | "pickupDate"
   | "legPositionLetter"
   | "legId"
-  | "enRouteTime"
-  | "pickupTime"
-  | "dropOffTime";
+  /** When the app saw the driver arrive at the pick-up, if it did. */
+  | "waitArrivedAt"
+  /** When the app saw them leave, if it did. */
+  | "waitLeftAt";
 
 export interface SupportFieldOption {
   value: string;
@@ -85,6 +86,14 @@ export interface SupportField {
   type: SupportFieldType;
   /** Label above the control. A required field renders a red asterisk after it. */
   label: string;
+  /**
+   * A noun phrase for this field, for use INSIDE a sentence.
+   *
+   * A driver-facing label is often a question — "What time did you leave?" — which
+   * reads fine above a control and badly quoted mid-sentence. Anything that has to
+   * name a field in prose uses this, falling back to `label`.
+   */
+  shortLabel?: string;
   /** Placeholder inside the control. */
   placeholder?: string;
   /** Helper copy under the control. */

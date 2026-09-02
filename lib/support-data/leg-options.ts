@@ -23,10 +23,10 @@ export interface LegOption {
  *
  * Only legs that take part in the swipe sequence (those carrying `progress`) are
  * offered — an Appointment Time row is a destination, not a leg you swipe, so it
- * cannot be the subject of a missed-swipe report.
+ * cannot be the subject of a no-show report.
  *
  * By default this spans in-progress, needs-action, upcoming AND completed rides,
- * because a driver most often notices a missed swipe after the fact. Issues that
+ * because a driver most often files after the fact, not at the kerb. Issues that
  * only make sense on a live trip pass `"in-progress"` to narrow it.
  */
 export function getLegOptions(scope: LegScope = "all"): LegOption[] {

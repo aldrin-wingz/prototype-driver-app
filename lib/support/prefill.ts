@@ -34,8 +34,8 @@ function toDateInputValue(rideDate: string): string {
  * Resolve one prefill source against the ride.
  *
  * Returns an empty string when the app genuinely does not know the value — which
- * is the interesting case. A missing pick-up swipe leaves `pickupTime` blank, so
- * the one field the driver must actually supply is the one that is empty.
+ * is the interesting case. A ride the app never located leaves both wait times
+ * blank, so the fields the driver must actually supply are the empty ones.
  */
 function resolve(
   source: SupportPrefillSource,
@@ -56,12 +56,14 @@ function resolve(
       return leg?.legCode ?? "";
     case "legId":
       return leg?.id ?? "";
-    case "enRouteTime":
-      return toTimeInputValue(leg?.progress?.startedAt);
-    case "pickupTime":
-      return toTimeInputValue(leg?.progress?.pickedUpAt);
-    case "dropOffTime":
-      return toTimeInputValue(leg?.progress?.droppedOffAt);
+    // ⚠️ These prefill from the evidence the gate has just judged INSUFFICIENT,
+    // which is why neither field locks. An empty string is the honest answer when
+    // the app saw nothing — and it is the interesting case, because it leaves the
+    // driver the blank the form exists to collect.
+    case "waitArrivedAt":
+      return toTimeInputValue(leg?.waitEvidence?.arrivedAt);
+    case "waitLeftAt":
+      return toTimeInputValue(leg?.waitEvidence?.leftAt);
   }
 }
 
@@ -69,7 +71,7 @@ function resolve(
  * Drop a prefilled leg the field's own picker wouldn't offer.
  *
  * Opening the form from a ride prefills that ride's leg, but a scoped picker only
- * offers legs the issue actually applies to — a missed swipe needs a trip that is
+ * offers legs the issue actually applies to — a no-show needs a trip that is
  * under way. Prefilling an ineligible leg would let the driver file against a ride
  * that hasn't started, which the picker itself forbids.
  */

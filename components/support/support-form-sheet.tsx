@@ -19,6 +19,7 @@ import {
   isFieldVisible,
 } from "@/lib/support/field-rules";
 import { getTimeOrderWarnings } from "@/lib/support/time-order";
+import { WAIT_TIME_SEQUENCE } from "@/lib/support-data/case-registry";
 import type {
   SupportCallout,
   SupportCalloutTone,
@@ -156,8 +157,15 @@ export function SupportFormSheet({
    * sheet is the only thing holding them. Deliberately kept out of
    * `canSubmitCase` below — the driver was on the trip and we were not, so a
    * time that looks impossible to us is a question, not a rejection.
+   *
+   * The sequence comes from the case, since which fields are ordered is a
+   * property of what is being collected, not of the sheet.
    */
-  const warnings = getTimeOrderWarnings(supportCase.fields, values);
+  const warnings = getTimeOrderWarnings(
+    supportCase.fields,
+    values,
+    WAIT_TIME_SEQUENCE
+  );
   // Per `s-02a`, the primary action sits disabled (muted green) until every
   // required field has a value — and stays disabled for an issue whose field set
   // isn't built, since there is nothing to send.

@@ -31,9 +31,8 @@ export type MarketCode = "GA" | "FL" | "NC" | "TN";
  * Each value is the time the driver swiped, or `null` when that swipe has not been
  * made. Marks fill left to right; a driver cannot swipe out of order.
  *
- * A `null` mark is what Missed Swipe corrects. The data cannot tell "not there
- * yet" from "drove it but could not swipe" — only the driver can, which is why
- * filing is a deliberate act rather than something the app detects.
+ * Which mark is set is what gates Rider No-Show: only a leg that is en-route —
+ * started, not yet picked up — can have a member who failed to come out.
  */
 export interface LegSwipeProgress {
   /** Swiped "start" — the driver begins the leg / heads to pickup. */
@@ -45,108 +44,33 @@ export interface LegSwipeProgress {
 }
 
 /**
- * ⚠️ **PROVISIONAL — an assumption, not an agreed behaviour.**
+ * ⚠️ **PROVISIONAL — SEEDED. The app has no geofence, dwell timer or coordinates
+ * of any kind**, so this stands in for telematics.
  *
- * What the app noticed about the driver being at a waypoint and then leaving it,
- * without the matching swipe. If a driver reached the pick-up, stayed long enough
- * to have collected the member, and has since left the radius, then the swipe they
- * still owe almost certainly did not fail to happen — it failed to register.
+ * What the app can say about the driver being at the pick-up: how close it ever
+ * put them, when it saw them arrive, and when it saw them leave.
  *
- * That is the ONE circumstance in which the app can raise a missed swipe rather
- * than waiting to be told, and it is why this is seeded evidence rather than
- * anything derived from the swipe marks. Nothing in `progress` can distinguish
- * "has not got there yet" from "went, did it, could not swipe"; only location can.
+ * This is EVIDENCE, not a verdict. The verdict is derived from it in
+ * `lib/driver-data/no-show-rules.ts`, which is the whole point: the rule the
+ * business stated — ten minutes, within a mile, after the pick-up time — is real
+ * code reading real fields, so the seeded rides prove it rather than assert it.
  *
- * Deliberately an inference the driver can decline. The prompt asks rather than
- * asserts, and the normal swipe CTA stays available beside it — a false positive
- * must not strand a driver who really is still en route.
- *
- * Real implementation would read this from telematics with a geofence and a dwell
- * timer. The prototype has none of that, so, per the repo convention, the
- * interesting case is SEEDED.
+ * An absent `waitEvidence` and a `null` `closestMiles` mean the same thing:
+ * **no proof found.** Deliberately NOT the same as "the driver did not wait" —
+ * it is the case we have to ask about, which is why the form exists.
  */
-export interface MissedSwipeSignal {
-  /** Which waypoint the driver was at and left. */
-  at: "pickup" | "dropoff";
-  /** Clock time the app saw them arrive. */
-  arrivedAt: string;
-  /** Clock time the app saw them leave the radius. */
-  leftAt: string;
-  /** Minutes between the two, as the app measured it. */
-  dwellMinutes: number;
-}
-
-/**
- * ⚠️ **PROVISIONAL — proposed vocabulary, not something the app logs today.**
- *
- * Why a swipe the driver actually attempted was refused.
- *
- * Codes taken verbatim from the vault's own instrumentation ask
- * (`Project - Event Explorer/Phase 1/References/Instrumentation Ask - Blocked Swipes.md`),
- * which describes them as "a starting point, not a specification" — they are what
- * Support already hears as causes, not fields that exist. Reusing them anyway,
- * because a prototype inventing a second vocabulary for the same thing is how two
- * teams end up disagreeing about what happened.
- *
- * ⚠️ **This is NOT the same thing as "lookback ran out".** The GPS lookback is an
- * async BACKEND correction on completed trips: it searches for a nearby position
- * and, finding none, *accepts* the far swipe. Nothing about it is a driver-app
- * state. What the driver experiences is simply that the swipe was refused — which
- * is what this models.
- */
-export type SwipeBlockReason =
-  | "too_far_from_pickup"
-  | "too_early"
-  | "out_of_sequence"
-  | "odometer_missing"
-  | "odometer_invalid"
-  | "network_or_server_error";
-
-/**
- * A swipe attempt the app turned down.
- *
- * Seeded, like every other interesting state here: nothing in the prototype
- * advances a swipe mark at runtime, so there is no attempt to refuse. The rule it
- * stands in for lives with the ride that carries it.
- *
- * ⚠️ Note what this deliberately is NOT: a ride status. The vault's ask is
- * explicit — "please do not add a 'swipe rejected' ride status" — so a refusal is
- * a fact about one attempt, layered on a leg that is otherwise ordinary.
- */
-export interface SwipeBlock {
-  /** Which swipe was attempted and refused. */
-  mark: SwipeMark;
-  reason: SwipeBlockReason;
+export interface NoShowWaitEvidence {
   /**
-   * What to tell the driver, in their words rather than the code's.
+   * Closest the app ever put the driver to the pick-up, in miles.
    *
-   * Seeded per ride so it can name the specifics — how far, how early — which is
-   * the difference between "we couldn't record that" and something the driver can
-   * act on.
+   * `null` = never located near it at all. A number this large is not a
+   * measurement anyone would trust in production; it is a seed.
    */
-  detail: string;
-}
-
-/**
- * ⚠️ **PROVISIONAL — greenfield. No definition of this exists anywhere yet.**
- *
- * A trip still sitting open long after it should have finished.
- *
- * The threshold the user gave is **2 hours after the appointment time**, and it is
- * unvalidated against ops: nothing in the vault defines a stale trip, and the
- * nearest neighbours key off *pickup* rather than the appointment. So the number
- * is recorded here as data on the ride rather than as a rule in code, and the ride
- * seeds its own answer.
- *
- * What it changes for the driver: up to the boundary a late trip is just a late
- * trip and the normal swipe stands. Past it, the likelier story is that the trip
- * was driven and never swiped — so the swipe becomes the way into the form.
- */
-export interface StaleTrip {
-  /** Clock time the app decided this trip had gone stale. */
-  since: string;
-  /** How far past the appointment time that was, as the app measured it. */
-  hoursAfterAppointment: number;
+  closestMiles: number | null;
+  /** Clock time the app saw them arrive. */
+  arrivedAt: string | null;
+  /** Clock time the app saw them leave. */
+  leftAt: string | null;
 }
 
 export interface TripLeg {
@@ -174,27 +98,22 @@ export interface TripLeg {
    */
   progress?: LegSwipeProgress;
   /**
-   * Evidence that the driver was at a waypoint and left without swiping.
+   * What the app can say about the driver waiting at this pick-up.
    *
-   * Absent on almost every leg, because it is the exception: the app usually has
-   * no reason to think a swipe is owed. See `MissedSwipeSignal` — ⚠️ provisional.
+   * Absent on most legs — the app only has something to say once a driver has
+   * actually been sent to a pick-up. See `NoShowWaitEvidence` — ⚠️ provisional.
    */
-  missedSwipeSignal?: MissedSwipeSignal;
-  /**
-   * A swipe the driver tried to make and the app refused.
-   *
-   * Absent on almost every leg. See `SwipeBlock` — ⚠️ provisional.
-   */
-  swipeBlock?: SwipeBlock;
+  waitEvidence?: NoShowWaitEvidence;
 }
 
 /**
  * How far along a leg is, derived purely from which swipe marks are present.
  *
  * Marks fill left to right, always. A driver cannot swipe out of order, so there
- * is no "gap" state to model — a blank mark simply has not been made yet, whether
- * because the leg has not reached it or because the driver could not swipe. Both
- * look identical in the data, and both are what Missed Swipe corrects.
+ * is no "gap" state to model — a blank mark simply has not been made yet.
+ *
+ * `started` is the stage this branch cares about: en-route, member not yet
+ * aboard. It is the only window in which a no-show can be filed.
  */
 export type LegSwipeStage =
   | "not-started"
@@ -213,85 +132,6 @@ export function getLegStage(leg: TripLeg): LegSwipeStage {
   if (p.pickedUpAt) return "picked-up";
   if (p.startedAt) return "started";
   return "not-started";
-}
-
-/** One of the three swipe marks. */
-export type SwipeMark = keyof LegSwipeProgress;
-
-/**
- * The three marks in the order they happen.
- *
- * Declared once because more than one rule depends on it: which marks are still
- * unrecorded, and whether the times a driver types could have happened in the
- * order they gave them. Two hand-written copies of this sequence would be two
- * chances to disagree about the shape of a trip.
- */
-export const SWIPE_SEQUENCE: SwipeMark[] = [
-  "startedAt",
-  "pickedUpAt",
-  "droppedOffAt",
-];
-
-/**
- * The marks with no time against them — exactly what Missed Swipe collects.
- *
- * The complement of what the app recorded, which is the whole rule: a recorded
- * mark is locked in the form, an unrecorded one is required. So the swipe CTA the
- * ride is currently showing tells the driver what the form will ask for —
- * SWIPE TO START means all three, DROP OFF MEMBER means just the drop-off.
- *
- * A completed leg returns nothing, which is why it cannot file: every swipe
- * happened.
- */
-export function getUnrecordedSwipes(leg: TripLeg): SwipeMark[] {
-  const p = leg.progress;
-  if (!p) return [];
-  return SWIPE_SEQUENCE.filter((mark) => !p[mark]);
-}
-
-/**
- * The waypoint signal worth showing the driver right now, if any.
- *
- * Gated on the swipe still being outstanding, because the signal is only ever an
- * argument for a swipe the app has not received. Once the driver swipes, the
- * evidence has been overtaken and the prompt would be noise.
- *
- * ⚠️ Provisional — see `MissedSwipeSignal`.
- */
-export function getMissedSwipeSignal(leg: TripLeg): MissedSwipeSignal | undefined {
-  const signal = leg.missedSwipeSignal;
-  if (!signal) return undefined;
-
-  const owed: SwipeMark = signal.at === "pickup" ? "pickedUpAt" : "droppedOffAt";
-  return leg.progress?.[owed] ? undefined : signal;
-}
-
-/**
- * The refusal worth showing the driver right now, if any.
- *
- * Gated on the refused swipe still being outstanding, for the same reason
- * `getMissedSwipeSignal` is: a refusal only matters while the mark it blocked is
- * still missing. If the driver retried and it took, the earlier refusal is history.
- *
- * ⚠️ Provisional — see `SwipeBlock`.
- */
-export function getSwipeBlock(leg: TripLeg): SwipeBlock | undefined {
-  const block = leg.swipeBlock;
-  if (!block) return undefined;
-  return leg.progress?.[block.mark] ? undefined : block;
-}
-
-/**
- * Whether this trip has gone stale.
- *
- * A predicate rather than a status check, because staleness is layered on top of
- * a trip that is genuinely still in progress. Reading it as a status would take
- * the in-progress screen away from the driver at exactly the moment they need it.
- *
- * ⚠️ Provisional — see `StaleTrip`.
- */
-export function isStale(trip: Trip): boolean {
-  return Boolean(trip.staleSince);
 }
 
 /** The swipe the driver is expected to make next; null once the leg is done. */
@@ -351,14 +191,6 @@ export interface Trip {
   incentiveTypes: IncentiveType[];
   /** Whether this client/market is enrolled in incentive programs. */
   clientEnrolledInIncentives?: boolean;
-  /**
-   * Set when the app has decided this trip has gone stale.
-   *
-   * An OVERLAY on the trip's real status, never a replacement for it — a stale
-   * trip is still in progress, and the driver still needs the in-progress screen
-   * to do anything about it. See `StaleTrip` — ⚠️ provisional.
-   */
-  staleSince?: StaleTrip;
 }
 
 export interface TripPill {
@@ -1190,35 +1022,20 @@ export const mockNeedsActionTrips: Trip[] = [
   },
 ];
 
-// Mock in-progress trips — rides the driver has accepted and is working.
-//
-// EXACTLY THREE, one per swipe CTA, because the CTA is what tells the driver what
-// the Missed Swipe form will ask for. Marks fill left to right, so whatever is
-// recorded is locked in the form and whatever is blank is required — the form's
-// questions are the complement of the ride's progress.
-//
-//   1049800370  nothing recorded    CTA SWIPE TO START    form asks: all three
-//   1049800371  en-route only       CTA PICK UP MEMBER    form asks: pick-up + drop-off
-//   1049800372  en-route + pick-up  CTA DROP OFF MEMBER   form asks: drop-off
-//
-// A fourth, `1049800373`, carries the same swipe state as 371 but adds a seeded
-// `missedSwipeSignal` — ⚠️ provisional. It is the one ride where the app raises the
-// question itself instead of waiting for the driver to find the tile behind More.
-//
-// These three also replicate reference screenshots s-01a / s-01b / s-01c: same
-// ride shape (one A leg = Est Pick-up Time row + Appointment Time row), same
-// Carrollton GA geography, differing only in swipe state.
-//
-// There is deliberately no fourth. A COMPLETED leg has every mark recorded, so it
-// has nothing to correct and cannot file — see `getUnrecordedSwipes`. A ride
-// awaiting member confirmation is out of scope for this case entirely.
-//
 // ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
 // which case it demos. Demo scaffolding, NOT app data: the real app shows no such
 // pill, and they must be stripped before any capture that stands in for
-// production. They exist because swipe state is invisible on the ride list.
+// production. They exist because swipe state and wait evidence are both invisible
+// on the ride list.
+//
+// SIX rides, one per outcome of the Rider No-Show guardrails. Two prove the tile
+// is HIDDEN, one proves it passes, and three prove each way the wait check can
+// fail. Choosing a ride is how you pick a scenario — the demo mechanic.
 export const mockInProgressTrips: Trip[] = [
-  // ===== s-01a — Accepted Ride: nothing swiped yet =====
+  // ===== Not started — the tile is not offered at all =====
+  //
+  // You cannot no-show a ride you never started. Nothing has been swiped, so
+  // there is no pick-up the driver could have attended.
   {
     id: "1049800370",
     date: "Tue, Jul 8, 2026",
@@ -1257,12 +1074,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    // ⚠️ Prototype-only scenario label — see SCENARIO_PILL_NOTE below.
-    pills: [{ label: "Swipe to Start · form asks all three", variant: "neutral" }],
+    pills: [{ label: "Not started · No-Show tile hidden", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-  // ===== s-01b — Active Ride: en-route recorded, heading to the pick-up =====
+
+  // ===== Member on board — the tile is not offered either =====
+  //
+  // The other half of the same guardrail, and the reason it is a stage check
+  // rather than a "has started" check: a member already in the car cannot be a
+  // no-show.
   {
     id: "1049800371",
     date: "Tue, Jul 8, 2026",
@@ -1286,7 +1107,7 @@ export const mockInProgressTrips: Trip[] = [
         revenueNote: "Accepted by you",
         progress: {
           startedAt: "12:58 PM",
-          pickedUpAt: null,
+          pickedUpAt: "1:17 PM",
           droppedOffAt: null,
         },
       },
@@ -1301,11 +1122,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Pick Up Member · form asks pick-up + drop-off", variant: "neutral" }],
+    pills: [{ label: "Member on board · No-Show tile hidden", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-  // ===== s-01c — Ride: member on board, heading to drop-off =====
+
+  // ===== The wait is provable — no form, no questions =====
+  //
+  // Arrived 3:26, left 3:42, but the clock only starts at the 3:30 pick-up time:
+  // 12 qualifying minutes, comfortably inside a mile. This is the ride that shows
+  // the guardrail REWARDING a compliant driver rather than only refusing.
   {
     id: "1049800372",
     date: "Tue, Jul 8, 2026",
@@ -1329,8 +1155,13 @@ export const mockInProgressTrips: Trip[] = [
         revenueNote: "Accepted by you",
         progress: {
           startedAt: "3:19 PM",
-          pickedUpAt: "3:34 PM",
+          pickedUpAt: null,
           droppedOffAt: null,
+        },
+        waitEvidence: {
+          closestMiles: 0.3,
+          arrivedAt: "3:26 PM",
+          leftAt: "3:42 PM",
         },
       },
       {
@@ -1344,24 +1175,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    // The drop-off is simply not due yet. This is the ride that proves a driver can
-    // file for a swipe the app has no reason to think is owed.
-    pills: [{ label: "Drop Off Member · form asks drop-off", variant: "neutral" }],
+    pills: [{ label: "Wait proven · files with no form", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Detection — the app noticed, so the driver does not have to go hunting =====
+  // ===== Waited, but not long enough =====
   //
-  // ⚠️ PROVISIONAL. Same swipe state as 1049800371 (en-route recorded, pick-up
-  // owed), so the swipe marks alone cannot tell the two rides apart. The ONLY
-  // difference is `missedSwipeSignal`: the app saw this driver reach the pick-up,
-  // stay eleven minutes — long enough to have collected the member — and then leave
-  // the radius. A driver still en route would not have done that.
-  //
-  // So this is the one ride where the app raises the question itself, and the prompt
-  // sits ABOVE the swipe CTA rather than replacing it: the inference can be wrong,
-  // and a driver who really is still driving must still be able to swipe.
+  // Four qualifying minutes. The commonest real failure, and the one where the
+  // driver is most likely to be telling the truth about having waited longer —
+  // the app simply stopped seeing them.
   {
     id: "1049800373",
     date: "Tue, Jul 8, 2026",
@@ -1388,13 +1211,10 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        // Arrived, stayed long enough to load a member, then drove off — with the
-        // pick-up swipe still outstanding.
-        missedSwipeSignal: {
-          at: "pickup",
-          arrivedAt: "10:24 AM",
-          leftAt: "10:35 AM",
-          dwellMinutes: 11,
+        waitEvidence: {
+          closestMiles: 0.2,
+          arrivedAt: "10:19 AM",
+          leftAt: "10:24 AM",
         },
       },
       {
@@ -1408,24 +1228,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Detected · left the pick-up unswiped", variant: "warning" }],
+    pills: [{ label: "Waited 4 min · form", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Refused swipe — the driver tried, and the app said no =====
+  // ===== Never located near the pick-up =====
   //
-  // ⚠️ PROVISIONAL. The natural moment to notice a missed swipe is when a driver
-  // reaches for the swipe and cannot use it, so this is the ride where the swipe
-  // itself becomes the way into the form. Nothing here simulates the attempt: the
-  // prototype never advances a swipe mark, so the OUTCOME is seeded, the same way
-  // `missedSwipeSignal` is.
-  //
-  // The distance is seeded at 1.4 miles deliberately. The vault contradicts itself
-  // about which distance actually refuses a swipe — logs enforce 1000 ft, one
-  // fixture says 100 ft, the hard block is 1 mile — so the demo picks a value that
-  // is past every candidate threshold rather than picking a side in an open
-  // question.
+  // `closestMiles: null` is NOT "the driver was not there" — it is the app having
+  // nothing to say. That distinction is the reason this opens a form instead of a
+  // refusal.
   {
     id: "1049800374",
     date: "Tue, Jul 8, 2026",
@@ -1452,14 +1264,10 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        // The driver has the member on board and is standing at the address the
-        // app disagrees with. Retrying will keep failing, which is precisely why
-        // the refusal has to lead somewhere.
-        swipeBlock: {
-          mark: "pickedUpAt",
-          reason: "too_far_from_pickup",
-          detail:
-            "We had you 1.4 miles from the pick-up address, so the pick-up couldn't be recorded.",
+        waitEvidence: {
+          closestMiles: null,
+          arrivedAt: null,
+          leftAt: null,
         },
       },
       {
@@ -1473,22 +1281,17 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Refused swipe · too far from pick-up", variant: "danger" }],
+    pills: [{ label: "Never located at pick-up · form", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Stale trip — hours past its appointment with nothing swiped =====
+  // ===== Waited a long time, all of it too early =====
   //
-  // ⚠️ PROVISIONAL, and greenfield: nothing in the vault defines a stale trip.
-  //
-  // Nothing is recorded on this leg, so the CTA would normally read SWIPE TO
-  // START — and that is the point. A late trip keeps its normal swipe for as long
-  // as starting it is still plausible; hours past the appointment it is not, and
-  // the likelier story is a trip that was driven and never swiped. That is the
-  // whole reason the boundary exists, and why this ride still has to render the
-  // in-progress screen: staleness is an overlay on a trip that is genuinely still
-  // open, not a status of its own.
+  // EIGHTEEN minutes at the door — well past the ten-minute bar — and none of it
+  // counts, because the driver left six minutes before the pick-up time. Seeded
+  // above the threshold on purpose: it is the only ride that can prove the
+  // "after the pick-up time" clause is doing work rather than riding along.
   {
     id: "1049800375",
     date: "Tue, Jul 8, 2026",
@@ -1511,9 +1314,14 @@ export const mockInProgressTrips: Trip[] = [
         revenue: 58.25,
         revenueNote: "Accepted by you",
         progress: {
-          startedAt: null,
+          startedAt: "8:14 AM",
           pickedUpAt: null,
           droppedOffAt: null,
+        },
+        waitEvidence: {
+          closestMiles: 0.2,
+          arrivedAt: "8:26 AM",
+          leftAt: "8:44 AM",
         },
       },
       {
@@ -1527,16 +1335,10 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    // 3 hours past the 9:30 AM appointment, so well clear of the 2-hour boundary
-    // the threshold is written against.
-    staleSince: { since: "12:30 PM", hoursAfterAppointment: 3 },
-    // The app's own "Stale Trips" pill is prepended on the ride list, so this
-    // demo pill says what is distinctive rather than repeating it.
-    pills: [{ label: "Nothing swiped · 3 hrs past appointment", variant: "neutral" }],
+    pills: [{ label: "Waited 18 min, all before pick-up · form", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-
 ];
 
 // Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);

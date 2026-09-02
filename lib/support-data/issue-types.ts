@@ -12,7 +12,7 @@ import type {
  * apply to a trip that is under way, and some are never chosen at all — they are
  * entered from somewhere that already knows what happened.
  *
- * Every v1 issue is `hidden`. The other two are kept because they are the two
+ * Every issue on this branch is `hidden`. The other two are kept because they are the two
  * answers a new case is likely to need, and deciding them per case is the point.
  */
 export type IssueVisibility =
@@ -42,31 +42,32 @@ export interface SupportIssueType {
 /** The label suffix for an issue whose field set isn't built. */
 const NOT_YET_SUFFIX = " — ⚠️ not in prototype yet";
 
-export const ISSUE_MISSED_SWIPE = "missed-swipe";
+export const ISSUE_RIDER_NO_SHOW = "rider-no-show";
 
 /**
  * The support issues a driver can file.
  *
- * v1 covers one. Still a list, and still carrying visibility and build state,
- * because the point of this file is that a case is an entry in it: the second one
- * is a new object here plus a field block gated on it, and nothing else changes.
+ * This branch covers one: **Rider No-Show**. Still a list, and still carrying
+ * visibility and build state, because the point of this file is that a case is an
+ * entry in it — the next one is a new object here plus a field block gated on it,
+ * and nothing else changes.
  *
- * The Support Case Catalog holds the specs for the six cases that came before this
- * branch. They are not in the code until each has been agreed with the support
- * lead — a case in the prototype reads as a case that was decided.
+ * The Support Case Catalog holds the specs for the other cases. They are not in
+ * the code until each has been agreed with the support lead — a case in the
+ * prototype reads as a case that was decided.
  */
 export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   {
-    value: ISSUE_MISSED_SWIPE,
-    label: "Missed Swipe",
+    value: ISSUE_RIDER_NO_SHOW,
+    label: "Rider No-Show",
     description:
-      "For a trip you drove but couldn't swipe at the time. Anything the app already recorded is filled in — just add the times that are missing.",
-    // Hidden rather than in-progress-only: the driver reaches this from the Missed
-    // Swipe tile on a ride, which already knows the trip and the issue. There is
+      "For a member who never came out. Tell us when you started waiting and when you left, and attach anything showing you tried to reach them.",
+    // Hidden rather than in-progress-only: the driver reaches this from the
+    // Member No-Show tile, which already knows the trip and the issue. There is
     // no dropdown left to be visible in.
     visibility: "hidden",
     buildState: "in-prototype",
-    note: "Entered from the Missed Swipe tile in More Options. Applies anywhere from en-route to drop-off; whatever the app recorded arrives prefilled.",
+    note: "Entered from the Member No-Show tile in More Options — that tile IS this case. Only offered on a leg that is en-route, and only asks anything when the app cannot confirm the wait itself.",
   },
 ];
 

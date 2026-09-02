@@ -13,7 +13,7 @@ import { getIssueLabel } from "./issue-types";
 export interface SupportFormRecord {
   id: string;
   caseId: string;
-  /** Issue type value, e.g. `missed-swipe`. */
+  /** Issue type value, e.g. `rider-no-show`. */
   issue: string;
   /** Plain label for lists — never carries the not-in-prototype flag suffix. */
   issueLabel: string;

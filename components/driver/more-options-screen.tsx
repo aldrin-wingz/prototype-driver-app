@@ -10,16 +10,19 @@ import {
   Calendar,
   X,
   Reply,
-  History,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  MissedSwipeForm,
-  buildMissedSwipe,
-} from "@/components/support/missed-swipe-form";
+  RiderNoShowForm,
+  buildRiderNoShow,
+} from "@/components/support/rider-no-show-form";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
+import {
+  canFileNoShow,
+  resolveNoShowGate,
+} from "@/lib/driver-data/no-show-rules";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -63,6 +66,11 @@ interface OptionTile {
  * and `Member No-Show` / `Send Back Trip` are two of the candidate support cases
  * in the Support Case Catalog. Left exactly as captured — restructuring this
  * screen around support cases is a design decision nobody has made yet.
+ *
+ * **`Member No-Show` is this branch's front door.** No new tile was added and no
+ * separate Member No-Show case exists: the tile IS Rider No-Show. It behaves as
+ * production does when the app can confirm the wait, and opens the form when it
+ * cannot.
  */
 const PRODUCTION_TILES: OptionTile[] = [
   {
@@ -116,25 +124,6 @@ const PRODUCTION_TILES: OptionTile[] = [
     color: DRIVER_GOLD,
   },
 ];
-
-/**
- * Missed Swipe — the one support case v1 covers, and the only way into a form.
- *
- * A tile rather than a dropdown entry: the driver opened this screen from a
- * specific ride, so which trip the request is about is already settled. Tapping
- * it goes straight to the form with the issue and the ride both filled in.
- *
- * `History` — a clock with a reverse arrow — because the action is correcting a
- * time that has already passed. The previous `AlarmClockOff` read as an alarm
- * being silenced, which is a different idea entirely.
- */
-const MISSED_SWIPE_TILE: OptionTile = {
-  id: "missed-swipe",
-  label: "Missed Swipe",
-  icon: History,
-  variant: "filled",
-  color: DRIVER_NAVY,
-};
 
 function TileIcon({ tile }: { tile: OptionTile }) {
   const Icon = tile.icon;
@@ -224,17 +213,37 @@ export function MoreOptionsScreen({
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
-  // Hidden only while this ride already has a request in flight, so a driver
-  // cannot file twice against the same trip.
-  const gridTiles: OptionTile[] = !pending
-    ? [...PRODUCTION_TILES, MISSED_SWIPE_TILE]
-    : // Without the support tile the grid has an odd count, so Send Back Trip
-      // takes the full width and centres, per capture s-03a.
-      PRODUCTION_TILES.map((tile) =>
+
+  const { initialValues } = buildRiderNoShow(trip, activeLeg);
+
+  /**
+   * Guardrail 1 — whether Member No-Show is offered at all.
+   *
+   * Three conditions, and each removes the tile rather than disabling it. A
+   * control that appears and then refuses is how the production flow earns its
+   * reputation; a control that is simply absent asks nothing of the driver.
+   *
+   *  - the leg has to be en-route (not started = no pick-up attended; picked up =
+   *    the member is in the car)
+   *  - the ride must not already be with Support
+   *  - the form has to be anchorable to this ride — an empty prefilled `legId`
+   *    means `legScope: "in-progress"` dropped it, and the locked "From this
+   *    ride" card would degrade into an open search box
+   */
+  const canNoShow = Boolean(
+    activeLeg &&
+      canFileNoShow(activeLeg) &&
+      !pending &&
+      initialValues.legId
+  );
+
+  // Without the No-Show tile the grid has an odd count, so Send Back Trip takes
+  // the full width and centres, per capture s-03a.
+  const gridTiles: OptionTile[] = canNoShow
+    ? PRODUCTION_TILES
+    : PRODUCTION_TILES.filter((tile) => tile.id !== "no-show").map((tile) =>
         tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
       );
-
-  const { initialValues } = buildMissedSwipe(trip, activeLeg);
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -247,27 +256,19 @@ export function MoreOptionsScreen({
   }
 
   function handleGridTile(id: string) {
-    if (id === MISSED_SWIPE_TILE.id) {
-      // An empty prefilled leg means this ride is not one the form's own picker
-      // would accept — `legScope: "in-progress"` drops it, because a missed swipe
-      // is only actionable on a trip that is under way.
-      //
-      // Checked here rather than trusted, because opening the form anyway breaks
-      // the premise it is built on: with nothing to prefill, the locked "From this
-      // ride" card degrades into an open search box asking which trip the driver
-      // means — the one question arriving from a ride has already answered.
-      if (!initialValues.legId) {
-        toast({
-          title: "Missed Swipe",
-          description: "Available once this ride is under way.",
-        });
+    if (id === "no-show" && activeLeg) {
+      const gate = resolveNoShowGate(activeLeg);
+      // Guardrail 2. When the app CAN confirm the wait there is nothing to ask —
+      // production files it and so would we, so the tile behaves as the
+      // production action. It is only the failure that becomes a form, which is
+      // the whole point of the case: production refuses here.
+      if (gate.ok) {
+        handleProductionTile(id);
         return;
       }
       setFormOpen(true);
       return;
     }
-    // Member No-Show included: it is a real production action and a candidate
-    // support case, but not one v1 covers, so it toasts like the rest.
     handleProductionTile(id);
   }
 
@@ -304,7 +305,7 @@ export function MoreOptionsScreen({
         ))}
       </div>
 
-      <MissedSwipeForm
+      <RiderNoShowForm
         trip={trip}
         leg={activeLeg}
         open={formOpen}

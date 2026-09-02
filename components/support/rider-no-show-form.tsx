@@ -2,22 +2,17 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { SupportFormSheet } from "./support-form-sheet";
-import {
-  buildSupportFormCase,
-  TIME_FIELD_FOR_SWIPE,
-} from "@/lib/support-data/case-registry";
-import { ISSUE_MISSED_SWIPE } from "@/lib/support-data/issue-types";
+import { buildSupportFormCase } from "@/lib/support-data/case-registry";
+import { ISSUE_RIDER_NO_SHOW } from "@/lib/support-data/issue-types";
 import { buildPrefilledValues } from "@/lib/support/prefill";
 import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import {
-  getUnrecordedSwipes,
-  type Trip,
-  type TripLeg,
-} from "@/lib/driver-data/mock-trips";
+import { resolveNoShowGate } from "@/lib/driver-data/no-show-rules";
+import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
+import type { SupportCallout } from "@/types/support";
 
 /**
- * Build the Missed Swipe case for one leg, plus the values the app can prefill.
+ * Build the Rider No-Show case for one leg, plus the values the app can prefill.
  *
  * Exported because an entry point needs the prefilled `legId` *before* it opens
  * anything: an empty one means this ride is not a ride the form's own leg picker
@@ -26,39 +21,52 @@ import {
  * search box — asking the driver the one question arriving from a ride has
  * already answered.
  */
-export function buildMissedSwipe(trip: Trip, leg: TripLeg | undefined) {
+export function buildRiderNoShow(trip: Trip, leg: TripLeg | undefined) {
   const supportCase = buildSupportFormCase({
-    // `includeIssues` is what puts Missed Swipe in the select's options at all — a
-    // selected value with no matching option renders as the placeholder, so the
+    // `includeIssues` is what puts Rider No-Show in the select's options at all —
+    // a selected value with no matching option renders as the placeholder, so the
     // form would claim no issue was picked.
-    includeIssues: [ISSUE_MISSED_SWIPE],
-    // Every mark the app has no time for becomes required, because filing this
-    // form asserts the driver drove the leg and could not swipe it. So the swipe
-    // CTA on the ride is what tells the driver what they will be asked.
-    requireFields: leg
-      ? getUnrecordedSwipes(leg).map((mark) => TIME_FIELD_FOR_SWIPE[mark])
-      : [],
+    includeIssues: [ISSUE_RIDER_NO_SHOW],
   });
 
   const initialValues: Record<string, string> = {
     ...buildPrefilledValues(supportCase, trip, leg),
     // Seeding `issue` is what marks it app-supplied, which is what
     // `lockWhenPrefilled` reads.
-    issue: ISSUE_MISSED_SWIPE,
+    issue: ISSUE_RIDER_NO_SHOW,
   };
 
   return { supportCase, initialValues };
 }
 
 /**
- * The Missed Swipe form, with its submit wired up.
+ * What the app could not confirm, said plainly at the top of the sheet.
  *
- * Shared rather than inlined because there are now two ways in — the tile behind
- * `More`, and the detection prompt on the ride itself — and the interesting parts
- * (which fields are required, what arrives locked, what the store records) must
- * not be able to differ between them.
+ * The driver is being asked questions *because* a check failed, and a form that
+ * opens without saying which one reads as the app being difficult. Naming the gap
+ * also tells them what to write: "we only saw 4 minutes" and "we never placed you
+ * there" call for different answers.
  */
-export function MissedSwipeForm({
+function buildCallout(leg: TripLeg | undefined): SupportCallout | undefined {
+  if (!leg) return undefined;
+  const gate = resolveNoShowGate(leg);
+  if (gate.ok) return undefined;
+
+  return {
+    tone: "warning",
+    title: "We couldn't confirm your wait",
+    detail: gate.detail,
+  };
+}
+
+/**
+ * The Rider No-Show form, with its submit wired up.
+ *
+ * One mount, so the required fields, the locks and the store write cannot differ
+ * between callers — there is a single entry point today, and that is exactly when
+ * it is cheap to keep it that way.
+ */
+export function RiderNoShowForm({
   trip,
   leg,
   open,
@@ -74,11 +82,12 @@ export function MissedSwipeForm({
 }) {
   const { toast } = useToast();
   const { submitForm } = useRideFlow();
-  const { supportCase, initialValues } = buildMissedSwipe(trip, leg);
+  const { supportCase, initialValues } = buildRiderNoShow(trip, leg);
 
   return (
     <SupportFormSheet
       supportCase={supportCase}
+      callout={buildCallout(leg)}
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}
@@ -86,7 +95,7 @@ export function MissedSwipeForm({
         onOpenChange(false);
         submitForm({
           caseId: supportCase.id,
-          issue: ISSUE_MISSED_SWIPE,
+          issue: ISSUE_RIDER_NO_SHOW,
           ...resolveTripContext(supportCase, values),
           values,
         });
