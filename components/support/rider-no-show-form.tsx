@@ -24,10 +24,15 @@ import type { SupportCallout } from "@/types/support";
 export function buildRiderNoShow(
   trip: Trip,
   leg: TripLeg | undefined,
-  /** What the driver picked on the Member No-Show screen. */
+  /** What the driver picked on the Member No-Show screen — "" when none ran. */
   noShowType = ""
 ) {
+  // ⚠️ No screen ran, so nothing has been collected: the form has to ask for the
+  // type and take the signature itself, or Support gets a claim with neither.
+  const standalone = noShowType === "";
   const supportCase = buildSupportFormCase({
+    askNoShowType: standalone,
+    askSignature: standalone,
     // `includeIssues` is what puts Rider No-Show in the select's options at all —
     // a selected value with no matching option renders as the placeholder, so the
     // form would claim no issue was picked.

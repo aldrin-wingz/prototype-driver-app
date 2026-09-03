@@ -27,8 +27,11 @@ import {
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_TYPES,
   resolveNoShow,
+  treatmentFor,
+  NO_SHOW_BOTH_RULES_COPY,
   type NoShowOutcome,
 } from "@/lib/driver-data/no-show-rules";
+import { refusalCopyFor } from "@/components/driver/more-options-screen";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   COUNTDOWN_MAX_MINUTES,
@@ -78,14 +81,17 @@ export function MemberNoShowScreen({
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
   /**
-   * The one real clock in the prototype, and it only runs while a countdown is
-   * on screen. Seeded record ages advance by it, so the timer genuinely runs
-   * down and the gate genuinely opens at zero rather than pretending to.
+   * The clock still runs here, because the Submit-time refusal is a real backstop
+   * for direct-URL entry and its remaining time has to be current.
+   *
+   * ⚠️ It no longer drives anything on the button. Every refusal fires on the
+   * More Options tile now, so a driver who reaches this screen is one whose
+   * no-show will succeed — the countdown belongs where the refusal is.
    */
+  const treatment = treatmentFor(trip);
   const outcomeNow = resolveNoShow(trip, activeLeg, 0);
   const elapsed = useNoShowClock(outcomeNow.kind === "timer");
   const outcome = resolveNoShow(trip, activeLeg, elapsed);
-  const waiting = outcome.kind === "timer" ? outcome : null;
 
   function handleSubmit() {
     // Light validation first, and deliberately NOT the refusal dialog — an
@@ -124,16 +130,17 @@ export function MemberNoShowScreen({
     router.push(backHref);
   }
 
-  /** What the refusal dialog says, and whether it offers a way forward. */
-  const refusalCopy =
-    refusal?.kind === "timer"
-      ? NO_SHOW_REFUSAL_COPY[refusal.reason]
-      : refusal?.kind === "form"
-        ? NO_SHOW_REFUSAL_COPY[refusal.gap]
-        : "";
-  // ⚠️ A timer NEVER offers the form. The driver is at the pick-up and simply
-  // has not waited long enough; a form there is a way to skip the wait.
-  const refusalOffersForm = refusal?.kind === "form";
+  /** What the refusal dialog says — production's wording, or the revised copy. */
+  const refusalCopy = refusalCopyFor(refusal, treatment);
+  /**
+   * ⚠️ Two independent reasons this can be false.
+   *
+   * A timer never offers the form, in any treatment: the driver is at the
+   * pick-up and simply has not waited long enough, so a form there is a way to
+   * skip the wait. And an `as-is` treatment never offers it either, because
+   * production does not — that dead end is precisely what the proposals fix.
+   */
+  const refusalOffersForm = refusal?.kind === "form" && treatment.offerForm;
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -192,40 +199,20 @@ export function MemberNoShowScreen({
       </div>
 
       {/* Pinned, and always tappable — production lets you submit and then tells
-          you no, which is the behaviour being replicated. What is NEW is that
-          while a wait is running the button says so, rather than looking ready
-          and refusing. */}
+          you no, which is the behaviour being replicated.
+
+          ⚠️ No countdown here any more. Every refusal now fires on the More
+          Options tile, before the driver picks a type or signs, so a driver who
+          reaches this screen is one whose no-show will succeed. The Submit-time
+          refusal below survives only as a backstop for direct-URL entry. */}
       <div className="sticky bottom-0 border-t border-gray-200 bg-white px-4 py-4">
         <button
           type="button"
           onClick={handleSubmit}
-          className="flex h-14 w-full flex-col items-center justify-center rounded-lg font-bold text-white"
-          style={{
-            // Muted while it cannot succeed. Still tappable, because tapping is
-            // how the driver gets the explanation.
-            backgroundColor: waiting ? "#9CD9CE" : DRIVER_TEAL,
-          }}
+          className="h-14 w-full rounded-lg text-lg font-bold text-white"
+          style={{ backgroundColor: DRIVER_TEAL }}
         >
-          {waiting ? (
-            <>
-              <span className="text-lg leading-tight">
-                {waiting.minutesRemaining > COUNTDOWN_MAX_MINUTES
-                  ? formatLongWait(waiting.minutesRemaining)
-                  : formatCountdown(waiting.minutesRemaining)}
-              </span>
-              <span className="text-xs font-medium leading-tight opacity-90">
-                {waiting.minutesRemaining > COUNTDOWN_MAX_MINUTES
-                  ? waiting.reason === "post-pickup"
-                    ? "until 15 min past pick-up"
-                    : "until 10 min at the pick-up"
-                  : waiting.reason === "post-pickup"
-                    ? "until 15 min past pick-up"
-                    : "until 10 min at the pick-up"}
-              </span>
-            </>
-          ) : (
-            <span className="text-lg">Submit</span>
-          )}
+          Submit
         </button>
       </div>
 
@@ -241,10 +228,18 @@ export function MemberNoShowScreen({
             <AlertDialogDescription className="text-base text-gray-700">
               {refusalCopy}
             </AlertDialogDescription>
-            {/* On a timer the dialog also says HOW LONG, which production never
-                does — "wait at least 10 minutes" with no idea how many are left
-                is the difference between a rule and an instruction. */}
-            {refusal?.kind === "timer" && (
+            {/* On a timer the dialog also says HOW LONG — which production never
+                does. "Wait at least 10 minutes" with no idea how many are left is
+                the difference between a rule and an instruction, and it is gated
+                on the treatment so the as-is rows stay honest. */}
+            {refusal?.kind === "timer" &&
+              treatment.copy === "revised" &&
+              refusal.reason === "post-pickup" && (
+                <AlertDialogDescription className="text-base text-gray-700">
+                  {NO_SHOW_BOTH_RULES_COPY}
+                </AlertDialogDescription>
+              )}
+            {refusal?.kind === "timer" && treatment.showTimer && (
               <p className="pt-1 text-base font-bold text-gray-900">
                 {refusal.minutesRemaining > COUNTDOWN_MAX_MINUTES
                   ? `About ${formatLongWait(refusal.minutesRemaining)} to go — stay at the pick-up and it will unlock.`

@@ -233,23 +233,33 @@ bun run typecheck    # must stay at 0 — the only automated check that exists
 
 **The demo path:** My Rides → a ride → **More** → **Member No-Show** → pick a type, sign, **Submit**.
 
-**Six scenarios, named against the production check. The tile is on every ride; choosing a ride IS how you pick a scenario:**
+**A BEFORE-AND-AFTER matrix.** The In Progress tab is ordered to match it, so a reviewer walks straight down the list. A plain number is **production as it behaves today**; a decimal is a **proposal**.
 
-| # | Ride | Seeded records | Outcome |
-|---|---|---|---|
-| **1** | `1049800371` — member on board | — | **Dead end**, *only allowed for rides that are ready to start or en-route* |
-| **2** | `1049800370` — 12 unbroken min at the pickup | near ×5, spanning 17 min | **Files** |
-| **3** | `1049800373` — left and came back 2 min ago | near, **gap**, near — 18 min of near records | **Timer 8:00** |
-| **4** | `1049800376` — facility, 0.6 mi out for 17 min | all just outside the radius | **Form** |
-| **5** | `1049800377` — no fix at all | `[]` | **Form**, with the *right* message |
-| **WT** | `1049800378` — WellTrans IN, 6 min past pickup | 13 min of continuous presence | **Timer to +15** |
+| Row | Ride | Refused at | Copy | Timer | Form |
+|---|---|---|---|---|---|
+| **1** | `…371` not started or en-route | More | production | — | — |
+| **2** | `…370` meets criteria | — files | — | — | — |
+| **3** | `…381` no 10 consec min — **as-is** | Submit | production | ✗ | ✗ |
+| **3.1** | `…373` ″ | Submit | production | **✓** | ✗ |
+| **3.2** | `…382` ″ | **More** | production | **✓** | ✗ |
+| **4** | `…383` not at pickup — **as-is** | Submit | production | ✗ | ✗ |
+| **4.1** | `…376` ″ | Submit | **revised** | ✗ | **✓** |
+| **4.2** | `…384` ″ | **More** | **revised** | ✗ | **✓** |
+| **5** | `…377` no location points | Submit | revised | ✗ | ✓ |
+| **WV1** | `…378` not yet +15 — **as-is** | Submit | production | ✗ | ✗ |
+| **WV1.1** | `…385` ″ | Submit | **revised** | **✓** | ✗ |
+| — | `…380` 3.1 at the boundary | Submit | production | ✓ | ✗ |
 
-Plus two extras: `1049800380` is **scenario 3 a hair from the boundary**, so the countdown runs out while you watch and the button unlocks — the only way to see `files` without waiting eight minutes. And the pre-existing unconfirmed ride in `mockNeedsActionTrips` gives **Confirm first**; ⚠️ that gate is **client-side**, since production's status list is `[ACCEPTED, CHECKED, EN_ROUTE]` and an unconfirmed trip may well sit at `ACCEPTED`.
+**⚠️ The treatment cannot come from the ride data.** 3, 3.1 and 3.2 are the *same* guardrail state — the check resolves identically on all three, which is asserted in the verification — and differ only in how the app says so. So it is declared per ride as `trip.noShowDemo`, resolved through `NO_SHOW_TREATMENTS`. Demo scaffolding, not a product concept.
 
-**Scenario 3 is the one that proves the rule.** Six of its eight records are inside the radius, spanning eighteen minutes — more than the threshold — and it correctly blocks, because a gap in the middle resets the clock. **Any implementation that sums time-at-pickup passes that ride.**
+**⚠️ Every as-is row has `offerForm: false`.** Production refuses and stops; the "Submit support form" button is the *proposal*. An as-is ride that offered it would quietly turn the before-picture into an after. Same for `showTimer` and the tile pill — production shows neither, so neither appears.
 
-**Scenario 5 is the literal empty set** — the branch `if not locations:` tests for, and ⚠️ **the one production can never reach**, because `canNoshow` inserts a row before it queries. The bogus-fix path production actually takes (a null-island fix at an absurd distance) is caught by `IMPLAUSIBLE_FIX_MILES` and lands on the same, correct message.
+**⚠️ Row 4 as-is reproduces the bug faithfully.** That driver's latest fix is outside the radius, so they have left — and it tells them to *"wait at least 10 minutes at the pick up location"*, then dead-ends. Waiting where they are can never clear it. **That is the traffic this project exists to absorb**, and 4.1 / 4.2 are the fix.
 
-⚠️ **`inferNearWindow` is currently unexercised by the seed.** It prefills the form's two times from a wait the app *did* see, and no kept scenario has one — 4 and 5 have no near records at all. The behaviour is correct; bring back a "waited then drove off" ride to see it.
+**Row 5 has no as-is twin**, because there is nothing to compare against: production's own message for it is unreachable, so a driver with no fix gets the wait-10-minutes message today. See finding 1.
+
+`…380` is the only way to reach `files` without waiting eight minutes: the countdown runs out while you watch and Submit unlocks.
+
+⚠️ **`inferNearWindow` is unexercised by the seed.** It prefills the form's two times from a wait the app *did* see, and no kept row has one — 4.x and 5 have no near records at all. Correct, but bring back a "waited then drove off" ride to see it.
 
 **One known console warning:** Radix `Missing 'Description' or 'aria-describedby'` on `DialogContent`. Pre-existing, from the drawer primitive.

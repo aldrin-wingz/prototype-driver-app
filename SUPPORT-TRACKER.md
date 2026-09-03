@@ -117,6 +117,33 @@ The production `canNoshow` source arrived, and it corrected the model twice over
 
 **And a prototype seam:** long waits show a **duration** (`2h 05m`), not a clock time. "Available at 10:15 AM" is better product, but it adds real minutes to the real clock while every ride time here is seeded fiction — a ride whose pickup reads 1:50 PM was offering "2:29 AM". A real build should show the time of day.
 
+### A before-and-after matrix · 2026-09-04
+
+The scenario set became a **comparison**: a plain row is production as it behaves today, a decimal is a proposal, and the In Progress tab is ordered to match so a reviewer walks straight down it.
+
+| Row | Refused at | Copy | Timer | Form |
+|---|---|---|---|---|
+| 3 / 4 / WV1 — **as-is** | Submit | production | ✗ | ✗ |
+| 3.1 | Submit | production | ✓ | ✗ |
+| 3.2 | **More** | production | ✓ | ✗ |
+| 4.1 | Submit | **revised** | ✗ | ✓ |
+| 4.2 | **More** | **revised** | ✗ | ✓ |
+| WV1.1 | Submit | **revised** | ✓ | ✗ |
+
+**⚠️ The treatment cannot come from the ride data**, and that is the load-bearing insight. 3, 3.1 and 3.2 are the *same* guardrail state — the verification asserts each pair resolves identically — so no amount of seeded location data distinguishes them. It is declared per ride as `trip.noShowDemo` and resolved through `NO_SHOW_TREATMENTS`. Demo scaffolding, clearly marked.
+
+**⚠️ Every as-is row has `offerForm: false`, `showTimer: false`, and no tile pill.** Production refuses and stops. An as-is ride that offered the form, or carried a countdown, would quietly turn the before-picture into an after — which would make the whole comparison worthless.
+
+**Row 4 as-is reproduces the bug on purpose:** latest fix outside the radius, so the driver has left, and it says *"wait at least 10 minutes at the pick up location"* and dead-ends.
+
+**Two decisions from the user, recorded:**
+- **3.2's pop-up closes** — no Continue into the screen. They are at the pick-up and simply have not waited long enough.
+- **4.2 skips the screen**, so nothing collects a no-show type or a signature — the form now asks for both via `askNoShowType` / `askSignature`. Without that Support would receive a claim with neither.
+
+**A bug the tagging pass introduced and the checks caught:** tagging existing rides and then *cloning from them* produced two `noShowDemo` keys on the same object; and once treatments existed, scenario 5 and the boundary ride fell through to the as-is default, silently losing 5's form and the boundary's timer. A "no refusing ride may be untagged" assertion now covers the second.
+
+**Verified in the browser, per pair:** 3 as-is shows **no tile pill** while 3.2 shows `7:58` with a **Close-only** dialog that stays on More; 4 as-is gives production's wrong copy with **OK only** while 4.1 gives the revised copy plus the form.
+
 ## Next
 
 1. **Is `Cancel At Door` really a no-show?** It is the odd one of the three captured types — the member appeared. Does Support want it as its own claim, and does it earn the fee?

@@ -17,17 +17,28 @@ import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
+  AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { RiderNoShowForm } from "@/components/support/rider-no-show-form";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   canFileNoShow,
+  NO_SHOW_BOTH_RULES_COPY,
+  NO_SHOW_POST_PICKUP_MINUTES,
+  NO_SHOW_REFUSAL_COPY,
   NO_SHOW_STAGE_REFUSAL,
+  NO_SHOW_WAIT_MINUTES,
+  requiresPostPickupDelay,
   resolveNoShow,
+  treatmentFor,
+  type NoShowOutcome,
+  type NoShowTreatment,
 } from "@/lib/driver-data/no-show-rules";
 import {
   COUNTDOWN_MAX_MINUTES,
@@ -137,6 +148,27 @@ const PRODUCTION_TILES: OptionTile[] = [
   },
 ];
 
+/**
+ * The refusal wording, per treatment.
+ *
+ * ⚠️ `production` is the exact string production raises today, including where it
+ * is **wrong** — a driver who has already left is told to wait at a pick-up they
+ * are not at. Reproducing that faithfully is the whole point of the as-is rows;
+ * `revised` is the proposal.
+ */
+export function refusalCopyFor(
+  outcome: NoShowOutcome | null,
+  treatment: NoShowTreatment
+): string {
+  if (!outcome) return "";
+  if (outcome.kind === "timer") return NO_SHOW_REFUSAL_COPY[outcome.reason];
+  if (outcome.kind !== "form") return "";
+  return treatment.copy === "revised"
+    ? NO_SHOW_REFUSAL_COPY[outcome.gap]
+    : // Production has ONE message for every location failure.
+      NO_SHOW_REFUSAL_COPY.presence;
+}
+
 function TileIcon({ tile }: { tile: OptionTile }) {
   const Icon = tile.icon;
 
@@ -242,6 +274,16 @@ export function MoreOptionsScreen({
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
   const [stageRefused, setStageRefused] = useState(false);
+  /**
+   * The refusal shown BEFORE the driver invests anything.
+   *
+   * With this in place the Member No-Show screen is reachable only when the
+   * no-show would actually succeed — every refusal now happens here, on the tap,
+   * rather than after picking a type and signing. The screen's own Submit-time
+   * refusal survives as a backstop for direct-URL entry.
+   */
+  const [earlyRefusal, setEarlyRefusal] = useState<NoShowOutcome | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   /**
    * The same ladder the Member No-Show screen runs, one screen earlier.
@@ -252,14 +294,26 @@ export function MoreOptionsScreen({
    * have to learn. A countdown is different: it is information they cannot get
    * any other way, and it saves a pointless trip through the form.
    */
+  const treatment = treatmentFor(trip);
   const outcomeNow = resolveNoShow(trip, activeLeg, 0);
   const elapsed = useNoShowClock(outcomeNow.kind === "timer");
   const outcome = resolveNoShow(trip, activeLeg, elapsed);
-  const noShowCountdown =
+  const countdownText =
     outcome.kind === "timer"
       ? outcome.minutesRemaining > COUNTDOWN_MAX_MINUTES
         ? formatLongWait(outcome.minutesRemaining)
         : formatCountdown(outcome.minutesRemaining)
+      : undefined;
+  /**
+   * The passive pill on the tile — a glance at More tells you you are waiting.
+   *
+   * ⚠️ Only on treatments that surface the wait early. An `as-is` ride must not
+   * carry it: production shows nothing here, and a pill would quietly turn the
+   * before-picture into a proposal.
+   */
+  const noShowCountdown =
+    treatment.refuseAt === "more" && treatment.showTimer
+      ? countdownText
       : undefined;
 
   /**
@@ -302,6 +356,17 @@ export function MoreOptionsScreen({
         });
         return;
       }
+      // Guardrail 2, but only for the rides whose treatment says the refusal
+      // belongs here. The `as-is` rows deliberately let the driver walk into the
+      // screen, pick a type and sign before being refused — that is what
+      // production does, and the comparison is the point.
+      if (
+        treatment.refuseAt === "more" &&
+        (outcome.kind === "timer" || outcome.kind === "form")
+      ) {
+        setEarlyRefusal(outcome);
+        return;
+      }
       router.push(`/my-rides/${trip.id}/no-show`);
       return;
     }
@@ -323,6 +388,69 @@ export function MoreOptionsScreen({
           More Options
         </h1>
       </header>
+
+      <AlertDialog
+        open={Boolean(earlyRefusal)}
+        onOpenChange={(open) => !open && setEarlyRefusal(null)}
+      >
+        <AlertDialogContent className="max-w-[21rem] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-gray-900">
+              {earlyRefusal?.kind === "timer"
+                ? "Not yet"
+                : "Unable to complete action"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-gray-700">
+              {refusalCopyFor(earlyRefusal, treatment)}
+            </AlertDialogDescription>
+            {/* ⚠️ WV 1.1 — be explicit that BOTH rules apply. A WellTrans Indiana
+                driver waiting on the pick-up window would otherwise think the
+                clock is the only thing standing between them and filing, and
+                wander off the pick-up while it runs. */}
+            {earlyRefusal?.kind === "timer" &&
+              earlyRefusal.reason === "post-pickup" &&
+              treatment.copy === "revised" && (
+                <AlertDialogDescription className="text-base text-gray-700">
+                  {NO_SHOW_BOTH_RULES_COPY}
+                </AlertDialogDescription>
+              )}
+            {/* The countdown lives HERE now, not on the Submit button. */}
+            {earlyRefusal?.kind === "timer" && treatment.showTimer && countdownText && (
+              <p className="pt-1 text-2xl font-bold tabular-nums text-gray-900">
+                {countdownText}
+                <span className="ml-2 align-middle text-sm font-medium text-gray-500">
+                  {earlyRefusal.reason === "post-pickup"
+                    ? `until ${NO_SHOW_POST_PICKUP_MINUTES} min past pick-up`
+                    : `until ${NO_SHOW_WAIT_MINUTES} min at the pick-up`}
+                </span>
+              </p>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+            {/* ⚠️ A timer gets NO form and NO way through — closing is the only
+                action, because the driver is at the pick-up and simply has not
+                waited long enough. Anything else here is a way to skip the wait.
+
+                A form outcome is the opposite: nothing they do at the pick-up
+                will ever clear it, so the form is the only way forward. */}
+            {earlyRefusal?.kind === "form" && treatment.offerForm && (
+              <AlertDialogAction
+                onClick={() => {
+                  setEarlyRefusal(null);
+                  setFormOpen(true);
+                }}
+                className="h-12 w-full rounded-lg text-base font-bold text-white"
+                style={{ backgroundColor: "#00B090" }}
+              >
+                Submit support form
+              </AlertDialogAction>
+            )}
+            <AlertDialogCancel className="mt-0 h-12 w-full rounded-lg border-gray-300 text-base font-bold text-gray-900">
+              {earlyRefusal?.kind === "timer" ? "Close" : "OK"}
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={stageRefused}
@@ -349,6 +477,16 @@ export function MoreOptionsScreen({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* No screen ran, so `noShowType` is empty — which is what makes the form
+          ask for the type and take the signature itself. */}
+      <RiderNoShowForm
+        trip={trip}
+        leg={activeLeg}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmitted={() => router.push(backHref)}
+      />
 
       <div className="grid grid-cols-2 border-t border-[#F0F0F0]">
         {gridTiles.map((tile, index) => (

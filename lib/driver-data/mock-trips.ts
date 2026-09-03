@@ -1,4 +1,5 @@
 import type { IncentiveType } from "@/lib/data/incentives";
+import type { NoShowDemoRow } from "./no-show-rules";
 
 /**
  * The day the prototype pretends it is.
@@ -190,6 +191,12 @@ export interface Trip {
   incentiveTypes: IncentiveType[];
   /** Whether this client/market is enrolled in incentive programs. */
   clientEnrolledInIncentives?: boolean;
+  /**
+   * ⚠️ **DEMO SCAFFOLDING.** Which row of the Member No-Show comparison matrix
+   * this ride demonstrates — a plain number is production today, a decimal is a
+   * proposal. See `NoShowDemoRow`. Absent means today's behaviour.
+   */
+  noShowDemo?: NoShowDemoRow;
 }
 
 export interface TripPill {
@@ -1048,6 +1055,54 @@ export const mockNeedsActionTrips: Trip[] = [
 // unconfirmed ride in `mockNeedsActionTrips`, which is a client-side gate rather
 // than one of the six.
 export const mockInProgressTrips: Trip[] = [
+  // ===== ROW 3 — member on board =====
+  //
+  // The closed end of guardrail 1. The CTA reads DROP OFF MEMBER, so no-show is
+  // out: a member already in the car cannot have failed to show. The tile is
+  // still there — it always is — and the dialog names the rule.
+  {
+    id: "1049800371",
+    date: "Tue, Jul 8, 2026",
+    rider: "Rowan Whitfield",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 47.80,
+    notes: "",
+    legs: [
+      {
+        id: "1049800371",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "1:15 PM",
+        address: "1204 Maple St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 47.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "12:58 PM",
+          pickedUpAt: "1:17 PM",
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800371-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:00 PM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "1 · Not started or en-route → refused", variant: "neutral" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
   // ===== SCENARIO 2 — meets every criterion =====
   //
   // Twelve unbroken minutes inside the radius, so the walk finds the 12-minute
@@ -1098,58 +1153,71 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario 2 · Meets criteria → files", variant: "success" }],
+    pills: [{ label: "2 · Meets criteria → files", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== ROW 3 — member on board =====
+  // ===== SCENARIO 3 — AS-IS. What production does today =====
   //
-  // The closed end of guardrail 1. The CTA reads DROP OFF MEMBER, so no-show is
-  // out: a member already in the car cannot have failed to show. The tile is
-  // still there — it always is — and the dialog names the rule.
+  // Identical guardrail state to 3.1. The only difference is the treatment:
+  // no timer anywhere, refused at Submit after the driver has picked a type and
+  // signed, and the dialog is a dead end. This ride exists so the proposals have
+  // something to be compared against.
   {
-    id: "1049800371",
+    id: "1049800381",
     date: "Tue, Jul 8, 2026",
-    rider: "Rowan Whitfield",
+    rider: "Nadine Prosper",
     client: "Verida",
     market: "GA",
     passengerCount: 1,
     distance: "",
-    totalRevenue: 47.80,
-    notes: "",
+    totalRevenue: 53.40,
+    notes: "Apartment gate on the Cedar St side",
     legs: [
       {
-        id: "1049800371",
+        id: "1049800381",
         legCode: "A",
         type: "est-pickup",
         label: "Est Pick-up Time",
-        time: "1:15 PM",
-        address: "1204 Maple St, Carrollton, GA 30117",
+        time: "10:20 AM",
+        address: "512 Cedar St, Carrollton, GA 30117",
         county: "Carroll County",
-        revenue: 47.80,
+        revenue: 53.40,
         revenueNote: "Accepted by you",
         progress: {
-          startedAt: "12:58 PM",
-          pickedUpAt: "1:17 PM",
+          startedAt: "10:06 AM",
+          pickedUpAt: null,
           droppedOffAt: null,
         },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 1, distanceMiles: 0.2 },
+            { ageMinutes: 2, distanceMiles: 0.2 },
+            { ageMinutes: 4, distanceMiles: 1.9 },
+            { ageMinutes: 6, distanceMiles: 2.4 },
+            { ageMinutes: 9, distanceMiles: 0.3 },
+            { ageMinutes: 14, distanceMiles: 0.3 },
+            { ageMinutes: 18, distanceMiles: 0.4 },
+        ],
       },
       {
-        id: "1049800371-appt",
+        id: "1049800381-appt",
         type: "appointment",
         label: "Appointment Time",
-        time: "2:00 PM",
+        time: "11:00 AM",
         address: "45 Tanner Medical Way, Carrollton, GA 30117",
         county: "Carroll County",
         revenue: 0,
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario 1 · Not started or en-route → refused", variant: "neutral" }],
+    noShowDemo: "3",
+    pills: [{ label: "3 · No 10 consec min · AS-IS prod pop-up", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
+
   // ===== ROW 5 — left, and came back two minutes ago =====
   //
   // The interesting one. There IS an earlier ten-minute stretch at the pick-up
@@ -1204,10 +1272,129 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario 3 · No 10 consecutive min → timer", variant: "warning" }],
+    noShowDemo: "3.1",
+    pills: [{ label: "3.1 · No 10 consec min · timer IN the pop-up", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
+
+  // ===== SCENARIO 3.2 — the countdown moves to the tile tap =====
+  //
+  // Same state again. The driver learns the wait before picking a type or
+  // signing, and the pop-up CLOSES — no way through, because they are at the
+  // pick-up and simply have not waited long enough.
+  {
+    id: "1049800382",
+    date: "Tue, Jul 8, 2026",
+    rider: "Cassian Boyle",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 53.40,
+    notes: "Apartment gate on the Cedar St side",
+    legs: [
+      {
+        id: "1049800382",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "10:20 AM",
+        address: "512 Cedar St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 53.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "10:06 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 1, distanceMiles: 0.2 },
+            { ageMinutes: 2, distanceMiles: 0.2 },
+            { ageMinutes: 4, distanceMiles: 1.9 },
+            { ageMinutes: 6, distanceMiles: 2.4 },
+            { ageMinutes: 9, distanceMiles: 0.3 },
+            { ageMinutes: 14, distanceMiles: 0.3 },
+            { ageMinutes: 18, distanceMiles: 0.4 },
+        ],
+      },
+      {
+        id: "1049800382-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:00 AM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "3.2",
+    pills: [{ label: "3.2 · No 10 consec min · timer from More, closes", variant: "attention" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== SCENARIO 4 — AS-IS. What production does today =====
+  //
+  // ⚠️ THE BUG, reproduced faithfully. This driver's latest fix is outside the
+  // radius, so they have left or never arrived — and production tells them to
+  // "wait at least 10 minutes at the pick up location". Waiting where they are
+  // can never clear it, and the dialog is a dead end, so the only way forward is
+  // Zendesk. That is the traffic this whole project exists to absorb.
+  {
+    id: "1049800383",
+    date: "Tue, Jul 8, 2026",
+    rider: "Odalys Ferrer",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 39.75,
+    notes: "Pick-up is the west tower lobby, not the main entrance",
+    legs: [
+      {
+        id: "1049800383",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "2:10 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 39.75,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:52 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.61 },
+            { ageMinutes: 3, distanceMiles: 0.6 },
+            { ageMinutes: 7, distanceMiles: 0.62 },
+            { ageMinutes: 12, distanceMiles: 0.59 },
+            { ageMinutes: 17, distanceMiles: 0.63 },
+        ],
+      },
+      {
+        id: "1049800383-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:55 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "4",
+    pills: [{ label: "4 · Not at pickup · AS-IS prod pop-up", variant: "neutral" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
   // ===== ROW 10 — a facility bigger than the radius =====
   //
   // The driver has not moved in seventeen minutes and is 0.6 miles out the whole
@@ -1260,7 +1447,64 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario 4 · Location now > 0.5 mi → form", variant: "danger" }],
+    noShowDemo: "4.1",
+    pills: [{ label: "4.1 · Not at pickup · revised copy + form", variant: "warning" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== SCENARIO 4.2 — the same message, before any effort =====
+  //
+  // ⚠️ Skipping the screen means nothing has collected a no-show type or a
+  // signature, so the FORM asks for both — see `askNoShowType` / `askSignature`.
+  // Without that, Support would get a claim with neither.
+  {
+    id: "1049800384",
+    date: "Tue, Jul 8, 2026",
+    rider: "Rafferty Nunes",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 39.75,
+    notes: "Pick-up is the west tower lobby, not the main entrance",
+    legs: [
+      {
+        id: "1049800384",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "2:10 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 39.75,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:52 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.61 },
+            { ageMinutes: 3, distanceMiles: 0.6 },
+            { ageMinutes: 7, distanceMiles: 0.62 },
+            { ageMinutes: 12, distanceMiles: 0.59 },
+            { ageMinutes: 17, distanceMiles: 0.63 },
+        ],
+      },
+      {
+        id: "1049800384-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:55 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "4.2",
+    pills: [{ label: "4.2 · Not at pickup · revised copy from More", variant: "attention" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1319,7 +1563,9 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario 5 · No location points → form", variant: "danger" }],
+    // the corrected location-settings message plus the form
+    noShowDemo: "5",
+    pills: [{ label: "5 · No location points → form", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1376,10 +1622,69 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario WT · Not yet 15 min from pickup", variant: "warning" }],
+    noShowDemo: "WV1",
+    pills: [{ label: "WV1 · Not yet +15 · AS-IS prod pop-up", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
+
+  // ===== WV 1.1 — the countdown, and both rules said out loud =====
+  //
+  // The location rule has already been satisfied here, which is exactly why the
+  // copy has to mention it: a driver watching only the pick-up clock would
+  // reasonably wander off and reset the ten minutes they had banked.
+  {
+    id: "1049800385",
+    date: "Tue, Jul 8, 2026",
+    rider: "Thaddeus Cork",
+    client: "WellTrans",
+    market: "IN",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 46.20,
+    notes: "",
+    legs: [
+      {
+        id: "1049800385",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:40 AM",
+        address: "3401 W Michigan St, Indianapolis, IN 46222",
+        county: "Marion County",
+        revenue: 46.20,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "11:22 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 4, distanceMiles: 0.2 },
+            { ageMinutes: 9, distanceMiles: 0.3 },
+            { ageMinutes: 13, distanceMiles: 0.3 },
+            { ageMinutes: 18, distanceMiles: 0.2 },
+        ],
+        minutesSinceScheduledPickup: 6,
+      },
+      {
+        id: "1049800385-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "12:25 PM",
+        address: "1801 N Senate Blvd, Indianapolis, IN 46202",
+        county: "Marion County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "WV1.1",
+    pills: [{ label: "WV1.1 · Not yet +15 · timer + both rules named", variant: "attention" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
   // ===== The one you can actually watch =====
   //
   // The oldest near record is 9.5 minutes old, so the countdown reads ~0:30 and
@@ -1433,7 +1738,9 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Scenario 3 at the boundary · unlocks in ~30s", variant: "attention" }],
+    // scenario 3.1's treatment, seeded at the boundary so the timer runs out while you watch
+    noShowDemo: "3.1",
+    pills: [{ label: "Live · 3.1 at the boundary, unlocks in ~30s", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

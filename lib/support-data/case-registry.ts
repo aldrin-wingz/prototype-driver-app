@@ -1,4 +1,5 @@
 import { getIssueOptions, ISSUE_RIDER_NO_SHOW } from "./issue-types";
+import { NO_SHOW_TYPES } from "@/lib/driver-data/no-show-rules";
 import type { SupportCaseDefinition } from "@/types/support";
 
 /**
@@ -42,6 +43,8 @@ export const WAIT_TIME_SEQUENCE = ["waitedFrom", "leftAt"];
  */
 export function buildSupportFormCase({
   includeIssues,
+  askNoShowType = false,
+  askSignature = false,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -52,6 +55,19 @@ export function buildSupportFormCase({
    * on the driver's behalf.
    */
   includeIssues?: string[];
+  /**
+   * Ask for the no-show type here rather than showing one already chosen.
+   *
+   * ⚠️ The form has TWO entry paths and they have collected different things.
+   * Reached from the Member No-Show screen, the type and signature are already
+   * given, so the type shows locked and the signature is not asked twice.
+   * Reached straight from `More` — which is what happens when the app can see
+   * the driver is not at the pick-up — neither exists yet, so the form has to
+   * collect both or Support gets a claim with no type and no attestation.
+   */
+  askNoShowType?: boolean;
+  /** Ask for the signature here, because no screen collected one. */
+  askSignature?: boolean;
 } = {}): SupportCaseDefinition {
   return {
     id: SUPPORT_FORM_CASE_ID,
@@ -85,17 +101,29 @@ export function buildSupportFormCase({
       },
 
       // ---- Rider No-Show -------------------------------------------------
-      {
-        id: "noShowType",
-        type: "text",
-        label: "No-show type",
-        // Locked: chosen on the Member No-Show screen a moment ago, so asking
-        // again would be asking the driver to repeat themselves. Carried into
-        // the request because Support needs to know which kind was claimed.
-        lockWhenPrefilled: true,
-        lockedBadge: "From the no-show screen",
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
+      askNoShowType
+        ? {
+            id: "noShowType",
+            type: "select",
+            label: "No-show type",
+            placeholder: "Select:",
+            required: true,
+            // Same three values as the screen's picker, from the one list.
+            options: NO_SHOW_TYPES.map((value) => ({ value, label: value })),
+            showIf: ONLY_RIDER_NO_SHOW,
+          }
+        : {
+            id: "noShowType",
+            type: "text",
+            label: "No-show type",
+            // Locked: chosen on the Member No-Show screen a moment ago, so
+            // asking again would be asking the driver to repeat themselves.
+            // Carried into the request because Support needs to know which kind
+            // was claimed.
+            lockWhenPrefilled: true,
+            lockedBadge: "From the no-show screen",
+            showIf: ONLY_RIDER_NO_SHOW,
+          },
       {
         id: "legId",
         type: "leg-picker",
@@ -149,13 +177,30 @@ export function buildSupportFormCase({
         helpText: "A call log, a screenshot of your texts, anything showing you tried.",
         showIf: ONLY_RIDER_NO_SHOW,
       },
-      // ⚠️ NO signature field, and that is a change of position worth stating.
+      // ⚠️ The signature is conditional, and where it lives is a real decision.
       //
-      // It used to be here, last, on the reasoning that proving the wait is not
-      // proving the member was absent. That reasoning still holds — but the
-      // driver now signs on the Member No-Show screen BEFORE the guardrail runs,
-      // because that is production's order and familiarity won. Asking again
-      // here would be a second signature for one claim.
+      // Reached from the Member No-Show screen the driver has already signed —
+      // production signs before it refuses, and familiarity won — so asking
+      // again would be a second signature for one claim. Reached straight from
+      // `More`, no screen ran, and the claim needs an attestation: proving a wait
+      // is not proving the member was absent, and that gap is what a signature
+      // covers.
+      //
+      // LAST when present, always. The driver attests to the answers above, so a
+      // field after it would be signed for before it was written.
+      ...(askSignature
+        ? ([
+            {
+              id: "signature",
+              type: "signature",
+              label: "Sign to confirm",
+              helpText:
+                "Sign to confirm the member did not come out for this ride.",
+              required: true,
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
     ],
   };
 }

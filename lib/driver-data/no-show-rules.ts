@@ -259,6 +259,93 @@ export function inferNearWindow(
   };
 }
 
+/**
+ * ⚠️ **DEMO SCAFFOLDING. Not a product concept.**
+ *
+ * Which row of the comparison matrix a ride demonstrates. The rows come in
+ * pairs: a plain number is **production as it behaves today**, kept so a reviewer
+ * can see the before; a decimal is a **proposal**.
+ *
+ * This exists because 3, 3.1 and 3.2 are the same guardrail state — the driver
+ * has not been at the pick-up long enough — and differ only in how the app says
+ * so. No amount of seeded location data can distinguish them, so the treatment
+ * has to be declared per ride.
+ */
+export type NoShowDemoRow =
+  | "3" | "3.1" | "3.2"
+  | "4" | "4.1" | "4.2"
+  | "5"
+  | "WV1" | "WV1.1";
+
+export interface NoShowTreatment {
+  /** Where the refusal appears — after the driver has invested effort, or before. */
+  refuseAt: "submit" | "more";
+  /** Production's exact wording, or the revised copy. */
+  copy: "production" | "revised";
+  /** Put the live countdown in the refusal. */
+  showTimer: boolean;
+  /** Offer the support form as a way forward. */
+  offerForm: boolean;
+}
+
+/**
+ * The matrix, as config.
+ *
+ * ⚠️ Note what the `as-is` rows have in common: **`offerForm: false`**. Production
+ * refuses and stops — the "Submit support form" button is the proposal, not the
+ * status quo, and an as-is ride that offered it would misrepresent today.
+ */
+export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
+  // ── Scenario 3 — no 10 consecutive minutes at the pick-up ──
+  /** Today. Refused at Submit, production's wording, no timer, dead end. */
+  "3": { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
+  /** Proposal: the same refusal, now carrying the countdown. */
+  "3.1": { refuseAt: "submit", copy: "production", showTimer: true, offerForm: false },
+  /** Proposal: the countdown moves to the tile tap, before any effort is spent. */
+  "3.2": { refuseAt: "more", copy: "production", showTimer: true, offerForm: false },
+
+  // ── Scenario 4 — latest location outside the radius ──
+  /** Today. ⚠️ Production tells a driver who has LEFT to wait where they are. */
+  "4": { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
+  /** Proposal: copy that is true for this driver, and a way forward. */
+  "4.1": { refuseAt: "submit", copy: "revised", showTimer: false, offerForm: true },
+  /** Proposal: the same, on the tile tap — they never enter a screen that cannot help. */
+  "4.2": { refuseAt: "more", copy: "revised", showTimer: false, offerForm: true },
+
+  // ── Scenario 5 — no location points at all in the window ──
+  /**
+   * No as-is/proposal split, because there is nothing to compare against:
+   * production's own message for this case is **unreachable** (it inserts a
+   * location row before it queries), so a driver with no fix gets "wait 10
+   * minutes" today. This row is the corrected behaviour, and the form is the way
+   * forward because nothing they do at the pick-up will produce a fix.
+   */
+  "5": { refuseAt: "submit", copy: "revised", showTimer: false, offerForm: true },
+
+  // ── WellTrans Indiana — not yet 15 minutes past the pick-up ──
+  /** Today. */
+  WV1: { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
+  /** Proposal: countdown, and explicit that BOTH rules have to hold. */
+  "WV1.1": { refuseAt: "submit", copy: "revised", showTimer: true, offerForm: false },
+};
+
+/** The treatment for a ride, defaulting to today's behaviour. */
+export function treatmentFor(trip: Trip): NoShowTreatment {
+  return trip.noShowDemo
+    ? NO_SHOW_TREATMENTS[trip.noShowDemo]
+    : { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false };
+}
+
+/**
+ * WV 1.1 spells out that the location rule still applies.
+ *
+ * Without it a WellTrans driver watching the pick-up clock would reasonably think
+ * it is the only thing between them and filing — and wander off the pick-up while
+ * it runs, resetting the ten minutes they had already banked.
+ */
+export const NO_SHOW_BOTH_RULES_COPY =
+  `You also need to stay within ${NO_SHOW_RADIUS_MILES} miles of the pick-up for ${NO_SHOW_WAIT_MINUTES} minutes without leaving — both have to be true.`;
+
 /** Whether Member No-Show is offered without a refusal. Kept for the tile's own check. */
 export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
   return !isAwaitingMemberConfirmation(trip) && isInSwipeWindow(leg);
@@ -274,7 +361,17 @@ export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
 export const NO_SHOW_REFUSAL_COPY = {
   presence: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
   "post-pickup": `Please wait at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled pick up time before requesting a Member no-show.`,
-  not_at_pickup: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
+  /**
+   * ⚠️ **OURS, and a correction — not production's wording.**
+   *
+   * Production says "please wait at least 10 minutes at the pick up location",
+   * which is **actively wrong advice** for the driver this fires on: their latest
+   * fix is outside the radius, so they have left or never arrived, and waiting
+   * where they are now can never clear it. The one thing that would help is
+   * either going back, or telling us what happened — so the message says that.
+   */
+  not_at_pickup:
+    "You must be at the pick-up location to report a Member no-show. If you were there earlier and have already left, use the support form below.",
   no_location_data:
     "No location data has been detected from your phone. Please verify that your phone has the correct location settings before you request a Member no-show from the app.",
 } as const;
