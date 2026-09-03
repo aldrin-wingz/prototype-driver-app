@@ -10,7 +10,6 @@ import {
   Calendar,
   X,
   Reply,
-  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -24,12 +23,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RiderNoShowForm } from "@/components/support/rider-no-show-form";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   canFileNoShow,
-  NO_SHOW_BOTH_RULES_COPY,
   NO_SHOW_POST_PICKUP_MINUTES,
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_STAGE_REFUSAL,
@@ -40,12 +37,6 @@ import {
   type NoShowOutcome,
   type NoShowTreatment,
 } from "@/lib/driver-data/no-show-rules";
-import {
-  COUNTDOWN_MAX_MINUTES,
-  formatCountdown,
-  formatLongWait,
-  useNoShowClock,
-} from "@/hooks/use-no-show-clock";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -214,37 +205,21 @@ function TileIcon({ tile }: { tile: OptionTile }) {
 
 function Tile({
   tile,
-  countdown,
   onSelect,
 }: {
   tile: OptionTile;
-  /**
-   * A live wait shown on the tile itself.
-   *
-   * So the driver learns they are waiting WITHOUT having to open the screen,
-   * pick a type, sign, and be refused. The tile stays fully tappable on purpose
-   * — going in early to choose a type and sign, ready to submit the moment it
-   * unlocks, is a reasonable thing to want to do.
-   */
-  countdown?: string;
   onSelect: (id: string) => void;
 }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(tile.id)}
-      className="flex min-h-[168px] w-full flex-col items-center justify-center gap-2 px-4 py-6"
+      className="flex min-h-[168px] w-full flex-col items-center justify-center gap-3 px-4 py-6"
     >
       <TileIcon tile={tile} />
-      <span className="mt-1 max-w-[150px] text-center text-base leading-snug text-gray-800">
+      <span className="max-w-[150px] text-center text-base leading-snug text-gray-800">
         {tile.label}
       </span>
-      {countdown && (
-        <span className="flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-bold tabular-nums text-[#92400E]">
-          <Clock className="h-3 w-3" aria-hidden />
-          {countdown}
-        </span>
-      )}
     </button>
   );
 }
@@ -274,55 +249,23 @@ export function MoreOptionsScreen({
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
   const [stageRefused, setStageRefused] = useState(false);
-  /**
-   * The refusal shown BEFORE the driver invests anything.
-   *
-   * With this in place the Member No-Show screen is reachable only when the
-   * no-show would actually succeed — every refusal now happens here, on the tap,
-   * rather than after picking a type and signing. The screen's own Submit-time
-   * refusal survives as a backstop for direct-URL entry.
-   */
-  const [earlyRefusal, setEarlyRefusal] = useState<NoShowOutcome | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
 
   /**
-   * The same ladder the Member No-Show screen runs, one screen earlier.
+   * ⚠️ Nothing about guardrail 2 is known here.
    *
-   * Only the `timer` outcome surfaces here. A `form` or a refusal deliberately
-   * does NOT — those are the familiar production dialogs, and pre-empting them
-   * on the tile would replace a message the driver recognises with a label they
-   * have to learn. A countdown is different: it is information they cannot get
-   * any other way, and it saves a pointless trip through the form.
-   */
-  const treatment = treatmentFor(trip);
-  const outcomeNow = resolveNoShow(trip, activeLeg, 0);
-  const elapsed = useNoShowClock(outcomeNow.kind === "timer");
-  const outcome = resolveNoShow(trip, activeLeg, elapsed);
-  const countdownText =
-    outcome.kind === "timer"
-      ? outcome.minutesRemaining > COUNTDOWN_MAX_MINUTES
-        ? formatLongWait(outcome.minutesRemaining)
-        : formatCountdown(outcome.minutesRemaining)
-      : undefined;
-  /**
-   * The passive pill on the tile — a glance at More tells you you are waiting.
+   * The production lookback runs only on Submit, so at this point the app has
+   * performed no location check at all — no distance, no dwell, nothing. There
+   * used to be a countdown pill on this tile and a refusal dialog on the tap;
+   * both were scrapped, because they were claiming knowledge the app does not
+   * have until the driver submits.
    *
-   * ⚠️ Only on treatments that surface the wait early. An `as-is` ride must not
-   * carry it: production shows nothing here, and a pill would quietly turn the
-   * before-picture into a proposal.
+   * Guardrail 1 is different and stays: it reads the ride's own status, which is
+   * available immediately and needs no location at all.
    */
-  const noShowCountdown =
-    treatment.refuseAt === "more" && treatment.showTimer
-      ? countdownText
-      : undefined;
 
   /**
    * ⚠️ The grid never changes shape. All seven production tiles, always, with
    * `Send Back Trip` full-width as the odd one — exactly as captured.
-   *
-   * Member No-Show is among them whatever the ride's state. It refuses with a
-   * dialog rather than disappearing, because production does and because a tile
-   * that vanishes leaves the driver hunting for a control they know is there.
    */
   const gridTiles: OptionTile[] = PRODUCTION_TILES.map((tile) =>
     tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
@@ -340,9 +283,7 @@ export function MoreOptionsScreen({
 
   function handleGridTile(id: string) {
     if (id === "no-show") {
-      // Guardrail 1, here on the grid, because it is about the RIDE and needs no
-      // input to decide. Guardrail 2 is about the wait and fires on the next
-      // screen's Submit, which is where production runs it.
+      // Guardrail 1 only — the ride's status, which needs no location check.
       if (!activeLeg || !canFileNoShow(trip, activeLeg)) {
         setStageRefused(true);
         return;
@@ -354,17 +295,6 @@ export function MoreOptionsScreen({
           title: "Member No-Show",
           description: "This ride is already with Support.",
         });
-        return;
-      }
-      // Guardrail 2, but only for the rides whose treatment says the refusal
-      // belongs here. The `as-is` rows deliberately let the driver walk into the
-      // screen, pick a type and sign before being refused — that is what
-      // production does, and the comparison is the point.
-      if (
-        treatment.refuseAt === "more" &&
-        (outcome.kind === "timer" || outcome.kind === "form")
-      ) {
-        setEarlyRefusal(outcome);
         return;
       }
       router.push(`/my-rides/${trip.id}/no-show`);
@@ -388,69 +318,6 @@ export function MoreOptionsScreen({
           More Options
         </h1>
       </header>
-
-      <AlertDialog
-        open={Boolean(earlyRefusal)}
-        onOpenChange={(open) => !open && setEarlyRefusal(null)}
-      >
-        <AlertDialogContent className="max-w-[21rem] rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold text-gray-900">
-              {earlyRefusal?.kind === "timer"
-                ? "Not yet"
-                : "Unable to complete action"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base text-gray-700">
-              {refusalCopyFor(earlyRefusal, treatment)}
-            </AlertDialogDescription>
-            {/* ⚠️ WV 1.1 — be explicit that BOTH rules apply. A WellTrans Indiana
-                driver waiting on the pick-up window would otherwise think the
-                clock is the only thing standing between them and filing, and
-                wander off the pick-up while it runs. */}
-            {earlyRefusal?.kind === "timer" &&
-              earlyRefusal.reason === "post-pickup" &&
-              treatment.copy === "revised" && (
-                <AlertDialogDescription className="text-base text-gray-700">
-                  {NO_SHOW_BOTH_RULES_COPY}
-                </AlertDialogDescription>
-              )}
-            {/* The countdown lives HERE now, not on the Submit button. */}
-            {earlyRefusal?.kind === "timer" && treatment.showTimer && countdownText && (
-              <p className="pt-1 text-2xl font-bold tabular-nums text-gray-900">
-                {countdownText}
-                <span className="ml-2 align-middle text-sm font-medium text-gray-500">
-                  {earlyRefusal.reason === "post-pickup"
-                    ? `until ${NO_SHOW_POST_PICKUP_MINUTES} min past pick-up`
-                    : `until ${NO_SHOW_WAIT_MINUTES} min at the pick-up`}
-                </span>
-              </p>
-            )}
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
-            {/* ⚠️ A timer gets NO form and NO way through — closing is the only
-                action, because the driver is at the pick-up and simply has not
-                waited long enough. Anything else here is a way to skip the wait.
-
-                A form outcome is the opposite: nothing they do at the pick-up
-                will ever clear it, so the form is the only way forward. */}
-            {earlyRefusal?.kind === "form" && treatment.offerForm && (
-              <AlertDialogAction
-                onClick={() => {
-                  setEarlyRefusal(null);
-                  setFormOpen(true);
-                }}
-                className="h-12 w-full rounded-lg text-base font-bold text-white"
-                style={{ backgroundColor: "#00B090" }}
-              >
-                Submit support form
-              </AlertDialogAction>
-            )}
-            <AlertDialogCancel className="mt-0 h-12 w-full rounded-lg border-gray-300 text-base font-bold text-gray-900">
-              {earlyRefusal?.kind === "timer" ? "Close" : "OK"}
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog
         open={stageRefused}
@@ -478,16 +345,6 @@ export function MoreOptionsScreen({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* No screen ran, so `noShowType` is empty — which is what makes the form
-          ask for the type and take the signature itself. */}
-      <RiderNoShowForm
-        trip={trip}
-        leg={activeLeg}
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        onSubmitted={() => router.push(backHref)}
-      />
-
       <div className="grid grid-cols-2 border-t border-[#F0F0F0]">
         {gridTiles.map((tile, index) => (
           <div
@@ -500,11 +357,7 @@ export function MoreOptionsScreen({
             )}
             style={tile.fullWidth ? { gridColumn: "span 2" } : undefined}
           >
-            <Tile
-              tile={tile}
-              countdown={tile.id === "no-show" ? noShowCountdown : undefined}
-              onSelect={handleGridTile}
-            />
+            <Tile tile={tile} onSelect={handleGridTile} />
           </div>
         ))}
       </div>

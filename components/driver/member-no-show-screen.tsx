@@ -28,7 +28,6 @@ import {
   NO_SHOW_TYPES,
   resolveNoShow,
   treatmentFor,
-  NO_SHOW_BOTH_RULES_COPY,
   type NoShowOutcome,
 } from "@/lib/driver-data/no-show-rules";
 import { refusalCopyFor } from "@/components/driver/more-options-screen";
@@ -89,9 +88,9 @@ export function MemberNoShowScreen({
    * no-show will succeed — the countdown belongs where the refusal is.
    */
   const treatment = treatmentFor(trip);
-  const outcomeNow = resolveNoShow(trip, activeLeg, 0);
+  const outcomeNow = resolveNoShow(trip, activeLeg, 0, noShowType);
   const elapsed = useNoShowClock(outcomeNow.kind === "timer");
-  const outcome = resolveNoShow(trip, activeLeg, elapsed);
+  const outcome = resolveNoShow(trip, activeLeg, elapsed, noShowType);
 
   function handleSubmit() {
     // Light validation first, and deliberately NOT the refusal dialog — an
@@ -113,6 +112,14 @@ export function MemberNoShowScreen({
       return;
     }
     if (!activeLeg) return;
+
+    // ⚠️ `Cancel At Door` on a bypass ride: no wait to serve, so the form opens
+    // and asks who told them instead. The location check still ran — a driver
+    // who has left falls through to the refusal below like anyone else.
+    if (outcome.kind === "cancel-at-door") {
+      setFormOpen(true);
+      return;
+    }
 
     if (outcome.kind !== "files") {
       setRefusal(outcome);
@@ -232,13 +239,6 @@ export function MemberNoShowScreen({
                 does. "Wait at least 10 minutes" with no idea how many are left is
                 the difference between a rule and an instruction, and it is gated
                 on the treatment so the as-is rows stay honest. */}
-            {refusal?.kind === "timer" &&
-              treatment.copy === "revised" &&
-              refusal.reason === "post-pickup" && (
-                <AlertDialogDescription className="text-base text-gray-700">
-                  {NO_SHOW_BOTH_RULES_COPY}
-                </AlertDialogDescription>
-              )}
             {refusal?.kind === "timer" && treatment.showTimer && (
               <p className="pt-1 text-base font-bold text-gray-900">
                 {refusal.minutesRemaining > COUNTDOWN_MAX_MINUTES
@@ -290,6 +290,9 @@ export function MemberNoShowScreen({
         trip={trip}
         leg={activeLeg}
         noShowType={noShowType}
+        variant={
+          outcome.kind === "cancel-at-door" ? "cancel-at-door" : "presence"
+        }
         open={formOpen}
         onOpenChange={setFormOpen}
         onSubmitted={() => router.push(backHref)}

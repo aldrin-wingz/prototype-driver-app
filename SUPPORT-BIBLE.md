@@ -233,33 +233,47 @@ bun run typecheck    # must stay at 0 — the only automated check that exists
 
 **The demo path:** My Rides → a ride → **More** → **Member No-Show** → pick a type, sign, **Submit**.
 
-**A BEFORE-AND-AFTER matrix.** The In Progress tab is ordered to match it, so a reviewer walks straight down the list. A plain number is **production as it behaves today**; a decimal is a **proposal**.
+**A BEFORE-AND-AFTER matrix.** The In Progress tab is ordered to match it. A plain number is **production as it behaves today**; a decimal is a **proposal**.
 
-| Row | Ride | Refused at | Copy | Timer | Form |
+| Row | Ride | Copy | Timer | Form | Cancel-at-door bypass |
 |---|---|---|---|---|---|
-| **1** | `…371` not started or en-route | More | production | — | — |
+| **1** | `…371` not started or en-route | production | — | — | — |
 | **2** | `…370` meets criteria | — files | — | — | — |
-| **3** | `…381` no 10 consec min — **as-is** | Submit | production | ✗ | ✗ |
-| **3.1** | `…373` ″ | Submit | production | **✓** | ✗ |
-| **3.2** | `…382` ″ | **More** | production | **✓** | ✗ |
-| **4** | `…383` not at pickup — **as-is** | Submit | production | ✗ | ✗ |
-| **4.1** | `…376` ″ | Submit | **revised** | ✗ | **✓** |
-| **4.2** | `…384` ″ | **More** | **revised** | ✗ | **✓** |
-| **5** | `…377` no location points | Submit | revised | ✗ | ✓ |
-| **WV1** | `…378` not yet +15 — **as-is** | Submit | production | ✗ | ✗ |
-| **WV1.1** | `…385` ″ | **More** | **revised** | **✓** | ✗ |
-| — | `…380` 3.1 at the boundary | Submit | production | ✓ | ✗ |
+| **3** | `…381` no 10 consec min — **as-is** | production | ✗ | ✗ | ✗ |
+| **3.1** | `…373` ″ | production | **✓** | ✗ | **✓** |
+| **4** | `…383` not at pickup — **as-is** | production | ✗ | ✗ | ✗ |
+| **4.1** | `…376` ″ | **revised** | ✗ | **✓** | n/a |
+| **5** | `…377` no location points | revised | ✗ | ✓ | n/a |
+| **WV1** | `…378` not yet +15 — **as-is** | production | ✗ | ✗ | ✗ |
+| **WV1.1** | `…385` ″ | **revised** | **✓** | ✗ | **✓** |
+| — | `…380` 3.1 at the boundary | production | ✓ | ✗ | ✓ |
 
-**⚠️ The treatment cannot come from the ride data.** 3, 3.1 and 3.2 are the *same* guardrail state — the check resolves identically on all three, which is asserted in the verification — and differ only in how the app says so. So it is declared per ride as `trip.noShowDemo`, resolved through `NO_SHOW_TREATMENTS`. Demo scaffolding, not a product concept.
+**⚠️ Everything refuses at Submit, and nothing appears on the tile.** Rows that refused from the More tile — and the countdown pill that went with them — were **scrapped** once it was confirmed the production lookback runs only on Submit. Before that the app has performed no location check at all: no distance, no dwell. A pill or a dialog there would be claiming knowledge it does not have. Guardrail 1 is the exception and still fires at More, because it reads ride status and needs no location.
 
-**⚠️ Every as-is row has `offerForm: false`.** Production refuses and stops; the "Submit support form" button is the *proposal*. An as-is ride that offered it would quietly turn the before-picture into an after. Same for `showTimer` and the tile pill — production shows neither, so neither appears.
+**⚠️ The treatment cannot come from the ride data.** 3 and 3.1 are the *same* guardrail state; the verification asserts they resolve identically. It is declared per ride as `trip.noShowDemo`, resolved through `NO_SHOW_TREATMENTS`. Demo scaffolding, not a product concept.
 
-**⚠️ Row 4 as-is reproduces the bug faithfully.** That driver's latest fix is outside the radius, so they have left — and it tells them to *"wait at least 10 minutes at the pick up location"*, then dead-ends. Waiting where they are can never clear it. **That is the traffic this project exists to absorb**, and 4.1 / 4.2 are the fix.
+**⚠️ Every as-is row has `offerForm: false`, `showTimer: false`, `cancelAtDoorBypass: false`.** Production refuses and stops; the form button, the countdown and the bypass are all *proposals*. An as-is ride carrying any of them would quietly turn the before-picture into an after.
 
-**Row 5 has no as-is twin**, because there is nothing to compare against: production's own message for it is unreachable, so a driver with no fix gets the wait-10-minutes message today. See finding 1.
+### Cancel At Door skips the wait — but not the location check
 
-`…380` is the only way to reach `files` without waiting eight minutes: the countdown runs out while you watch and Submit unlocks.
+⚠️ **Proposal only.** The ten-minute wait exists to establish that the member never came out; a **cancellation is established by a person saying so**. A driver told at the door should not stand there for ten minutes proving an absence nobody is claiming.
 
-⚠️ **`inferNearWindow` is unexercised by the seed.** It prefills the form's two times from a wait the app *did* see, and no kept row has one — 4.x and 5 have no near records at all. Correct, but bring back a "waited then drove off" ride to see it.
+What it does *not* skip is where they are. `resolveNoShow` grants the bypass only when the walk shows a near-run — so a driver who has left, or was never there, still gets scenario 4's refusal. Asserted in the verification.
+
+The form swaps question set with the claim:
+
+| `presence` — a wait we couldn't confirm | `cancel-at-door` — a person told them |
+|---|---|
+| What time did you arrive? | Who did you talk to? *(member / related / other)* |
+| What time did you leave? | Signature **or** a photo |
+| Where did you wait for the member? | |
+| Did you knock at the door? | |
+| Attach proof you were there *(optional)* | |
+
+**⚠️ `requireOneOf` is a new runtime rule, and it has a trap.** Signature *or* photo cannot be expressed with per-field `required`, so it is a case-level group read by `canSubmitCase`. **A field in a group must not also be individually `required`** — `areRequiredFieldsFilled` runs first, so a required member can never be satisfied by its partner and the group becomes dead code. That bug shipped for one commit: the copy promised either while the gate demanded the signature. `conflictingOneOfFields` exists so it cannot come back silently, and the verification runs it across all eight builder shapes.
+
+**Where did you wait** is free text. ⚠️ Production should offer a **map pin** as well — "the main entrance" of a hospital campus is not a location — but a pin picker is a map the prototype does not have.
+
+**Attach proof changed meaning** and is now **optional**: it used to be proof the driver tried to *reach* the member, and is now proof they were *at the location*. Optional because a driver at an empty doorstep may have nothing to photograph, and a required field they cannot satisfy is another dead end.
 
 **One known console warning:** Radix `Missing 'Description' or 'aria-describedby'` on `DialogContent`. Pre-existing, from the drawer primitive.

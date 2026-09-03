@@ -224,6 +224,14 @@ export interface SupportCaseDefinition {
   /** Label on the secondary footer button. */
   cancelLabel?: string;
   fields: SupportField[];
+  /**
+   * Groups where at least one field must be filled.
+   *
+   * For a case that will accept any one of several answers — a signature OR a
+   * photo — which per-field `required` cannot express. Each inner array is one
+   * group; every group needs one non-empty visible member.
+   */
+  requireOneOf?: string[][];
   resolution: SupportResolutionPath;
   /** Confirmation copy shown after a successful submit. */
   successMessage?: string;

@@ -45,6 +45,7 @@ export function buildSupportFormCase({
   includeIssues,
   askNoShowType = false,
   askSignature = false,
+  variant = "presence",
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -68,6 +69,19 @@ export function buildSupportFormCase({
   askNoShowType?: boolean;
   /** Ask for the signature here, because no screen collected one. */
   askSignature?: boolean;
+  /**
+   * Which set of questions this filing needs.
+   *
+   * `presence` — the driver says they waited and we could not confirm it, so the
+   * form substitutes for the evidence: when they arrived, when they left, where
+   * they waited, whether they knocked.
+   *
+   * `cancel-at-door` — a different claim entirely. Nobody failed to appear; the
+   * member (or their family) cancelled to the driver's face. The wait is beside
+   * the point and the questions are about **who said so**, which is why this
+   * variant skips the ten-minute gate upstream.
+   */
+  variant?: "presence" | "cancel-at-door";
 } = {}): SupportCaseDefinition {
   return {
     id: SUPPORT_FORM_CASE_ID,
@@ -82,6 +96,18 @@ export function buildSupportFormCase({
     resolution: "cs-queue",
     successMessage: "Sent to Support",
     zendeskEquivalent: "Member no-show",
+    /**
+     * ⚠️ Either the signature or the photo will do — not both, and not neither.
+     *
+     * The runtime's per-field `required` cannot express that, so this is a
+     * case-level rule read by `canSubmitCase`. Added because a specified case
+     * needs it, not speculatively: asking a driver for a signature AND a photo
+     * of the same cancellation is asking twice.
+     */
+    requireOneOf:
+      variant === "cancel-at-door" && askSignature
+        ? [["signature", "cancelProof"]]
+        : undefined,
     fields: [
       {
         id: "issue",
@@ -140,43 +166,95 @@ export function buildSupportFormCase({
         lockWhenPrefilled: true,
         lockedBadge: "From this ride",
       },
-      {
-        id: "waitedFrom",
-        type: "time",
-        label: "What time did you start waiting?",
-        // The label is a question; the warning copy needs a noun phrase.
-        shortLabel: "time you started waiting",
-        helpText: "When you arrived at the pick-up.",
-        required: true,
-        prefillFrom: "waitArrivedAt",
-        // ⚠️ NO `lockWhenPrefilled`, and that is the whole point — the inverse of
-        // a recorded swipe mark. What prefills here is the evidence we have just
-        // judged insufficient, so locking it would stop the driver correcting the
-        // one thing we are unsure about.
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
-      {
-        id: "leftAt",
-        type: "time",
-        label: "What time did you leave?",
-        shortLabel: "time you left",
-        helpText: "When you gave up and drove off.",
-        required: true,
-        prefillFrom: "waitLeftAt",
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
-      {
-        id: "contactProof",
-        type: "file",
-        label: "Attach proof you tried to reach the member",
-        // Required in the real flow — a no-show without a contact attempt is not
-        // a no-show — but a prototype must not hold a demo hostage to a call-log
-        // screenshot nobody has to hand.
-        required: true,
-        requiredNotEnforced: true,
-        helpText: "A call log, a screenshot of your texts, anything showing you tried.",
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
+      ...(variant === "cancel-at-door"
+        ? ([
+            {
+              id: "cancelToldBy",
+              type: "select",
+              label: "Who did you talk to?",
+              placeholder: "Select:",
+              required: true,
+              options: [
+                { value: "member", label: "The member" },
+                { value: "related", label: "Someone related to the member" },
+                { value: "other", label: "Someone else" },
+              ],
+              helpText: "Whoever told you the ride was cancelled.",
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+            {
+              id: "cancelProof",
+              type: "file",
+              label: "Attach a photo",
+              helpText:
+                "A photo works instead of a signature — either one is enough.",
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : ([
+            {
+              id: "waitedFrom",
+              type: "time",
+              label: "What time did you arrive?",
+              shortLabel: "time you arrived",
+              helpText: "When you got to the pick-up.",
+              required: true,
+              prefillFrom: "waitArrivedAt",
+              // ⚠️ NO `lockWhenPrefilled` — the inverse of a recorded swipe
+              // mark. What prefills here is the evidence we have just judged
+              // insufficient, so locking it would stop the driver correcting the
+              // one thing we are unsure about.
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+            {
+              id: "leftAt",
+              type: "time",
+              label: "What time did you leave?",
+              shortLabel: "time you left",
+              helpText: "When you gave up and drove off.",
+              required: true,
+              prefillFrom: "waitLeftAt",
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+            {
+              id: "waitedWhere",
+              type: "text",
+              label: "Where did you wait for the member?",
+              placeholder: "e.g. front entrance, west tower lobby, in the driveway",
+              required: true,
+              // ⚠️ Production should offer a map pin as well as free text — "the
+              // main entrance" of a hospital campus is not a location. Text only
+              // here, because a pin picker is a map the prototype does not have.
+              helpText:
+                "Be specific — it is how Support can tell you were at the right door. ⚠️ A map pin belongs here too.",
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+            {
+              id: "knocked",
+              type: "select",
+              label: "Did you knock at the door?",
+              placeholder: "Select:",
+              required: true,
+              options: [
+                { value: "yes", label: "Yes" },
+                { value: "no", label: "No" },
+              ],
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+            {
+              id: "contactProof",
+              // ⚠️ OPTIONAL now, and it changed meaning: it used to be proof the
+              // driver tried to REACH the member; it is now proof they were at
+              // the location. Optional because a driver standing at an empty
+              // doorstep has nothing obvious to photograph, and a required field
+              // they cannot satisfy is a dead end.
+              type: "file",
+              label: "Attach proof you were there (optional)",
+              helpText: "A photo of the address or the door, if you have one.",
+              showIf: ONLY_RIDER_NO_SHOW,
+            },
+          ] as SupportCaseDefinition["fields"])),
+
       // ⚠️ The signature is conditional, and where it lives is a real decision.
       //
       // Reached from the Member No-Show screen the driver has already signed —
@@ -193,10 +271,20 @@ export function buildSupportFormCase({
             {
               id: "signature",
               type: "signature",
-              label: "Sign to confirm",
+              label:
+                variant === "cancel-at-door"
+                  ? "Sign to confirm"
+                  : "Sign to confirm",
               helpText:
-                "Sign to confirm the member did not come out for this ride.",
-              required: true,
+                variant === "cancel-at-door"
+                  ? "Sign, or attach a photo above — either one is enough."
+                  : "Sign to confirm the member did not come out for this ride.",
+              // ⚠️ NOT individually required in the cancel-at-door variant, and
+              // that is load-bearing: `areRequiredFieldsFilled` runs BEFORE the
+              // either/or groups, so a field marked required here can never be
+              // satisfied by its partner and the group is dead code. Enforced by
+              // `assertOneOfGroupsAreNotRequired`.
+              required: variant !== "cancel-at-door",
               showIf: ONLY_RIDER_NO_SHOW,
             },
           ] as SupportCaseDefinition["fields"])

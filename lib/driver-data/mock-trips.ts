@@ -1043,6 +1043,10 @@ export const mockNeedsActionTrips: Trip[] = [
 // SIX SCENARIOS, named against the production `canNoshow` check. Choosing a ride
 // is how you pick one — the demo mechanic.
 //
+// ⚠️ 3.2 and 4.2 were SCRAPPED once it was confirmed the production lookback
+// runs only on Submit — before that the app has checked nothing, so it cannot
+// honestly refuse or show a countdown from the More tile.
+//
 //   1   not started or en-route          → refused, dead end
 //   2   meets every criterion            → files
 //   3   no 10 consecutive min at pickup  → timer
@@ -1273,66 +1277,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "3.1",
-    pills: [{ label: "3.1 · No 10 consec min · timer IN the pop-up", variant: "warning" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
-
-  // ===== SCENARIO 3.2 — the countdown moves to the tile tap =====
-  //
-  // Same state again. The driver learns the wait before picking a type or
-  // signing, and the pop-up CLOSES — no way through, because they are at the
-  // pick-up and simply have not waited long enough.
-  {
-    id: "1049800382",
-    date: "Tue, Jul 8, 2026",
-    rider: "Cassian Boyle",
-    client: "Verida",
-    market: "GA",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 53.40,
-    notes: "Apartment gate on the Cedar St side",
-    legs: [
-      {
-        id: "1049800382",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "10:20 AM",
-        address: "512 Cedar St, Carrollton, GA 30117",
-        county: "Carroll County",
-        revenue: 53.40,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "10:06 AM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-        locationRecords: [
-            { ageMinutes: 0, distanceMiles: 0.2 },
-            { ageMinutes: 1, distanceMiles: 0.2 },
-            { ageMinutes: 2, distanceMiles: 0.2 },
-            { ageMinutes: 4, distanceMiles: 1.9 },
-            { ageMinutes: 6, distanceMiles: 2.4 },
-            { ageMinutes: 9, distanceMiles: 0.3 },
-            { ageMinutes: 14, distanceMiles: 0.3 },
-            { ageMinutes: 18, distanceMiles: 0.4 },
-        ],
-      },
-      {
-        id: "1049800382-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "11:00 AM",
-        address: "45 Tanner Medical Way, Carrollton, GA 30117",
-        county: "Carroll County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    noShowDemo: "3.2",
-    pills: [{ label: "3.2 · No 10 consec min · timer from More, closes", variant: "attention" }],
+    pills: [{ label: "3.1 · No 10 consec min · timer + cancel-at-door bypass", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1448,63 +1393,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "4.1",
-    pills: [{ label: "4.1 · Not at pickup · revised copy + form", variant: "warning" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
-
-  // ===== SCENARIO 4.2 — the same message, before any effort =====
-  //
-  // ⚠️ Skipping the screen means nothing has collected a no-show type or a
-  // signature, so the FORM asks for both — see `askNoShowType` / `askSignature`.
-  // Without that, Support would get a claim with neither.
-  {
-    id: "1049800384",
-    date: "Tue, Jul 8, 2026",
-    rider: "Rafferty Nunes",
-    client: "Alivi",
-    market: "FL",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 39.75,
-    notes: "Pick-up is the west tower lobby, not the main entrance",
-    legs: [
-      {
-        id: "1049800384",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "2:10 PM",
-        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
-        county: "Lee County",
-        revenue: 39.75,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "1:52 PM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-        locationRecords: [
-            { ageMinutes: 0, distanceMiles: 0.61 },
-            { ageMinutes: 3, distanceMiles: 0.6 },
-            { ageMinutes: 7, distanceMiles: 0.62 },
-            { ageMinutes: 12, distanceMiles: 0.59 },
-            { ageMinutes: 17, distanceMiles: 0.63 },
-        ],
-      },
-      {
-        id: "1049800384-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "2:55 PM",
-        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
-        county: "Lee County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    noShowDemo: "4.2",
-    pills: [{ label: "4.2 · Not at pickup · revised copy from More", variant: "attention" }],
+    pills: [{ label: "4.1 · Not at pickup · revised copy + 5-question form", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1680,7 +1569,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "WV1.1",
-    pills: [{ label: "WV1.1 · Not yet +15 · timer from More + both rules", variant: "attention" }],
+    pills: [{ label: "WV1.1 · Not yet +15 · timer, both rules, bypass", variant: "attention" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1744,7 +1633,6 @@ export const mockInProgressTrips: Trip[] = [
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-
 ];
 
 // Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);

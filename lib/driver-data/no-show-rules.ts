@@ -150,12 +150,21 @@ export function requiresPostPickupDelay(trip: Trip): boolean {
 }
 
 export type NoShowFormGap = "not_at_pickup" | "no_location_data";
+
+/** `Cancel At Door` — the type whose claim is confirmed by a person, not a wait. */
+export const NO_SHOW_TYPE_CANCEL_AT_DOOR = "Cancel At Door";
 export type NoShowTimerReason = "presence" | "post-pickup";
 
 export type NoShowOutcome =
   | { kind: "files"; qualifyingMinutes: number }
   | { kind: "timer"; reason: NoShowTimerReason; minutesRemaining: number }
   | { kind: "form"; gap: NoShowFormGap; detail: string }
+  /**
+   * `Cancel At Door`, at the pick-up, on a ride whose treatment allows the
+   * bypass. The ten-minute wait is skipped and the driver is asked who told them
+   * instead — a cancellation is established by a person, not by dwell time.
+   */
+  | { kind: "cancel-at-door" }
   | { kind: "confirm-first" }
   | { kind: "dead-end" };
 
@@ -169,12 +178,34 @@ export type NoShowOutcome =
 export function resolveNoShow(
   trip: Trip,
   leg: TripLeg | undefined,
-  elapsedMinutes = 0
+  elapsedMinutes = 0,
+  /** What the driver picked on the Member No-Show screen, if anything yet. */
+  noShowType = ""
 ): NoShowOutcome {
   if (isAwaitingMemberConfirmation(trip)) return { kind: "confirm-first" };
   if (!leg || !isInSwipeWindow(leg)) return { kind: "dead-end" };
 
   const walk = walkLocationRecords(leg.locationRecords ?? [], elapsedMinutes);
+
+  /**
+   * ⚠️ The bypass, and note WHAT it skips.
+   *
+   * It skips the ten-minute wait — not the location check. A driver claiming a
+   * cancellation at the door still has to be at the door, so a `blocked_far`
+   * with no near-run (they have left, or never arrived) still falls through to
+   * the form below. What it removes is the requirement to stand there for ten
+   * minutes proving an absence that is not being claimed.
+   */
+  const bypass =
+    treatmentFor(trip).cancelAtDoorBypass &&
+    noShowType === NO_SHOW_TYPE_CANCEL_AT_DOOR;
+  if (bypass) {
+    const atPickupNow =
+      walk.ok ||
+      (walk.reason === "blocked_far" && walk.nearRunOldestAge !== null) ||
+      walk.reason === "no_ten_minute_record";
+    if (atPickupNow) return { kind: "cancel-at-door" };
+  }
 
   if (!walk.ok) {
     // No usable position at all — or a fix so far out it cannot be one.
@@ -272,24 +303,37 @@ export function inferNearWindow(
  * has to be declared per ride.
  */
 export type NoShowDemoRow =
-  | "3" | "3.1" | "3.2"
-  | "4" | "4.1" | "4.2"
+  | "3" | "3.1"
+  | "4" | "4.1"
   | "5"
   | "WV1" | "WV1.1";
 
 export interface NoShowTreatment {
-  /** Where the refusal appears — after the driver has invested effort, or before. */
-  refuseAt: "submit" | "more";
   /** Production's exact wording, or the revised copy. */
   copy: "production" | "revised";
   /** Put the live countdown in the refusal. */
   showTimer: boolean;
   /** Offer the support form as a way forward. */
   offerForm: boolean;
+  /**
+   * `Cancel At Door` skips the ten-minute wait.
+   *
+   * ⚠️ Proposal only — production has no such bypass. The reasoning: the wait
+   * exists to establish that the member never came out, and a cancellation is
+   * established by a PERSON saying so. A driver who has just been told at the
+   * door should not have to stand there for ten minutes to prove it — but they
+   * do still have to be AT the door, so the location check stays.
+   */
+  cancelAtDoorBypass: boolean;
 }
 
 /**
  * The matrix, as config.
+ *
+ * ⚠️ **Everything is refused at Submit.** Rows that refused from the More tile
+ * were scrapped once it was confirmed the production lookback runs only on
+ * Submit: before that the app has performed no location check at all, so it
+ * cannot honestly say anything — not in a dialog, and not on a tile pill.
  *
  * ⚠️ Note what the `as-is` rows have in common: **`offerForm: false`**. Production
  * refuses and stops — the "Submit support form" button is the proposal, not the
@@ -298,59 +342,80 @@ export interface NoShowTreatment {
 export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
   // ── Scenario 3 — no 10 consecutive minutes at the pick-up ──
   /** Today. Refused at Submit, production's wording, no timer, dead end. */
-  "3": { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
-  /** Proposal: the same refusal, now carrying the countdown. */
-  "3.1": { refuseAt: "submit", copy: "production", showTimer: true, offerForm: false },
-  /** Proposal: the countdown moves to the tile tap, before any effort is spent. */
-  "3.2": { refuseAt: "more", copy: "production", showTimer: true, offerForm: false },
+  "3": {
+    copy: "production",
+    showTimer: false,
+    offerForm: false,
+    cancelAtDoorBypass: false,
+  },
+  /** Proposal: the same refusal, now carrying the countdown — and a bypass. */
+  "3.1": {
+    copy: "production",
+    showTimer: true,
+    offerForm: false,
+    cancelAtDoorBypass: true,
+  },
 
   // ── Scenario 4 — latest location outside the radius ──
   /** Today. ⚠️ Production tells a driver who has LEFT to wait where they are. */
-  "4": { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
+  "4": {
+    copy: "production",
+    showTimer: false,
+    offerForm: false,
+    cancelAtDoorBypass: false,
+  },
   /** Proposal: copy that is true for this driver, and a way forward. */
-  "4.1": { refuseAt: "submit", copy: "revised", showTimer: false, offerForm: true },
-  /** Proposal: the same, on the tile tap — they never enter a screen that cannot help. */
-  "4.2": { refuseAt: "more", copy: "revised", showTimer: false, offerForm: true },
+  "4.1": {
+    copy: "revised",
+    showTimer: false,
+    offerForm: true,
+    // Irrelevant here by construction: the bypass still requires being AT the
+    // pick-up, and this row is the driver who is not.
+    cancelAtDoorBypass: false,
+  },
 
   // ── Scenario 5 — no location points at all in the window ──
   /**
    * No as-is/proposal split, because there is nothing to compare against:
    * production's own message for this case is **unreachable** (it inserts a
    * location row before it queries), so a driver with no fix gets "wait 10
-   * minutes" today. This row is the corrected behaviour, and the form is the way
-   * forward because nothing they do at the pick-up will produce a fix.
+   * minutes" today. This row is the corrected behaviour.
    */
-  "5": { refuseAt: "submit", copy: "revised", showTimer: false, offerForm: true },
+  "5": {
+    copy: "revised",
+    showTimer: false,
+    offerForm: true,
+    cancelAtDoorBypass: false,
+  },
 
   // ── WellTrans Indiana — not yet 15 minutes past the pick-up ──
   /** Today. */
-  WV1: { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
-  /**
-   * Proposal: countdown from the tile tap, and explicit that BOTH rules hold.
-   *
-   * `more` for the same reason as 3.2 — a driver waiting on the pick-up window
-   * should not have to pick a type and sign to find that out. It also means this
-   * row picks up the tile pill, so the wait is visible at a glance.
-   */
-  "WV1.1": { refuseAt: "more", copy: "revised", showTimer: true, offerForm: false },
+  WV1: {
+    copy: "production",
+    showTimer: false,
+    offerForm: false,
+    cancelAtDoorBypass: false,
+  },
+  /** Proposal: countdown, both rules named, and the same bypass as 3.1. */
+  "WV1.1": {
+    copy: "revised",
+    showTimer: true,
+    offerForm: false,
+    cancelAtDoorBypass: true,
+  },
 };
 
 /** The treatment for a ride, defaulting to today's behaviour. */
 export function treatmentFor(trip: Trip): NoShowTreatment {
-  return trip.noShowDemo
-    ? NO_SHOW_TREATMENTS[trip.noShowDemo]
-    : { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false };
+  return (
+    (trip.noShowDemo && NO_SHOW_TREATMENTS[trip.noShowDemo]) || {
+      copy: "production",
+      showTimer: false,
+      offerForm: false,
+      cancelAtDoorBypass: false,
+    }
+  );
 }
-
-/**
- * WV 1.1 spells out that the location rule still applies.
- *
- * Without it a WellTrans driver watching the pick-up clock would reasonably think
- * it is the only thing between them and filing — and wander off the pick-up while
- * it runs, resetting the ten minutes they had already banked.
- */
-export const NO_SHOW_BOTH_RULES_COPY =
-  `You also need to stay within ${NO_SHOW_RADIUS_MILES} miles of the pick-up for ${NO_SHOW_WAIT_MINUTES} minutes without leaving — both have to be true.`;
 
 /** Whether Member No-Show is offered without a refusal. Kept for the tile's own check. */
 export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
@@ -366,7 +431,15 @@ export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
  */
 export const NO_SHOW_REFUSAL_COPY = {
   presence: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
-  "post-pickup": `Please wait at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled pick up time before requesting a Member no-show.`,
+  /**
+   * ⚠️ Revised, and deliberately spells out BOTH requirements.
+   *
+   * A driver told only about the pick-up window reasonably concludes the clock is
+   * the only thing in their way — and wanders off to get a coffee, resetting the
+   * ten minutes of presence they had already banked. Naming both is the whole
+   * point of the row.
+   */
+  "post-pickup": `A Member no-show can only be submitted ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled pick-up time. You also need to be at the pick-up when you submit, and to have been within ${NO_SHOW_RADIUS_MILES} miles of it for ${NO_SHOW_WAIT_MINUTES} minutes without leaving.`,
   /**
    * ⚠️ **OURS, and a correction — not production's wording.**
    *
@@ -377,7 +450,7 @@ export const NO_SHOW_REFUSAL_COPY = {
    * either going back, or telling us what happened — so the message says that.
    */
   not_at_pickup:
-    "You must be at the pick-up location to report a Member no-show. If you were there earlier and have already left, use the support form below.",
+    "You are not at the pick-up location. A Member no-show can only be reported from the pick-up. If you were there earlier and have already left, use the support form below.",
   no_location_data:
     "No location data has been detected from your phone. Please verify that your phone has the correct location settings before you request a Member no-show from the app.",
 } as const;
