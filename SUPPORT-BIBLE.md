@@ -254,6 +254,20 @@ bun run typecheck    # must stay at 0 — the only automated check that exists
 
 **⚠️ Every as-is row has `offerForm: false`, `showTimer: false`, `cancelAtDoorBypass: false`.** Production refuses and stops; the form button, the countdown and the bypass are all *proposals*. An as-is ride carrying any of them would quietly turn the before-picture into an after.
 
+### WellTrans Indiana already parameterises its refusal
+
+⚠️ **This corrects an assumption that was wrong.** "Production never tells the driver how long to wait" holds for the presence check and **not here** — the real string is:
+
+> `Please wait at least {wait_min} minutes after the scheduled pickup time before marking a Member no-show ({remaining} minute(s) remaining).`
+
+So the WV1 as-is row is **not** silent about time. It states a number — computed once at the moment of refusal, and stale the instant the driver reads it. Note also "marking", not "requesting": the two production messages do not share wording, and both are reproduced as found.
+
+WV1.1 keeps that opening and adds the thing a number cannot give: **the clock time it becomes available.**
+
+⚠️ **That time comes off the leg's scheduled pick-up, never `Date.now()`** — `postPickupAvailableAt`. Two reasons. It is what production would do, since the boundary is a fixed moment (`scheduled_pickup + 15`) rather than a rolling target. And it keeps the prototype coherent: ride times here are seeded, so adding minutes to the real clock previously produced *"2:29 AM"* on a ride whose pick-up read 1:50 PM.
+
+`postPickupRefusalCopy` never says *"0 minute(s) remaining"* — a refusal claiming no time remains reads as a bug rather than a wait — and the revised variant drops the availability clause entirely if the pick-up time cannot be parsed, rather than inventing one.
+
 ### Cancel At Door skips the wait — but not the location check
 
 ⚠️ **Proposal only.** The ten-minute wait exists to establish that the member never came out; a **cancellation is established by a person saying so**. A driver told at the door should not stand there for ten minutes proving an absence nobody is claiming.

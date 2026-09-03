@@ -138,7 +138,7 @@ export function MemberNoShowScreen({
   }
 
   /** What the refusal dialog says — production's wording, or the revised copy. */
-  const refusalCopy = refusalCopyFor(refusal, treatment);
+  const refusalCopy = refusalCopyFor(refusal, treatment, activeLeg);
   /**
    * ⚠️ Two independent reasons this can be false.
    *

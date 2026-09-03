@@ -24,13 +24,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
+import {
+  getLegStage,
+  type Trip,
+  type TripLeg,
+} from "@/lib/driver-data/mock-trips";
 import {
   canFileNoShow,
   NO_SHOW_POST_PICKUP_MINUTES,
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_STAGE_REFUSAL,
   NO_SHOW_WAIT_MINUTES,
+  postPickupAvailableAt,
+  postPickupRefusalCopy,
   requiresPostPickupDelay,
   resolveNoShow,
   treatmentFor,
@@ -149,10 +155,22 @@ const PRODUCTION_TILES: OptionTile[] = [
  */
 export function refusalCopyFor(
   outcome: NoShowOutcome | null,
-  treatment: NoShowTreatment
+  treatment: NoShowTreatment,
+  /** The leg, so the WellTrans availability time can come off its pick-up. */
+  leg?: TripLeg
 ): string {
   if (!outcome) return "";
-  if (outcome.kind === "timer") return NO_SHOW_REFUSAL_COPY[outcome.reason];
+  if (outcome.kind === "timer") {
+    // The post-pickup wait is the one production already parameterises, so its
+    // copy is built rather than looked up.
+    return outcome.reason === "post-pickup"
+      ? postPickupRefusalCopy({
+          copy: treatment.copy,
+          remainingMinutes: outcome.minutesRemaining,
+          availableAt: leg ? postPickupAvailableAt(leg) : null,
+        })
+      : NO_SHOW_REFUSAL_COPY.presence;
+  }
   if (outcome.kind !== "form") return "";
   return treatment.copy === "revised"
     ? NO_SHOW_REFUSAL_COPY[outcome.gap]

@@ -149,6 +149,41 @@ export function requiresPostPickupDelay(trip: Trip): boolean {
   return trip.client === "WellTrans" && trip.market === "IN";
 }
 
+/** "11:40 AM" → minutes since midnight, or `null` if it cannot be read. */
+function clockToMinutes(clock: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(clock.trim());
+  if (!match) return null;
+  const [, rawHour, minute, meridiem] = match;
+  const hour = Number(rawHour) % 12;
+  return hour * 60 + Number(minute) + (meridiem.toUpperCase() === "PM" ? 720 : 0);
+}
+
+/** 715 → "11:55 AM". */
+function minutesToClock(minutes: number): string {
+  const wrapped = ((Math.round(minutes) % 1440) + 1440) % 1440;
+  const hour24 = Math.floor(wrapped / 60);
+  const hour = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour}:${String(wrapped % 60).padStart(2, "0")} ${hour24 < 12 ? "AM" : "PM"}`;
+}
+
+/**
+ * The clock time a WellTrans Indiana filing becomes available.
+ *
+ * ⚠️ Derived from the leg's **scheduled pick-up**, never from `Date.now()`, and
+ * that matters twice. It is what production would do — the boundary is a fixed
+ * moment, `scheduled_pickup + 15`, not a rolling target. And it keeps the
+ * prototype coherent: ride times here are seeded, so adding minutes to the real
+ * clock produced things like "2:29 AM" on a ride whose pick-up reads 1:50 PM.
+ *
+ * `null` when the leg's time cannot be read — then say nothing rather than guess.
+ */
+export function postPickupAvailableAt(leg: TripLeg): string | null {
+  const pickup = clockToMinutes(leg.time);
+  return pickup === null
+    ? null
+    : minutesToClock(pickup + NO_SHOW_POST_PICKUP_MINUTES);
+}
+
 export type NoShowFormGap = "not_at_pickup" | "no_location_data";
 
 /** `Cancel At Door` — the type whose claim is confirmed by a person, not a wait. */
@@ -432,15 +467,6 @@ export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
 export const NO_SHOW_REFUSAL_COPY = {
   presence: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
   /**
-   * ⚠️ Revised, and deliberately spells out BOTH requirements.
-   *
-   * A driver told only about the pick-up window reasonably concludes the clock is
-   * the only thing in their way — and wanders off to get a coffee, resetting the
-   * ten minutes of presence they had already banked. Naming both is the whole
-   * point of the row.
-   */
-  "post-pickup": `A Member no-show can only be submitted ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled pick-up time. You also need to be at the pick-up when you submit, and to have been within ${NO_SHOW_RADIUS_MILES} miles of it for ${NO_SHOW_WAIT_MINUTES} minutes without leaving.`,
-  /**
    * ⚠️ **OURS, and a correction — not production's wording.**
    *
    * Production says "please wait at least 10 minutes at the pick up location",
@@ -454,6 +480,51 @@ export const NO_SHOW_REFUSAL_COPY = {
   no_location_data:
     "No location data has been detected from your phone. Please verify that your phone has the correct location settings before you request a Member no-show from the app.",
 } as const;
+
+/**
+ * WellTrans Indiana's refusal, which production already parameterises.
+ *
+ * ⚠️ **This corrects an earlier assumption of mine.** "Production never tells a
+ * driver how long to wait" is true of the presence check and **false here** — the
+ * real string carries `({remaining} minute(s) remaining)`. So the as-is row is
+ * not silent about time; it states a number, computed once at the moment of
+ * refusal and stale the instant it is read.
+ *
+ * `production` is that string verbatim — plural parentheses, and "marking"
+ * rather than "requesting" — because those are the words a driver recognises.
+ *
+ * `revised` keeps the opening and then does the thing a number cannot: names the
+ * **clock time** it becomes available, so the driver can plan instead of
+ * re-tapping to watch a smaller number. It also names the location requirement,
+ * which production omits — a driver told only about the pick-up window wanders
+ * off and resets the ten minutes they had banked.
+ */
+export function postPickupRefusalCopy({
+  copy,
+  remainingMinutes,
+  availableAt,
+}: {
+  copy: "production" | "revised";
+  remainingMinutes: number;
+  availableAt: string | null;
+}): string {
+  const opening =
+    `Please wait at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled ` +
+    `pickup time before marking a Member no-show`;
+
+  if (copy === "production") {
+    // `Math.max(1, ...)`: production counts whole minutes remaining, and a
+    // refusal that says "0 minute(s) remaining" reads as a bug rather than a wait.
+    const remaining = Math.max(1, Math.ceil(remainingMinutes));
+    return `${opening} (${remaining} minute(s) remaining).`;
+  }
+
+  return (
+    `${opening}${availableAt ? ` — this will be available at ${availableAt}` : ""}. ` +
+    `You also need to be at the pick-up when you submit, and to have been within ` +
+    `${NO_SHOW_RADIUS_MILES} miles of it for ${NO_SHOW_WAIT_MINUTES} minutes without leaving.`
+  );
+}
 
 /** Guardrail 1's refusal — production's exact wording, and a deliberate dead end. */
 export const NO_SHOW_STAGE_REFUSAL =
