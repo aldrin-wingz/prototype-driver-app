@@ -128,13 +128,15 @@ The scenario set became a **comparison**: a plain row is production as it behave
 | 3.2 | **More** | production | ✓ | ✗ |
 | 4.1 | Submit | **revised** | ✗ | ✓ |
 | 4.2 | **More** | **revised** | ✗ | ✓ |
-| WV1.1 | Submit | **revised** | ✓ | ✗ |
+| WV1.1 | **More** | **revised** | ✓ | ✗ |
 
 **⚠️ The treatment cannot come from the ride data**, and that is the load-bearing insight. 3, 3.1 and 3.2 are the *same* guardrail state — the verification asserts each pair resolves identically — so no amount of seeded location data distinguishes them. It is declared per ride as `trip.noShowDemo` and resolved through `NO_SHOW_TREATMENTS`. Demo scaffolding, clearly marked.
 
 **⚠️ Every as-is row has `offerForm: false`, `showTimer: false`, and no tile pill.** Production refuses and stops. An as-is ride that offered the form, or carried a countdown, would quietly turn the before-picture into an after — which would make the whole comparison worthless.
 
 **Row 4 as-is reproduces the bug on purpose:** latest fix outside the radius, so the driver has left, and it says *"wait at least 10 minutes at the pick up location"* and dead-ends.
+
+**All three proposals now fire early.** `3.2`, `4.2` and `WV1.1` all refuse from the tile tap, so every proposal shares one idea: tell the driver before they spend effort. The three as-is rows still refuse at Submit, which the verification asserts — an as-is row that fired early would stop being a before-picture.
 
 **Two decisions from the user, recorded:**
 - **3.2's pop-up closes** — no Continue into the screen. They are at the pick-up and simply have not waited long enough.

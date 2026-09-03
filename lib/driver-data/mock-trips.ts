@@ -1680,7 +1680,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "WV1.1",
-    pills: [{ label: "WV1.1 · Not yet +15 · timer + both rules named", variant: "attention" }],
+    pills: [{ label: "WV1.1 · Not yet +15 · timer from More + both rules", variant: "attention" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

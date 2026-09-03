@@ -247,7 +247,7 @@ bun run typecheck    # must stay at 0 — the only automated check that exists
 | **4.2** | `…384` ″ | **More** | **revised** | ✗ | **✓** |
 | **5** | `…377` no location points | Submit | revised | ✗ | ✓ |
 | **WV1** | `…378` not yet +15 — **as-is** | Submit | production | ✗ | ✗ |
-| **WV1.1** | `…385` ″ | Submit | **revised** | **✓** | ✗ |
+| **WV1.1** | `…385` ″ | **More** | **revised** | **✓** | ✗ |
 | — | `…380` 3.1 at the boundary | Submit | production | ✓ | ✗ |
 
 **⚠️ The treatment cannot come from the ride data.** 3, 3.1 and 3.2 are the *same* guardrail state — the check resolves identically on all three, which is asserted in the verification — and differ only in how the app says so. So it is declared per ride as `trip.noShowDemo`, resolved through `NO_SHOW_TREATMENTS`. Demo scaffolding, not a product concept.

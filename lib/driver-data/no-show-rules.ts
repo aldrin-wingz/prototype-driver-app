@@ -325,8 +325,14 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
   // ── WellTrans Indiana — not yet 15 minutes past the pick-up ──
   /** Today. */
   WV1: { refuseAt: "submit", copy: "production", showTimer: false, offerForm: false },
-  /** Proposal: countdown, and explicit that BOTH rules have to hold. */
-  "WV1.1": { refuseAt: "submit", copy: "revised", showTimer: true, offerForm: false },
+  /**
+   * Proposal: countdown from the tile tap, and explicit that BOTH rules hold.
+   *
+   * `more` for the same reason as 3.2 — a driver waiting on the pick-up window
+   * should not have to pick a type and sign to find that out. It also means this
+   * row picks up the tile pill, so the wait is visible at a glance.
+   */
+  "WV1.1": { refuseAt: "more", copy: "revised", showTimer: true, offerForm: false },
 };
 
 /** The treatment for a ride, defaulting to today's behaviour. */
