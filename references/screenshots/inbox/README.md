@@ -6,6 +6,10 @@ Staging folder for new reference captures of the **existing production Wingz NEM
 
 Naming only matters if a screenshot is ambiguous on its own. If two captures are the same screen in different states, or one is a scrolled continuation of another, say so in a note or make the filename hint at it (`options menu scrolled.png`).
 
+## Filed so far
+
+✅ **2026-09-03 — the Member No-Show pack** (`s-06a`–`s-06e`) was filed into `canonical/` and `by-step/s-6/`, and documented in the parent `README.md`. It closed the "Existing support/help entry" and "Options menu — open" needs below, and is the source of truth for the `luis/rider-no-show` branch.
+
 ## What's needed for the In-App Support Requests slice
 
 | Need | Screen | Why |

@@ -21,7 +21,12 @@ import type { SupportCallout } from "@/types/support";
  * search box — asking the driver the one question arriving from a ride has
  * already answered.
  */
-export function buildRiderNoShow(trip: Trip, leg: TripLeg | undefined) {
+export function buildRiderNoShow(
+  trip: Trip,
+  leg: TripLeg | undefined,
+  /** What the driver picked on the Member No-Show screen. */
+  noShowType = ""
+) {
   const supportCase = buildSupportFormCase({
     // `includeIssues` is what puts Rider No-Show in the select's options at all —
     // a selected value with no matching option renders as the placeholder, so the
@@ -31,9 +36,10 @@ export function buildRiderNoShow(trip: Trip, leg: TripLeg | undefined) {
 
   const initialValues: Record<string, string> = {
     ...buildPrefilledValues(supportCase, trip, leg),
-    // Seeding `issue` is what marks it app-supplied, which is what
+    // Seeding a value is what marks it app-supplied, which is what
     // `lockWhenPrefilled` reads.
     issue: ISSUE_RIDER_NO_SHOW,
+    noShowType,
   };
 
   return { supportCase, initialValues };
@@ -69,12 +75,15 @@ function buildCallout(leg: TripLeg | undefined): SupportCallout | undefined {
 export function RiderNoShowForm({
   trip,
   leg,
+  noShowType,
   open,
   onOpenChange,
   onSubmitted,
 }: {
   trip: Trip;
   leg: TripLeg | undefined;
+  /** Carried from the Member No-Show screen, so it is not asked twice. */
+  noShowType?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Runs after the store write, for a caller that wants to navigate. */
@@ -82,7 +91,7 @@ export function RiderNoShowForm({
 }) {
   const { toast } = useToast();
   const { submitForm } = useRideFlow();
-  const { supportCase, initialValues } = buildRiderNoShow(trip, leg);
+  const { supportCase, initialValues } = buildRiderNoShow(trip, leg, noShowType);
 
   return (
     <SupportFormSheet

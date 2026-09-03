@@ -1028,14 +1028,19 @@ export const mockNeedsActionTrips: Trip[] = [
 // production. They exist because swipe state and wait evidence are both invisible
 // on the ride list.
 //
-// SIX rides, one per outcome of the Rider No-Show guardrails. Two prove the tile
-// is HIDDEN, one proves it passes, and three prove each way the wait check can
-// fail. Choosing a ride is how you pick a scenario — the demo mechanic.
+// SIX rides, one per outcome of the Rider No-Show guardrails. Two pass (one per
+// allowed stage), one is refused for being at the wrong stage, and three prove
+// each way the wait check can fail. Choosing a ride is how you pick a scenario —
+// the demo mechanic.
 export const mockInProgressTrips: Trip[] = [
-  // ===== Not started — the tile is not offered at all =====
+  // ===== Ready to start — allowed, and the wait is provable =====
   //
-  // You cannot no-show a ride you never started. Nothing has been swiped, so
-  // there is no pick-up the driver could have attended.
+  // Nothing swiped, so the CTA reads SWIPE TO START — and no-show is allowed
+  // here. This is the commonest shape of the whole problem: a driver arrives to
+  // an empty doorstep and never gets to begin the ride.
+  //
+  // Wait evidence without a single swipe mark is not a contradiction: the app
+  // tracks where the phone was regardless of what the driver pressed.
   {
     id: "1049800370",
     date: "Tue, Jul 8, 2026",
@@ -1062,6 +1067,13 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
+        // 10:56 to 11:11, but the clock starts at the 11:00 pick-up time:
+        // 11 qualifying minutes, inside the radius.
+        waitEvidence: {
+          closestMiles: 0.4,
+          arrivedAt: "10:56 AM",
+          leftAt: "11:11 AM",
+        },
       },
       {
         id: "1049800370-appt",
@@ -1074,16 +1086,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Not started · No-Show tile hidden", variant: "neutral" }],
+    pills: [{ label: "Ready to start · wait proven, no form", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Member on board — the tile is not offered either =====
+  // ===== Member on board — the tile is there and refuses =====
   //
-  // The other half of the same guardrail, and the reason it is a stage check
-  // rather than a "has started" check: a member already in the car cannot be a
-  // no-show.
+  // The closed end of guardrail 1. The CTA reads DROP OFF MEMBER, so no-show is
+  // out: a member already in the car cannot have failed to show. The tile still
+  // appears — it always does — and the dialog names the rule.
   {
     id: "1049800371",
     date: "Tue, Jul 8, 2026",
@@ -1122,16 +1134,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Member on board · No-Show tile hidden", variant: "neutral" }],
+    pills: [{ label: "On board · No-Show refused (wrong stage)", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== The wait is provable — no form, no questions =====
+  // ===== En-route, and the wait is provable — no form, no questions =====
   //
   // Arrived 3:26, left 3:42, but the clock only starts at the 3:30 pick-up time:
-  // 12 qualifying minutes, comfortably inside a mile. This is the ride that shows
-  // the guardrail REWARDING a compliant driver rather than only refusing.
+  // 12 qualifying minutes, comfortably inside a mile. The other allowed stage,
+  // so this and `370` together cover both ends of guardrail 1's window.
   {
     id: "1049800372",
     date: "Tue, Jul 8, 2026",
@@ -1175,7 +1187,7 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Wait proven · files with no form", variant: "success" }],
+    pills: [{ label: "En-route · wait proven, no form", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

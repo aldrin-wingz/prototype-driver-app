@@ -1,14 +1,29 @@
-import { getLegStage, type TripLeg } from "./mock-trips";
+import { getNextSwipe, type Trip, type TripLeg } from "./mock-trips";
 
 /**
  * Rider No-Show — the two guardrails, and what happens when they are not met.
  *
- * ## Guardrail 1: the trip has to be en-route
+ * ## Guardrail 1: the ride has to be ready to start, or en-route
  *
- * You cannot no-show a ride you never started, and you cannot no-show a member
- * already in the car. So the tile is not offered at all outside that window —
- * hidden rather than disabled, because a control that appears and then refuses
- * teaches a driver to distrust the screen.
+ * You cannot no-show a member who is already in the car. But you CAN no-show one
+ * before swiping start — a driver who arrives to an empty doorstep never gets to
+ * begin the ride, which is the commonest shape of the whole problem.
+ *
+ * So the window opens once the trip is CONFIRMED and the swipe CTA reads
+ * **SWIPE TO START** or **PICK UP MEMBER**, and closes once it reads DROP OFF
+ * MEMBER.
+ *
+ * ⚠️ **The unconfirmed trip is the case this rule exists for**, and it is easy to
+ * get wrong: a trip awaiting member confirmation has no swipe marks either, so
+ * anything reading swipe state alone concludes "ready to start" and wrongly
+ * allows it. Its CTA is the orange **I REACHED OUT TO CONFIRM**, not a swipe —
+ * nothing is ready to start until the member is confirmed. Hence the trip-level
+ * check below, which cannot be derived from the leg.
+ *
+ * ⚠️ **The tile is ALWAYS shown**, and refuses with a dialog outside that window —
+ * production's behaviour, and the reason it is not hidden: a tile that vanishes
+ * leaves a driver hunting for a control they know exists, whereas a dialog naming
+ * the rule teaches it.
  *
  * ## Guardrail 2: the wait has to be provable
  *
@@ -22,6 +37,29 @@ import { getLegStage, type TripLeg } from "./mock-trips";
  * that it *cannot confirm* the wait, which is not the same as knowing the driver
  * did not wait. So we ask them instead.
  */
+
+/**
+ * The `No-Show Type:` options on the Member No-Show screen.
+ *
+ * All three captured from the production picker. The list is complete: the
+ * capture shows the same options-then-gap-then-Cancel shape as the app's other
+ * action sheets, and nothing sits in the gap.
+ *
+ * ⚠️ **`Cancel At Door` is not a no-show**, and it is worth noticing that the
+ * production screen files it as one. A member who came to the door and cancelled
+ * did show up — the driver's problem is the same (a trip that earned nothing) but
+ * the claim is different, and Support may well want to treat it differently.
+ * Modelled as captured rather than corrected; flagged as an open question.
+ *
+ * ⚠️ Production renders these in a native action sheet. This prototype uses the
+ * app's own `Select`, because a native sheet is not something a web prototype
+ * can borrow — the values and the order are faithful, the control is a stand-in.
+ */
+export const NO_SHOW_TYPES: readonly string[] = [
+  "Member Not Home",
+  "Cancel At Door",
+  "Member Not Ready",
+] as const;
 
 /** How long a driver must wait at the pick-up before a no-show is valid. */
 export const NO_SHOW_WAIT_MINUTES = 10;
@@ -47,6 +85,25 @@ export type NoShowGap =
 export type NoShowGate =
   | { ok: true; qualifyingMinutes: number }
   | { ok: false; gap: NoShowGap; detail: string };
+
+/**
+ * The refusal copy, in the production register.
+ *
+ * ⚠️ `wait_too_short` is **production's exact wording**, taken from the reference
+ * capture — the driver has seen this dialog before and recognising it is the
+ * point. The other two are written to match its register, because production has
+ * no message for them: it only ever checks the one condition.
+ *
+ * Kept apart from a gap's `detail`, which is explanatory and belongs on the form
+ * that follows. The dialog is a refusal a driver already knows; the form is where
+ * we explain ourselves.
+ */
+export const NO_SHOW_REFUSAL_COPY: Record<NoShowGap, string> = {
+  wait_too_short: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
+  never_near_pickup:
+    "We could not confirm you were at the pick up location. Please request a Member no-show from the pick up location.",
+  wait_before_pickup_time: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location after the scheduled pick up time before requesting a Member no-show.`,
+};
 
 /** "3:26 PM" → minutes since midnight. `null` when it cannot be read. */
 export function toMinutesOfDay(clock: string | null | undefined): number | null {
@@ -85,13 +142,44 @@ export function qualifyingWaitMinutes(leg: TripLeg): number | null {
 }
 
 /**
- * Whether a no-show can be filed against this leg at all — guardrail 1.
+ * Whether the trip is still waiting on the member to confirm.
  *
- * `started` exactly: en-route, not yet picked up.
+ * ⚠️ Not derivable from the leg. Its swipe marks are all empty, exactly like a
+ * confirmed ride that has not been started — the difference lives on the trip.
+ * The driver sees it as the orange I REACHED OUT TO CONFIRM action standing where
+ * a swipe would be.
  */
-export function canFileNoShow(leg: TripLeg): boolean {
-  return getLegStage(leg) === "started";
+export function isAwaitingMemberConfirmation(trip: Trip): boolean {
+  return trip.status === "needs-action";
 }
+
+/**
+ * Whether a no-show can be filed against this ride at all — guardrail 1.
+ *
+ * Two conditions, and the first is the one worth stating: **an unconfirmed trip
+ * is never ready to start.** Reading swipe state alone would allow it, because an
+ * unconfirmed trip and a confirmed-but-unstarted one have identical marks.
+ *
+ * The second is keyed off the swipe expected NEXT rather than the stage name,
+ * because that is how a driver experiences it: the option is live exactly while
+ * the button in front of them says SWIPE TO START or PICK UP MEMBER.
+ */
+export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
+  if (isAwaitingMemberConfirmation(trip)) return false;
+  const next = getNextSwipe(leg);
+  return next === "start" || next === "pick-up";
+}
+
+/**
+ * The refusal for a ride outside that window.
+ *
+ * ⚠️ Production's exact wording, from the reference capture. Shown over the More
+ * Options grid, and deliberately a DEAD END with no form behind it: if the member
+ * is already in the car there is no no-show to file, so offering to collect one
+ * would be collecting a claim that cannot be true.
+ */
+export const NO_SHOW_STAGE_REFUSAL =
+  "Member No-Show is only allowed for rides that are ready to start or en-route.";
 
 /**
  * Guardrail 2, derived from the seeded evidence rather than seeded itself.

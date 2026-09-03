@@ -35,6 +35,10 @@ export const WAIT_TIME_SEQUENCE = ["waitedFrom", "leftAt"];
  * drove off is told no, and the only way forward is Zendesk. Every question here
  * is one the app would have answered itself if it could, which is why the form
  * only ever opens when it could not.
+ *
+ * Reached only from the Member No-Show screen, after its guardrail refuses — so
+ * the issue, the leg, the no-show type and the signature are all already settled
+ * by the time this renders. It asks the three things that screen could not know.
  */
 export function buildSupportFormCase({
   includeIssues,
@@ -81,6 +85,17 @@ export function buildSupportFormCase({
       },
 
       // ---- Rider No-Show -------------------------------------------------
+      {
+        id: "noShowType",
+        type: "text",
+        label: "No-show type",
+        // Locked: chosen on the Member No-Show screen a moment ago, so asking
+        // again would be asking the driver to repeat themselves. Carried into
+        // the request because Support needs to know which kind was claimed.
+        lockWhenPrefilled: true,
+        lockedBadge: "From the no-show screen",
+        showIf: ONLY_RIDER_NO_SHOW,
+      },
       {
         id: "legId",
         type: "leg-picker",
@@ -134,20 +149,13 @@ export function buildSupportFormCase({
         helpText: "A call log, a screenshot of your texts, anything showing you tried.",
         showIf: ONLY_RIDER_NO_SHOW,
       },
-      {
-        // LAST, deliberately. The driver is attesting to the answers above, so a
-        // field after the signature would be signed for before it was written.
-        //
-        // And it is here at all because proving the wait is not proving the member
-        // was absent: the app can know how long a driver sat there and still have
-        // no idea who failed to appear. That gap is what the signature covers.
-        id: "signature",
-        type: "signature",
-        label: "Sign to confirm",
-        helpText: "Sign to confirm the member did not come out for this ride.",
-        required: true,
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
+      // ⚠️ NO signature field, and that is a change of position worth stating.
+      //
+      // It used to be here, last, on the reasoning that proving the wait is not
+      // proving the member was absent. That reasoning still holds — but the
+      // driver now signs on the Member No-Show screen BEFORE the guardrail runs,
+      // because that is production's order and familiarity won. Asking again
+      // here would be a second signature for one claim.
     ],
   };
 }

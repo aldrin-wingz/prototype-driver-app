@@ -24,10 +24,21 @@ export function SignaturePad({
   /** Bumping this clears the pad — used to reset between openings. */
   resetKey,
   className,
+  canvasClassName,
+  /**
+   * Show the built-in hint + Clear row.
+   *
+   * Off for a surface that replicates a production screen, where Clear is a
+   * centred link under a full-bleed canvas rather than a small button beside a
+   * hint. Such a caller owns its own Clear and bumps `resetKey`.
+   */
+  showFooter = true,
 }: {
   onSignedChange: (signed: boolean) => void;
   resetKey?: unknown;
   className?: string;
+  canvasClassName?: string;
+  showFooter?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const observer = useRef<ResizeObserver | null>(null);
@@ -170,22 +181,25 @@ export function SignaturePad({
         // `touch-none` is load-bearing on a phone: without it the browser claims
         // the gesture as a scroll and no stroke is ever drawn.
         className={cn(
-          "h-44 w-full touch-none rounded-xl border border-dashed border-gray-300 bg-white"
+          "h-44 w-full touch-none rounded-xl border border-dashed border-gray-300 bg-white",
+          canvasClassName
         )}
       />
-      <div className="mt-2 flex items-center justify-between">
-        <p className="text-sm text-gray-400">
-          {hasStroke ? "Signed" : "Draw your signature above"}
-        </p>
-        <button
-          type="button"
-          onClick={clear}
-          disabled={!hasStroke}
-          className="text-sm font-semibold text-gray-600 disabled:opacity-40"
-        >
-          Clear
-        </button>
-      </div>
+      {showFooter && (
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-sm text-gray-400">
+            {hasStroke ? "Signed" : "Draw your signature above"}
+          </p>
+          <button
+            type="button"
+            onClick={clear}
+            disabled={!hasStroke}
+            className="text-sm font-semibold text-gray-600 disabled:opacity-40"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }

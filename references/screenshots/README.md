@@ -31,7 +31,19 @@ Captures for the **In-App Support Requests** prototype use `s-*` slots so they n
 | s-02a | `s-02a - Form Request - Late Pickup Reason.png` | The app's existing "Late pickup reason" form | **The base pattern for every support form.** Bottom sheet w/ drag handle · bold title + ✕ · pink context callout (`Scheduled time` / `N mins late`) · required = red asterisk · optional-ness in the label text · Cancel (outline) + case-specific primary · **primary DISABLED while required fields are empty** (which is why "Save Reason" is muted green) |
 | s-03a | `s-03a - More Options - Grid.jpg` | The screen behind `More` | **Full pushed page, not a sheet.** Back chevron + centred "More Options", no bottom nav. Two-column icon grid, hairline dividers, odd last tile full-width. 7 actions: Map to Pickup · Map to Drop-off · Call Member or Support · Email Support · Add Event To Calendar · Member No-Show · Send Back Trip |
 
-**Step packs:** `by-step/s-1/` (three swipe stages) · `by-step/s-2/` (form pattern) · `by-step/s-3/` (More Options).
+### Member No-Show pack (`s-06*`)
+
+Filed 2026-09-03. **The source of truth for the Rider No-Show branch** (`luis/rider-no-show`) — the production screen and both of its refusals.
+
+| Slot | Filename | Screen | What it pins down |
+|------|----------|--------|-------------------|
+| s-06a | `s-06a - Member No-Show - Empty.jpg` | The Member No-Show screen, untouched | **A pushed page, not a sheet.** Back chevron + centred title · bold `No-Show Type:` + a `Select:` box · bold `Driver Signature` + a tall **full-bleed** canvas · centred **blue** Clear · full-width teal Submit pinned at the bottom. ⚠️ **Submit is bright/enabled with nothing filled** — production lets you submit and then refuses |
+| s-06b | `s-06b - Member No-Show - No-Show Type Picker.jpg` | The type picker, open | **All three options: `Member Not Home` · `Cancel At Door` · `Member Not Ready`.** A native action sheet, blue text, options-then-gap-then-Cancel — the same shape as `s-06e`, and nothing sits in the gap, which is how we know the list is complete |
+| s-06c | `s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg` | Guardrail 2 refusing | Title **"Unable to complete action"** + *"Please wait at least 10 minutes at the pick up location before requesting a Member no-show."* + a single teal **OK**. ⚠️ Type is already picked and the signature already drawn — **the check runs at Submit, after the work** |
+| s-06d | `s-06d - More Options - Ready To Start Or En-Route Refusal.jpg` | Guardrail 1 refusing | **No title** — just *"Member No-Show is only allowed for rides that are ready to start or en-route."* + teal OK. Fires over the More Options grid, and proves the **tile is always present** rather than hidden |
+| s-06e | `s-06e - More Options - Call Member Or Support Sheet.jpg` | The Call action sheet | Not a support surface — filed as the **control comparison** for `s-06b`. Four options (Rider Phone · Pickup Phone · Dropoff Phone · Wingz Support), then the gap, then Cancel |
+
+**Step packs:** `by-step/s-1/` (three swipe stages) · `by-step/s-2/` (form pattern) · `by-step/s-3/` (More Options) · `by-step/s-6/` (Member No-Show, all five).
 
 ### Sampled colours
 

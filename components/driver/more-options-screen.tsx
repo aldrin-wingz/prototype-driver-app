@@ -14,14 +14,18 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  RiderNoShowForm,
-  buildRiderNoShow,
-} from "@/components/support/rider-no-show-form";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   canFileNoShow,
-  resolveNoShowGate,
+  NO_SHOW_STAGE_REFUSAL,
 } from "@/lib/driver-data/no-show-rules";
 import {
   DRIVER_NAVY,
@@ -205,7 +209,6 @@ export function MoreOptionsScreen({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [formOpen, setFormOpen] = useState(false);
 
   const { getPendingRequest } = useRideFlow();
   const pending = getPendingRequest(trip.id);
@@ -214,36 +217,19 @@ export function MoreOptionsScreen({
   const activeLeg =
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
-  const { initialValues } = buildRiderNoShow(trip, activeLeg);
+  const [stageRefused, setStageRefused] = useState(false);
 
   /**
-   * Guardrail 1 — whether Member No-Show is offered at all.
+   * ⚠️ The grid never changes shape. All seven production tiles, always, with
+   * `Send Back Trip` full-width as the odd one — exactly as captured.
    *
-   * Three conditions, and each removes the tile rather than disabling it. A
-   * control that appears and then refuses is how the production flow earns its
-   * reputation; a control that is simply absent asks nothing of the driver.
-   *
-   *  - the leg has to be en-route (not started = no pick-up attended; picked up =
-   *    the member is in the car)
-   *  - the ride must not already be with Support
-   *  - the form has to be anchorable to this ride — an empty prefilled `legId`
-   *    means `legScope: "in-progress"` dropped it, and the locked "From this
-   *    ride" card would degrade into an open search box
+   * Member No-Show is among them whatever the ride's state. It refuses with a
+   * dialog rather than disappearing, because production does and because a tile
+   * that vanishes leaves the driver hunting for a control they know is there.
    */
-  const canNoShow = Boolean(
-    activeLeg &&
-      canFileNoShow(activeLeg) &&
-      !pending &&
-      initialValues.legId
+  const gridTiles: OptionTile[] = PRODUCTION_TILES.map((tile) =>
+    tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
   );
-
-  // Without the No-Show tile the grid has an odd count, so Send Back Trip takes
-  // the full width and centres, per capture s-03a.
-  const gridTiles: OptionTile[] = canNoShow
-    ? PRODUCTION_TILES
-    : PRODUCTION_TILES.filter((tile) => tile.id !== "no-show").map((tile) =>
-        tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
-      );
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -256,17 +242,24 @@ export function MoreOptionsScreen({
   }
 
   function handleGridTile(id: string) {
-    if (id === "no-show" && activeLeg) {
-      const gate = resolveNoShowGate(activeLeg);
-      // Guardrail 2. When the app CAN confirm the wait there is nothing to ask —
-      // production files it and so would we, so the tile behaves as the
-      // production action. It is only the failure that becomes a form, which is
-      // the whole point of the case: production refuses here.
-      if (gate.ok) {
-        handleProductionTile(id);
+    if (id === "no-show") {
+      // Guardrail 1, here on the grid, because it is about the RIDE and needs no
+      // input to decide. Guardrail 2 is about the wait and fires on the next
+      // screen's Submit, which is where production runs it.
+      if (!activeLeg || !canFileNoShow(trip, activeLeg)) {
+        setStageRefused(true);
         return;
       }
-      setFormOpen(true);
+      // The prototype's own guard, which production has no concept of: one
+      // request per ride, or the driver files the same claim twice.
+      if (pending) {
+        toast({
+          title: "Member No-Show",
+          description: "This ride is already with Support.",
+        });
+        return;
+      }
+      router.push(`/my-rides/${trip.id}/no-show`);
       return;
     }
     handleProductionTile(id);
@@ -288,6 +281,32 @@ export function MoreOptionsScreen({
         </h1>
       </header>
 
+      <AlertDialog
+        open={stageRefused}
+        onOpenChange={(open) => !open && setStageRefused(false)}
+      >
+        <AlertDialogContent className="max-w-[20rem] rounded-2xl">
+          {/* No VISIBLE title, matching the capture — the sentence is the whole
+              message and a heading above it would only restate it. But Radix
+              requires one for screen readers (it errors without it), so it is
+              present and `sr-only`: a driver using a reader hears what the dialog
+              is before hearing the rule. */}
+          <AlertDialogTitle className="sr-only">
+            Member No-Show unavailable
+          </AlertDialogTitle>
+          <AlertDialogDescription className="py-2 text-base text-gray-900">
+            {NO_SHOW_STAGE_REFUSAL}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            {/* Deliberately the only way out. A member already in the car cannot
+                have failed to show, so there is nothing to collect. */}
+            <AlertDialogAction className="bg-transparent text-base font-bold text-[#00B090] shadow-none hover:bg-transparent">
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="grid grid-cols-2 border-t border-[#F0F0F0]">
         {gridTiles.map((tile, index) => (
           <div
@@ -305,13 +324,6 @@ export function MoreOptionsScreen({
         ))}
       </div>
 
-      <RiderNoShowForm
-        trip={trip}
-        leg={activeLeg}
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        onSubmitted={() => router.push(backHref)}
-      />
     </div>
   );
 }
