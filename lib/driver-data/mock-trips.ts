@@ -20,7 +20,7 @@ export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "s
  * rather than by client alone. Nothing before this needed geography, so it is
  * optional — an absent market means "not one of the markets with a special rule".
  */
-export type MarketCode = "GA" | "FL" | "NC" | "TN";
+export type MarketCode = "GA" | "FL" | "NC" | "TN" | "IN";
 
 /**
  * The three swipes a driver makes to move a leg forward.
@@ -44,33 +44,21 @@ export interface LegSwipeProgress {
 }
 
 /**
- * ⚠️ **PROVISIONAL — SEEDED. The app has no geofence, dwell timer or coordinates
- * of any kind**, so this stands in for telematics.
+ * One location fix, as the server would have stored it.
  *
- * What the app can say about the driver being at the pick-up: how close it ever
- * put them, when it saw them arrive, and when it saw them leave.
+ * ⚠️ **SEEDED.** The prototype has no GPS. `ageMinutes` is the age at the moment
+ * the screen mounted; a live clock advances it, so a countdown really does run
+ * down and the gate really does open when it reaches zero.
  *
- * This is EVIDENCE, not a verdict. The verdict is derived from it in
- * `lib/driver-data/no-show-rules.ts`, which is the whole point: the rule the
- * business stated — ten minutes, within a mile, after the pick-up time — is real
- * code reading real fields, so the seeded rides prove it rather than assert it.
- *
- * An absent `waitEvidence` and a `null` `closestMiles` mean the same thing:
- * **no proof found.** Deliberately NOT the same as "the driver did not wait" —
- * it is the case we have to ask about, which is why the form exists.
+ * Declared here rather than beside the rule that reads it, because this is seed
+ * data and `no-show-rules` already imports from this module — the other
+ * direction would be a cycle.
  */
-export interface NoShowWaitEvidence {
-  /**
-   * Closest the app ever put the driver to the pick-up, in miles.
-   *
-   * `null` = never located near it at all. A number this large is not a
-   * measurement anyone would trust in production; it is a seed.
-   */
-  closestMiles: number | null;
-  /** Clock time the app saw them arrive. */
-  arrivedAt: string | null;
-  /** Clock time the app saw them leave. */
-  leftAt: string | null;
+export interface LocationRecord {
+  /** Minutes before "now" this fix was recorded, at mount. */
+  ageMinutes: number;
+  /** Straight-line miles from the pick-up. */
+  distanceMiles: number;
 }
 
 export interface TripLeg {
@@ -98,12 +86,23 @@ export interface TripLeg {
    */
   progress?: LegSwipeProgress;
   /**
-   * What the app can say about the driver waiting at this pick-up.
+   * The driver's location fixes, as the server would have them.
    *
-   * Absent on most legs — the app only has something to say once a driver has
-   * actually been sent to a pick-up. See `NoShowWaitEvidence` — ⚠️ provisional.
+   * ⚠️ **SEEDED, and the whole scenario lives here.** Every Rider No-Show
+   * outcome is a different shape of this array — which is the point: the real
+   * check is a walk over these records, so seeding the records rather than the
+   * verdict means each ride genuinely exercises the rule.
+   *
+   * Newest-first is not required; `walkLocationRecords` sorts by age.
    */
-  waitEvidence?: NoShowWaitEvidence;
+  locationRecords?: LocationRecord[];
+  /**
+   * Minutes since the leg's scheduled pick-up time, at mount. Negative = early.
+   *
+   * ⚠️ Only read by the WellTrans Indiana rule, and only seeded on those rides.
+   * Not derived from `time` because the prototype has no clock to compare it to.
+   */
+  minutesSinceScheduledPickup?: number;
 }
 
 /**
@@ -1016,7 +1015,13 @@ export const mockNeedsActionTrips: Trip[] = [
       },
     ],
     status: "needs-action",
-    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    pills: [
+      { label: "Not Confirmed", variant: "danger" },
+      // Not one of the six. ⚠️ The confirmation gate is CLIENT-SIDE — production's
+      // status list is [ACCEPTED, CHECKED, EN_ROUTE] and an unconfirmed trip may
+      // well sit at ACCEPTED, in which case the server would allow it.
+      { label: "Extra · unconfirmed → confirm first", variant: "attention" },
+    ],
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
@@ -1025,22 +1030,29 @@ export const mockNeedsActionTrips: Trip[] = [
 // ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
 // which case it demos. Demo scaffolding, NOT app data: the real app shows no such
 // pill, and they must be stripped before any capture that stands in for
-// production. They exist because swipe state and wait evidence are both invisible
-// on the ride list.
+// production. They exist because the location-record stream is invisible on the
+// ride list, and it is the entire scenario.
 //
-// SIX rides, one per outcome of the Rider No-Show guardrails. Two pass (one per
-// allowed stage), one is refused for being at the wrong stage, and three prove
-// each way the wait check can fail. Choosing a ride is how you pick a scenario —
-// the demo mechanic.
+// SIX SCENARIOS, named against the production `canNoshow` check. Choosing a ride
+// is how you pick one — the demo mechanic.
+//
+//   1   not started or en-route          → refused, dead end
+//   2   meets every criterion            → files
+//   3   no 10 consecutive min at pickup  → timer
+//   4   location now > 0.5 mi            → form
+//   5   no location points in 20 min     → form
+//   WT  WellTrans IN, not yet pickup+15  → timer
+//
+// Plus two extras: scenario 3 seeded a hair from the boundary, so the countdown
+// runs out while you watch and the button unlocks; and the pre-existing
+// unconfirmed ride in `mockNeedsActionTrips`, which is a client-side gate rather
+// than one of the six.
 export const mockInProgressTrips: Trip[] = [
-  // ===== Ready to start — allowed, and the wait is provable =====
+  // ===== SCENARIO 2 — meets every criterion =====
   //
-  // Nothing swiped, so the CTA reads SWIPE TO START — and no-show is allowed
-  // here. This is the commonest shape of the whole problem: a driver arrives to
-  // an empty doorstep and never gets to begin the ride.
-  //
-  // Wait evidence without a single swipe mark is not a contradiction: the app
-  // tracks where the phone was regardless of what the driver pressed.
+  // Twelve unbroken minutes inside the radius, so the walk finds the 12-minute
+  // record still near and breaks there. Submits with no questions — the ride that
+  // shows the guardrail REWARDING a compliant driver rather than only refusing.
   {
     id: "1049800370",
     date: "Tue, Jul 8, 2026",
@@ -1063,17 +1075,17 @@ export const mockInProgressTrips: Trip[] = [
         revenue: 52.52,
         revenueNote: "Accepted by you",
         progress: {
-          startedAt: null,
+          startedAt: "10:44 AM",
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        // 10:56 to 11:11, but the clock starts at the 11:00 pick-up time:
-        // 11 qualifying minutes, inside the radius.
-        waitEvidence: {
-          closestMiles: 0.4,
-          arrivedAt: "10:56 AM",
-          leftAt: "11:11 AM",
-        },
+        locationRecords: [
+          { ageMinutes: 0, distanceMiles: 0.1 },
+          { ageMinutes: 3, distanceMiles: 0.2 },
+          { ageMinutes: 7, distanceMiles: 0.2 },
+          { ageMinutes: 12, distanceMiles: 0.3 },
+          { ageMinutes: 17, distanceMiles: 0.4 },
+        ],
       },
       {
         id: "1049800370-appt",
@@ -1086,16 +1098,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Ready to start · wait proven, no form", variant: "success" }],
+    pills: [{ label: "Scenario 2 · Meets criteria → files", variant: "success" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Member on board — the tile is there and refuses =====
+  // ===== ROW 3 — member on board =====
   //
   // The closed end of guardrail 1. The CTA reads DROP OFF MEMBER, so no-show is
-  // out: a member already in the car cannot have failed to show. The tile still
-  // appears — it always does — and the dialog names the rule.
+  // out: a member already in the car cannot have failed to show. The tile is
+  // still there — it always is — and the dialog names the rule.
   {
     id: "1049800371",
     date: "Tue, Jul 8, 2026",
@@ -1134,69 +1146,16 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "On board · No-Show refused (wrong stage)", variant: "danger" }],
+    pills: [{ label: "Scenario 1 · Not started or en-route → refused", variant: "neutral" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
-
-  // ===== En-route, and the wait is provable — no form, no questions =====
+  // ===== ROW 5 — left, and came back two minutes ago =====
   //
-  // Arrived 3:26, left 3:42, but the clock only starts at the 3:30 pick-up time:
-  // 12 qualifying minutes, comfortably inside a mile. The other allowed stage,
-  // so this and `370` together cover both ends of guardrail 1's window.
-  {
-    id: "1049800372",
-    date: "Tue, Jul 8, 2026",
-    rider: "Marisol Vega",
-    client: "Verida",
-    market: "GA",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 61.15,
-    notes: "Rider prefers front passenger seat",
-    legs: [
-      {
-        id: "1049800372",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "3:30 PM",
-        address: "88 Lovvorn Rd, Carrollton, GA 30117",
-        county: "Carroll County",
-        revenue: 61.15,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "3:19 PM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-        waitEvidence: {
-          closestMiles: 0.3,
-          arrivedAt: "3:26 PM",
-          leftAt: "3:42 PM",
-        },
-      },
-      {
-        id: "1049800372-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "4:10 PM",
-        address: "310 Dialysis Center Dr, Carrollton, GA 30117",
-        county: "Carroll County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [{ label: "En-route · wait proven, no form", variant: "success" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
-
-  // ===== Waited, but not long enough =====
-  //
-  // Four qualifying minutes. The commonest real failure, and the one where the
-  // driver is most likely to be telling the truth about having waited longer —
-  // the app simply stopped seeing them.
+  // The interesting one. There IS an earlier ten-minute stretch at the pick-up
+  // (9, 14, 18 min ago) — but the driver left at 4–6 minutes ago and the walk
+  // hits that gap first. So the earlier wait does not count and the clock
+  // restarts: 8:00 to go. Correct, and not something a dwell-total would catch.
   {
     id: "1049800373",
     date: "Tue, Jul 8, 2026",
@@ -1223,11 +1182,16 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        waitEvidence: {
-          closestMiles: 0.2,
-          arrivedAt: "10:19 AM",
-          leftAt: "10:24 AM",
-        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 1, distanceMiles: 0.2 },
+            { ageMinutes: 2, distanceMiles: 0.2 },
+            { ageMinutes: 4, distanceMiles: 1.9 },
+            { ageMinutes: 6, distanceMiles: 2.4 },
+            { ageMinutes: 9, distanceMiles: 0.3 },
+            { ageMinutes: 14, distanceMiles: 0.3 },
+            { ageMinutes: 18, distanceMiles: 0.4 },
+        ],
       },
       {
         id: "1049800373-appt",
@@ -1240,117 +1204,240 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Waited 4 min · form", variant: "warning" }],
+    pills: [{ label: "Scenario 3 · No 10 consecutive min → timer", variant: "warning" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  // ===== ROW 10 — a facility bigger than the radius =====
+  //
+  // The driver has not moved in seventeen minutes and is 0.6 miles out the whole
+  // time: a hospital campus where the pick-up pin is one tower and the driver is
+  // at another. Waiting can never clear this, because the app will never place
+  // them inside 0.5 miles. So it is a form — and the callout names the distance,
+  // which is the one thing that makes this legible to Support.
+  {
+    id: "1049800376",
+    date: "Tue, Jul 8, 2026",
+    rider: "Constance Whitlow",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 39.75,
+    notes: "Pick-up is the west tower lobby, not the main entrance",
+    legs: [
+      {
+        id: "1049800376",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "2:10 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 39.75,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:52 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.61 },
+            { ageMinutes: 3, distanceMiles: 0.6 },
+            { ageMinutes: 7, distanceMiles: 0.62 },
+            { ageMinutes: 12, distanceMiles: 0.59 },
+            { ageMinutes: 17, distanceMiles: 0.63 },
+        ],
+      },
+      {
+        id: "1049800376-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:55 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Scenario 4 · Location now > 0.5 mi → form", variant: "danger" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Never located near the pick-up =====
+  // ===== SCENARIO 5 — no location points at all in the last twenty minutes =====
   //
-  // `closestMiles: null` is NOT "the driver was not there" — it is the app having
-  // nothing to say. That distinction is the reason this opens a form instead of a
-  // refusal.
+  // The literal empty set, which is what `if not locations:` tests for.
+  //
+  // ⚠️ **And production can never reach it.** `canNoshow` saves a row from the
+  // incoming lat/lng BEFORE it queries, so the window always holds at least one
+  // record. A phone with location off does not produce an empty set — it produces
+  // a fix at null island, whose distance then tells the driver to "wait 10
+  // minutes at the pick up location". Exactly the wrong advice, and production's
+  // own "check your location settings" message sits unreachable behind it.
+  //
+  // So this ride seeds the empty array the code asks about, and
+  // `IMPLAUSIBLE_FIX_MILES` catches the bogus-fix path that production actually
+  // takes. Both land on the same, correct message.
   {
-    id: "1049800374",
+    id: "1049800377",
     date: "Tue, Jul 8, 2026",
-    rider: "Priya Raman",
+    rider: "Emmanuel Cortez",
+    client: "ModivCare",
+    market: "NC",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 51.40,
+    notes: "",
+    legs: [
+      {
+        id: "1049800377",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "7:30 AM",
+        address: "140 Trade St, Winston-Salem, NC 27101",
+        county: "Forsyth County",
+        revenue: 51.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "7:11 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // Nothing. Not a bad fix — no fix.
+        locationRecords: [],
+      },
+      {
+        id: "1049800377-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "8:15 AM",
+        address: "1 Medical Center Blvd, Winston-Salem, NC 27157",
+        county: "Forsyth County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Scenario 5 · No location points → form", variant: "danger" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== ROW 6 — WellTrans Indiana, location fine, appointment too recent =====
+  //
+  // ⚠️ The only client-specific rule in this branch. Every location condition is
+  // met — thirteen minutes of continuous presence — and it still blocks, because
+  // WellTrans Indiana also requires fifteen minutes past the scheduled pick-up
+  // and only six have passed. A timer, because it clears by itself.
+  {
+    id: "1049800378",
+    date: "Tue, Jul 8, 2026",
+    rider: "Loretta Vance",
+    client: "WellTrans",
+    market: "IN",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 46.20,
+    notes: "",
+    legs: [
+      {
+        id: "1049800378",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:40 AM",
+        address: "3401 W Michigan St, Indianapolis, IN 46222",
+        county: "Marion County",
+        revenue: 46.20,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "11:22 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 4, distanceMiles: 0.2 },
+            { ageMinutes: 9, distanceMiles: 0.3 },
+            { ageMinutes: 13, distanceMiles: 0.3 },
+            { ageMinutes: 18, distanceMiles: 0.2 },
+        ],
+        minutesSinceScheduledPickup: 6,
+      },
+      {
+        id: "1049800378-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "12:25 PM",
+        address: "1801 N Senate Blvd, Indianapolis, IN 46202",
+        county: "Marion County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Scenario WT · Not yet 15 min from pickup", variant: "warning" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  // ===== The one you can actually watch =====
+  //
+  // The oldest near record is 9.5 minutes old, so the countdown reads ~0:30 and
+  // runs out while you are standing there — the button then enables and the
+  // no-show files. Seeded this way on purpose: every other timer here is honest
+  // about the real ten minutes, and nobody demos a six-minute wait.
+  {
+    id: "1049800380",
+    date: "Tue, Jul 8, 2026",
+    rider: "Ingrid Salas",
     client: "Verida",
     market: "GA",
     passengerCount: 1,
     distance: "",
-    totalRevenue: 44.90,
-    notes: "Pick-up is behind the main building",
+    totalRevenue: 43.10,
+    notes: "",
     legs: [
       {
-        id: "1049800374",
+        id: "1049800380",
         legCode: "A",
         type: "est-pickup",
         label: "Est Pick-up Time",
-        time: "9:05 AM",
-        address: "2210 Maple Ridge Rd, Villa Rica, GA 30180",
+        time: "9:15 AM",
+        address: "418 Newnan Rd, Carrollton, GA 30117",
         county: "Carroll County",
-        revenue: 44.90,
+        revenue: 43.10,
         revenueNote: "Accepted by you",
         progress: {
-          startedAt: "8:47 AM",
+          startedAt: "8:58 AM",
           pickedUpAt: null,
           droppedOffAt: null,
         },
-        waitEvidence: {
-          closestMiles: null,
-          arrivedAt: null,
-          leftAt: null,
-        },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 2, distanceMiles: 0.2 },
+            { ageMinutes: 5, distanceMiles: 0.2 },
+            { ageMinutes: 9.5, distanceMiles: 0.3 },
+            // ⚠️ NOTHING older, deliberately. A near record at 14 minutes would
+            // satisfy the ten-minute test on its own and this ride would file
+            // immediately — which is exactly what it did on the first seed.
+        ],
       },
       {
-        id: "1049800374-appt",
+        id: "1049800380-appt",
         type: "appointment",
         label: "Appointment Time",
-        time: "9:45 AM",
+        time: "10:00 AM",
         address: "45 Tanner Medical Way, Carrollton, GA 30117",
         county: "Carroll County",
         revenue: 0,
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Never located at pick-up · form", variant: "warning" }],
+    pills: [{ label: "Scenario 3 at the boundary · unlocks in ~30s", variant: "attention" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
 
-  // ===== Waited a long time, all of it too early =====
-  //
-  // EIGHTEEN minutes at the door — well past the ten-minute bar — and none of it
-  // counts, because the driver left six minutes before the pick-up time. Seeded
-  // above the threshold on purpose: it is the only ride that can prove the
-  // "after the pick-up time" clause is doing work rather than riding along.
-  {
-    id: "1049800375",
-    date: "Tue, Jul 8, 2026",
-    rider: "Harold Bassett",
-    client: "Verida",
-    market: "GA",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 58.25,
-    notes: "Wheelchair — ramp entrance on the north side",
-    legs: [
-      {
-        id: "1049800375",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "8:50 AM",
-        address: "119 Rockmart Rd, Villa Rica, GA 30180",
-        county: "Carroll County",
-        revenue: 58.25,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "8:14 AM",
-          pickedUpAt: null,
-          droppedOffAt: null,
-        },
-        waitEvidence: {
-          closestMiles: 0.2,
-          arrivedAt: "8:26 AM",
-          leftAt: "8:44 AM",
-        },
-      },
-      {
-        id: "1049800375-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "9:30 AM",
-        address: "310 Dialysis Center Dr, Carrollton, GA 30117",
-        county: "Carroll County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [{ label: "Waited 18 min, all before pick-up · form", variant: "warning" }],
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
 ];
 
 // Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);

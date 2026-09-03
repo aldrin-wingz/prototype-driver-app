@@ -1,240 +1,291 @@
-import { getNextSwipe, type Trip, type TripLeg } from "./mock-trips";
+import {
+  getNextSwipe,
+  type LocationRecord,
+  type Trip,
+  type TripLeg,
+} from "./mock-trips";
 
 /**
- * Rider No-Show — the two guardrails, and what happens when they are not met.
+ * Rider No-Show — the guardrails, ported from the production `canNoshow` check.
  *
- * ## Guardrail 1: the ride has to be ready to start, or en-route
+ * ## What the server actually enforces
  *
- * You cannot no-show a member who is already in the car. But you CAN no-show one
- * before swiping start — a driver who arrives to an empty doorstep never gets to
- * begin the ride, which is the commonest shape of the whole problem.
+ * The real check walks the driver's location records **newest to oldest**,
+ * rejects the moment one is further than the radius, and **stops at the first
+ * record ten minutes old**. Which resolves to one sentence:
  *
- * So the window opens once the trip is CONFIRMED and the swipe CTA reads
- * **SWIPE TO START** or **PICK UP MEMBER**, and closes once it reads DROP OFF
- * MEMBER.
+ * > The driver must have been within 0.5 miles of the pickup, continuously, for
+ * > the last ten minutes.
  *
- * ⚠️ **The unconfirmed trip is the case this rule exists for**, and it is easy to
- * get wrong: a trip awaiting member confirmation has no swipe marks either, so
- * anything reading swipe state alone concludes "ready to start" and wrongly
- * allows it. Its CTA is the orange **I REACHED OUT TO CONFIRM**, not a swipe —
- * nothing is ready to start until the member is confirmed. Hence the trip-level
- * check below, which cannot be derived from the leg.
+ * The `break` is the whole subtlety and it is why the driver-facing copy is
+ * honest. A driver who arrives at `T` is blocked by their own approach records
+ * until the arrival record turns ten minutes old — at which point the walk breaks
+ * there and never reaches the drive in.
  *
- * ⚠️ **The tile is ALWAYS shown**, and refuses with a dialog outside that window —
- * production's behaviour, and the reason it is not hidden: a tile that vanishes
- * leaves a driver hunting for a control they know exists, whereas a dialog naming
- * the rule teaches it.
+ * ## What this branch changes
  *
- * ## Guardrail 2: the wait has to be provable
+ * Production has ONE message for four different situations. Two of them clear on
+ * their own if the driver stays put, one never will, and one needs a different
+ * action entirely. `resolveNoShow` splits them:
  *
- * At least **ten minutes**, within **one mile** of the pick-up, counted from the
- * **scheduled pick-up time** onward.
+ *   files         every condition met — submit, as production does
+ *   timer         will clear by waiting — countdown, and NO form
+ *   form          will never clear — only the driver knows, so ask them
+ *   confirm-first clears by a different action available now
+ *   dead-end      nothing to do, and correctly so
  *
- * ⚠️ **And failing it is not an error.** Production hard-refuses here, which is
- * the whole reason this case exists: a driver waits the full ten minutes, gives
- * up, drives off, and only then remembers the process — at which point the app
- * says no and the only way forward is Zendesk. What the app actually knows is
- * that it *cannot confirm* the wait, which is not the same as knowing the driver
- * did not wait. So we ask them instead.
+ * ⚠️ **A form must never appear on a `timer`.** The driver is standing at the
+ * pickup and simply has not waited long enough; offering a form there turns it
+ * into a way to skip the wait.
  */
 
-/**
- * The `No-Show Type:` options on the Member No-Show screen.
- *
- * All three captured from the production picker. The list is complete: the
- * capture shows the same options-then-gap-then-Cancel shape as the app's other
- * action sheets, and nothing sits in the gap.
- *
- * ⚠️ **`Cancel At Door` is not a no-show**, and it is worth noticing that the
- * production screen files it as one. A member who came to the door and cancelled
- * did show up — the driver's problem is the same (a trip that earned nothing) but
- * the claim is different, and Support may well want to treat it differently.
- * Modelled as captured rather than corrected; flagged as an open question.
- *
- * ⚠️ Production renders these in a native action sheet. This prototype uses the
- * app's own `Select`, because a native sheet is not something a web prototype
- * can borrow — the values and the order are faithful, the control is a stand-in.
- */
-export const NO_SHOW_TYPES: readonly string[] = [
-  "Member Not Home",
-  "Cancel At Door",
-  "Member Not Ready",
-] as const;
+/** Radius the driver has to be inside. ⚠️ Production compares `0.5` bare — unit unconfirmed. */
+export const NO_SHOW_RADIUS_MILES = 0.5;
 
-/** How long a driver must wait at the pick-up before a no-show is valid. */
+/** How long that has to have been continuously true. */
 export const NO_SHOW_WAIT_MINUTES = 10;
 
-/** How close to the pick-up that wait has to happen. */
-export const NO_SHOW_RADIUS_MILES = 1;
+/** How far back the server looks for records. */
+export const NO_SHOW_LOOKBACK_MINUTES = 20;
+
+/** WellTrans Indiana only: minutes after the scheduled pickup before filing is allowed. */
+export const NO_SHOW_POST_PICKUP_MINUTES = 15;
 
 /**
- * Why the app could not confirm the wait.
+ * ⚠️ **OURS, not production's.** A fix this far from the pickup on a live trip is
+ * not a position, it is a phone with no usable location — a null island, a stale
+ * cell-tower guess.
  *
- * Three, because the rule has three parts and a driver told only "we couldn't
- * confirm it" has no idea what to put in the form. Each one names a different
- * thing the app saw.
+ * Production has a message for exactly this ("No location data has been
+ * detected from your phone…") and can never show it, because `canNoshow` inserts
+ * a row from the incoming lat/lng before it queries, so its empty-set branch is
+ * unreachable. The driver gets "please wait at least 10 minutes" instead — told
+ * to wait when the fix is a permissions toggle. This threshold is how we say the
+ * right thing.
  */
-export type NoShowGap =
-  /** Never located within the radius — or never located at all. */
-  | "never_near_pickup"
-  /** Within the radius, but for less than the required time. */
-  | "wait_too_short"
-  /** A long enough wait, but it ended before the scheduled pick-up. */
-  | "wait_before_pickup_time";
+export const IMPLAUSIBLE_FIX_MILES = 50;
 
-export type NoShowGate =
+/** ⚠️ Ordered by `-id_location` in production — by PRIMARY KEY, not `created_at`. */
+type WalkResult =
   | { ok: true; qualifyingMinutes: number }
-  | { ok: false; gap: NoShowGap; detail: string };
+  /** No records in the lookback window at all. Unreachable in production — see `IMPLAUSIBLE_FIX_MILES`. */
+  | { ok: false; reason: "no_records"; nearRunOldestAge: null }
+  /** Hit a record outside the radius. `nearRunOldestAge` is `null` when the LATEST record is the far one. */
+  | { ok: false; reason: "blocked_far"; blockedDistanceMiles: number; nearRunOldestAge: number | null }
+  /** Every inspected record was inside the radius, but none was old enough. */
+  | { ok: false; reason: "no_ten_minute_record"; nearRunOldestAge: number };
 
 /**
- * The refusal copy, in the production register.
+ * The production loop, ported line for line so it stays auditable.
  *
- * ⚠️ `wait_too_short` is **production's exact wording**, taken from the reference
- * capture — the driver has seen this dialog before and recognising it is the
- * point. The other two are written to match its register, because production has
- * no message for them: it only ever checks the one condition.
- *
- * Kept apart from a gap's `detail`, which is explanatory and belongs on the form
- * that follows. The dialog is a refusal a driver already knows; the form is where
- * we explain ourselves.
+ * `nearRunOldestAge` is the piece production throws away and we need: the age of
+ * the oldest record in the unbroken near-run from newest. Once that record turns
+ * ten minutes old the walk will break on it, so it *is* the countdown target —
+ * and its existence is also what proves the driver is at the pickup right now.
  */
-export const NO_SHOW_REFUSAL_COPY: Record<NoShowGap, string> = {
-  wait_too_short: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
-  never_near_pickup:
-    "We could not confirm you were at the pick up location. Please request a Member no-show from the pick up location.",
-  wait_before_pickup_time: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location after the scheduled pick up time before requesting a Member no-show.`,
-};
+export function walkLocationRecords(
+  records: readonly LocationRecord[],
+  elapsedMinutes = 0
+): WalkResult {
+  const inWindow = records
+    .map((record) => ({ ...record, age: record.ageMinutes + elapsedMinutes }))
+    // Newest first, which is what `-id_location` approximates.
+    .sort((a, b) => a.age - b.age)
+    .filter((record) => record.age <= NO_SHOW_LOOKBACK_MINUTES);
 
-/** "3:26 PM" → minutes since midnight. `null` when it cannot be read. */
-export function toMinutesOfDay(clock: string | null | undefined): number | null {
-  if (!clock) return null;
-  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(clock.trim());
-  if (!match) return null;
+  if (inWindow.length === 0) {
+    return { ok: false, reason: "no_records", nearRunOldestAge: null };
+  }
 
-  const [, rawHour, minute, meridiem] = match;
-  const hour = Number(rawHour) % 12;
-  const offset = meridiem.toUpperCase() === "PM" ? 12 * 60 : 0;
-  return hour * 60 + Number(minute) + offset;
+  let nearRunOldestAge: number | null = null;
+  for (const record of inWindow) {
+    if (record.distanceMiles > NO_SHOW_RADIUS_MILES) {
+      return {
+        ok: false,
+        reason: "blocked_far",
+        blockedDistanceMiles: record.distanceMiles,
+        nearRunOldestAge,
+      };
+    }
+    if (record.age >= NO_SHOW_WAIT_MINUTES) {
+      return { ok: true, qualifyingMinutes: record.age };
+    }
+    nearRunOldestAge = record.age;
+  }
+
+  // Ran out of records before finding one ten minutes old.
+  return {
+    ok: false,
+    reason: "no_ten_minute_record",
+    nearRunOldestAge: nearRunOldestAge ?? inWindow[inWindow.length - 1].age,
+  };
 }
 
 /**
- * Minutes of the wait that actually count.
- *
- * The overlap of the window the app observed with everything from the scheduled
- * pick-up onward — which is what makes "after the pick-up time" a real condition
- * rather than a phrase. A driver who waited twenty minutes and drove off before
- * the pick-up time waited twenty minutes for nothing, and this returns 0 for them.
- *
- * ⚠️ Single-day only. Wall-clock with no date, so a pick-up either side of
- * midnight would compute nonsense. Not solved: no leg in the seed spans midnight,
- * and inventing a date here would be guessing.
- */
-export function qualifyingWaitMinutes(leg: TripLeg): number | null {
-  const evidence = leg.waitEvidence;
-  if (!evidence) return null;
-
-  const arrived = toMinutesOfDay(evidence.arrivedAt);
-  const left = toMinutesOfDay(evidence.leftAt);
-  const pickup = toMinutesOfDay(leg.time);
-  if (arrived === null || left === null || pickup === null) return null;
-
-  return Math.max(0, left - Math.max(arrived, pickup));
-}
-
-/**
- * Whether the trip is still waiting on the member to confirm.
- *
- * ⚠️ Not derivable from the leg. Its swipe marks are all empty, exactly like a
- * confirmed ride that has not been started — the difference lives on the trip.
- * The driver sees it as the orange I REACHED OUT TO CONFIRM action standing where
- * a swipe would be.
+ * ⚠️ Not derivable from the leg. An unconfirmed trip's swipe marks are all empty,
+ * exactly like a confirmed ride nobody has started — the difference lives on the
+ * trip. The driver sees it as the orange I REACHED OUT TO CONFIRM action standing
+ * where a swipe would be.
  */
 export function isAwaitingMemberConfirmation(trip: Trip): boolean {
   return trip.status === "needs-action";
 }
 
 /**
- * Whether a no-show can be filed against this ride at all — guardrail 1.
+ * The swipe window: SWIPE TO START or PICK UP MEMBER.
  *
- * Two conditions, and the first is the one worth stating: **an unconfirmed trip
- * is never ready to start.** Reading swipe state alone would allow it, because an
- * unconfirmed trip and a confirmed-but-unstarted one have identical marks.
- *
- * The second is keyed off the swipe expected NEXT rather than the stage name,
- * because that is how a driver experiences it: the option is live exactly while
- * the button in front of them says SWIPE TO START or PICK UP MEMBER.
+ * Production gates on ride status `[ACCEPTED, CHECKED, EN_ROUTE]` and raises a
+ * bare `invalid trip status`; the friendly copy is mapped client-side. ⚠️ What
+ * `CHECKED` means is unconfirmed, so whether an unconfirmed trip would pass the
+ * SERVER check is unknown — here the confirmation gate is enforced above.
  */
-export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
-  if (isAwaitingMemberConfirmation(trip)) return false;
+export function isInSwipeWindow(leg: TripLeg): boolean {
   const next = getNextSwipe(leg);
   return next === "start" || next === "pick-up";
 }
 
+/** ⚠️ The only client-specific rule, and the first in this branch. */
+export function requiresPostPickupDelay(trip: Trip): boolean {
+  return trip.client === "WellTrans" && trip.market === "IN";
+}
+
+export type NoShowFormGap = "not_at_pickup" | "no_location_data";
+export type NoShowTimerReason = "presence" | "post-pickup";
+
+export type NoShowOutcome =
+  | { kind: "files"; qualifyingMinutes: number }
+  | { kind: "timer"; reason: NoShowTimerReason; minutesRemaining: number }
+  | { kind: "form"; gap: NoShowFormGap; detail: string }
+  | { kind: "confirm-first" }
+  | { kind: "dead-end" };
+
 /**
- * The refusal for a ride outside that window.
+ * The whole ladder, first rung wins.
  *
- * ⚠️ Production's exact wording, from the reference capture. Shown over the More
- * Options grid, and deliberately a DEAD END with no form behind it: if the member
- * is already in the car there is no no-show to file, so offering to collect one
- * would be collecting a claim that cannot be true.
+ * Order matters: confirmation before stage, stage before location, location
+ * before the client rule. A driver blocked on two things is told about the one
+ * they can act on first.
  */
+export function resolveNoShow(
+  trip: Trip,
+  leg: TripLeg | undefined,
+  elapsedMinutes = 0
+): NoShowOutcome {
+  if (isAwaitingMemberConfirmation(trip)) return { kind: "confirm-first" };
+  if (!leg || !isInSwipeWindow(leg)) return { kind: "dead-end" };
+
+  const walk = walkLocationRecords(leg.locationRecords ?? [], elapsedMinutes);
+
+  if (!walk.ok) {
+    // No usable position at all — or a fix so far out it cannot be one.
+    const bogusFix =
+      walk.reason === "blocked_far" &&
+      walk.nearRunOldestAge === null &&
+      walk.blockedDistanceMiles > IMPLAUSIBLE_FIX_MILES;
+
+    if (walk.reason === "no_records" || bogusFix) {
+      return {
+        kind: "form",
+        gap: "no_location_data",
+        detail:
+          "We're not getting a location from your phone, so we can't confirm the wait ourselves.",
+      };
+    }
+
+    // The discriminator production throws away: is the driver here RIGHT NOW.
+    // A near-run means the newest records are inside the radius, so staying put
+    // will clear this on its own — a form here would skip the wait.
+    if (walk.nearRunOldestAge !== null) {
+      return {
+        kind: "timer",
+        reason: "presence",
+        minutesRemaining: Math.max(
+          0,
+          NO_SHOW_WAIT_MINUTES - walk.nearRunOldestAge
+        ),
+      };
+    }
+
+    // Latest record is outside the radius: they have left, or never arrived, or
+    // the pickup is bigger than the radius. Waiting cannot fix any of those.
+    return {
+      kind: "form",
+      gap: "not_at_pickup",
+      detail:
+        walk.reason === "blocked_far"
+          ? `We last had you ${walk.blockedDistanceMiles.toFixed(1)} miles from the pick-up, outside the ${NO_SHOW_RADIUS_MILES}-mile range.`
+          : "We couldn't place you at the pick-up, so we can't confirm the wait ourselves.",
+    };
+  }
+
+  if (requiresPostPickupDelay(trip)) {
+    const since = (leg.minutesSinceScheduledPickup ?? 0) + elapsedMinutes;
+    if (since < NO_SHOW_POST_PICKUP_MINUTES) {
+      return {
+        kind: "timer",
+        reason: "post-pickup",
+        minutesRemaining: NO_SHOW_POST_PICKUP_MINUTES - since,
+      };
+    }
+  }
+
+  return { kind: "files", qualifyingMinutes: walk.qualifyingMinutes };
+}
+
+/**
+ * The stretch the app DID see the driver at the pick-up, if any.
+ *
+ * Ages in minutes, oldest and newest sighting of the contiguous near-run
+ * measured from the oldest end of the record stream.
+ *
+ * This exists for the form. On the commonest failure — waited, gave up, drove
+ * off — the app can see the whole wait; it just is not in the last ten minutes.
+ * Prefilling from it turns the form into "we saw you here from X to Y, is that
+ * right?" rather than a blank interrogation. Returns `null` when there is no
+ * near sighting at all, which is the honest answer for a driver who never
+ * arrived or whose phone had no fix — those forms open empty.
+ */
+export function inferNearWindow(
+  leg: TripLeg
+): { arrivedAgoMinutes: number; lastSeenAgoMinutes: number } | null {
+  const near = (leg.locationRecords ?? [])
+    .filter((record) => record.distanceMiles <= NO_SHOW_RADIUS_MILES)
+    .map((record) => record.ageMinutes)
+    .sort((a, b) => a - b);
+  if (near.length === 0) return null;
+  return {
+    arrivedAgoMinutes: near[near.length - 1],
+    lastSeenAgoMinutes: near[0],
+  };
+}
+
+/** Whether Member No-Show is offered without a refusal. Kept for the tile's own check. */
+export function canFileNoShow(trip: Trip, leg: TripLeg): boolean {
+  return !isAwaitingMemberConfirmation(trip) && isInSwipeWindow(leg);
+}
+
+/**
+ * The refusal copy, in the production register.
+ *
+ * ⚠️ The presence line is production's **exact wording** — the driver has seen
+ * this dialog before and recognising it is the point. The others match its
+ * register, because production has no message for them.
+ */
+export const NO_SHOW_REFUSAL_COPY = {
+  presence: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
+  "post-pickup": `Please wait at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled pick up time before requesting a Member no-show.`,
+  not_at_pickup: `Please wait at least ${NO_SHOW_WAIT_MINUTES} minutes at the pick up location before requesting a Member no-show.`,
+  no_location_data:
+    "No location data has been detected from your phone. Please verify that your phone has the correct location settings before you request a Member no-show from the app.",
+} as const;
+
+/** Guardrail 1's refusal — production's exact wording, and a deliberate dead end. */
 export const NO_SHOW_STAGE_REFUSAL =
   "Member No-Show is only allowed for rides that are ready to start or en-route.";
 
-/**
- * Guardrail 2, derived from the seeded evidence rather than seeded itself.
- *
- * Deliberately a derivation. Seeding the verdict would make the two constants
- * above decorative and leave the three failing rides differing only by a label —
- * whereas deriving it means each seeded ride genuinely exercises the rule, and
- * changing `NO_SHOW_WAIT_MINUTES` visibly moves which rides pass.
- */
-export function resolveNoShowGate(leg: TripLeg): NoShowGate {
-  const evidence = leg.waitEvidence;
-  const closest = evidence?.closestMiles ?? null;
-
-  // No proof found. NOT "the driver was not there" — the app simply has nothing
-  // to say, which is exactly the case worth asking about.
-  if (closest === null || closest > NO_SHOW_RADIUS_MILES) {
-    return {
-      ok: false,
-      gap: "never_near_pickup",
-      detail:
-        closest === null
-          ? "We couldn't place you at the pick-up, so we can't confirm the wait ourselves."
-          : `The closest we placed you to the pick-up was ${closest} miles, outside the ${NO_SHOW_RADIUS_MILES}-mile range.`,
-    };
-  }
-
-  const qualifying = qualifyingWaitMinutes(leg);
-  if (qualifying === null) {
-    return {
-      ok: false,
-      gap: "never_near_pickup",
-      detail: "We couldn't work out how long you waited, so we can't confirm it ourselves.",
-    };
-  }
-
-  if (qualifying >= NO_SHOW_WAIT_MINUTES) {
-    return { ok: true, qualifyingMinutes: qualifying };
-  }
-
-  // A wait that ended before the pick-up time is a different story from a short
-  // one, and the driver needs to be told which — the answer changes what they
-  // write in the form.
-  const left = toMinutesOfDay(evidence?.leftAt);
-  const pickup = toMinutesOfDay(leg.time);
-  if (left !== null && pickup !== null && left <= pickup) {
-    return {
-      ok: false,
-      gap: "wait_before_pickup_time",
-      detail: `We saw you at the pick-up from ${evidence?.arrivedAt} to ${evidence?.leftAt}, but that was all before the ${leg.time} pick-up time.`,
-    };
-  }
-
-  return {
-    ok: false,
-    gap: "wait_too_short",
-    detail: `We could only account for ${qualifying} minute${qualifying === 1 ? "" : "s"} at the pick-up after ${leg.time} — we look for ${NO_SHOW_WAIT_MINUTES}.`,
-  };
-}
+/** The `No-Show Type:` options, all three captured from the production picker. */
+export const NO_SHOW_TYPES: readonly string[] = [
+  "Member Not Home",
+  "Cancel At Door",
+  "Member Not Ready",
+] as const;

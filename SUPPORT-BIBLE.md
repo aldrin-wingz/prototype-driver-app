@@ -83,25 +83,39 @@ That refusal is a **deliberate dead end** with no form behind it. If the member 
 
 ### Guardrail 2 — the wait has to be provable
 
-At least **ten minutes**, within **one mile**, counted from the **scheduled pick-up time** onward.
+Ported from the production `canNoshow`, which walks the driver's location records **newest to oldest**, rejects the moment one is further than **0.5 mi**, and **stops at the first record ten minutes old**. `walkLocationRecords` mirrors it line for line so it stays auditable.
 
-**It fires on the Member No-Show screen's Submit**, which is where production runs it — see §6.
+That resolves to one sentence:
 
-**⚠️ Failing it is not a dead end.** What the app actually knows is that it *cannot confirm* the wait, which is not the same as knowing the driver did not wait. Production shows a dialog and stops; here the same dialog offers **"Submit support form"** and leads to the form.
+> **The driver must have been within 0.5 miles of the pickup, continuously, for the last ten minutes.**
 
-**⚠️ Seed the EVIDENCE, derive the VERDICT.** `NoShowWaitEvidence` carries what the app observed (`closestMiles`, `arrivedAt`, `leftAt`) and `resolveNoShowGate` derives the answer. This is a deliberate departure from seeding outcomes directly: the rule *is* the spec, so seeding the verdict would make `10` and `1` decorative and leave the three failing rides differing only by a label. Derived, each seeded ride genuinely exercises the rule.
+⚠️ **The `break` is the whole subtlety.** A driver who arrives at `T` is blocked by their own approach records — until the arrival record turns ten minutes old, at which point the walk breaks there and the drive in is **never inspected**. It is also why the production copy is honest: it really is ten minutes at the pickup.
 
-Qualifying wait = the overlap of `[arrivedAt, leftAt]` with `[scheduled pick-up, ∞)`. That is what makes "after the pick-up time" a real condition rather than a phrase.
+⚠️ **A dwell TOTAL would get this wrong.** Scenario 5 has eighteen minutes of near records, more than the threshold — and correctly blocks, because a gap in the middle resets the clock. Any implementation that sums time-at-pickup passes that ride.
 
-**Three gaps, because the rule has three parts.** A driver told only "we couldn't confirm it" has no idea what to write:
+**Seed the RECORDS, not the verdict.** Every scenario is a different shape of `leg.locationRecords`, so each ride genuinely exercises the rule and changing `NO_SHOW_RADIUS_MILES` visibly moves which rides pass.
 
-| Gap | What the app saw |
-|---|---|
-| `never_near_pickup` | Never located within the radius — or never located at all |
-| `wait_too_short` | Within the radius, but under the required minutes |
-| `wait_before_pickup_time` | A long enough wait, but it ended before the scheduled pick-up |
+**Five outcomes, from one production message.** Production has a single failure string covering four situations. `resolveNoShow` splits them, and the discriminator is the piece production throws away — **`nearRunOldestAge`**, the age of the oldest record in the unbroken near-run from newest. Its existence proves the driver is at the pickup right now; its value is the countdown target.
 
-An absent `waitEvidence` and a `null` `closestMiles` mean **no proof found** — deliberately not the same as "did not wait". That distinction is the entire reason this opens a form instead of a refusal.
+| Outcome | Clears by | Offer |
+|---|---|---|
+| `files` | — | submits, as production does |
+| `timer` | staying put | countdown on the button, **and no form** |
+| `form` | nothing — only the driver knows | *Submit support form* |
+| `confirm-first` | a different action, available now | the confirmation flow |
+| `dead-end` | nothing, correctly | OK only |
+
+**⚠️ A `timer` must NEVER offer the form.** The driver is standing at the pickup and simply has not waited long enough; a form there turns it into a way to skip the wait. `refusalOffersForm` is gated on `kind === "form"` for exactly this.
+
+**The client rule.** `requiresPostPickupDelay` — WellTrans + Indiana, ≥15 min after the scheduled pickup. ⚠️ The first client-specific rule in this branch, and it appears **nowhere in `canNoshow`**, so it lives in another layer.
+
+### What the code does that the driver isn't told
+
+Three findings, all still open with whoever owns the backend check:
+
+1. ⚠️ **The "check your location settings" message is unreachable.** `canNoshow` saves a `Location` row from the incoming lat/lng *before* it queries, so `if not locations:` can't be satisfied. A driver with location off sends a null or stale fix, which reads as an enormous distance, so they get *"please wait at least 10 minutes"* — told to wait when the fix is a permissions toggle. `IMPLAUSIBLE_FIX_MILES` is how this branch says the right thing instead, and it is **ours, not production's**.
+2. ⚠️ **`order_by('-id_location')` sorts by primary key, not `created_at`.** Fine while inserts are chronological. If the app ever buffers locations offline and batch-uploads them, the walk stops moving backwards through time and could `break` on an out-of-order old-but-near record — **passing a driver who left and came back**.
+3. ⚠️ **Filtered by `id_user`, not `id_ride`** — the driver's records from any trip count. Right for continuous presence, and it means a previous trip's drop-off two miles away will block this one.
 
 ## 6. The Member No-Show screen, and the form behind it
 
@@ -208,20 +222,23 @@ bun run typecheck    # must stay at 0 — the only automated check that exists
 
 **The demo path:** My Rides → a ride → **More** → **Member No-Show** → pick a type, sign, **Submit**.
 
-**Seven rides, one per outcome. The tile is on every one of them; choosing a ride IS how you pick a scenario:**
+**Six scenarios, named against the production check. The tile is on every ride; choosing a ride IS how you pick a scenario:**
 
-| Ride | State | Seeded evidence | What you see |
+| # | Ride | Seeded records | Outcome |
 |---|---|---|---|
-| `260731-780322` | **unconfirmed** (Needs Action) | — | Guardrail 1 dialog — *"only allowed for rides that are ready to start or en-route"* |
-| `1049800371` | member on board | — | Same dialog, the closed end of the window |
-| `1049800370` | ready to start | 11 min @ 0.4 mi, after pick-up | **Passes** → success toast, no form |
-| `1049800372` | en-route | 12 min @ 0.3 mi, after pick-up | **Passes** → success toast, no form |
-| `1049800373` | en-route | 4 min @ 0.2 mi | `wait_too_short` → dialog → form |
-| `1049800374` | en-route | never located | `never_near_pickup` → dialog → form |
-| `1049800375` | en-route | 18 min, all before pick-up | `wait_before_pickup_time` → dialog → form |
+| **1** | `1049800371` — member on board | — | **Dead end**, *only allowed for rides that are ready to start or en-route* |
+| **2** | `1049800370` — 12 unbroken min at the pickup | near ×5, spanning 17 min | **Files** |
+| **3** | `1049800373` — left and came back 2 min ago | near, **gap**, near — 18 min of near records | **Timer 8:00** |
+| **4** | `1049800376` — facility, 0.6 mi out for 17 min | all just outside the radius | **Form** |
+| **5** | `1049800377` — no fix at all | `[]` | **Form**, with the *right* message |
+| **WT** | `1049800378` — WellTrans IN, 6 min past pickup | 13 min of continuous presence | **Timer to +15** |
 
-`370` and `372` cover both ends of the allowed window; `260731-780322` and `371` cover both ways out of it.
+Plus two extras: `1049800380` is **scenario 3 a hair from the boundary**, so the countdown runs out while you watch and the button unlocks — the only way to see `files` without waiting eight minutes. And the pre-existing unconfirmed ride in `mockNeedsActionTrips` gives **Confirm first**; ⚠️ that gate is **client-side**, since production's status list is `[ACCEPTED, CHECKED, EN_ROUTE]` and an unconfirmed trip may well sit at `ACCEPTED`.
 
-`375` waits **18 minutes** — over the ten-minute bar — and still fails. That is on purpose: it is the only ride that can prove the "after the pick-up time" clause does its own work rather than riding along with the duration check.
+**Scenario 3 is the one that proves the rule.** Six of its eight records are inside the radius, spanning eighteen minutes — more than the threshold — and it correctly blocks, because a gap in the middle resets the clock. **Any implementation that sums time-at-pickup passes that ride.**
+
+**Scenario 5 is the literal empty set** — the branch `if not locations:` tests for, and ⚠️ **the one production can never reach**, because `canNoshow` inserts a row before it queries. The bogus-fix path production actually takes (a null-island fix at an absurd distance) is caught by `IMPLAUSIBLE_FIX_MILES` and lands on the same, correct message.
+
+⚠️ **`inferNearWindow` is currently unexercised by the seed.** It prefills the form's two times from a wait the app *did* see, and no kept scenario has one — 4 and 5 have no near records at all. The behaviour is correct; bring back a "waited then drove off" ride to see it.
 
 **One known console warning:** Radix `Missing 'Description' or 'aria-describedby'` on `DialogContent`. Pre-existing, from the drawer primitive.

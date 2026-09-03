@@ -26,10 +26,16 @@ import { RiderNoShowForm } from "@/components/support/rider-no-show-form";
 import {
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_TYPES,
-  resolveNoShowGate,
-  type NoShowGate,
+  resolveNoShow,
+  type NoShowOutcome,
 } from "@/lib/driver-data/no-show-rules";
 import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
+import {
+  COUNTDOWN_MAX_MINUTES,
+  formatLongWait,
+  formatCountdown,
+  useNoShowClock,
+} from "@/hooks/use-no-show-clock";
 import { DRIVER_TEAL } from "@/constants/driver-app-colors";
 
 /**
@@ -64,14 +70,22 @@ export function MemberNoShowScreen({
   const [noShowType, setNoShowType] = useState("");
   const [signed, setSigned] = useState(false);
   const [resetKey, setResetKey] = useState(0);
-  const [refusal, setRefusal] = useState<Extract<NoShowGate, { ok: false }> | null>(
-    null
-  );
+  const [refusal, setRefusal] = useState<NoShowOutcome | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
+
+  /**
+   * The one real clock in the prototype, and it only runs while a countdown is
+   * on screen. Seeded record ages advance by it, so the timer genuinely runs
+   * down and the gate genuinely opens at zero rather than pretending to.
+   */
+  const outcomeNow = resolveNoShow(trip, activeLeg, 0);
+  const elapsed = useNoShowClock(outcomeNow.kind === "timer");
+  const outcome = resolveNoShow(trip, activeLeg, elapsed);
+  const waiting = outcome.kind === "timer" ? outcome : null;
 
   function handleSubmit() {
     // Light validation first, and deliberately NOT the refusal dialog — an
@@ -94,22 +108,32 @@ export function MemberNoShowScreen({
     }
     if (!activeLeg) return;
 
-    const gate = resolveNoShowGate(activeLeg);
-    if (!gate.ok) {
-      setRefusal(gate);
+    if (outcome.kind !== "files") {
+      setRefusal(outcome);
       return;
     }
 
-    // The wait is provable, so production files it and there is nothing to ask.
+    // Every condition met, so production files it and there is nothing to ask.
     // ⚠️ No support request is created on this path, on purpose: the app action
     // IS the submission, and inventing a queue record would misrepresent what
     // happened.
     toast({
       title: "Member No-Show submitted",
-      description: `We recorded ${gate.qualifyingMinutes} minutes at the pick-up. Not wired further in the prototype — this is the production action.`,
+      description: `We had you at the pick-up for ${Math.floor(outcome.qualifyingMinutes)} minutes. Not wired further in the prototype — this is the production action.`,
     });
     router.push(backHref);
   }
+
+  /** What the refusal dialog says, and whether it offers a way forward. */
+  const refusalCopy =
+    refusal?.kind === "timer"
+      ? NO_SHOW_REFUSAL_COPY[refusal.reason]
+      : refusal?.kind === "form"
+        ? NO_SHOW_REFUSAL_COPY[refusal.gap]
+        : "";
+  // ⚠️ A timer NEVER offers the form. The driver is at the pick-up and simply
+  // has not waited long enough; a form there is a way to skip the wait.
+  const refusalOffersForm = refusal?.kind === "form";
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -167,16 +191,41 @@ export function MemberNoShowScreen({
         </button>
       </div>
 
-      {/* Pinned, and always enabled — production lets you submit and then tells
-          you no, which is the behaviour being replicated. */}
+      {/* Pinned, and always tappable — production lets you submit and then tells
+          you no, which is the behaviour being replicated. What is NEW is that
+          while a wait is running the button says so, rather than looking ready
+          and refusing. */}
       <div className="sticky bottom-0 border-t border-gray-200 bg-white px-4 py-4">
         <button
           type="button"
           onClick={handleSubmit}
-          className="h-14 w-full rounded-lg text-lg font-bold text-white"
-          style={{ backgroundColor: DRIVER_TEAL }}
+          className="flex h-14 w-full flex-col items-center justify-center rounded-lg font-bold text-white"
+          style={{
+            // Muted while it cannot succeed. Still tappable, because tapping is
+            // how the driver gets the explanation.
+            backgroundColor: waiting ? "#9CD9CE" : DRIVER_TEAL,
+          }}
         >
-          Submit
+          {waiting ? (
+            <>
+              <span className="text-lg leading-tight">
+                {waiting.minutesRemaining > COUNTDOWN_MAX_MINUTES
+                  ? formatLongWait(waiting.minutesRemaining)
+                  : formatCountdown(waiting.minutesRemaining)}
+              </span>
+              <span className="text-xs font-medium leading-tight opacity-90">
+                {waiting.minutesRemaining > COUNTDOWN_MAX_MINUTES
+                  ? waiting.reason === "post-pickup"
+                    ? "until 15 min past pick-up"
+                    : "until 10 min at the pick-up"
+                  : waiting.reason === "post-pickup"
+                    ? "until 15 min past pick-up"
+                    : "until 10 min at the pick-up"}
+              </span>
+            </>
+          ) : (
+            <span className="text-lg">Submit</span>
+          )}
         </button>
       </div>
 
@@ -190,27 +239,43 @@ export function MemberNoShowScreen({
               Unable to complete action
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-gray-700">
-              {refusal ? NO_SHOW_REFUSAL_COPY[refusal.gap] : ""}
+              {refusalCopy}
             </AlertDialogDescription>
+            {/* On a timer the dialog also says HOW LONG, which production never
+                does — "wait at least 10 minutes" with no idea how many are left
+                is the difference between a rule and an instruction. */}
+            {refusal?.kind === "timer" && (
+              <p className="pt-1 text-base font-bold text-gray-900">
+                {refusal.minutesRemaining > COUNTDOWN_MAX_MINUTES
+                  ? `About ${formatLongWait(refusal.minutesRemaining)} to go — stay at the pick-up and it will unlock.`
+                  : `${formatCountdown(refusal.minutesRemaining)} to go — stay at the pick-up and it will unlock.`}
+              </p>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
             {/* The one thing production does not offer. Everything above this
                 line is the dialog the driver already knows; this is the way out
                 of it that used to be Zendesk.
 
+                ⚠️ And it appears ONLY on a form outcome. On a timer the driver is
+                standing at the pick-up and simply has not waited long enough —
+                offering a form there turns it into a way to skip the wait.
+
                 Labelled for the ARTEFACT, not the feeling — "Submit support
                 form" tells the driver what they are about to do and matches the
                 vocabulary the rest of the app uses. */}
-            <AlertDialogAction
-              onClick={() => {
-                setRefusal(null);
-                setFormOpen(true);
-              }}
-              className="h-12 w-full rounded-lg text-base font-bold text-white"
-              style={{ backgroundColor: DRIVER_TEAL }}
-            >
-              Submit support form
-            </AlertDialogAction>
+            {refusalOffersForm && (
+              <AlertDialogAction
+                onClick={() => {
+                  setRefusal(null);
+                  setFormOpen(true);
+                }}
+                className="h-12 w-full rounded-lg text-base font-bold text-white"
+                style={{ backgroundColor: DRIVER_TEAL }}
+              >
+                Submit support form
+              </AlertDialogAction>
+            )}
             <AlertDialogCancel className="mt-0 h-12 w-full rounded-lg border-gray-300 text-base font-bold text-gray-900">
               OK
             </AlertDialogCancel>

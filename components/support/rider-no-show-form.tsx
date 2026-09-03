@@ -7,7 +7,7 @@ import { ISSUE_RIDER_NO_SHOW } from "@/lib/support-data/issue-types";
 import { buildPrefilledValues } from "@/lib/support/prefill";
 import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
-import { resolveNoShowGate } from "@/lib/driver-data/no-show-rules";
+import { resolveNoShow } from "@/lib/driver-data/no-show-rules";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import type { SupportCallout } from "@/types/support";
 
@@ -53,15 +53,23 @@ export function buildRiderNoShow(
  * also tells them what to write: "we only saw 4 minutes" and "we never placed you
  * there" call for different answers.
  */
-function buildCallout(leg: TripLeg | undefined): SupportCallout | undefined {
-  if (!leg) return undefined;
-  const gate = resolveNoShowGate(leg);
-  if (gate.ok) return undefined;
+function buildCallout(
+  trip: Trip,
+  leg: TripLeg | undefined
+): SupportCallout | undefined {
+  const outcome = resolveNoShow(trip, leg);
+  // Only the form outcomes reach this sheet, and only they have something to
+  // explain. Anything else means the sheet was opened by a path that should not
+  // have — better to render no callout than to invent one.
+  if (outcome.kind !== "form") return undefined;
 
   return {
     tone: "warning",
-    title: "We couldn't confirm your wait",
-    detail: gate.detail,
+    title:
+      outcome.gap === "no_location_data"
+        ? "We can't see your location"
+        : "We couldn't confirm your wait",
+    detail: outcome.detail,
   };
 }
 
@@ -96,7 +104,7 @@ export function RiderNoShowForm({
   return (
     <SupportFormSheet
       supportCase={supportCase}
-      callout={buildCallout(leg)}
+      callout={buildCallout(trip, leg)}
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}

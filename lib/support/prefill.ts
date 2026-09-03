@@ -1,5 +1,6 @@
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import { getLegOptions } from "@/lib/support-data/leg-options";
+import { inferNearWindow } from "@/lib/driver-data/no-show-rules";
 import type {
   SupportCaseDefinition,
   SupportField,
@@ -19,6 +20,19 @@ function toTimeInputValue(clock: string | null | undefined): string {
   let hour = Number(rawHour) % 12;
   if (meridiem.toUpperCase() === "PM") hour += 12;
   return `${String(hour).padStart(2, "0")}:${minute}`;
+}
+
+/**
+ * A record age in minutes as the `<input type="time">` value it happened at.
+ *
+ * Uses the real clock, because a record age is only meaningful relative to now —
+ * and the driver is being asked about the last twenty minutes, so "10:19" has to
+ * mean ten past ten on their phone, not on `MOCK_TODAY`.
+ */
+function clockFromMinutesAgo(minutesAgo: number | undefined): string {
+  if (minutesAgo === undefined) return "";
+  const at = new Date(Date.now() - minutesAgo * 60000);
+  return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
 }
 
 /** Convert "Thu, Jul 31, 2026" to the `<input type="date">` value "2026-07-31". */
@@ -56,14 +70,19 @@ function resolve(
       return leg?.legCode ?? "";
     case "legId":
       return leg?.id ?? "";
-    // ⚠️ These prefill from the evidence the gate has just judged INSUFFICIENT,
-    // which is why neither field locks. An empty string is the honest answer when
-    // the app saw nothing — and it is the interesting case, because it leaves the
-    // driver the blank the form exists to collect.
+    // ⚠️ These prefill from the record stream the gate has just judged
+    // INSUFFICIENT, which is why neither field locks. On the commonest failure —
+    // waited, then drove off — the app saw the whole wait and can offer it back;
+    // where it saw nothing, both stay blank, which is the honest answer and the
+    // interesting case.
     case "waitArrivedAt":
-      return toTimeInputValue(leg?.waitEvidence?.arrivedAt);
+      return clockFromMinutesAgo(
+        leg ? inferNearWindow(leg)?.arrivedAgoMinutes : undefined
+      );
     case "waitLeftAt":
-      return toTimeInputValue(leg?.waitEvidence?.leftAt);
+      return clockFromMinutesAgo(
+        leg ? inferNearWindow(leg)?.lastSeenAgoMinutes : undefined
+      );
   }
 }
 

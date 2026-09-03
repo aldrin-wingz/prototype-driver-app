@@ -82,13 +82,49 @@ Reference captures of the real Member No-Show arrived, and they changed the shap
 
 **Verified in the browser:** all three types render in order; `260731-780322` (unconfirmed) and `371` (on board) both show the tile and refuse with production's sentence; `370` and `372` pass to a success toast naming the minutes recorded; `373`/`374`/`375` refuse and lead to the form with the type carried and locked, the gap named in the callout, prefilled times editable, and no second signature. Submit is gated by the signature and NOT by the attachment. Console clean.
 
+### The real logic, ported · 2026-09-04
+
+The production `canNoshow` source arrived, and it corrected the model twice over. What I had built — a 1-mile radius, a dwell total, and a general "after the pickup time" rule — was wrong on all three counts.
+
+**What the code actually enforces:** the walk goes newest→oldest, rejects the moment a record is further than **0.5 mi**, and **stops at the first record ten minutes old**. Which is: *within 0.5 miles, continuously, for the last ten minutes.* `walkLocationRecords` mirrors it line for line so it stays auditable.
+
+| Change | Why |
+|---|---|
+| Radius 1 mi → **0.5 mi** | The code compares `0.5`. ⚠️ Unit unconfirmed — `calculate_distance_two_points` has no conversion near it |
+| Dwell total → **the walk** | A gap resets the clock; a total does not. Scenario 3 exists to prove it |
+| `wait_before_pickup_time` **deleted** | Not a general rule — WellTrans Indiana only, and +15, not "after" |
+| Seeded verdict → **seeded records** | Every scenario is a shape of `leg.locationRecords`, so each ride exercises the rule rather than asserting it |
+| Two outcomes → **five** | `files` · `timer` · `form` · `confirm-first` · `dead-end` |
+| — | **`useNoShowClock`**: the one real clock, relative to mount, so a countdown genuinely runs down and the gate genuinely opens |
+
+**The discriminator production throws away.** `nearRunOldestAge` — the age of the oldest record in the unbroken near-run from newest. Its *existence* proves the driver is at the pickup right now; its *value* is the countdown target. Without it, "waited then drove off" and "just arrived" are identical on the stated rules, which is why production shows both the same message.
+
+**⚠️ A timer never offers the form.** The driver is at the pickup and simply has not waited long enough; a form there is a way to skip the wait. `refusalOffersForm` is gated on `kind === "form"`.
+
+**Three findings against the production check**, all open:
+
+1. **The "check your location settings" message is unreachable.** The function saves a `Location` row from the incoming lat/lng before it queries, so `if not locations:` can't be satisfied. A driver with location off gets *"wait at least 10 minutes"* — told to wait when the fix is a permissions toggle. `IMPLAUSIBLE_FIX_MILES` is how this branch says the right thing, and it is **ours**.
+2. **`order_by('-id_location')` sorts by primary key, not `created_at`.** If the app ever batch-uploads buffered locations, the walk stops moving backwards through time and could `break` on an out-of-order old-but-near record — **passing a driver who left and came back**.
+3. **Filtered by `id_user`, not `id_ride`** — a previous trip's drop-off two miles away blocks this one.
+
+**Scenario set,** after two rounds of the user simplifying: six, named against the check. Dropped as data-identical to scenario 4: "waited then drove off" and "never got near" — latest record outside the radius, no near-run, so one ride covers all three and the form is where the driver says which.
+
+**Verified:** all six resolve correctly plus both extras; the timer ticks live (0:28 → 0:04 → **Submit**) and then files, naming the minutes recorded; the timer dialog carries production's exact copy **plus how long is left** and offers **OK only**; scenario 5 shows the message production has and cannot reach. `bun run typecheck` at 0.
+
+**A verification error worth recording:** I read a button as "Submit" and nearly called the timer broken — the browser was still on the previous ride because `curl` had warmed the route without navigating the pane. Warm with curl, then navigate; never read the result of one as the other.
+
+**And a prototype seam:** long waits show a **duration** (`2h 05m`), not a clock time. "Available at 10:15 AM" is better product, but it adds real minutes to the real clock while every ride time here is seeded fiction — a ride whose pickup reads 1:50 PM was offering "2:29 AM". A real build should show the time of day.
+
 ## Next
 
 1. **Is `Cancel At Door` really a no-show?** It is the odd one of the three captured types — the member appeared. Does Support want it as its own claim, and does it earn the fee?
-2. **Confirm the wait rule with ops** — is it 10 minutes and 1 mile, is it uniform across clients and markets, and is "after the pick-up time" right?
-3. **The no-show fee.** Does a form-path no-show earn it, and should an unenforced-proof form be able to trigger a payment at all? The prototype touches pay nowhere.
-4. **The on-site rule** — the parked branch required `Verida`+`TN` drivers to file from the pick-up. This branch drops it. Intended?
-5. **What counts as proof in production**, and its false-negative rate — that rate *is* the volume of this form.
-6. **Should filing end the ride** or change its status?
-7. **Stories → PRD.** Not started. `reverse-engineer-prototype` before `prd-finalizer`.
-8. **Push.** Not yet pushed; no upstream is set, deliberately, so a bare `git push` cannot target main.
+2. **Answer the three findings above** with whoever owns `canNoshow` — the unreachable message is the one a driver feels today.
+3. **Does `calculate_distance_two_points` return miles?** `0.5` is compared bare. Kilometres would make the real radius 0.31 mi.
+4. **What `CHECKED` means**, and whether the confirmation gate exists server-side at all.
+5. **Confirm the wait rule with ops** — is it 10 minutes and 1 mile, is it uniform across clients and markets, and is "after the pick-up time" right?
+6. **The no-show fee.** Does a form-path no-show earn it, and should an unenforced-proof form be able to trigger a payment at all? The prototype touches pay nowhere.
+7. **The on-site rule** — the parked branch required `Verida`+`TN` drivers to file from the pick-up. This branch drops it. Intended?
+8. **What counts as proof in production**, and its false-negative rate — that rate *is* the volume of this form.
+9. **Should filing end the ride** or change its status?
+10. **Stories → PRD.** Not started. `reverse-engineer-prototype` before `prd-finalizer`.
+11. **Push.** Not yet pushed; no upstream is set, deliberately, so a bare `git push` cannot target main.
