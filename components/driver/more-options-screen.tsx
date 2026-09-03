@@ -10,6 +10,7 @@ import {
   Calendar,
   X,
   Reply,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,14 @@ import { getLegStage, type Trip } from "@/lib/driver-data/mock-trips";
 import {
   canFileNoShow,
   NO_SHOW_STAGE_REFUSAL,
+  resolveNoShow,
 } from "@/lib/driver-data/no-show-rules";
+import {
+  COUNTDOWN_MAX_MINUTES,
+  formatCountdown,
+  formatLongWait,
+  useNoShowClock,
+} from "@/hooks/use-no-show-clock";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -174,21 +182,37 @@ function TileIcon({ tile }: { tile: OptionTile }) {
 
 function Tile({
   tile,
+  countdown,
   onSelect,
 }: {
   tile: OptionTile;
+  /**
+   * A live wait shown on the tile itself.
+   *
+   * So the driver learns they are waiting WITHOUT having to open the screen,
+   * pick a type, sign, and be refused. The tile stays fully tappable on purpose
+   * — going in early to choose a type and sign, ready to submit the moment it
+   * unlocks, is a reasonable thing to want to do.
+   */
+  countdown?: string;
   onSelect: (id: string) => void;
 }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(tile.id)}
-      className="flex min-h-[168px] w-full flex-col items-center justify-center gap-3 px-4 py-6"
+      className="flex min-h-[168px] w-full flex-col items-center justify-center gap-2 px-4 py-6"
     >
       <TileIcon tile={tile} />
-      <span className="max-w-[150px] text-center text-base leading-snug text-gray-800">
+      <span className="mt-1 max-w-[150px] text-center text-base leading-snug text-gray-800">
         {tile.label}
       </span>
+      {countdown && (
+        <span className="flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2 py-0.5 text-xs font-bold tabular-nums text-[#92400E]">
+          <Clock className="h-3 w-3" aria-hidden />
+          {countdown}
+        </span>
+      )}
     </button>
   );
 }
@@ -218,6 +242,25 @@ export function MoreOptionsScreen({
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
   const [stageRefused, setStageRefused] = useState(false);
+
+  /**
+   * The same ladder the Member No-Show screen runs, one screen earlier.
+   *
+   * Only the `timer` outcome surfaces here. A `form` or a refusal deliberately
+   * does NOT — those are the familiar production dialogs, and pre-empting them
+   * on the tile would replace a message the driver recognises with a label they
+   * have to learn. A countdown is different: it is information they cannot get
+   * any other way, and it saves a pointless trip through the form.
+   */
+  const outcomeNow = resolveNoShow(trip, activeLeg, 0);
+  const elapsed = useNoShowClock(outcomeNow.kind === "timer");
+  const outcome = resolveNoShow(trip, activeLeg, elapsed);
+  const noShowCountdown =
+    outcome.kind === "timer"
+      ? outcome.minutesRemaining > COUNTDOWN_MAX_MINUTES
+        ? formatLongWait(outcome.minutesRemaining)
+        : formatCountdown(outcome.minutesRemaining)
+      : undefined;
 
   /**
    * ⚠️ The grid never changes shape. All seven production tiles, always, with
@@ -319,7 +362,11 @@ export function MoreOptionsScreen({
             )}
             style={tile.fullWidth ? { gridColumn: "span 2" } : undefined}
           >
-            <Tile tile={tile} onSelect={handleGridTile} />
+            <Tile
+              tile={tile}
+              countdown={tile.id === "no-show" ? noShowCountdown : undefined}
+              onSelect={handleGridTile}
+            />
           </div>
         ))}
       </div>

@@ -139,6 +139,15 @@ Three findings, all still open with whoever owns the backend check:
 
 ⚠️ Production uses a native action sheet; this uses the app's own `Select`. The values and their order are faithful, the control is a stand-in — a web prototype cannot borrow a native sheet.
 
+### The countdown starts on the tile
+
+The Member No-Show tile in More Options carries the live countdown too, so a driver learns they are waiting **without** opening the screen, picking a type, signing, and being refused.
+
+Two deliberate limits:
+
+- **Only the `timer` outcome surfaces there.** A `form` or a refusal does not — those are the production dialogs the driver recognises, and pre-empting them on a tile would swap a familiar message for a label they have to learn. A countdown is different: it is information available nowhere else.
+- **The tile stays fully tappable.** Going in early to choose a type and sign, ready to submit the moment it unlocks, is a reasonable thing to want.
+
 ### The form
 
 | Field | Type | Required | Notes |
@@ -184,6 +193,8 @@ No runtime change. This is why `showIf` is kept even though it is now always tru
 **⚠️ A titleless Radix `AlertDialog` errors.** The captured dialog has no visible heading, and omitting `AlertDialogTitle` to match it logged an accessibility error on every open. Keep the title and make it `sr-only`.
 
 **⚠️ A Radix `Select` would not open from a synthetic pointer sequence here.** Keyboard is a genuine interaction path and works: focus the trigger, `Enter` to open, `Enter` on the `[role="option"]` to pick.
+
+**⚠️ Two ways to read the wrong page, both of which cost a wrong conclusion here.** `curl` warms a route without moving the pane, so a read after it returns the PREVIOUS ride — this nearly got the timer reported as broken. And `history.pushState` + a synthetic `popstate` does **not** remount an App Router page, so a sweep across seven rides read one unchanged page seven times, its countdown ticking down and looking like seven different values. Use a real `navigate` per ride and accept the round trips.
 
 **⚠️ A full page load resets the in-session store.** Checking that a filed ride moved to Pending must use client-side navigation (the back chevron is `router.push`); a `location.href` destroys the state you are trying to read. This cost a re-run.
 

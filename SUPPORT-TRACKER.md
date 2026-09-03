@@ -111,7 +111,9 @@ The production `canNoshow` source arrived, and it corrected the model twice over
 
 **Verified:** all six resolve correctly plus both extras; the timer ticks live (0:28 → 0:04 → **Submit**) and then files, naming the minutes recorded; the timer dialog carries production's exact copy **plus how long is left** and offers **OK only**; scenario 5 shows the message production has and cannot reach. `bun run typecheck` at 0.
 
-**A verification error worth recording:** I read a button as "Submit" and nearly called the timer broken — the browser was still on the previous ride because `curl` had warmed the route without navigating the pane. Warm with curl, then navigate; never read the result of one as the other.
+**The countdown also runs on the tile** in More Options, so the driver learns they are waiting before opening the screen. Only the `timer` outcome surfaces there — a form or a refusal stays behind the familiar production dialog — and the tile stays tappable, since picking a type and signing while the clock runs is reasonable.
+
+**Two verification errors worth recording, same class:** I read a button as "Submit" and nearly called the timer broken — the browser was still on the previous ride, because `curl` had warmed the route without navigating the pane. Then a sweep across seven rides showed a countdown on every one, including the three that should have none: `history.pushState` + a synthetic `popstate` does not remount an App Router page, so I read one unchanged page seven times while its timer ticked. Both times the reading was wrong, not the code. Use a real `navigate` per ride.
 
 **And a prototype seam:** long waits show a **duration** (`2h 05m`), not a clock time. "Available at 10:15 AM" is better product, but it adds real minutes to the real clock while every ride time here is seeded fiction — a ride whose pickup reads 1:50 PM was offering "2:29 AM". A real build should show the time of day.
 
