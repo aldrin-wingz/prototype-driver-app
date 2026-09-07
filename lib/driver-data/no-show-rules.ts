@@ -28,6 +28,9 @@ import {
  * their own if the driver stays put, one never will, and one needs a different
  * action entirely. `resolveNoShow` splits them:
  *
+ * ⚠️ The no-show TYPE is not consulted anywhere in this ladder. It is a label
+ * Support reads, not a branch the app takes.
+ *
  *   files         every condition met — submit, as production does
  *   timer         will clear by waiting — countdown, and NO form
  *   form          will never clear — only the driver knows, so ask them
@@ -613,15 +616,23 @@ export const NO_SHOW_STAGE_REFUSAL =
   "Member No-Show is only allowed for rides that are ready to start or en-route.";
 
 /**
- * The `No-Show Type:` options.
+ * The `No-Show Type:` options — all three, exactly as production's picker shows
+ * them.
  *
- * ⚠️ Production's picker offers a third, `Cancel At Door`, and this release
- * deliberately does not: that claim is established by a person rather than by a
- * wait, so it needs its own questions and its own guardrail. Out of scope here,
- * and left out of the list rather than hidden in the UI — a value the form can
- * still produce is a value Support has to handle.
+ * ⚠️ **The type is a LABEL, not a branch, and that is the finalised decision.**
+ * An earlier version of this prototype gave `Cancel At Door` its own guardrail
+ * and its own question set: it skipped the ten-minute wait and asked who told the
+ * driver instead. It no longer does. All three types take the same path, serve
+ * the same wait, and produce the same form — the value tells Support what the
+ * driver believes happened, and nothing in the app reads it to decide anything.
+ *
+ * ⚠️ Which is why `resolveNoShow` does not take the type as a parameter at all.
+ * Keeping the argument "just in case" would leave a seam for one branch to creep
+ * back in and be the only one anybody tested. `verify-no-show.ts` asserts the
+ * outcome is identical across all three.
  */
 export const NO_SHOW_TYPES: readonly string[] = [
   "Member Not Home",
+  "Cancel At Door",
   "Member Not Ready",
 ] as const;

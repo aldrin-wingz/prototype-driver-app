@@ -42,11 +42,12 @@ export const WAIT_TIME_SEQUENCE = ["waitedFrom", "leftAt"];
  * by the time this renders. It asks the four things that screen could not know:
  * when they arrived, when they left, where they waited, whether they knocked.
  *
- * ⚠️ **One field set, no variants.** An earlier version branched on the no-show
- * type: `Cancel At Door` asked who told them instead of how long they waited.
- * That case is out of scope for this release, and removing the branch removed the
- * `requireOneOf` machinery with it — the signature-or-photo rule existed only for
- * that variant.
+ * ⚠️ **One field set for all three no-show types.** An earlier version branched:
+ * `Cancel At Door` asked who told them instead of how long they waited. It no
+ * longer does — the type is a label Support reads, not a branch the form takes,
+ * so a Cancel At Door filing answers the same four questions as any other. That
+ * removed the `requireOneOf` machinery with it, since the signature-or-photo rule
+ * existed only for that variant.
  */
 export function buildSupportFormCase({
   includeIssues,

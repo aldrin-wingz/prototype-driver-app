@@ -8,6 +8,7 @@
  * Every check that loops over a filtered set asserts its DENOMINATOR first. A
  * check that agrees with nothing is not a passing check.
  */
+import { readFileSync } from "node:fs";
 import {
   NO_SHOW_PICKUP_TIME_MINUTES,
   NO_SHOW_POST_PICKUP_MINUTES,
@@ -157,10 +158,75 @@ if (gaLeg) {
   check("the two markets get different sentences", zero !== fifteen);
 }
 
-// ── Cancel At Door is gone, everywhere ──────────────────────────────────────
-check("two no-show types remain", NO_SHOW_TYPES.length === 2, NO_SHOW_TYPES.join("/"));
-check("Cancel At Door is not offered",
-  !NO_SHOW_TYPES.some((t) => /cancel at door/i.test(t)), NO_SHOW_TYPES.join("/"));
+// ── The no-show type is a LABEL, not a branch ───────────────────────────────
+check("all three production types are offered", NO_SHOW_TYPES.length === 3,
+  NO_SHOW_TYPES.join("/"));
+check("Cancel At Door is one of them",
+  NO_SHOW_TYPES.some((t) => /cancel at door/i.test(t)), NO_SHOW_TYPES.join("/"));
+
+/**
+ * ⚠️ The invariant that matters, and it needs a source scan to be falsifiable.
+ *
+ * "All three types behave the same" is true by CONSTRUCTION right now —
+ * `resolveNoShow` does not take the type and the form builder does not either —
+ * so asserting it against the running code proves nothing and would keep passing
+ * the day somebody adds the branch back. What can fail is the SHAPE: a
+ * comparison against a type string anywhere in the rules or the form, and an
+ * extra parameter on the resolver.
+ */
+const RULES_SRC = readFileSync("lib/driver-data/no-show-rules.ts", "utf8");
+const SCREEN_SRC = readFileSync("components/driver/member-no-show-screen.tsx", "utf8");
+const FORM_SRC = readFileSync("components/support/rider-no-show-form.tsx", "utf8");
+const REGISTRY_SRC = readFileSync("lib/support-data/case-registry.ts", "utf8");
+
+// Positive control: the scan can find the list it is looking for values from.
+check("the scan reads the real rules file", RULES_SRC.includes("NO_SHOW_TYPES"));
+
+for (const [name, src] of [
+  ["rules", RULES_SRC],
+  ["no-show screen", SCREEN_SRC],
+  ["form wrapper", FORM_SRC],
+  ["case registry", REGISTRY_SRC],
+] as const) {
+  // Strip comments first — these files legitimately DISCUSS Cancel At Door at
+  // length, explaining that it is not branched on. Scanning raw text would trip
+  // on the very notes that document the rule.
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  for (const type of NO_SHOW_TYPES) {
+    /**
+     * ⚠️ Looks for a COMPARISON, not a mention. The first version of this check
+     * searched for the bare literal and failed on the rules file — which is where
+     * `NO_SHOW_TYPES` is DECLARED. A declaration is not a branch, and a check
+     * that cannot tell them apart can only be satisfied by deleting the list.
+     */
+    const compared = new RegExp(
+      `(?:===|!==|==(?!=)|!=(?!=)|case)\\s*"${type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`
+    );
+    check(`${name} never compares against "${type}"`, !compared.test(code),
+      `literal comparison in ${name}`);
+  }
+  // A named constant is the other way one comes back.
+  check(`${name} declares no per-type constant`,
+    !/NO_SHOW_TYPE_[A-Z_]+/.test(code), name);
+}
+
+// ⚠️ Arity 2, not 3: `Function.length` counts only the parameters BEFORE the
+// first defaulted one, and `elapsedMinutes = 0` is defaulted. Getting this wrong
+// is how a shape check passes for the wrong reason — here it failed loudly, but
+// an off-by-one in the permissive direction would not have.
+check("resolveNoShow takes no no-show type", resolveNoShow.length === 2,
+  `arity ${resolveNoShow.length}`);
+
+// And the form is the same four questions whichever type is carried in.
+const perType = NO_SHOW_TYPES.map((type) => {
+  const built = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
+  return { type, ids: built.fields.map((f) => f.id).join(",") };
+});
+check("every type builds the same field set",
+  new Set(perType.map((p) => p.ids)).size === 1,
+  perType.map((p) => `${p.type}: ${p.ids}`).join(" | "));
 
 // ── The form asks four questions and no attachment ─────────────────────────
 const form = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
