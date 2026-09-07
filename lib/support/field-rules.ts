@@ -42,63 +42,31 @@ export function areRequiredFieldsFilled(
  */
 export function canSubmitCase(
   fields: SupportField[],
-  values: Record<string, string>,
-  /** Groups where at least one member must be answered — see `requireOneOf`. */
-  requireOneOf?: string[][]
+  values: Record<string, string>
 ): boolean {
   const blocked = fields.some(
     (field) => field.type === "notice" && isFieldVisible(field, values)
   );
-  if (blocked || !areRequiredFieldsFilled(fields, values)) return false;
-  return areOneOfGroupsSatisfied(fields, values, requireOneOf);
+  return !blocked && areRequiredFieldsFilled(fields, values);
 }
 
 /**
- * ⚠️ A field in an either/or group must NOT also be individually `required`.
+ * ⚠️ **`requireOneOf` was removed with the `Cancel At Door` variant.**
  *
- * `areRequiredFieldsFilled` runs first, so a required member can never be
- * satisfied by its partner — the group becomes dead code and the driver is held
- * to both answers while the copy promises either. This exact bug shipped for one
- * commit; the check exists so it cannot come back silently.
+ * It expressed "either the signature or the photo, not both and not neither" —
+ * the only either/or rule any case here ever had. With that variant out of scope
+ * nothing uses it, and it is deleted rather than parked because it carries a real
+ * landmine: `areRequiredFieldsFilled` runs BEFORE any group check, so a field
+ * that is both `required` and in a group can never be satisfied by its partner.
+ * That bug shipped for one commit and needed `conflictingOneOfFields` to guard
+ * it. Leaving the machinery in place, unexercised, is leaving that trap for
+ * whoever adds case two.
  *
- * Returns the offending ids rather than throwing, so a caller can assert in a
- * test and the runtime stays quiet in production.
+ * Restoring it is one revert: `areOneOfGroupsSatisfied`, `conflictingOneOfFields`,
+ * the `requireOneOf` field on `SupportCaseDefinition`, and the third argument to
+ * `canSubmitCase`.
  */
-export function conflictingOneOfFields(
-  fields: SupportField[],
-  requireOneOf?: string[][]
-): string[] {
-  if (!requireOneOf?.length) return [];
-  const grouped = new Set(requireOneOf.flat());
-  return fields
-    .filter((field) => grouped.has(field.id) && field.required)
-    .map((field) => field.id);
-}
 
-/**
- * Whether every either/or group has an answer.
- *
- * A group is satisfied by any one visible member holding a value. Fields that
- * are not currently visible are ignored, so a group whose members are all hidden
- * cannot block the submit — the same rule `areRequiredFieldsFilled` follows.
- */
-export function areOneOfGroupsSatisfied(
-  fields: SupportField[],
-  values: Record<string, string>,
-  requireOneOf?: string[][]
-): boolean {
-  if (!requireOneOf?.length) return true;
-  return requireOneOf.every((group) => {
-    const visible = group
-      .map((id) => fields.find((field) => field.id === id))
-      .filter(
-        (field): field is SupportField =>
-          Boolean(field) && isFieldVisible(field!, values)
-      );
-    if (visible.length === 0) return true;
-    return visible.some((field) => (values[field.id] ?? "").trim().length > 0);
-  });
-}
 
 /** Blank starting values for a case, so inputs stay controlled from mount. */
 export function emptyValues(fields: SupportField[]): Record<string, string> {

@@ -37,8 +37,7 @@ import {
   NO_SHOW_WAIT_MINUTES,
   postPickupAvailableAt,
   postPickupRefusalCopy,
-  requiresPostPickupDelay,
-  resolveNoShow,
+  postPickupThresholdMinutes,
   treatmentFor,
   type NoShowOutcome,
   type NoShowTreatment,
@@ -156,20 +155,24 @@ const PRODUCTION_TILES: OptionTile[] = [
 export function refusalCopyFor(
   outcome: NoShowOutcome | null,
   treatment: NoShowTreatment,
-  /** The leg, so the WellTrans availability time can come off its pick-up. */
-  leg?: TripLeg
+  /** The leg, so the availability time can come off its own pick-up. */
+  leg?: TripLeg,
+  /** The trip, which is what decides the threshold — 15 in Indiana, 0 elsewhere. */
+  trip?: Trip
 ): string {
   if (!outcome) return "";
   if (outcome.kind === "timer") {
-    // The post-pickup wait is the one production already parameterises, so its
-    // copy is built rather than looked up.
-    return outcome.reason === "post-pickup"
-      ? postPickupRefusalCopy({
-          copy: treatment.copy,
-          remainingMinutes: outcome.minutesRemaining,
-          availableAt: leg ? postPickupAvailableAt(leg) : null,
-        })
-      : NO_SHOW_REFUSAL_COPY.presence;
+    if (outcome.reason !== "post-pickup") return NO_SHOW_REFUSAL_COPY.presence;
+    // ⚠️ The threshold has to come from the TRIP, not from the constant. Reading
+    // `NO_SHOW_POST_PICKUP_MINUTES` here would print "wait at least 15 minutes"
+    // to a Georgia driver whose actual boundary is the pick-up time itself.
+    const threshold = (trip && postPickupThresholdMinutes(trip)) ?? 0;
+    return postPickupRefusalCopy({
+      copy: treatment.copy,
+      remainingMinutes: outcome.minutesRemaining,
+      availableAt: leg ? postPickupAvailableAt(leg, threshold) : null,
+      thresholdMinutes: threshold,
+    });
   }
   if (outcome.kind !== "form") return "";
   return treatment.copy === "revised"

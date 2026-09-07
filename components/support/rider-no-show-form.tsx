@@ -25,19 +25,14 @@ export function buildRiderNoShow(
   trip: Trip,
   leg: TripLeg | undefined,
   /** What the driver picked on the Member No-Show screen — "" when none ran. */
-  noShowType = "",
-  variant: "presence" | "cancel-at-door" = "presence"
+  noShowType = ""
 ) {
   // ⚠️ No screen ran, so nothing has been collected: the form has to ask for the
   // type and take the signature itself, or Support gets a claim with neither.
   const standalone = noShowType === "";
   const supportCase = buildSupportFormCase({
-    variant,
     askNoShowType: standalone,
-    // A cancel-at-door filing always needs an attestation, even though the
-    // screen ran: the driver signed for a NO-SHOW there, and this is a different
-    // claim. Either the signature or a photo satisfies it — see `requireOneOf`.
-    askSignature: standalone || variant === "cancel-at-door",
+    askSignature: standalone,
     // `includeIssues` is what puts Rider No-Show in the select's options at all —
     // a selected value with no matching option renders as the placeholder, so the
     // form would claim no issue was picked.
@@ -68,21 +63,9 @@ function buildCallout(
   leg: TripLeg | undefined,
   noShowType: string
 ): SupportCallout | undefined {
-  const outcome = resolveNoShow(trip, leg, 0, noShowType);
+  const outcome = resolveNoShow(trip, leg, 0);
 
-  // Not a refusal at all — the driver said the ride was cancelled to their face,
-  // and we skipped the wait rather than made them serve it. Say that, so the form
-  // does not read as a telling-off.
-  if (outcome.kind === "cancel-at-door") {
-    return {
-      tone: "info",
-      title: "No need to wait",
-      detail:
-        "You told us the ride was cancelled at the door, so we won't hold you to the 10-minute wait. Just tell us who you spoke to.",
-    };
-  }
-
-  // Only the form outcomes reach this sheet otherwise, and only they have
+  // Only the form outcomes reach this sheet, and only they have
   // something to explain. Anything else means the sheet was opened by a path
   // that should not have — better to render no callout than to invent one.
   if (outcome.kind !== "form") return undefined;
@@ -108,7 +91,6 @@ export function RiderNoShowForm({
   trip,
   leg,
   noShowType,
-  variant = "presence",
   open,
   onOpenChange,
   onSubmitted,
@@ -117,8 +99,6 @@ export function RiderNoShowForm({
   leg: TripLeg | undefined;
   /** Carried from the Member No-Show screen, so it is not asked twice. */
   noShowType?: string;
-  /** Which question set — a claimed wait, or a cancellation at the door. */
-  variant?: "presence" | "cancel-at-door";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Runs after the store write, for a caller that wants to navigate. */
@@ -126,12 +106,7 @@ export function RiderNoShowForm({
 }) {
   const { toast } = useToast();
   const { submitForm } = useRideFlow();
-  const { supportCase, initialValues } = buildRiderNoShow(
-    trip,
-    leg,
-    noShowType,
-    variant
-  );
+  const { supportCase, initialValues } = buildRiderNoShow(trip, leg, noShowType);
 
   return (
     <SupportFormSheet

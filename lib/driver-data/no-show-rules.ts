@@ -48,8 +48,23 @@ export const NO_SHOW_WAIT_MINUTES = 10;
 /** How far back the server looks for records. */
 export const NO_SHOW_LOOKBACK_MINUTES = 20;
 
-/** WellTrans Indiana only: minutes after the scheduled pickup before filing is allowed. */
+/**
+ * Minutes after the scheduled pickup before a no-show may be filed.
+ *
+ * ⚠️ **Every market has this rule now, not just Indiana.** WellTrans IN keeps its
+ * fifteen minutes; everywhere else the boundary is the pickup time itself — you
+ * cannot no-show a ride that is not due yet.
+ *
+ * `0` is a real threshold, not "no rule": the check is `since < threshold`, so at
+ * `0` it refuses exactly while `since` is negative, which is the whole point.
+ *
+ * ⚠️ Combined with the ten-minute presence rule this makes the earliest possible
+ * filing **`max(arrival + 10, scheduled pickup + threshold)`**. A driver who
+ * arrives 10:45 for an 11:00 pickup satisfies presence at 10:55 and still waits
+ * until 11:00.
+ */
 export const NO_SHOW_POST_PICKUP_MINUTES = 15;
+export const NO_SHOW_PICKUP_TIME_MINUTES = 0;
 
 /**
  * ⚠️ **OURS, not production's.** A fix this far from the pickup on a live trip is
@@ -144,9 +159,36 @@ export function isInSwipeWindow(leg: TripLeg): boolean {
   return next === "start" || next === "pick-up";
 }
 
-/** ⚠️ The only client-specific rule, and the first in this branch. */
-export function requiresPostPickupDelay(trip: Trip): boolean {
-  return trip.client === "WellTrans" && trip.market === "IN";
+/**
+ * How long after the scheduled pickup this trip has to wait.
+ *
+ * ⚠️ **This is a tightening, and the only one in this project.** Every other
+ * proposal here opens a path that production closes; this one closes a path
+ * production leaves open. Today a Verida GA driver who arrives early and waits
+ * ten minutes CAN file before the pickup time. After this they cannot. That is a
+ * real behaviour change for early arrivals, deliberately made.
+ *
+ * Returns a threshold rather than a boolean so there is one code path and one
+ * comparison. A boolean would have meant "Indiana does this, others do not",
+ * which is exactly the shape that stops being true — and did.
+ */
+export function postPickupThresholdMinutes(trip: Trip): number | null {
+  // Indiana's fifteen minutes is production today and always applies.
+  if (trip.client === "WellTrans" && trip.market === "IN") {
+    return NO_SHOW_POST_PICKUP_MINUTES;
+  }
+  // ⚠️ `null` means NO GATE, which is production for every other market — and it
+  // has to remain reachable, because the matrix's as-is row for this rule is a
+  // driver who files BEFORE the pick-up and succeeds. If the gate were
+  // unconditional in code, that row could not demonstrate the before.
+  return treatmentFor(trip).pickupTimeGate
+    ? NO_SHOW_PICKUP_TIME_MINUTES
+    : null;
+}
+
+/** ⚠️ Kept only to name the Indiana case; the rule itself is universal now. */
+export function requiresExtendedPostPickupDelay(trip: Trip): boolean {
+  return (postPickupThresholdMinutes(trip) ?? 0) > NO_SHOW_PICKUP_TIME_MINUTES;
 }
 
 /** "11:40 AM" → minutes since midnight, or `null` if it cannot be read. */
@@ -177,29 +219,28 @@ function minutesToClock(minutes: number): string {
  *
  * `null` when the leg's time cannot be read — then say nothing rather than guess.
  */
-export function postPickupAvailableAt(leg: TripLeg): string | null {
+export function postPickupAvailableAt(
+  leg: TripLeg,
+  thresholdMinutes = NO_SHOW_POST_PICKUP_MINUTES
+): string | null {
   const pickup = clockToMinutes(leg.time);
-  return pickup === null
-    ? null
-    : minutesToClock(pickup + NO_SHOW_POST_PICKUP_MINUTES);
+  return pickup === null ? null : minutesToClock(pickup + thresholdMinutes);
 }
 
 export type NoShowFormGap = "not_at_pickup" | "no_location_data";
 
-/** `Cancel At Door` — the type whose claim is confirmed by a person, not a wait. */
-export const NO_SHOW_TYPE_CANCEL_AT_DOOR = "Cancel At Door";
+/**
+ * Why the driver is being asked to wait.
+ *
+ * `presence`    — not yet ten unbroken minutes at the pick-up.
+ * `post-pickup` — the ride is not due yet (or, in Indiana, not due long enough).
+ */
 export type NoShowTimerReason = "presence" | "post-pickup";
 
 export type NoShowOutcome =
   | { kind: "files"; qualifyingMinutes: number }
   | { kind: "timer"; reason: NoShowTimerReason; minutesRemaining: number }
   | { kind: "form"; gap: NoShowFormGap; detail: string }
-  /**
-   * `Cancel At Door`, at the pick-up, on a ride whose treatment allows the
-   * bypass. The ten-minute wait is skipped and the driver is asked who told them
-   * instead — a cancellation is established by a person, not by dwell time.
-   */
-  | { kind: "cancel-at-door" }
   | { kind: "confirm-first" }
   | { kind: "dead-end" };
 
@@ -213,34 +254,12 @@ export type NoShowOutcome =
 export function resolveNoShow(
   trip: Trip,
   leg: TripLeg | undefined,
-  elapsedMinutes = 0,
-  /** What the driver picked on the Member No-Show screen, if anything yet. */
-  noShowType = ""
+  elapsedMinutes = 0
 ): NoShowOutcome {
   if (isAwaitingMemberConfirmation(trip)) return { kind: "confirm-first" };
   if (!leg || !isInSwipeWindow(leg)) return { kind: "dead-end" };
 
   const walk = walkLocationRecords(leg.locationRecords ?? [], elapsedMinutes);
-
-  /**
-   * ⚠️ The bypass, and note WHAT it skips.
-   *
-   * It skips the ten-minute wait — not the location check. A driver claiming a
-   * cancellation at the door still has to be at the door, so a `blocked_far`
-   * with no near-run (they have left, or never arrived) still falls through to
-   * the form below. What it removes is the requirement to stand there for ten
-   * minutes proving an absence that is not being claimed.
-   */
-  const bypass =
-    treatmentFor(trip).cancelAtDoorBypass &&
-    noShowType === NO_SHOW_TYPE_CANCEL_AT_DOOR;
-  if (bypass) {
-    const atPickupNow =
-      walk.ok ||
-      (walk.reason === "blocked_far" && walk.nearRunOldestAge !== null) ||
-      walk.reason === "no_ten_minute_record";
-    if (atPickupNow) return { kind: "cancel-at-door" };
-  }
 
   if (!walk.ok) {
     // No usable position at all — or a fix so far out it cannot be one.
@@ -284,13 +303,14 @@ export function resolveNoShow(
     };
   }
 
-  if (requiresPostPickupDelay(trip)) {
+  const threshold = postPickupThresholdMinutes(trip);
+  if (threshold !== null) {
     const since = (leg.minutesSinceScheduledPickup ?? 0) + elapsedMinutes;
-    if (since < NO_SHOW_POST_PICKUP_MINUTES) {
+    if (since < threshold) {
       return {
         kind: "timer",
         reason: "post-pickup",
-        minutesRemaining: NO_SHOW_POST_PICKUP_MINUTES - since,
+        minutesRemaining: threshold - since,
       };
     }
   }
@@ -341,7 +361,8 @@ export type NoShowDemoRow =
   | "3" | "3.1"
   | "4" | "4.1"
   | "5"
-  | "WV1" | "WV1.1";
+  | "WV1" | "WV1.1"
+  | "6" | "6.1";
 
 export interface NoShowTreatment {
   /** Production's exact wording, or the revised copy. */
@@ -351,15 +372,18 @@ export interface NoShowTreatment {
   /** Offer the support form as a way forward. */
   offerForm: boolean;
   /**
-   * `Cancel At Door` skips the ten-minute wait.
+   * Whether the universal pick-up-time boundary is enforced for this ride.
    *
-   * ⚠️ Proposal only — production has no such bypass. The reasoning: the wait
-   * exists to establish that the member never came out, and a cancellation is
-   * established by a PERSON saying so. A driver who has just been told at the
-   * door should not have to stand there for ten minutes to prove it — but they
-   * do still have to be AT the door, so the location check stays.
+   * ⚠️ Unlike every other flag here, this one changes the OUTCOME rather than the
+   * wording — it is the difference between the as-is row filing successfully
+   * before the pick-up and the proposal row refusing. It exists because that
+   * refusal is new: production has no pick-up-time rule outside Indiana, so
+   * "before" is a ride that goes through, and there is no way to seed that except
+   * to declare it.
+   *
+   * Indiana's fifteen-minute rule ignores this — it is production today.
    */
-  cancelAtDoorBypass: boolean;
+  pickupTimeGate: boolean;
 }
 
 /**
@@ -381,14 +405,20 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
-    cancelAtDoorBypass: false,
+    pickupTimeGate: true,
   },
-  /** Proposal: the same refusal, now carrying the countdown — and a bypass. */
+  /**
+   * Proposal: the same refusal, now carrying the live countdown.
+   *
+   * ⚠️ It used to also branch on the no-show type — `Cancel At Door` skipped the
+   * wait entirely. That type is out of scope, so this row is now the one thing it
+   * always was underneath: tell the driver how much longer.
+   */
   "3.1": {
     copy: "production",
     showTimer: true,
     offerForm: false,
-    cancelAtDoorBypass: true,
+    pickupTimeGate: true,
   },
 
   // ── Scenario 4 — latest location outside the radius ──
@@ -397,16 +427,14 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
-    cancelAtDoorBypass: false,
+    pickupTimeGate: true,
   },
   /** Proposal: copy that is true for this driver, and a way forward. */
   "4.1": {
     copy: "revised",
     showTimer: false,
     offerForm: true,
-    // Irrelevant here by construction: the bypass still requires being AT the
-    // pick-up, and this row is the driver who is not.
-    cancelAtDoorBypass: false,
+    pickupTimeGate: true,
   },
 
   // ── Scenario 5 — no location points at all in the window ──
@@ -420,7 +448,38 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "revised",
     showTimer: false,
     offerForm: true,
-    cancelAtDoorBypass: false,
+    pickupTimeGate: true,
+  },
+
+  // ── Scenario 6 — not yet the scheduled pick-up time, outside Indiana ──
+  /**
+   * Today, and it is the one row where "today" means **it goes through**.
+   *
+   * ⚠️ Every other as-is row in this matrix is a refusal. This one is a driver
+   * who arrived early, waited their ten minutes and files BEFORE the ride is
+   * due — which production allows outside Indiana, because the post-pickup rule
+   * is client-specific there. Seeded so the tightening below has a visible before.
+   */
+  "6": {
+    copy: "production",
+    showTimer: false,
+    offerForm: false,
+    // The row's entire point: no pick-up-time gate, so it files.
+    pickupTimeGate: false,
+  },
+  /**
+   * The finalised behaviour: refused until the pick-up time, everywhere.
+   *
+   * ⚠️ A NEW guardrail, not revised copy for an old one — so `copy: "revised"` is
+   * the only option; production has no message for it. It gets the countdown
+   * because this is a wait that clears on its own, which is the same reason 3.1
+   * has one.
+   */
+  "6.1": {
+    copy: "revised",
+    showTimer: true,
+    offerForm: false,
+    pickupTimeGate: true,
   },
 
   // ── WellTrans Indiana — not yet 15 minutes past the pick-up ──
@@ -429,14 +488,14 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
-    cancelAtDoorBypass: false,
+    pickupTimeGate: true,
   },
-  /** Proposal: countdown, both rules named, and the same bypass as 3.1. */
+  /** Proposal: countdown, and both rules named rather than just the window. */
   "WV1.1": {
     copy: "revised",
     showTimer: true,
     offerForm: false,
-    cancelAtDoorBypass: true,
+    pickupTimeGate: true,
   },
 };
 
@@ -447,7 +506,10 @@ export function treatmentFor(trip: Trip): NoShowTreatment {
       copy: "production",
       showTimer: false,
       offerForm: false,
-      cancelAtDoorBypass: false,
+      // ⚠️ The default is the FINALISED behaviour, not production's. An untagged
+      // ride is an ordinary ride in the shipped app; only the tagged as-is rows
+      // reproduce what production does today.
+      pickupTimeGate: true,
     }
   );
 }
@@ -503,13 +565,34 @@ export function postPickupRefusalCopy({
   copy,
   remainingMinutes,
   availableAt,
+  thresholdMinutes,
 }: {
   copy: "production" | "revised";
   remainingMinutes: number;
   availableAt: string | null;
+  /** 15 in WellTrans Indiana, 0 everywhere else. */
+  thresholdMinutes: number;
 }): string {
+  const locationLine =
+    `You also need to be at the pick-up when you submit, and to have been within ` +
+    `${NO_SHOW_RADIUS_MILES} miles of it for ${NO_SHOW_WAIT_MINUTES} minutes without leaving.`;
+
+  /**
+   * ⚠️ The pick-up-time boundary needs its own sentence, not the Indiana string
+   * with a `0` in it. "Please wait at least 0 minutes after the scheduled pickup
+   * time" is not a sentence, and a driver reading it would reasonably conclude
+   * the app is broken. It also has no production counterpart to quote — this rule
+   * does not exist outside Indiana today — so there is only the revised register.
+   */
+  if (thresholdMinutes <= 0) {
+    return (
+      `A Member no-show can only be reported from the scheduled pick-up time ` +
+      `onwards${availableAt ? ` — that is ${availableAt}` : ""}. ${locationLine}`
+    );
+  }
+
   const opening =
-    `Please wait at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes after the scheduled ` +
+    `Please wait at least ${thresholdMinutes} minutes after the scheduled ` +
     `pickup time before marking a Member no-show`;
 
   if (copy === "production") {
@@ -521,8 +604,7 @@ export function postPickupRefusalCopy({
 
   return (
     `${opening}${availableAt ? ` — this will be available at ${availableAt}` : ""}. ` +
-    `You also need to be at the pick-up when you submit, and to have been within ` +
-    `${NO_SHOW_RADIUS_MILES} miles of it for ${NO_SHOW_WAIT_MINUTES} minutes without leaving.`
+    locationLine
   );
 }
 
@@ -530,9 +612,16 @@ export function postPickupRefusalCopy({
 export const NO_SHOW_STAGE_REFUSAL =
   "Member No-Show is only allowed for rides that are ready to start or en-route.";
 
-/** The `No-Show Type:` options, all three captured from the production picker. */
+/**
+ * The `No-Show Type:` options.
+ *
+ * ⚠️ Production's picker offers a third, `Cancel At Door`, and this release
+ * deliberately does not: that claim is established by a person rather than by a
+ * wait, so it needs its own questions and its own guardrail. Out of scope here,
+ * and left out of the list rather than hidden in the UI — a value the form can
+ * still produce is a value Support has to handle.
+ */
 export const NO_SHOW_TYPES: readonly string[] = [
   "Member Not Home",
-  "Cancel At Door",
   "Member Not Ready",
 ] as const;

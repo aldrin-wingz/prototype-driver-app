@@ -169,11 +169,7 @@ export function SupportFormSheet({
   // Per `s-02a`, the primary action sits disabled (muted green) until every
   // required field has a value — and stays disabled for an issue whose field set
   // isn't built, since there is nothing to send.
-  const canSubmit = canSubmitCase(
-    supportCase.fields,
-    values,
-    supportCase.requireOneOf
-  );
+  const canSubmit = canSubmitCase(supportCase.fields, values);
 
   function setValue(id: string, value: string) {
     setValues((previous) => ({ ...previous, [id]: value }));

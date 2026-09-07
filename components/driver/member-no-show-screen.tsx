@@ -88,9 +88,12 @@ export function MemberNoShowScreen({
    * no-show will succeed — the countdown belongs where the refusal is.
    */
   const treatment = treatmentFor(trip);
-  const outcomeNow = resolveNoShow(trip, activeLeg, 0, noShowType);
+  // ⚠️ The outcome no longer depends on the no-show type. It used to — `Cancel At
+  // Door` bypassed the wait — and dropping that type dropped the dependency, so
+  // the guardrail is now a pure function of the trip, the leg and the clock.
+  const outcomeNow = resolveNoShow(trip, activeLeg, 0);
   const elapsed = useNoShowClock(outcomeNow.kind === "timer");
-  const outcome = resolveNoShow(trip, activeLeg, elapsed, noShowType);
+  const outcome = resolveNoShow(trip, activeLeg, elapsed);
 
   function handleSubmit() {
     // Light validation first, and deliberately NOT the refusal dialog — an
@@ -112,14 +115,6 @@ export function MemberNoShowScreen({
       return;
     }
     if (!activeLeg) return;
-
-    // ⚠️ `Cancel At Door` on a bypass ride: no wait to serve, so the form opens
-    // and asks who told them instead. The location check still ran — a driver
-    // who has left falls through to the refusal below like anyone else.
-    if (outcome.kind === "cancel-at-door") {
-      setFormOpen(true);
-      return;
-    }
 
     if (outcome.kind !== "files") {
       setRefusal(outcome);
@@ -290,9 +285,6 @@ export function MemberNoShowScreen({
         trip={trip}
         leg={activeLeg}
         noShowType={noShowType}
-        variant={
-          outcome.kind === "cancel-at-door" ? "cancel-at-door" : "presence"
-        }
         open={formOpen}
         onOpenChange={setFormOpen}
         onSubmitted={() => router.push(backHref)}

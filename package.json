@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "next dev --turbo",
     "typecheck": "tsc --noEmit",
+    "verify": "bun scripts/verify-no-show.ts",
     "build": "tsc --noEmit && next build",
     "start": "next start",
     "lint": "next lint"

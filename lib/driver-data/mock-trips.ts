@@ -1277,7 +1277,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "3.1",
-    pills: [{ label: "3.1 · No 10 consec min · timer + cancel-at-door bypass", variant: "warning" }],
+    pills: [{ label: "3.1 · No 10 consec min · refusal carries a countdown", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1393,7 +1393,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "4.1",
-    pills: [{ label: "4.1 · Not at pickup · revised copy + 5-question form", variant: "warning" }],
+    pills: [{ label: "4.1 · Not at pickup · revised copy + 4-question form", variant: "warning" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1459,7 +1459,139 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: true,
   },
 
-  // ===== ROW 6 — WellTrans Indiana, location fine, appointment too recent =====
+  // ===== 6 / 6.1 — early arrival, ride not due yet, outside Indiana =====
+  //
+  // The tightening. Both rides are the same driver in the same place at the same
+  // moment: arrived 10:31 for an 11:00 pick-up, stood inside the radius for
+  // fourteen unbroken minutes, and taps Submit at 10:56.
+  //
+  // ⚠️ Row 6 is the ONLY as-is row in this matrix that succeeds. Production has
+  // no pick-up-time rule outside Indiana, so today this filing goes through four
+  // minutes early. Row 6.1 is the finalised behaviour: refused until 11:00, with
+  // the countdown. Seeded as a pair because this is the one change in the project
+  // that takes something away from drivers, and the before is what shows it.
+
+  {
+    id: "1049800386",
+    date: "Tue, Jul 8, 2026",
+    rider: "Marguerite Odell",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 47.80,
+    notes: "Waits at the Bankhead Hwy bus shelter",
+    legs: [
+      {
+        id: "1049800386",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:00 AM",
+        address: "88 Bankhead Hwy, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 47.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "10:31 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // ⚠️ Presence PASSES here, deliberately: fourteen unbroken minutes inside
+        // the radius. The pick-up-time rule is the only thing left to block, so
+        // this ride isolates it — a seed that also failed the walk would prove
+        // nothing about the new guardrail.
+        locationRecords: [
+          { ageMinutes: 0, distanceMiles: 0.1 },
+          { ageMinutes: 3, distanceMiles: 0.1 },
+          { ageMinutes: 7, distanceMiles: 0.2 },
+          { ageMinutes: 11, distanceMiles: 0.2 },
+          { ageMinutes: 14, distanceMiles: 0.2 },
+        ],
+        // ⚠️ NEGATIVE, and that is the whole point. Every other ride in this file
+        // leaves this undefined, which falls through to `?? 0` and passes any
+        // threshold — so before this ride the pick-up-time gate could not fire
+        // even once, and every check of it would have been green against nothing.
+        minutesSinceScheduledPickup: -4,
+      },
+      {
+        id: "1049800386-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:45 AM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "6",
+    pills: [{ label: "6 · Before pick-up time · AS-IS files anyway", variant: "neutral" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  {
+    id: "1049800387",
+    date: "Tue, Jul 8, 2026",
+    rider: "Marguerite Odell",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 47.80,
+    notes: "Waits at the Bankhead Hwy bus shelter",
+    legs: [
+      {
+        id: "1049800387",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:00 AM",
+        address: "88 Bankhead Hwy, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 47.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "10:31 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // ⚠️ Presence PASSES here, deliberately: fourteen unbroken minutes inside
+        // the radius. The pick-up-time rule is the only thing left to block, so
+        // this ride isolates it — a seed that also failed the walk would prove
+        // nothing about the new guardrail.
+        locationRecords: [
+          { ageMinutes: 0, distanceMiles: 0.1 },
+          { ageMinutes: 3, distanceMiles: 0.1 },
+          { ageMinutes: 7, distanceMiles: 0.2 },
+          { ageMinutes: 11, distanceMiles: 0.2 },
+          { ageMinutes: 14, distanceMiles: 0.2 },
+        ],
+        // ⚠️ NEGATIVE, and that is the whole point. Every other ride in this file
+        // leaves this undefined, which falls through to `?? 0` and passes any
+        // threshold — so before this ride the pick-up-time gate could not fire
+        // even once, and every check of it would have been green against nothing.
+        minutesSinceScheduledPickup: -4,
+      },
+      {
+        id: "1049800387-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:45 AM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "6.1",
+    pills: [{ label: "6.1 · Before pick-up time · refused + countdown", variant: "warning" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== WV1 / WV1.1 — WellTrans Indiana, location fine, pick-up too recent =====
   //
   // ⚠️ The only client-specific rule in this branch. Every location condition is
   // met — thirteen minutes of continuous presence — and it still blocks, because
@@ -1569,7 +1701,7 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "WV1.1",
-    pills: [{ label: "WV1.1 · Not yet +15 · timer, both rules, bypass", variant: "attention" }],
+    pills: [{ label: "WV1.1 · Not yet +15 · timer + both rules named", variant: "attention" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
