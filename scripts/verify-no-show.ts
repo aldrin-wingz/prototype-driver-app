@@ -40,34 +40,42 @@ const activeLeg = (trip: (typeof mockInProgressTrips)[number]) =>
   trip.legs.find((leg) => leg.type === "est-pickup");
 const tagged = mockInProgressTrips.filter((trip) => trip.noShowDemo);
 
-// ── The matrix is complete and reachable ────────────────────────────────────
-check("every treatment row is seeded on a ride", true);
+// ── The seed is EXACTLY the two demo scenarios ─────────────────────────
+// ⚠️ Narrowed 2026-09-09. This used to assert that EVERY declared treatment row
+// had a ride — the nine-row comparison matrix. The demo is now two rides, one per
+// user story, so the assertion is INVERTED: the expected set is declared here as a
+// literal, and the seed must match it exactly. Declaring it rather than deriving it
+// from the seed is the point — a set derived from the thing it checks cannot fail.
+const EXPECTED_ROWS = ["3.1", "4.1"] as const;
 const seededRows = new Set(tagged.map((t) => t.noShowDemo as NoShowDemoRow));
-for (const row of Object.keys(NO_SHOW_TREATMENTS) as NoShowDemoRow[]) {
-  check(`row ${row} has a ride`, seededRows.has(row));
+check("the seed carries exactly the expected rows",
+  seededRows.size === EXPECTED_ROWS.length &&
+    EXPECTED_ROWS.every((r) => seededRows.has(r as NoShowDemoRow)),
+  [...seededRows].sort().join(",") || "none");
+for (const row of seededRows) {
+  check(`seeded row ${row} is a declared treatment`,
+    Object.prototype.hasOwnProperty.call(NO_SHOW_TREATMENTS, row));
 }
 check("there are rows to check", seededRows.size > 0, `${seededRows.size}`);
 
-// ── The as-is rows must not misrepresent production ─────────────────────────
-const asIs = tagged.filter((t) => !String(t.noShowDemo).includes("."));
-check("as-is rows exist", asIs.length > 0, `${asIs.length}`);
-// ⚠️ Row 5 is the one exception, and it is exempt from BOTH checks. Production's
-// own message for "no location points" is unreachable — `canNoshow` inserts a
-// location row before it queries — so there is no as-is behaviour to reproduce
-// and the row IS the correction. Exempting it from the copy check but not the
-// form check is what this script caught on its first run.
+// ── As-is rows: none are seeded now, and that is DECLARED ────────────────
+// The rule still applies if one ever returns: an as-is row reproduces production,
+// so it must not offer the form or use revised copy. ⚠️ Row 5 was always exempt from
+// BOTH — production's "no location points" message is unreachable, so there is no
+// as-is behaviour to reproduce. Exempting it from the copy check but not the form
+// check is what this script caught on its very first run; the pairing is kept.
 const AS_IS_EXEMPT = new Set(["5"]);
-let asIsChecked = 0;
+const asIs = tagged.filter((t) => !String(t.noShowDemo).includes("."));
+check("the demo seeds no as-is rows", asIs.length === 0,
+  asIs.map((t) => t.noShowDemo).join(","));
 for (const trip of asIs) {
   if (AS_IS_EXEMPT.has(String(trip.noShowDemo))) continue;
   const t = treatmentFor(trip);
-  asIsChecked += 1;
   check(`${trip.noShowDemo} never offers the form`, !t.offerForm);
   check(`${trip.noShowDemo} uses production copy`, t.copy === "production");
 }
-check("as-is rows were actually checked", asIsChecked > 0, `${asIsChecked}`);
 
-// ── No refusing ride may be untagged ────────────────────────────────────────
+// ── No refusing ride may be untagged ─────────────────────────────
 let refusing = 0;
 for (const trip of mockInProgressTrips) {
   const leg = activeLeg(trip);
@@ -81,81 +89,115 @@ for (const trip of mockInProgressTrips) {
 }
 check("some ride actually refuses", refusing > 0, `${refusing}`);
 
-// ── The pick-up-time gate: the new rule ─────────────────────────────────────
-// ⚠️ THE denominator that matters. Before scenario 6 was seeded,
-// `minutesSinceScheduledPickup` was undefined everywhere outside Indiana, so a
-// 0-minute threshold passed every ride and this whole rule fired zero times.
-let pickupGateFired = 0;
-for (const trip of tagged) {
-  const leg = activeLeg(trip);
-  if (!leg) continue;
-  const outcome = resolveNoShow(trip, leg, 0);
-  const threshold = postPickupThresholdMinutes(trip);
-  if (
-    outcome.kind === "timer" &&
-    outcome.reason === "post-pickup" &&
-    threshold === NO_SHOW_PICKUP_TIME_MINUTES
-  ) {
-    pickupGateFired += 1;
+// ── The two stories, one ride each ──────────────────────────────
+// These replace the matrix checks. They assert the branch each ride demonstrates,
+// which is exactly what `PRD - Rider No-Show.md` specifies — timer if the driver IS
+// at the pick-up, form if they are NOT. ⚠️ Both must FAIL the presence walk, or they
+// would file and neither story would be reachable.
+const timerRide = tagged.find((t) => t.noShowDemo === "3.1");
+const formRide = tagged.find((t) => t.noShowDemo === "4.1");
+check("the timer ride (3.1) is seeded", Boolean(timerRide));
+check("the form ride (4.1) is seeded", Boolean(formRide));
+
+if (timerRide) {
+  const leg = activeLeg(timerRide)!;
+  const walk = walkLocationRecords(leg.locationRecords ?? []);
+  check("3.1 does not pass the presence walk", !walk.ok);
+  check("3.1 is still near the pick-up now", walk.ok === false && walk.nearRunOldestAge !== null,
+    `nearRunOldestAge=${walk.ok === false ? walk.nearRunOldestAge : "n/a"}`);
+  const out = resolveNoShow(timerRide, leg, 0);
+  check("3.1 refuses with a timer", out.kind === "timer", out.kind);
+  check("3.1 refuses on presence, not the pick-up time",
+    out.kind === "timer" && out.reason === "presence",
+    out.kind === "timer" ? out.reason : out.kind);
+  check("3.1 shows a countdown", treatmentFor(timerRide).showTimer);
+  // ⚠️ The invariant that matters most: a form here would be a way to skip the wait.
+  check("3.1 offers NO form", !treatmentFor(timerRide).offerForm);
+}
+
+if (formRide) {
+  const leg = activeLeg(formRide)!;
+  const walk = walkLocationRecords(leg.locationRecords ?? []);
+  check("4.1 does not pass the presence walk", !walk.ok);
+  check("4.1 has no near run — the driver has left",
+    walk.ok === false && walk.nearRunOldestAge === null,
+    `nearRunOldestAge=${walk.ok === false ? walk.nearRunOldestAge : "n/a"}`);
+  const out = resolveNoShow(formRide, leg, 0);
+  check("4.1 opens the form", out.kind === "form", out.kind);
+  check("4.1 opens it because the driver is not at the pick-up",
+    out.kind === "form" && out.gap === "not_at_pickup",
+    out.kind === "form" ? out.gap : out.kind);
+  check("4.1 actually offers the form", treatmentFor(formRide).offerForm);
+}
+
+// ⚠️ The two rides must genuinely DIVERGE, or the pair proves nothing.
+if (timerRide && formRide) {
+  const a = resolveNoShow(timerRide, activeLeg(timerRide)!, 0);
+  const b = resolveNoShow(formRide, activeLeg(formRide)!, 0);
+  check("the two demo rides reach different outcomes", a.kind !== b.kind,
+    `${a.kind} vs ${b.kind}`);
+}
+
+// ── The pick-up-time rule ───────────────────────────────────
+// ⚠️ The PROPOSAL to standardize Indiana's +15 across every market was WITHDRAWN
+// 2026-09-09, and scenarios 6 / 6.1 / WV1 / WV1.1 went with it. But WellTrans
+// Indiana's +15 is LIVE PRODUCTION and this code still implements it, so the
+// coverage stays — driven from a synthetic trip rather than a seeded ride, since no
+// demo ride exercises it any more. Built by spreading a real trip so every required
+// property is real; a hand-built `as Trip` fixture would silence missing fields.
+const anyTrip = mockInProgressTrips[0];
+check("there is a trip to build fixtures from", Boolean(anyTrip));
+if (anyTrip) {
+  const indiana = { ...anyTrip, client: "WellTrans", market: "IN" as const, noShowDemo: undefined };
+  const elsewhere = { ...anyTrip, client: "Verida", market: "GA" as const, noShowDemo: undefined };
+  check("WellTrans Indiana still waits 15 minutes",
+    postPickupThresholdMinutes(indiana) === NO_SHOW_POST_PICKUP_MINUTES,
+    `${postPickupThresholdMinutes(indiana)}`);
+  // ⚠️⚠️ A DECLARED DIVERGENCE, not an assertion of intent.
+  // `PRD - Rider No-Show.md` withdrew the universal pick-up-time gate on 2026-09-09:
+  // only WellTrans Indiana has a wait, and no other market gains one. The CODE has not
+  // caught up — `treatmentFor`'s default carries `pickupTimeGate: true`, so an untagged
+  // ride outside Indiana still resolves to a 0-minute gate rather than no gate at all.
+  //
+  // It is unobservable in this demo (both seeded rides are tagged, and neither seeds
+  // `minutesSinceScheduledPickup`, so `0 < 0` is false and no timer fires), which is
+  // exactly why it needs a check rather than a comment. This asserts what the code DOES
+  // so the divergence cannot be forgotten: when the default is flipped to `false`, this
+  // fails, and whoever flips it will read this note and know the PRD already expects it.
+  check("⚠️ untagged non-Indiana still carries the WITHDRAWN universal gate",
+    postPickupThresholdMinutes(elsewhere) === NO_SHOW_PICKUP_TIME_MINUTES,
+    `${postPickupThresholdMinutes(elsewhere)} — PRD says this should be null`);
+
+  const anyLeg = activeLeg(anyTrip);
+  check("the fixture trip has a leg", Boolean(anyLeg));
+  if (anyLeg) {
+    const zeroAt = postPickupAvailableAt(anyLeg, NO_SHOW_PICKUP_TIME_MINUTES);
+    const zero = postPickupRefusalCopy({
+      copy: "revised",
+      remainingMinutes: 4,
+      availableAt: zeroAt,
+      thresholdMinutes: NO_SHOW_PICKUP_TIME_MINUTES,
+    });
+    // ⚠️ The bug this guards: reusing Indiana's string at threshold 0 produces
+    // "wait at least 0 minutes after the scheduled pickup time".
+    check("pick-up-time copy never says 0 minutes", !/\b0 minutes\b/.test(zero), zero);
+    check("pick-up-time copy names the unlock time",
+      Boolean(zeroAt) && zero.includes(String(zeroAt)), zero);
+    check("pick-up-time copy states the location rule",
+      zero.includes(String(NO_SHOW_RADIUS_MILES)) &&
+        zero.includes(String(NO_SHOW_WAIT_MINUTES)), zero);
+
+    const fifteen = postPickupRefusalCopy({
+      copy: "production",
+      remainingMinutes: 9,
+      availableAt: null,
+      thresholdMinutes: NO_SHOW_POST_PICKUP_MINUTES,
+    });
+    check("Indiana copy keeps production's wording",
+      fifteen.includes(`at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes`) &&
+        fifteen.includes("minute(s) remaining"), fifteen);
+    check("the two thresholds get different sentences", zero !== fifteen);
   }
-}
-check("the pick-up-time gate fires on at least one ride", pickupGateFired > 0,
-  `fired ${pickupGateFired} times`);
-
-// The pair: same situation, opposite outcome, and the difference is the gate.
-const six = tagged.find((t) => t.noShowDemo === "6");
-const sixOne = tagged.find((t) => t.noShowDemo === "6.1");
-check("scenario 6 pair is seeded", Boolean(six && sixOne));
-if (six && sixOne) {
-  const legA = activeLeg(six)!;
-  const legB = activeLeg(sixOne)!;
-  // Both must pass presence, or the pair tests the wrong rule.
-  check("6 passes the presence walk", walkLocationRecords(legA.locationRecords ?? []).ok);
-  check("6.1 passes the presence walk", walkLocationRecords(legB.locationRecords ?? []).ok);
-  // Both must actually be before their pick-up.
-  check("6 is seeded before the pick-up", (legA.minutesSinceScheduledPickup ?? 0) < 0);
-  check("6.1 is seeded before the pick-up", (legB.minutesSinceScheduledPickup ?? 0) < 0);
-  // And the outcomes must diverge.
-  const outA = resolveNoShow(six, legA, 0);
-  const outB = resolveNoShow(sixOne, legB, 0);
-  check("6 files today (as-is)", outA.kind === "files", outA.kind);
-  check("6.1 is refused (finalised)", outB.kind === "timer", outB.kind);
-  check("6.1 refuses on the pick-up time, not presence",
-    outB.kind === "timer" && outB.reason === "post-pickup",
-    outB.kind === "timer" ? outB.reason : outB.kind);
-  // ⚠️ The two candidate answers must NOT agree on the data, or the pair proves
-  // nothing about the gate.
-  check("the pair genuinely diverges", outA.kind !== outB.kind);
-}
-
-// ── The refusal copy is a sentence in both markets ──────────────────────────
-const gaLeg = six ? activeLeg(six)! : null;
-if (gaLeg) {
-  const zero = postPickupRefusalCopy({
-    copy: "revised",
-    remainingMinutes: 4,
-    availableAt: postPickupAvailableAt(gaLeg, NO_SHOW_PICKUP_TIME_MINUTES),
-    thresholdMinutes: NO_SHOW_PICKUP_TIME_MINUTES,
-  });
-  // ⚠️ The bug this guards: reusing Indiana's string at threshold 0 produces
-  // "wait at least 0 minutes after the scheduled pickup time".
-  check("pick-up-time copy never says 0 minutes", !/\b0 minutes\b/.test(zero), zero);
-  check("pick-up-time copy names the pick-up time", zero.includes("11:00 AM"), zero);
-  check("pick-up-time copy states the location rule",
-    zero.includes(String(NO_SHOW_RADIUS_MILES)) &&
-      zero.includes(String(NO_SHOW_WAIT_MINUTES)), zero);
-
-  const fifteen = postPickupRefusalCopy({
-    copy: "production",
-    remainingMinutes: 9,
-    availableAt: null,
-    thresholdMinutes: NO_SHOW_POST_PICKUP_MINUTES,
-  });
-  // Production's exact shape, kept because the driver recognises it.
-  check("Indiana copy keeps production's wording",
-    fifteen.includes(`at least ${NO_SHOW_POST_PICKUP_MINUTES} minutes`) &&
-      fifteen.includes("minute(s) remaining"), fifteen);
-  check("the two markets get different sentences", zero !== fifteen);
 }
 
 // ── The no-show type is a LABEL, not a branch ───────────────────────────────
