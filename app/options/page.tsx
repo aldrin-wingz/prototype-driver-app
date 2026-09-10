@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
-import { Settings, History, HelpCircle, LogOut, ChevronRight } from "lucide-react";
+import { Settings, History, HelpCircle, LogOut, ChevronRight, MessageCircle } from "lucide-react";
+import { useChatPlacement } from "@/lib/messages-data/chat-placement-context";
+import { MOCK_UNREAD_TOTAL } from "@/lib/messages-data/mock-threads";
 
-const menuItems = [
+const baseMenuItems = [
   { 
     icon: History, 
     label: "Ride History", 
@@ -32,7 +34,33 @@ const menuItems = [
   },
 ];
 
+/**
+ * Under the `options-row` placement the chat lives here and nowhere else — no
+ * chrome change at all. Cheapest to build and least discoverable: the unread
+ * badge does no work if the driver has to go looking for it.
+ *
+ * Under "two entry points" this is also where Support Chat stays, so the two
+ * appear as sibling rows rather than as two competing icons.
+ */
 export default function OptionsPage() {
+  const { placement, coexistence } = useChatPlacement();
+
+  const messagesRow = {
+    icon: MessageCircle,
+    label: "Messages",
+    href: "/messages",
+    description:
+      coexistence === "separate"
+        ? `${MOCK_UNREAD_TOTAL} unread from the Wingz team`
+        : `${MOCK_UNREAD_TOTAL} unread — Wingz team and Support`,
+  };
+
+  // Insert above "Help & Support" so the two chats read as siblings.
+  const menuItems =
+    placement === "options-row"
+      ? [baseMenuItems[0], baseMenuItems[1], messagesRow, ...baseMenuItems.slice(2)]
+      : baseMenuItems;
+
   return (
     <div className="flex min-h-screen flex-col pb-20">
       <Header title="Options" showFilter={false} showRefresh={false} />

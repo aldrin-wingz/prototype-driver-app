@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
 import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup";
 import { RideFlowProvider } from "@/lib/support-data/ride-flow-context";
+import { ChatPlacementProvider } from "@/lib/messages-data/chat-placement-context";
+import { PlacementStrip } from "@/components/dev/placement-strip";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -33,8 +35,11 @@ export default function RootLayout({
         >
           <IncentiveEarnedProvider>
             <RideFlowProvider>
-              {children}
-              <IncentiveEarnedPopup />
+              <ChatPlacementProvider>
+                <PlacementStrip />
+                {children}
+                <IncentiveEarnedPopup />
+              </ChatPlacementProvider>
             </RideFlowProvider>
           </IncentiveEarnedProvider>
           <Toaster />

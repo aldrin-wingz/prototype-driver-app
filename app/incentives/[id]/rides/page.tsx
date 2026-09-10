@@ -11,6 +11,7 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
 import { ChevronLeft } from "lucide-react";
 import { IncentiveRidesView } from "@/components/driver/incentive-rides-view";
 import { incentiveDefinitions } from "@/lib/data/incentives";
@@ -38,7 +39,9 @@ export default function IncentiveRidesPage({ params }: IncentiveRidesPageProps) 
         <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900">
           Rides
         </h1>
-        <div className="w-10" />
+        <div className="flex min-w-10 items-center justify-end">
+          <ChatHeaderActions />
+        </div>
       </header>
 
       {incentive ? (

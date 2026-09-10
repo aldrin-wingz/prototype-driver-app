@@ -17,6 +17,7 @@
 import * as React from "react";
 import { ChevronLeft, SlidersHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
 import { IncentiveCard } from "@/components/driver/dashboard-incentive-section";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -157,6 +158,8 @@ export default function IncentivesPage() {
         <h1 className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900">
           Driver Incentives
         </h1>
+        <div className="flex items-center gap-1">
+        <ChatHeaderActions />
         <button
           onClick={openFilters}
           aria-label="Open filters"
@@ -170,6 +173,7 @@ export default function IncentivesPage() {
             />
           ) : null}
         </button>
+        </div>
       </header>
 
       {/* Scrollable sections */}

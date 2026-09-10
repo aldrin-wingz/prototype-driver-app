@@ -21,6 +21,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
@@ -316,9 +317,12 @@ export function RideDetailLayout({
             #{trip.id} - {subtitle}
           </h1>
         </div>
-        <button className="text-gray-700">
-          <RefreshCw className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <ChatHeaderActions />
+          <button className="text-gray-700">
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Scrollable content area */}

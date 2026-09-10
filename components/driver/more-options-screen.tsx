@@ -12,6 +12,7 @@ import {
   Reply,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -335,9 +336,12 @@ export function MoreOptionsScreen({
         >
           <ChevronLeft className="h-7 w-7" />
         </button>
-        <h1 className="flex-1 pr-7 text-center text-xl font-bold text-gray-900">
+        <h1 className="flex-1 text-center text-xl font-bold text-gray-900">
           More Options
         </h1>
+        <div className="flex w-7 items-center justify-end">
+          <ChatHeaderActions />
+        </div>
       </header>
 
       <AlertDialog
