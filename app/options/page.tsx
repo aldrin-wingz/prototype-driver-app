@@ -43,12 +43,12 @@ const baseMenuItems = [
  * appear as sibling rows rather than as two competing icons.
  */
 export default function OptionsPage() {
-  const { placement, coexistence } = useChatPlacement();
+  const { placement, coexistence, openChat } = useChatPlacement();
 
   const messagesRow = {
     icon: MessageCircle,
     label: "Messages",
-    href: "/messages",
+    href: "__chat__",
     description:
       coexistence === "separate"
         ? `${MOCK_UNREAD_TOTAL} unread from the Wingz team`
@@ -70,10 +70,11 @@ export default function OptionsPage() {
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link
+              <MenuRow
                 key={item.label}
                 href={item.href}
-                className="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-gray-50"
+                onOpenChat={openChat}
+                className="flex w-full items-center gap-4 rounded-xl bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
                   <Icon className="h-5 w-5 text-gray-600" />
@@ -83,7 +84,7 @@ export default function OptionsPage() {
                   <p className="text-sm text-gray-500">{item.description}</p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-gray-400" />
-              </Link>
+              </MenuRow>
             );
           })}
         </div>
@@ -95,5 +96,31 @@ export default function OptionsPage() {
       
       <BottomNav />
     </div>
+  );
+}
+
+/** A menu row: a Link for a route, a button for the chat sheet. */
+function MenuRow({
+  href,
+  onOpenChat,
+  className,
+  children,
+}: {
+  href: string;
+  onOpenChat: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (href === "__chat__") {
+    return (
+      <button type="button" onClick={onOpenChat} className={className}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
   );
 }

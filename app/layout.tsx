@@ -8,6 +8,7 @@ import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup
 import { RideFlowProvider } from "@/lib/support-data/ride-flow-context";
 import { ChatPlacementProvider } from "@/lib/messages-data/chat-placement-context";
 import { PlacementStrip } from "@/components/dev/placement-strip";
+import { MessagesSheet } from "@/components/chat/messages-sheet";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({
               <ChatPlacementProvider>
                 <PlacementStrip />
                 {children}
+                <MessagesSheet />
                 <IncentiveEarnedPopup />
               </ChatPlacementProvider>
             </RideFlowProvider>

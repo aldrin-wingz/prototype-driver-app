@@ -50,17 +50,13 @@ export function Header({
 }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { placement } = useChatPlacement();
+  const { placement, openChat } = useChatPlacement();
 
   const chatOnLeft = isChatVisible(pathname, placement) && placement === "header-left";
 
   // The dead icon stays put only in the control. Every other placement is that
   // same icon somewhere else, so leaving it here would show two.
   const showDeadIcon = placement === "off" && showMessages;
-
-  function openMessages() {
-    router.push("/messages");
-  }
 
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-white px-4 shadow-sm">
@@ -75,7 +71,7 @@ export function Header({
           </button>
         ) : chatOnLeft ? (
           <button
-            onClick={openMessages}
+            onClick={openChat}
             className="relative flex h-10 w-10 items-center justify-center"
           >
             <MessageCircle className="h-6 w-6 text-gray-700" />

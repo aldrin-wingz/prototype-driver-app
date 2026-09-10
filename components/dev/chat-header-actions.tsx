@@ -1,7 +1,7 @@
 "use client";
 
 import { LifeBuoy, MessageCircle } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { ChatSlotNote } from "@/components/dev/chat-slot-note";
 import { DRIVER_NAVY } from "@/constants/driver-app-colors";
@@ -19,9 +19,8 @@ import { MOCK_UNREAD_TOTAL } from "@/lib/messages-data/mock-threads";
  */
 export function ChatHeaderActions() {
   const pathname = usePathname();
-  const router = useRouter();
   const { toast } = useToast();
-  const { placement, coexistence } = useChatPlacement();
+  const { placement, coexistence, openChat } = useChatPlacement();
 
   const chatVisible = isChatVisible(pathname, placement);
   const chatOnRight = chatVisible && placement === "header-right";
@@ -32,7 +31,7 @@ export function ChatHeaderActions() {
     <>
       {chatOnRight && (
         <button
-          onClick={() => router.push("/messages")}
+          onClick={openChat}
           className="relative flex h-10 w-10 items-center justify-center text-gray-700"
         >
           <MessageCircle className="h-5 w-5" />

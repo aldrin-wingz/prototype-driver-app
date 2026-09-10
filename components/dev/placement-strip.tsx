@@ -43,6 +43,9 @@ export function PlacementStrip() {
   // Why the icon is missing here, shown only while Gaps is on — the ghost in the
   // slot says "declined", this says why, and a screenshot captures both.
   const absent = showAbsences ? absentReasonFor(pathname, placement) : undefined;
+  // Present-and-wrong, which is different from absent: the affordance DOES
+  // render here, on a screen the coverage rule says it should not reach.
+  const violation = coverage?.violation?.[placement];
 
   return (
     <div className="w-full border-b border-[#374151] bg-[#111827] text-gray-300">
@@ -104,7 +107,11 @@ export function PlacementStrip() {
         </div>
 
         {/* Row 3 — what this screen contributes, only when there is something to say */}
-        {absent ? (
+        {violation ? (
+          <p className="text-[8px] leading-tight text-[#F87171]">
+            <span className="font-semibold">⛔ Breaks the rule:</span> {violation}
+          </p>
+        ) : absent ? (
           <p className="text-[8px] leading-tight text-[#FBBF24]">
             <span className="font-semibold">No icon here:</span> {absent}
           </p>

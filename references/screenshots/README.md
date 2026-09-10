@@ -45,6 +45,28 @@ Filed 2026-09-03. **The source of truth for the Rider No-Show branch** (`luis/ri
 
 **Step packs:** `by-step/s-1/` (three swipe stages) · `by-step/s-2/` (form pattern) · `by-step/s-3/` (More Options) · `by-step/s-6/` (Member No-Show, all five).
 
+### In-App Chat pack (`c-*`)
+
+Filed 2026-09-11. **The source of truth for the `luis/in-app-chat` placement study.** Two groups: where the chat bubble is and is not on the active-driver screens (`c-01*`), and what the chat actually looks like in the Onboarding flow (`c-02a`–`c-04a`).
+
+| Slot | Screen | What it pins down |
+|------|--------|-------------------|
+| c-01a | Home | Chat bubble **top-left**, no badge at zero unread. Refresh top-right. Confirms the bubble is real chrome, not a prototype invention |
+| c-01b | Requests | Bubble top-left; filter (with a red **1** count) + refresh top-right. The crowded case |
+| c-01c | My Rides | Bubble top-left, refresh top-right, four tabs with superscript counts |
+| c-01d | Planner | ⛔ **No bubble, and no standard header** — a date-picker bar instead. Planner is outside the rule |
+| c-01e | Options | ⛔ **No header icons at all.** Support is a `Contact Support` LIST ROW with a phone glyph, not a bubble |
+| c-01f | Ride Details | ⛔ **Back chevron owns the left slot**, refresh right. No bubble on any stack-pushed screen |
+| c-02a | Onboarding — Your application | The chat entry point in onboarding: a **green `?`-in-speech-bubble, top-right** |
+| c-03a | In-App Chat — inbox | ⭐ **A BOTTOM SHEET over a dimmed backdrop**, not a route. Centred bold `Messages` + ✕. Row = circular Wingz-logo avatar, bold name, one preview line with a green **`Draft:`** prefix. **No timestamp and no unread badge on the row** |
+| c-04a | In-App Chat — thread | ⭐ ‹ back / centred title / ✕. **Bottom-anchored**, opens with a grey `Today` pill. Outbound bubble green and heavily rounded; **the ✓ and the time sit OUTSIDE the bubble**, right-aligned beneath. Composer = `+` circle, rounded `Send a message` field, circular send arrow. **No drag handle** |
+
+**The coverage rule these settle:** chat appears **only where the Zendesk support box appears** — Home, Requests, My Rides — which eliminates the `nav-tab` and `options-row` placements rather than merely ranking them.
+
+**Sampled colours** (added to `constants/driver-app-colors.ts`): chat green `#5FCBAA` — ⚠️ *not* the driver green `#10B981`; it carries both the outbound bubble and the `Draft:` prefix. Date pill `#F4F6F8`. Composer border `#C0C3C9`.
+
+**Step pack:** `by-step/c-1/` (all nine).
+
 ### Sampled colours
 
 Taken from the captures directly rather than eyeballed, and codified in `constants/driver-app-colors.ts`. Several differ from the template defaults, so prefer these on replicated surfaces:

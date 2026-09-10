@@ -1,31 +1,35 @@
 /**
  * Seeded conversations for the In-App Chat placement study.
  *
- * Two channels live side by side here on purpose. `in-app` is the GetStream chat
- * that already ships (driver <-> Wingz staff, scoped to Onboarding today);
- * `support` is Zendesk, which stays as "Support Chat" and is a different
- * application entirely — see `SUPPORT_HANDOFF_NOTE` below for why its thread
- * renders as a handoff rather than as bubbles.
+ * ⚠️ Shapes match the PRODUCTION onboarding chat, captured in
+ * `references/screenshots/canonical/c-03a` (inbox) and `c-04a` (thread) — not
+ * invented. What those two screenshots pin down:
  *
- * ⚠️ Seeded, never computed — the repo convention. Timestamps are fixed strings
- * and unread counts are literals, so a screenshot taken next month matches one
- * taken today.
+ *   - the inbox row is a circular Wingz-logo avatar + a bold name + one preview
+ *     line, with a green `Draft:` prefix when the driver has typed and not sent.
+ *     No timestamp and no unread badge on the row itself.
+ *   - a thread is bottom-anchored, opens with a grey `Today` date pill, and puts
+ *     the tick and the time OUTSIDE the bubble, right-aligned beneath it.
+ *
+ * `Onboarding Support` is the one that exists today; the other three are the
+ * non-support cases this study is proposing.
+ *
+ * ⚠️ Seeded, never computed — timestamps are fixed strings so a screenshot taken
+ * next month matches one taken today.
  */
 
 export type ChatChannel = "in-app" | "support";
 
 /**
- * The non-support topics the study is testing chat against.
- *
  * ⚠️ `same-day-offers` is the user's wording. The vault project is
  * **Special Offers (a.k.a. Ride Offers)** — no "Same-Day Offers" term exists
  * there. Flagged rather than silently renamed; it is one string to change.
  */
 export type ChatTopic =
+  | "onboarding"
   | "compliance"
   | "same-day-offers"
   | "standing-orders"
-  | "onboarding"
   | "support";
 
 export interface ChatMessage {
@@ -35,6 +39,8 @@ export interface ChatMessage {
   body: string;
   /** Fixed label rather than a real clock, so screenshots stay stable. */
   timestamp: string;
+  /** The ✓ production draws under an outbound bubble. `me` messages only. */
+  delivered?: boolean;
 }
 
 /** What the handoff panel shows for a Zendesk thread. No message bodies. */
@@ -50,9 +56,12 @@ export interface ChatThread {
   topic: ChatTopic;
   /** Who the driver sees they are talking to. */
   title: string;
-  /** One-line row preview in the inbox. */
+  /** The row's second line. Ignored when `draft` is set. */
   preview: string;
-  timestamp: string;
+  /** Unsent text. Production renders a green `Draft:` prefix and shows this. */
+  draft?: string;
+  /** The grey date pill above the first message of the day. */
+  dateLabel: string;
   unread: number;
   messages: ChatMessage[];
   /** `support` threads only — they carry a ticket instead of a transcript. */
@@ -61,12 +70,26 @@ export interface ChatThread {
 
 export const MOCK_THREADS: ChatThread[] = [
   {
+    id: "onboarding",
+    channel: "in-app",
+    topic: "onboarding",
+    title: "Onboarding Support",
+    preview: "You're all set — background check cleared.",
+    // Reproduces c-03a/c-04a exactly: an unsent draft, and one outbound message.
+    draft: "Luis Test",
+    dateLabel: "Today",
+    unread: 0,
+    messages: [
+      { id: "onboarding-1", from: "me", body: "Luis Test", timestamp: "12:20 AM", delivered: true },
+    ],
+  },
+  {
     id: "compliance",
     channel: "in-app",
     topic: "compliance",
-    title: "Wingz Compliance",
-    preview: "Your auto insurance on file expires Sep 24 — send the new declaration page when you have it.",
-    timestamp: "2:14 PM",
+    title: "Compliance",
+    preview: "Your auto insurance on file expires Sep 24.",
+    dateLabel: "Today",
     unread: 2,
     messages: [
       {
@@ -87,9 +110,9 @@ export const MOCK_THREADS: ChatThread[] = [
     id: "same-day-offers",
     channel: "in-app",
     topic: "same-day-offers",
-    title: "Wingz Dispatch",
-    preview: "Two legs opened up for this afternoon — Nashville to Murfreesboro, 3:40 PM pickup.",
-    timestamp: "11:52 AM",
+    title: "Same-Day Offers",
+    preview: "Still yours if you want it — otherwise it goes back at 12.",
+    dateLabel: "Today",
     unread: 3,
     messages: [
       {
@@ -103,13 +126,9 @@ export const MOCK_THREADS: ChatThread[] = [
         from: "me",
         body: "Can I get back to you in ten? Finishing a drop-off.",
         timestamp: "11:47 AM",
+        delivered: true,
       },
-      {
-        id: "offers-3",
-        from: "them",
-        body: "Yes — I'll hold it until noon.",
-        timestamp: "11:48 AM",
-      },
+      { id: "offers-3", from: "them", body: "Yes — I'll hold it until noon.", timestamp: "11:48 AM" },
       {
         id: "offers-4",
         from: "them",
@@ -122,51 +141,29 @@ export const MOCK_THREADS: ChatThread[] = [
     id: "standing-orders",
     channel: "in-app",
     topic: "standing-orders",
-    title: "Wingz Ops",
-    preview: "Tuesday standing order moves to 6:45 AM starting Sep 22. Wednesday and Friday are unchanged.",
-    timestamp: "Yesterday",
+    title: "Standing Orders",
+    preview: "Tuesday moves to 6:45 AM starting Sep 22.",
+    dateLabel: "Yesterday",
     unread: 1,
     messages: [
       {
         id: "so-1",
         from: "them",
         body: "The client changed the Tuesday pickup on your Riverside Dialysis standing order. Starting Sep 22 it moves from 6:15 AM to 6:45 AM.",
-        timestamp: "Yesterday",
+        timestamp: "4:02 PM",
       },
       {
         id: "so-2",
         from: "me",
         body: "Does that shift the whole block or just Tuesday?",
-        timestamp: "Yesterday",
+        timestamp: "4:15 PM",
+        delivered: true,
       },
       {
         id: "so-3",
         from: "them",
         body: "Just Tuesday. Wednesday and Friday stay at 6:15 AM. Nothing for you to do — I've already updated it on our side.",
-        timestamp: "Yesterday",
-      },
-    ],
-  },
-  {
-    id: "onboarding",
-    channel: "in-app",
-    topic: "onboarding",
-    title: "Wingz Onboarding",
-    preview: "You're all set — background check cleared and your first trips are unlocked.",
-    timestamp: "Jul 28",
-    unread: 0,
-    messages: [
-      {
-        id: "onboarding-1",
-        from: "them",
-        body: "Background check came back clear. You're activated — trips will start showing in your Requests feed today.",
-        timestamp: "Jul 28",
-      },
-      {
-        id: "onboarding-2",
-        from: "me",
-        body: "Great, thanks for the help getting through it.",
-        timestamp: "Jul 28",
+        timestamp: "4:18 PM",
       },
     ],
   },
@@ -176,7 +173,7 @@ export const MOCK_THREADS: ChatThread[] = [
     topic: "support",
     title: "Wingz Support",
     preview: "Payment missing for trip #370291",
-    timestamp: "Sep 8",
+    dateLabel: "Sep 8",
     unread: 0,
     messages: [],
     ticket: {
@@ -190,16 +187,12 @@ export const MOCK_THREADS: ChatThread[] = [
 /**
  * The unread count the header badge shows.
  *
- * ⚠️ Seeded, not `MOCK_THREADS.reduce(...)`. It is held at 6 because that is the
- * `messageCount` default the production-replicated header already ships with
- * (`components/driver/header.tsx`), and the badge must stay constant across every
- * placement and coexistence value — position is the only variable under test.
+ * ⚠️ Seeded, not `MOCK_THREADS.reduce(...)`. Held at 6 because that is the
+ * `messageCount` default the production-replicated header already ships with,
+ * and the badge must stay constant across every placement — position is the only
+ * variable under test.
  */
 export const MOCK_UNREAD_TOTAL = 6;
-
-/** Why a Zendesk thread shows a handoff panel instead of a transcript. */
-export const SUPPORT_HANDOFF_NOTE =
-  "Support Chat runs in Zendesk, a separate app. The prototype shows the handoff rather than fake bubbles — rendering it identically to in-app chat would answer the study's own question.";
 
 export function getThread(id: string): ChatThread | undefined {
   return MOCK_THREADS.find((thread) => thread.id === id);
@@ -209,7 +202,7 @@ export function getThread(id: string): ChatThread | undefined {
  * The threads an inbox shows under a given coexistence model.
  *
  * `unified` = one inbox holding both channels. `separate` = in-app only, because
- * Support has its own entry point in the chrome.
+ * Support Chat has its own entry point.
  */
 export function getVisibleThreads(coexistence: "unified" | "separate"): ChatThread[] {
   if (coexistence === "separate") {

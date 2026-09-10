@@ -64,14 +64,14 @@ export const PLACEMENT_META: Record<ChatPlacement, PlacementMeta> = {
     label: "Nav tab",
     blurb: "A sixth bottom-nav tab beside Home, Requests, Planner, My Rides, Options.",
     tradeoff:
-      "Never appears on a ride detail — the bottom nav does not mount there, which is exactly where Ops coordination happens. And \"Messages\" does not fit in a sixth cell at 375px; the label has to shorten to \"Chat\".",
+      "⛔ BREAKS THE COVERAGE RULE. A tab renders on all five tab screens, so it puts chat on Planner and Options where the support box is not shown (c-01d, c-01e). It also never reaches a ride detail, where the nav does not mount. Separately: a sixth cell wraps \"My Rides\" onto two lines at 375px.",
   },
   "options-row": {
     label: "Options row",
     blurb:
-      "No chrome change at all. The Options menu's \"Help & Support\" row becomes the way in.",
+      "No chrome change at all. The Options menu gets a Messages row.",
     tradeoff:
-      "Cheapest and least discoverable: an unread message is invisible until the driver goes looking, so the badge does no work.",
+      "⛔ BREAKS THE COVERAGE RULE in the opposite direction — it puts chat ONLY on Options, the one tab screen with no support box and no header icon at all (c-01e). Also the least discoverable: an unread badge does no work if the driver has to go looking.",
   },
 };
 
@@ -106,8 +106,7 @@ export type RouteKey =
   | "/options"
   | "/ride-history"
   | "/incentives"
-  | "/incentives/[id]/rides"
-  | "/messages";
+  | "/incentives/[id]/rides";
 
 export interface RouteCoverage {
   label: string;
@@ -117,21 +116,33 @@ export interface RouteCoverage {
   absentReason: Partial<Record<ChatPlacement, string>>;
   /** An open question about this route, shown in the study strip. */
   caveat?: string;
+  /**
+   * Placements that DO render here but shouldn't under the coverage rule.
+   * Distinct from `absentReason`: this is present-and-wrong, not absent.
+   */
+  violation?: Partial<Record<ChatPlacement, string>>;
 }
 
 const NO_NAV = "no bottom nav on this screen";
 const BACK_WINS = "back chevron owns the left slot";
 const NOT_OPTIONS = "reached from the Options menu, not from here";
+const NO_BOX = "the Zendesk support box is not shown on this screen";
 
 /**
- * ⏳ PROVISIONAL until the production chat screenshots are filed.
+ * Where the chat affordance may appear.
  *
- * The one genuinely contested row is `/my-rides/[id]/no-show`, currently excluded
- * under every placement: App Release 4.5.1 shipped a fix for "the Zendesk chat
- * overlay covering the trip screen mid-trip", which is precedent for keeping a
- * chat affordance off a mid-flow form. If Dispatch <-> driver ride coordination is
- * a real use case, that argues the other way — the 4.5.1 bug was an overlay
- * problem, not a placement problem. Flip the row, don't rewrite the table.
+ * ⭐ THE RULE, set by the user 2026-09-11: **chat shows only where the current
+ * Zendesk support box is shown.** The production captures settle exactly where
+ * that is — the header speech bubble appears on Home (`c-01a`), Requests
+ * (`c-01b`) and My Rides (`c-01c`), and is absent from Planner (`c-01d`, which
+ * has a date-picker header instead), Options (`c-01e`, no header icons at all)
+ * and every stack-pushed screen, where the back chevron owns the left slot
+ * (`c-01f`).
+ *
+ * ⛔ That rule eliminates two of the five placements rather than ranking them:
+ * `nav-tab` renders on all five tab screens and `options-row` renders only on
+ * Options. Both are kept selectable so the violation is visible on the screen
+ * where it happens — see `violation` below.
  */
 export const ROUTE_COVERAGE: Record<RouteKey, RouteCoverage> = {
   "/": {
@@ -146,76 +157,73 @@ export const ROUTE_COVERAGE: Record<RouteKey, RouteCoverage> = {
     caveat:
       "Already carries filter + refresh. Header right makes 3 icons, or 4 under two entry points.",
   },
-  "/planner": {
-    label: "Planner",
-    placements: ["header-left", "header-right", "nav-tab"],
-    absentReason: { "options-row": NOT_OPTIONS },
-  },
   "/my-rides": {
     label: "My Rides",
     placements: ["header-left", "header-right", "nav-tab"],
     absentReason: { "options-row": NOT_OPTIONS },
   },
+
+  /* Tab screens the support box does NOT reach. A nav tab still renders here,
+   * which is the whole objection to that placement. */
+  "/planner": {
+    label: "Planner",
+    placements: ["nav-tab"],
+    absentReason: { "header-left": NO_BOX, "header-right": NO_BOX, "options-row": NOT_OPTIONS },
+    violation: {
+      "nav-tab":
+        "a tab puts chat here, but c-01d shows no support box on Planner — and no standard header to put one in",
+    },
+  },
   "/options": {
     label: "Options",
-    placements: ["header-left", "header-right", "nav-tab", "options-row"],
-    absentReason: {},
-    caveat: "The only tab screen with a free header right corner today.",
+    placements: ["nav-tab", "options-row"],
+    absentReason: { "header-left": NO_BOX, "header-right": NO_BOX },
+    violation: {
+      "nav-tab": "a tab puts chat here, but c-01e shows no support box on Options",
+      "options-row": "this places chat ONLY where the support box is not shown",
+    },
   },
+
+  /* Stack-pushed screens. The back chevron owns the left slot (c-01f) and the
+   * support box is not shown on any of them. */
   "/requests/[id]": {
     label: "Ride Details (request)",
-    placements: ["header-right"],
-    absentReason: { "header-left": BACK_WINS, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
+    placements: [],
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
   },
   "/my-rides/[id]": {
     label: "Ride Details",
-    placements: ["header-right"],
-    absentReason: { "header-left": BACK_WINS, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
+    placements: [],
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
     caveat:
-      "The contested one. In progress, the driver is driving — but this is also where Ops coordination happens.",
+      "⚠️ The rule excludes this — but it is where Ops coordination happens, and the action row already carries a navy chat glyph for rider SMS.",
   },
   "/my-rides/[id]/more": {
     label: "More Options",
-    placements: ["header-right", "options-row"],
-    absentReason: { "header-left": BACK_WINS, "nav-tab": NO_NAV },
-    caveat:
-      "Already holds today's Zendesk front doors: \"Call Member or Support\" and \"Email Support\".",
+    placements: [],
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
+    caveat: "Holds today's Zendesk front doors: \"Call Member or Support\" and \"Email Support\".",
   },
   "/my-rides/[id]/no-show": {
     label: "Member No-Show",
     placements: [],
-    absentReason: {
-      "header-left": BACK_WINS,
-      "header-right": "⏳ provisional — mid-flow form, and 4.5.1 fixed a chat overlay covering the trip screen",
-      "nav-tab": NO_NAV,
-      "options-row": NOT_OPTIONS,
-    },
-    caveat: "⏳ Excluded provisionally, pending the production screenshots.",
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
+    caveat: "✅ No longer provisional — the rule excludes it, and 4.5.1's overlay fix agrees.",
   },
   "/ride-history": {
     label: "Ride History",
-    placements: ["header-right"],
-    absentReason: {
-      "header-left": "showMessages={false} — this screen opts the icon out entirely",
-      "nav-tab": NO_NAV,
-      "options-row": NOT_OPTIONS,
-    },
+    placements: [],
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
   },
   "/incentives": {
     label: "Incentives",
-    placements: ["header-right"],
-    absentReason: { "header-left": BACK_WINS, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
+    placements: [],
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
   },
   "/incentives/[id]/rides": {
     label: "Incentive Rides",
-    placements: ["header-right"],
-    absentReason: { "header-left": BACK_WINS, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-  },
-  "/messages": {
-    label: "Messages",
     placements: [],
-    absentReason: {},
-    caveat: "The destination. Reachable by URL under every placement, including off.",
+    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
   },
 };
 
@@ -228,7 +236,6 @@ export function routeKeyFor(pathname: string): RouteKey | null {
   if (pathname === "/options") return "/options";
   if (pathname === "/ride-history") return "/ride-history";
   if (pathname === "/incentives") return "/incentives";
-  if (pathname.startsWith("/messages")) return "/messages";
   if (pathname.startsWith("/requests/")) return "/requests/[id]";
   if (pathname.endsWith("/no-show")) return "/my-rides/[id]/no-show";
   if (pathname.endsWith("/more")) return "/my-rides/[id]/more";

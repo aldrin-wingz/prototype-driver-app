@@ -13,6 +13,18 @@ interface ChatPlacementValue {
   /** Draw a dashed ghost where the affordance would have gone but doesn't. */
   showAbsences: boolean;
   setShowAbsences: (showAbsences: boolean) => void;
+  /* ── The chat sheet ──────────────────────────────────────────────────
+   * Production opens chat as a sheet over the current screen (c-03a/c-04a),
+   * so the open state lives here rather than in a route. Every placement
+   * calls the same `openChat()`, which keeps the icon the only variable.
+   */
+  chatOpen: boolean;
+  openChat: () => void;
+  closeChat: () => void;
+  /** Which thread the sheet is showing; null = the inbox. */
+  activeThreadId: string | null;
+  openThread: (id: string) => void;
+  backToInbox: () => void;
 }
 
 const ChatPlacementContext = createContext<ChatPlacementValue | null>(null);
@@ -33,6 +45,8 @@ export function ChatPlacementProvider({ children }: { children: React.ReactNode 
   const [placement, setPlacement] = useState<ChatPlacement>("off");
   const [coexistence, setCoexistence] = useState<ChatCoexistence>("unified");
   const [showAbsences, setShowAbsences] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
   const value = useMemo<ChatPlacementValue>(
     () => ({
@@ -42,8 +56,18 @@ export function ChatPlacementProvider({ children }: { children: React.ReactNode 
       setCoexistence,
       showAbsences,
       setShowAbsences,
+      chatOpen,
+      // Always land on the inbox, never on whatever thread was last read.
+      openChat: () => {
+        setActiveThreadId(null);
+        setChatOpen(true);
+      },
+      closeChat: () => setChatOpen(false),
+      activeThreadId,
+      openThread: setActiveThreadId,
+      backToInbox: () => setActiveThreadId(null),
     }),
-    [placement, coexistence, showAbsences]
+    [placement, coexistence, showAbsences, chatOpen, activeThreadId]
   );
 
   return (
@@ -69,5 +93,11 @@ export function useChatPlacement(): ChatPlacementValue {
     setCoexistence: () => {},
     showAbsences: false,
     setShowAbsences: () => {},
+    chatOpen: false,
+    openChat: () => {},
+    closeChat: () => {},
+    activeThreadId: null,
+    openThread: () => {},
+    backToInbox: () => {},
   };
 }

@@ -33,3 +33,19 @@ export const DRIVER_DROPOFF = "#E06078";
 
 /** Hairline divider between grid cells on the More Options screen. */
 export const DRIVER_DIVIDER = "#F0F0F0";
+
+/* ── In-App Chat ───────────────────────────────────────────────────────────
+ * Sampled from `c-03a` (inbox) and `c-04a` (thread) — the production
+ * onboarding chat. ⚠️ The chat green is NOT the driver green `#10B981`: it is
+ * visibly lighter, and the same value carries both the outbound bubble and the
+ * `Draft:` prefix.
+ */
+
+/** Outbound message bubble, and the green `Draft:` prefix in the inbox. */
+export const CHAT_GREEN = "#5FCBAA";
+
+/** The grey `Today` date pill that opens a thread. */
+export const CHAT_DATE_PILL = "#F4F6F8";
+
+/** Border of the composer's "Send a message" field. */
+export const CHAT_COMPOSER_BORDER = "#C0C3C9";

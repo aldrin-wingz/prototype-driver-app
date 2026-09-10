@@ -28,11 +28,11 @@ const navItems = [
  * at text-xs needs ~53px of glyph plus the px-3 padding. It overflows. If this
  * placement wins, the tab cannot be called what the screen is called.
  */
-const chatNavItem = { href: "/messages", label: "Chat", icon: MessageCircle };
+const chatNavItem = { href: "__chat__", label: "Chat", icon: MessageCircle };
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { placement } = useChatPlacement();
+  const { placement, openChat, chatOpen } = useChatPlacement();
 
   const items = placement === "nav-tab" ? [...navItems, chatNavItem] : navItems;
 
@@ -43,15 +43,21 @@ export function BottomNav() {
           // Prefix match so a tab stays lit inside its own stack (a thread under
           // /messages keeps Chat active). Home is exact — a bare startsWith
           // would make "/" match every route.
-          const isActive =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const isChat = item.href === "__chat__";
+          // The chat tab opens a sheet, so it is lit by sheet state, not path.
+          const isActive = isChat
+            ? chatOpen
+            : item.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(item.href);
           const Icon = item.icon;
-          const isChat = item.href === "/messages";
 
           return (
-            <Link
+            <Cell
               key={item.href}
+              isChat={isChat}
               href={item.href}
+              onOpenChat={openChat}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 px-3 py-2 transition-colors",
                 isActive ? "text-[#10B981]" : "text-gray-400"
@@ -72,10 +78,38 @@ export function BottomNav() {
                 )}
               </div>
               <span className="text-xs font-medium">{item.label}</span>
-            </Link>
+            </Cell>
           );
         })}
       </div>
     </nav>
+  );
+}
+
+/** A nav cell: a Link for a route, a button for the chat sheet. */
+function Cell({
+  isChat,
+  href,
+  onOpenChat,
+  className,
+  children,
+}: {
+  isChat: boolean;
+  href: string;
+  onOpenChat: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (isChat) {
+    return (
+      <button type="button" onClick={onOpenChat} className={className}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
   );
 }
