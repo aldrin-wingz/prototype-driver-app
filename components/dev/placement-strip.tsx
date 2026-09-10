@@ -10,6 +10,7 @@ import {
   PLACEMENT_META,
   ROUTE_COVERAGE,
   routeKeyFor,
+  slotConflict,
 } from "@/lib/messages-data/chat-placement";
 import { useChatPlacement } from "@/lib/messages-data/chat-placement-context";
 
@@ -46,6 +47,8 @@ export function PlacementStrip() {
   // Present-and-wrong, which is different from absent: the affordance DOES
   // render here, on a screen the coverage rule says it should not reach.
   const violation = coverage?.violation?.[placement];
+  // The two axes can be mutually impossible, independent of which screen.
+  const conflict = slotConflict(placement, coexistence);
 
   return (
     <div className="w-full border-b border-[#374151] bg-[#111827] text-gray-300">
@@ -107,7 +110,11 @@ export function PlacementStrip() {
         </div>
 
         {/* Row 3 — what this screen contributes, only when there is something to say */}
-        {violation ? (
+        {conflict ? (
+          <p className="text-[8px] leading-tight text-[#F87171]">
+            <span className="font-semibold">⛔ Impossible:</span> {conflict}
+          </p>
+        ) : violation ? (
           <p className="text-[8px] leading-tight text-[#F87171]">
             <span className="font-semibold">⛔ Breaks the rule:</span> {violation}
           </p>

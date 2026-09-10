@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
-import { Settings, History, HelpCircle, LogOut, ChevronRight, MessageCircle } from "lucide-react";
+import { Settings, History, HelpCircle, LogOut, ChevronRight, MessageCircleQuestion } from "lucide-react";
 import { useChatPlacement } from "@/lib/messages-data/chat-placement-context";
 import { MOCK_UNREAD_TOTAL } from "@/lib/messages-data/mock-threads";
 
@@ -46,7 +46,7 @@ export default function OptionsPage() {
   const { placement, coexistence, openChat } = useChatPlacement();
 
   const messagesRow = {
-    icon: MessageCircle,
+    icon: MessageCircleQuestion,
     label: "Messages",
     href: "__chat__",
     description:

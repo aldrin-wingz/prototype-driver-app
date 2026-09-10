@@ -50,15 +50,16 @@ export const PLACEMENT_META: Record<ChatPlacement, PlacementMeta> = {
   "header-left": {
     label: "Header left",
     blurb:
-      "Wire the MessageCircle that is ALREADY in the header top-left and already badged.",
+      "Put in-app chat in the header top-left — the slot the Zendesk bubble occupies today.",
     tradeoff:
-      "Looks free and is not: showBack wins the left slot, so it is structurally unavailable on 7 of the 12 driver routes — including every ride detail.",
+      "⛔ IMPOSSIBLE under two entry points: Zendesk already owns this slot, so the two cannot both sit here. Under one inbox it works and is invisible — the driver sees the same bubble in the same place, opening something new. Also unavailable on every stack-pushed screen, where the back chevron wins.",
   },
   "header-right": {
     label: "Header right",
-    blurb: "Move the chat icon into the right cluster, before filter and refresh.",
+    blurb:
+      "A new in-app chat icon in the right cluster, before filter and refresh. Zendesk keeps its bubble top-left.",
     tradeoff:
-      "The only placement that reaches every screen, and the most crowded: on Requests it makes a third icon, or a fourth once Support Chat has its own.",
+      "The only placement that survives two entry points, because it does not fight Zendesk for the left slot. Cost is crowding: on Requests it makes a third icon beside filter and refresh.",
   },
   "nav-tab": {
     label: "Nav tab",
@@ -226,6 +227,24 @@ export const ROUTE_COVERAGE: Record<RouteKey, RouteCoverage> = {
     absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
   },
 };
+
+/**
+ * Whether the two axes can coexist at all.
+ *
+ * ⛔ The one impossible combination: the Zendesk support box already occupies
+ * the header top-left (`c-01a`/`c-01b`/`c-01c`), so under "two entry points"
+ * in-app chat cannot also be placed there. Under "one inbox" it can, because
+ * there is only one icon and it absorbs Zendesk.
+ */
+export function slotConflict(
+  placement: ChatPlacement,
+  coexistence: ChatCoexistence
+): string | undefined {
+  if (placement === "header-left" && coexistence === "separate") {
+    return "Zendesk already owns the header top-left, so in-app chat cannot go there too. Pick a different slot, or merge them into one inbox.";
+  }
+  return undefined;
+}
 
 /** Map a live pathname onto a coverage key. Unknown paths get no affordance. */
 export function routeKeyFor(pathname: string): RouteKey | null {

@@ -8,7 +8,7 @@ import {
   Calendar,
   ClipboardCheck,
   Menu,
-  MessageCircle,
+  MessageCircleQuestion,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatPlacement } from "@/lib/messages-data/chat-placement-context";
@@ -28,7 +28,7 @@ const navItems = [
  * at text-xs needs ~53px of glyph plus the px-3 padding. It overflows. If this
  * placement wins, the tab cannot be called what the screen is called.
  */
-const chatNavItem = { href: "__chat__", label: "Chat", icon: MessageCircle };
+const chatNavItem = { href: "__chat__", label: "Chat", icon: MessageCircleQuestion };
 
 export function BottomNav() {
   const pathname = usePathname();
