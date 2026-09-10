@@ -1,109 +1,97 @@
 /**
- * The In-App Chat placement study: what is being compared, and where.
+ * The In-App Chat options study.
  *
- * The app is getting an in-app chat for NON-support use cases while the existing
- * Zendesk chat stays as "Support Chat". This registry is the whole experiment —
- * two independent axes plus a per-route coverage table that both the chrome and
- * `<ChatSlotNote>` read, so the coverage decision is live code rather than a doc
- * that drifts from what the screens actually render.
+ * The driver app is getting a chat for NON-support use cases — Compliance,
+ * Same-Day Offers, Standing Orders — while the existing Zendesk chat stays as
+ * Support Chat. This registry is the whole experiment.
  *
- * ⚠️ Every placement is ADDITIVE and defaults to `off`. At `off` the app must
- * render exactly as it does on `luis/rider-no-show` — that is what keeps the
- * Rider No-Show branch reviewable, and it is checked by the baseline screenshot.
+ * ⭐ ONE AXIS, not two. Each option is a complete proposal that encodes its own
+ * answer to "how do the two coexist", which is how the decision actually gets
+ * made — you compare whole proposals, not a matrix of independent knobs.
+ *
+ * ⭐ THE COVERAGE RULE (user, 2026-09-11): chat appears **only where the Zendesk
+ * support box appears**. The production captures fix that at Home (`c-01a`),
+ * Requests (`c-01b`) and My Rides (`c-01c`) — never Planner (`c-01d`, a
+ * date-picker header with no icons), never Options (`c-01e`, no header icons at
+ * all), never a stack-pushed screen (`c-01f`, the back chevron owns the left
+ * slot). That rule is what removed the nav-tab and Options-row options.
+ *
+ * ⚠️ Every option is ADDITIVE and defaults to `off`, where the app renders
+ * exactly as production does: the Zendesk bubble alone.
  */
 
-/** Axis 1 — where the chat affordance sits. */
-export type ChatPlacement =
-  | "off"
-  | "header-left"
-  | "header-right"
-  | "nav-tab"
-  | "options-row";
+export type ChatPlacement = "off" | "beside" | "roles" | "merged";
 
-/** Axis 2 — how In-App Chat and Zendesk Support Chat relate. */
-export type ChatCoexistence = "unified" | "separate";
-
-export const CHAT_PLACEMENTS: ChatPlacement[] = [
-  "off",
-  "header-left",
-  "header-right",
-  "nav-tab",
-  "options-row",
-];
-
-export const CHAT_COEXISTENCE: ChatCoexistence[] = ["unified", "separate"];
+export const CHAT_PLACEMENTS: ChatPlacement[] = ["off", "beside", "roles", "merged"];
 
 export interface PlacementMeta {
+  /** Short label for the study strip. */
   label: string;
   blurb: string;
-  /** The cost this placement carries — the thing the screenshot should show. */
+  /** The cost this option carries — what the screenshot should show. */
   tradeoff: string;
 }
 
 export const PLACEMENT_META: Record<ChatPlacement, PlacementMeta> = {
   off: {
     label: "Off",
-    blurb: "The control. App exactly as it ships today.",
-    tradeoff:
-      "The header MessageCircle still renders its red 6 badge and still goes nowhere — that is the current state, not a bug in the study.",
-  },
-  "header-left": {
-    label: "Header left",
     blurb:
-      "Put in-app chat in the header top-left — the slot the Zendesk bubble occupies today.",
+      "The control. One speech bubble top-left, which is Zendesk Support Chat — exactly what ships today.",
     tradeoff:
-      "⛔ IMPOSSIBLE under two entry points: Zendesk already owns this slot, so the two cannot both sit here. Under one inbox it works and is invisible — the driver sees the same bubble in the same place, opening something new. Also unavailable on every stack-pushed screen, where the back chevron wins.",
+      "Nothing to compare against unless you look at it first. Everything below is measured against this.",
   },
-  "header-right": {
-    label: "Header right",
+  beside: {
+    label: "Side by side",
     blurb:
-      "A new in-app chat icon in the right cluster, before filter and refresh. Zendesk keeps its bubble top-left.",
+      "The green ?-bubble sits immediately NEXT TO the Zendesk bubble, top-left. Two chats, two icons, both in the corner a driver already looks at.",
     tradeoff:
-      "The only placement that survives two entry points, because it does not fight Zendesk for the left slot. Cost is crowding: on Requests it makes a third icon beside filter and refresh.",
+      "Two speech bubbles 4px apart, differing only by a small ? and a colour. The cheapest to ship and the easiest to confuse — this is the option the study exists to test.",
   },
-  "nav-tab": {
-    label: "Nav tab",
-    blurb: "A sixth bottom-nav tab beside Home, Requests, Planner, My Rides, Options.",
-    tradeoff:
-      "⛔ BREAKS THE COVERAGE RULE. A tab renders on all five tab screens, so it puts chat on Planner and Options where the support box is not shown (c-01d, c-01e). It also never reaches a ride detail, where the nav does not mount. Separately: a sixth cell wraps \"My Rides\" onto two lines at 375px.",
-  },
-  "options-row": {
-    label: "Options row",
+  roles: {
+    label: "Two roles",
     blurb:
-      "No chrome change at all. The Options menu gets a Messages row.",
+      "Same two slots, but neither is 'chat'. Zendesk becomes an explicit Support icon (headset), and the new one becomes Updates — a notification tray for what Wingz is telling you, not a place you go to ask.",
     tradeoff:
-      "⛔ BREAKS THE COVERAGE RULE in the opposite direction — it puts chat ONLY on Options, the one tab screen with no support box and no header icon at all (c-01e). Also the least discoverable: an unread badge does no work if the driver has to go looking.",
+      "Solves the confusion by renaming the problem: the driver picks by INTENT (get help / read news) rather than by guessing which bubble. Costs a relearn of an icon drivers already use, and 'Updates' has to earn replies.",
+  },
+  merged: {
+    label: "Merged",
+    blurb:
+      "One bubble. Tapping it opens a chooser that splits the unread count — 3 from Wingz Support, 4 from Market Ops — and only then opens the channel.",
+    tradeoff:
+      "No new chrome and no icon confusion, at the price of one extra tap on every visit. The chooser has to carry the split or the merged badge is a number the driver cannot act on.",
   },
 };
 
-export interface CoexistenceMeta {
-  label: string;
-  blurb: string;
+/**
+ * What the in-app channel is called.
+ *
+ * ⚠️ The user asked for a name ("Market-Ops Chat or whatever else we can call
+ * it"). `Market Ops` is the suggestion: every seeded thread — compliance,
+ * same-day offers, standing orders — comes from market operations staff about
+ * the driver's own work, which is exactly what separates it from Support.
+ * Alternatives worth a look: `Wingz Team`, `Dispatch`, `Ops`.
+ *
+ * Under `roles` it is not a chat at all, so it takes the tray name instead.
+ */
+export const IN_APP_LABEL = "Market Ops";
+export const IN_APP_LABEL_AS_TRAY = "Updates";
+export const SUPPORT_LABEL = "Wingz Support";
+
+export function inAppLabel(placement: ChatPlacement): string {
+  return placement === "roles" ? IN_APP_LABEL_AS_TRAY : IN_APP_LABEL;
 }
-
-export const COEXISTENCE_META: Record<ChatCoexistence, CoexistenceMeta> = {
-  unified: {
-    label: "One inbox",
-    blurb:
-      "One affordance. Messages holds both — \"Wingz Team\" threads and a \"Support\" row that hands off to Zendesk. The driver picks a conversation, never a system.",
-  },
-  separate: {
-    label: "Two entry points",
-    blurb:
-      "Two affordances. The chat icon opens in-app threads only; a separate lifebuoy in the header right goes to Zendesk. Honest about the split, and it costs a second icon on every screen.",
-  },
-};
 
 /** Every driver-app route the study covers. Dev routes are excluded entirely. */
 export type RouteKey =
   | "/"
   | "/requests"
-  | "/requests/[id]"
   | "/planner"
   | "/my-rides"
   | "/my-rides/[id]"
   | "/my-rides/[id]/more"
   | "/my-rides/[id]/no-show"
+  | "/requests/[id]"
   | "/options"
   | "/ride-history"
   | "/incentives"
@@ -111,140 +99,55 @@ export type RouteKey =
 
 export interface RouteCoverage {
   label: string;
-  /** Placements that put a chat affordance on this route. */
-  placements: ChatPlacement[];
-  /** Why a placement is absent here. Rendered in the slot by `<ChatSlotNote>`. */
-  absentReason: Partial<Record<ChatPlacement, string>>;
+  /** Does the Zendesk bubble — and therefore the study — reach this screen? */
+  covered: boolean;
+  /** Why not, rendered in the slot by `<ChatSlotNote>` and in the strip. */
+  absentReason?: string;
   /** An open question about this route, shown in the study strip. */
   caveat?: string;
-  /**
-   * Placements that DO render here but shouldn't under the coverage rule.
-   * Distinct from `absentReason`: this is present-and-wrong, not absent.
-   */
-  violation?: Partial<Record<ChatPlacement, string>>;
 }
 
-const NO_NAV = "no bottom nav on this screen";
-const BACK_WINS = "back chevron owns the left slot";
-const NOT_OPTIONS = "reached from the Options menu, not from here";
 const NO_BOX = "the Zendesk support box is not shown on this screen";
+const BACK_WINS = "back chevron owns the left slot, and no support box here";
 
-/**
- * Where the chat affordance may appear.
- *
- * ⭐ THE RULE, set by the user 2026-09-11: **chat shows only where the current
- * Zendesk support box is shown.** The production captures settle exactly where
- * that is — the header speech bubble appears on Home (`c-01a`), Requests
- * (`c-01b`) and My Rides (`c-01c`), and is absent from Planner (`c-01d`, which
- * has a date-picker header instead), Options (`c-01e`, no header icons at all)
- * and every stack-pushed screen, where the back chevron owns the left slot
- * (`c-01f`).
- *
- * ⛔ That rule eliminates two of the five placements rather than ranking them:
- * `nav-tab` renders on all five tab screens and `options-row` renders only on
- * Options. Both are kept selectable so the violation is visible on the screen
- * where it happens — see `violation` below.
- */
 export const ROUTE_COVERAGE: Record<RouteKey, RouteCoverage> = {
-  "/": {
-    label: "Home",
-    placements: ["header-left", "header-right", "nav-tab"],
-    absentReason: { "options-row": NOT_OPTIONS },
-  },
+  "/": { label: "Home", covered: true },
   "/requests": {
     label: "Requests",
-    placements: ["header-left", "header-right", "nav-tab"],
-    absentReason: { "options-row": NOT_OPTIONS },
-    caveat:
-      "Already carries filter + refresh. Header right makes 3 icons, or 4 under two entry points.",
+    covered: true,
+    caveat: "Already carries filter + refresh on the right. The busiest header.",
   },
-  "/my-rides": {
-    label: "My Rides",
-    placements: ["header-left", "header-right", "nav-tab"],
-    absentReason: { "options-row": NOT_OPTIONS },
-  },
+  "/my-rides": { label: "My Rides", covered: true },
 
-  /* Tab screens the support box does NOT reach. A nav tab still renders here,
-   * which is the whole objection to that placement. */
   "/planner": {
     label: "Planner",
-    placements: ["nav-tab"],
-    absentReason: { "header-left": NO_BOX, "header-right": NO_BOX, "options-row": NOT_OPTIONS },
-    violation: {
-      "nav-tab":
-        "a tab puts chat here, but c-01d shows no support box on Planner — and no standard header to put one in",
-    },
+    covered: false,
+    absentReason: NO_BOX + " — c-01d shows a date-picker bar, not a standard header",
   },
   "/options": {
     label: "Options",
-    placements: ["nav-tab", "options-row"],
-    absentReason: { "header-left": NO_BOX, "header-right": NO_BOX },
-    violation: {
-      "nav-tab": "a tab puts chat here, but c-01e shows no support box on Options",
-      "options-row": "this places chat ONLY where the support box is not shown",
-    },
+    covered: false,
+    absentReason: NO_BOX + " — c-01e has no header icons; support is a Contact Support row",
   },
-
-  /* Stack-pushed screens. The back chevron owns the left slot (c-01f) and the
-   * support box is not shown on any of them. */
-  "/requests/[id]": {
-    label: "Ride Details (request)",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-  },
+  "/requests/[id]": { label: "Ride Details (request)", covered: false, absentReason: BACK_WINS },
   "/my-rides/[id]": {
     label: "Ride Details",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
+    covered: false,
+    absentReason: BACK_WINS,
     caveat:
       "⚠️ The rule excludes this — but it is where Ops coordination happens, and the action row already carries a navy chat glyph for rider SMS.",
   },
   "/my-rides/[id]/more": {
     label: "More Options",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-    caveat: "Holds today's Zendesk front doors: \"Call Member or Support\" and \"Email Support\".",
+    covered: false,
+    absentReason: BACK_WINS,
+    caveat: 'Holds today\'s other Zendesk doors: "Call Member or Support" and "Email Support".',
   },
-  "/my-rides/[id]/no-show": {
-    label: "Member No-Show",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-    caveat: "✅ No longer provisional — the rule excludes it, and 4.5.1's overlay fix agrees.",
-  },
-  "/ride-history": {
-    label: "Ride History",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-  },
-  "/incentives": {
-    label: "Incentives",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-  },
-  "/incentives/[id]/rides": {
-    label: "Incentive Rides",
-    placements: [],
-    absentReason: { "header-left": BACK_WINS, "header-right": NO_BOX, "nav-tab": NO_NAV, "options-row": NOT_OPTIONS },
-  },
+  "/my-rides/[id]/no-show": { label: "Member No-Show", covered: false, absentReason: BACK_WINS },
+  "/ride-history": { label: "Ride History", covered: false, absentReason: BACK_WINS },
+  "/incentives": { label: "Incentives", covered: false, absentReason: BACK_WINS },
+  "/incentives/[id]/rides": { label: "Incentive Rides", covered: false, absentReason: BACK_WINS },
 };
-
-/**
- * Whether the two axes can coexist at all.
- *
- * ⛔ The one impossible combination: the Zendesk support box already occupies
- * the header top-left (`c-01a`/`c-01b`/`c-01c`), so under "two entry points"
- * in-app chat cannot also be placed there. Under "one inbox" it can, because
- * there is only one icon and it absorbs Zendesk.
- */
-export function slotConflict(
-  placement: ChatPlacement,
-  coexistence: ChatCoexistence
-): string | undefined {
-  if (placement === "header-left" && coexistence === "separate") {
-    return "Zendesk already owns the header top-left, so in-app chat cannot go there too. Pick a different slot, or merge them into one inbox.";
-  }
-  return undefined;
-}
 
 /** Map a live pathname onto a coverage key. Unknown paths get no affordance. */
 export function routeKeyFor(pathname: string): RouteKey | null {
@@ -263,12 +166,11 @@ export function routeKeyFor(pathname: string): RouteKey | null {
   return null;
 }
 
-/** Does this route show the chat affordance under this placement? */
+/** Does the in-app chat affordance appear on this screen under this option? */
 export function isChatVisible(pathname: string, placement: ChatPlacement): boolean {
   if (placement === "off") return false;
   const key = routeKeyFor(pathname);
-  if (!key) return false;
-  return ROUTE_COVERAGE[key].placements.includes(placement);
+  return key ? ROUTE_COVERAGE[key].covered : false;
 }
 
 /** Why the affordance is missing here, or undefined if it isn't missing. */
@@ -280,6 +182,5 @@ export function absentReasonFor(
   const key = routeKeyFor(pathname);
   if (!key) return undefined;
   const coverage = ROUTE_COVERAGE[key];
-  if (coverage.placements.includes(placement)) return undefined;
-  return coverage.absentReason[placement];
+  return coverage.covered ? undefined : coverage.absentReason;
 }

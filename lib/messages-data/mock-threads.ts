@@ -113,7 +113,7 @@ export const MOCK_THREADS: ChatThread[] = [
     title: "Same-Day Offers",
     preview: "Still yours if you want it — otherwise it goes back at 12.",
     dateLabel: "Today",
-    unread: 3,
+    unread: 1,
     messages: [
       {
         id: "offers-1",
@@ -168,45 +168,83 @@ export const MOCK_THREADS: ChatThread[] = [
     ],
   },
   {
-    id: "support-370291",
+    id: "zd-1",
     channel: "support",
     topic: "support",
-    title: "Wingz Support",
-    preview: "Payment missing for trip #370291",
-    dateLabel: "Sep 8",
+    title: "Wingz",
+    preview: "Sorry I couldn't answer your question. Would you like to chat with an agent?",
+    dateLabel: "6/11/26",
+    unread: 1,
+    messages: [],
+  },
+  {
+    id: "zd-2",
+    channel: "support",
+    topic: "support",
+    title: "Wingz",
+    preview: "Sorry I couldn't answer your question. Would you like to chat with an agent?",
+    dateLabel: "6/11/26",
+    unread: 1,
+    messages: [],
+  },
+  {
+    id: "zd-3",
+    channel: "support",
+    topic: "support",
+    title: "Wingz",
+    preview: "Sorry I couldn't answer your question. Would you like to chat with an agent?",
+    dateLabel: "6/11/26",
+    unread: 1,
+    messages: [],
+  },
+  {
+    id: "zd-4",
+    channel: "support",
+    topic: "support",
+    title: "Wingz",
+    preview: "Sorry I couldn't answer your question. Would you like to chat with an agent?",
+    dateLabel: "6/10/26",
     unread: 0,
     messages: [],
-    ticket: {
-      subject: "Payment missing for trip #370291",
-      status: "Open — waiting on Support",
-      updatedAt: "Sep 8",
-    },
+  },
+  {
+    id: "zd-5",
+    channel: "support",
+    topic: "support",
+    title: "Wingz",
+    preview: "Sorry I couldn't answer your question. Would you like to chat with an agent?",
+    dateLabel: "6/10/26",
+    unread: 0,
+    messages: [],
   },
 ];
 
 /**
- * The unread count the header badge shows.
+ * The unread counts, split by channel.
  *
- * ⚠️ Seeded, not `MOCK_THREADS.reduce(...)`. Held at 6 because that is the
- * `messageCount` default the production-replicated header already ships with,
- * and the badge must stay constant across every placement — position is the only
- * variable under test.
+ * ⚠️ Seeded literals, not a `reduce` — the repo convention, and it keeps a
+ * screenshot stable. The split IS the point of the `merged` option: a driver
+ * who sees one badge of 7 cannot tell whether it is Support waiting on them or
+ * Ops telling them something, so the chooser has to break it down before it
+ * opens anything.
  */
-export const MOCK_UNREAD_TOTAL = 6;
+export const UNREAD_SUPPORT = 3;
+export const UNREAD_IN_APP = 4;
+export const UNREAD_TOTAL = UNREAD_SUPPORT + UNREAD_IN_APP;
+
+/** Back-compat alias for the header badge. */
+export const MOCK_UNREAD_TOTAL = UNREAD_TOTAL;
 
 export function getThread(id: string): ChatThread | undefined {
   return MOCK_THREADS.find((thread) => thread.id === id);
 }
 
-/**
- * The threads an inbox shows under a given coexistence model.
- *
- * `unified` = one inbox holding both channels. `separate` = in-app only, because
- * Support Chat has its own entry point.
- */
-export function getVisibleThreads(coexistence: "unified" | "separate"): ChatThread[] {
-  if (coexistence === "separate") {
-    return MOCK_THREADS.filter((thread) => thread.channel === "in-app");
-  }
-  return MOCK_THREADS;
+/** The Wingz (in-app) threads. Zendesk always has its own surface. */
+export function inAppThreads(): ChatThread[] {
+  return MOCK_THREADS.filter((thread) => thread.channel === "in-app");
+}
+
+/** The Zendesk conversations, as `c-05a` shows them. */
+export function supportThreads(): ChatThread[] {
+  return MOCK_THREADS.filter((thread) => thread.channel === "support");
 }

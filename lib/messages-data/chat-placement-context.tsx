@@ -1,73 +1,92 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState } from "react";
-import type { ChatCoexistence, ChatPlacement } from "./chat-placement";
+import type { ChatPlacement } from "./chat-placement";
+
+/** Which surface the sheet is showing. `null` = closed. */
+export type ChatView = "chooser" | "wingz" | "zendesk" | null;
 
 interface ChatPlacementValue {
-  /** Axis 1 — where the chat affordance sits. */
+  /** Which of the four proposals is being shown. */
   placement: ChatPlacement;
   setPlacement: (placement: ChatPlacement) => void;
-  /** Axis 2 — how In-App Chat and Zendesk Support Chat relate. */
-  coexistence: ChatCoexistence;
-  setCoexistence: (coexistence: ChatCoexistence) => void;
   /** Draw a dashed ghost where the affordance would have gone but doesn't. */
   showAbsences: boolean;
   setShowAbsences: (showAbsences: boolean) => void;
-  /* ── The chat sheet ──────────────────────────────────────────────────
-   * Production opens chat as a sheet over the current screen (c-03a/c-04a),
-   * so the open state lives here rather than in a route. Every placement
-   * calls the same `openChat()`, which keeps the icon the only variable.
-   */
-  chatOpen: boolean;
-  openChat: () => void;
-  closeChat: () => void;
-  /** Which thread the sheet is showing; null = the inbox. */
+
+  view: ChatView;
+  /** The in-app icon. Under `merged` this lands on the chooser instead. */
+  openInApp: () => void;
+  /** The Zendesk icon. */
+  openSupport: () => void;
+  /** The single merged bubble — always the chooser first. */
+  openChooser: () => void;
+  close: () => void;
+  /** Which in-app thread the sheet is showing; null = the inbox. */
   activeThreadId: string | null;
   openThread: (id: string) => void;
-  backToInbox: () => void;
+  back: () => void;
 }
 
 const ChatPlacementContext = createContext<ChatPlacementValue | null>(null);
 
 /**
- * Which placement the study is currently showing.
+ * Which option the study is showing, and what the chat sheet has open.
  *
- * Context rather than a prop because the affordance is read in 12 places — seven
- * `<Header>` call sites (Requests renders it twice, once in its Suspense
- * fallback), six `<BottomNav>` sites and five bespoke headers. Threading a prop
- * would mean re-touching all twelve every time a placement is added; this way a
- * new placement is one entry in `chat-placement.ts`.
+ * Context rather than props because the affordance is read in the shared header
+ * plus five bespoke ones; a new option is one entry in `chat-placement.ts`
+ * rather than an edit in twelve files.
  *
- * Defaults to `off` so the app boots identical to `luis/rider-no-show`. Resets on
- * reload, matching `RideFlowProvider` — every demo starts from the same state.
+ * Defaults to `off` so the app boots identical to production. Resets on reload,
+ * matching `RideFlowProvider` — every demo starts from the same state.
  */
 export function ChatPlacementProvider({ children }: { children: React.ReactNode }) {
-  const [placement, setPlacement] = useState<ChatPlacement>("off");
-  const [coexistence, setCoexistence] = useState<ChatCoexistence>("unified");
+  const [placement, setPlacementRaw] = useState<ChatPlacement>("off");
   const [showAbsences, setShowAbsences] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [view, setView] = useState<ChatView>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
   const value = useMemo<ChatPlacementValue>(
     () => ({
       placement,
-      setPlacement,
-      coexistence,
-      setCoexistence,
+      // Switching options mid-demo must not leave a sheet from the old one open.
+      setPlacement: (next) => {
+        setPlacementRaw(next);
+        setView(null);
+        setActiveThreadId(null);
+      },
       showAbsences,
       setShowAbsences,
-      chatOpen,
-      // Always land on the inbox, never on whatever thread was last read.
-      openChat: () => {
+      view,
+      openInApp: () => {
         setActiveThreadId(null);
-        setChatOpen(true);
+        setView("wingz");
       },
-      closeChat: () => setChatOpen(false),
+      openSupport: () => {
+        setActiveThreadId(null);
+        setView("zendesk");
+      },
+      openChooser: () => {
+        setActiveThreadId(null);
+        setView("chooser");
+      },
+      close: () => {
+        setView(null);
+        setActiveThreadId(null);
+      },
       activeThreadId,
       openThread: setActiveThreadId,
-      backToInbox: () => setActiveThreadId(null),
+      // Inside a thread, back returns to its inbox; from an inbox opened via
+      // the chooser, back returns to the chooser.
+      back: () => {
+        if (activeThreadId) {
+          setActiveThreadId(null);
+          return;
+        }
+        setView(placement === "merged" ? "chooser" : null);
+      },
     }),
-    [placement, coexistence, showAbsences, chatOpen, activeThreadId]
+    [placement, showAbsences, view, activeThreadId]
   );
 
   return (
@@ -80,8 +99,8 @@ export function ChatPlacementProvider({ children }: { children: React.ReactNode 
 /**
  * Read the current study state.
  *
- * Returns the `off` defaults rather than throwing when no provider is mounted, so
- * a chrome component stays renderable in the component showcase.
+ * Returns the `off` defaults rather than throwing when no provider is mounted,
+ * so a chrome component stays renderable in the component showcase.
  */
 export function useChatPlacement(): ChatPlacementValue {
   const context = useContext(ChatPlacementContext);
@@ -89,15 +108,15 @@ export function useChatPlacement(): ChatPlacementValue {
   return {
     placement: "off",
     setPlacement: () => {},
-    coexistence: "unified",
-    setCoexistence: () => {},
     showAbsences: false,
     setShowAbsences: () => {},
-    chatOpen: false,
-    openChat: () => {},
-    closeChat: () => {},
+    view: null,
+    openInApp: () => {},
+    openSupport: () => {},
+    openChooser: () => {},
+    close: () => {},
     activeThreadId: null,
     openThread: () => {},
-    backToInbox: () => {},
+    back: () => {},
   };
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
+import { ChatSlotNote } from "@/components/dev/chat-slot-note";
 import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SignaturePad } from "@/components/ui/signature-pad";
@@ -160,7 +160,7 @@ export function MemberNoShowScreen({
           Member No-Show
         </h1>
         <div className="flex w-7 items-center justify-end">
-          <ChatHeaderActions />
+          <ChatSlotNote />
         </div>
       </header>
 

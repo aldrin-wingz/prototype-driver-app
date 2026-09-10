@@ -21,7 +21,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
+import { ChatSlotNote } from "@/components/dev/chat-slot-note";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
@@ -318,7 +318,7 @@ export function RideDetailLayout({
           </h1>
         </div>
         <div className="flex items-center gap-1">
-          <ChatHeaderActions />
+          <ChatSlotNote />
           <button className="text-gray-700">
             <RefreshCw className="h-5 w-5" />
           </button>

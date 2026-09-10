@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Headset,
   MessageCircle,
   MessageCircleQuestion,
   RefreshCw,
@@ -8,12 +9,11 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
+import { ChatSlotNote } from "@/components/dev/chat-slot-note";
 import { CHAT_GREEN } from "@/constants/driver-app-colors";
-import { isChatVisible, slotConflict } from "@/lib/messages-data/chat-placement";
+import { isChatVisible } from "@/lib/messages-data/chat-placement";
 import { useChatPlacement } from "@/lib/messages-data/chat-placement-context";
-import { MOCK_UNREAD_TOTAL } from "@/lib/messages-data/mock-threads";
+import { UNREAD_IN_APP, UNREAD_SUPPORT, UNREAD_TOTAL } from "@/lib/messages-data/mock-threads";
 
 interface HeaderProps {
   title: string;
@@ -27,22 +27,20 @@ interface HeaderProps {
 }
 
 /**
- * The app header, as captured from the production driver app.
+ * The app header, as captured from production — now carrying the options study.
  *
  * ⚠️ THE TOP-LEFT SPEECH BUBBLE IS ZENDESK, confirmed by the user 2026-09-11.
- * It is not ours to rewire — it is the existing Support Chat launcher, and
- * `c-01a`/`c-01b`/`c-01c` show it on Home, Requests and My Rides only. So:
+ * Everything here is about what happens in and next to that one slot:
  *
- *   - `off`            — the Zendesk bubble alone. Exactly what ships.
- *   - one inbox        — ONE icon at the chosen slot, absorbing Zendesk. At
- *                        `header-left` that is invisible to the driver: same
- *                        bubble, same place, different destination.
- *   - two entry points — the Zendesk bubble STAYS top-left and in-app chat gets
- *                        a second, green `?`-bubble elsewhere. Which is why
- *                        `header-left` + two entry points is impossible.
+ *   off     — the Zendesk bubble alone. Exactly what ships.
+ *   beside  — the same bubble, plus a green ?-bubble immediately next to it.
+ *   roles   — the same two slots, but neither reads as "chat": Zendesk becomes
+ *             a headset (Support) and the new one an Updates tray.
+ *   merged  — ONE bubble carrying the combined badge, opening a chooser.
  *
- * The green `?`-in-bubble is not invented either — it is how the onboarding
- * flow already draws in-app chat (`c-02a`).
+ * Coverage is Home / Requests / My Rides only — the screens where the Zendesk
+ * box actually appears (`c-01a`–`c-01c`). Elsewhere `showMessages` is still
+ * honoured for the bubble itself but the study adds nothing.
  */
 export function Header({
   title,
@@ -52,32 +50,22 @@ export function Header({
   showBack = false,
   onFilterClick,
   onRefreshClick,
-  messageCount = MOCK_UNREAD_TOTAL,
+  messageCount,
 }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
-  const { placement, coexistence, openChat } = useChatPlacement();
+  const { placement, openInApp, openSupport, openChooser } = useChatPlacement();
 
   const covered = isChatVisible(pathname, placement);
-  const conflict = slotConflict(placement, coexistence);
-
-  // In-app chat takes the left slot only when it is the ONLY icon there.
-  const chatOnLeft = covered && placement === "header-left" && !conflict;
-  // Zendesk keeps its bubble unless in-app chat has absorbed it.
-  const zendeskOnLeft = showMessages && !showBack && !chatOnLeft;
-
-  function openSupportChat() {
-    toast({
-      title: "Support Chat",
-      description: "Not wired in the prototype — this opens Zendesk.",
-    });
-  }
+  const merged = covered && placement === "merged";
+  // `beside` and `roles` share a geometry and differ only in what the icons say.
+  const twoIcons = covered && (placement === "beside" || placement === "roles");
+  const asRoles = placement === "roles";
 
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between bg-white px-4 shadow-sm">
-      {/* Left side */}
-      <div className="flex items-center gap-3">
+      {/* Left side — the whole study lives here */}
+      <div className="flex items-center">
         {showBack ? (
           <button
             onClick={() => router.back()}
@@ -85,27 +73,35 @@ export function Header({
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
-        ) : chatOnLeft ? (
-          <button
-            onClick={openChat}
-            aria-label="Messages"
-            className="relative flex h-10 w-10 items-center justify-center"
+        ) : merged ? (
+          <IconButton
+            label="Messages"
+            badge={messageCount ?? UNREAD_TOTAL}
+            onClick={openChooser}
           >
             <MessageCircle className="h-6 w-6 text-gray-700" />
-            {messageCount > 0 && (
-              <span className="absolute -right-0.5 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-[#EF4444] text-[10px] font-bold text-white">
-                {messageCount}
-              </span>
+          </IconButton>
+        ) : showMessages ? (
+          <>
+            {/* Zendesk. Under `roles` it stops pretending to be generic chat. */}
+            <IconButton
+              label="Support Chat"
+              badge={twoIcons ? UNREAD_SUPPORT : 0}
+              onClick={openSupport}
+            >
+              {asRoles ? (
+                <Headset className="h-6 w-6 text-gray-700" />
+              ) : (
+                <MessageCircle className="h-6 w-6 text-gray-700" />
+              )}
+            </IconButton>
+
+            {twoIcons && (
+              <IconButton label="Updates" badge={UNREAD_IN_APP} onClick={openInApp}>
+                <MessageCircleQuestion className="h-6 w-6" style={{ color: CHAT_GREEN }} />
+              </IconButton>
             )}
-          </button>
-        ) : zendeskOnLeft ? (
-          <button
-            onClick={openSupportChat}
-            aria-label="Support Chat"
-            className="flex h-10 w-10 items-center justify-center"
-          >
-            <MessageCircle className="h-6 w-6 text-gray-700" />
-          </button>
+          </>
         ) : (
           <div className="w-10" />
         )}
@@ -118,7 +114,7 @@ export function Header({
 
       {/* Right side */}
       <div className="flex items-center gap-1">
-        <ChatHeaderActions />
+        <ChatSlotNote />
         {showFilter && (
           <button
             onClick={onFilterClick}
@@ -140,7 +136,29 @@ export function Header({
   );
 }
 
-/** The in-app chat icon, as onboarding draws it (`c-02a`). */
-export function InAppChatIcon({ className }: { className?: string }) {
-  return <MessageCircleQuestion className={className} style={{ color: CHAT_GREEN }} />;
+function IconButton({
+  label,
+  badge,
+  onClick,
+  children,
+}: {
+  label: string;
+  badge: number;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className="relative flex h-10 w-10 items-center justify-center"
+    >
+      {children}
+      {badge > 0 && (
+        <span className="absolute -right-0.5 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-[#EF4444] text-[10px] font-bold text-white">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
 }

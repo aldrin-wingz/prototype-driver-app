@@ -12,7 +12,7 @@ import {
   Reply,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ChatHeaderActions } from "@/components/dev/chat-header-actions";
+import { ChatSlotNote } from "@/components/dev/chat-slot-note";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -340,7 +340,7 @@ export function MoreOptionsScreen({
           More Options
         </h1>
         <div className="flex w-7 items-center justify-end">
-          <ChatHeaderActions />
+          <ChatSlotNote />
         </div>
       </header>
 

@@ -59,9 +59,12 @@ Filed 2026-09-11. **The source of truth for the `luis/in-app-chat` placement stu
 | c-01f | Ride Details | ⛔ **Back chevron owns the left slot**, refresh right. No bubble on any stack-pushed screen |
 | c-02a | Onboarding — Your application | The chat entry point in onboarding: a **green `?`-in-speech-bubble, top-right** |
 | c-03a | In-App Chat — inbox | ⭐ **A BOTTOM SHEET over a dimmed backdrop**, not a route. Centred bold `Messages` + ✕. Row = circular Wingz-logo avatar, bold name, one preview line with a green **`Draft:`** prefix. **No timestamp and no unread badge on the row** |
+| c-05a | Zendesk Support Chat — inbox | ⭐ **Zendesk opens its OWN conversation list** — one row per topic, each resolvable. Visually a different application: near-black rows under a **teal `#26484C`** bar, indigo Wingz mark, white ✕. That contrast is the strongest existing signal that these are two systems |
 | c-04a | In-App Chat — thread | ⭐ ‹ back / centred title / ✕. **Bottom-anchored**, opens with a grey `Today` pill. Outbound bubble green and heavily rounded; **the ✓ and the time sit OUTSIDE the bubble**, right-aligned beneath. Composer = `+` circle, rounded `Send a message` field, circular send arrow. **No drag handle** |
 
-**The coverage rule these settle:** chat appears **only where the Zendesk support box appears** — Home, Requests, My Rides — which eliminates the `nav-tab` and `options-row` placements rather than merely ranking them.
+**The coverage rule these settle:** chat appears **only where the Zendesk support box appears** — Home, Requests, My Rides. The `nav-tab` and `options-row` placements were removed on the back of it.
+
+**The four options now under study** (one axis — each is a whole proposal): `off` (Zendesk bubble alone) · `beside` (green ?-bubble next to it) · `roles` (Zendesk→headset "Support", new one→"Updates" tray) · `merged` (one bubble → a chooser that splits 7 unread into 3 Support + 4 Market Ops).
 
 **Sampled colours** (added to `constants/driver-app-colors.ts`): chat green `#5FCBAA` — ⚠️ *not* the driver green `#10B981`; it carries both the outbound bubble and the `Draft:` prefix. Date pill `#F4F6F8`. Composer border `#C0C3C9`.
 

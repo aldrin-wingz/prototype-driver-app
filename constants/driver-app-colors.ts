@@ -49,3 +49,19 @@ export const CHAT_DATE_PILL = "#F4F6F8";
 
 /** Border of the composer's "Send a message" field. */
 export const CHAT_COMPOSER_BORDER = "#C0C3C9";
+
+/* ── Zendesk Support Chat ──────────────────────────────────────────────────
+ * Sampled from `c-05a`. Zendesk is visually a different application: a dark
+ * near-black conversation list under a teal bar, where the Wingz chat is white
+ * with green bubbles. That contrast is doing real work in this study — it is
+ * the strongest existing signal that these are two systems.
+ */
+
+/** The teal header bar of the Zendesk widget. */
+export const ZENDESK_TEAL = "#26484C";
+
+/** The near-black conversation list behind it. */
+export const ZENDESK_BG = "#000000";
+
+/** Indigo cast of the Wingz mark as Zendesk renders it. */
+export const ZENDESK_LOGO = "#323265";
