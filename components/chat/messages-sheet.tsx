@@ -87,7 +87,7 @@ function ChooserView() {
           icon={<Headset className="h-6 w-6 text-white" />}
           iconBg={ZENDESK_TEAL}
           title={SUPPORT_LABEL}
-          subtitle="Pay, trips and app problems"
+          subtitle="Pay, account and general app help"
           count={UNREAD_SUPPORT}
           onClick={openSupport}
         />
@@ -96,7 +96,7 @@ function ChooserView() {
           icon={<MessageCircleQuestion className="h-6 w-6 text-white" />}
           iconBg={CHAT_GREEN}
           title={inAppLabel(placement)}
-          subtitle="Compliance, offers and standing orders"
+          subtitle="Trip offers, confirmations, compliance and policy"
           count={UNREAD_IN_APP}
           onClick={openInApp}
         />
@@ -366,7 +366,14 @@ function ThreadView({ thread }: { thread: ChatThread }) {
         })}
       </div>
 
-      <div className="flex shrink-0 items-center gap-3 border-t border-gray-100 px-4 py-3">
+      {thread.consequence && (
+        <p className="shrink-0 border-t border-gray-100 px-4 pt-2.5 text-xs leading-snug text-gray-500">
+          <span className="font-semibold text-gray-700">If you don&apos;t reply:</span>{" "}
+          {thread.consequence}
+        </p>
+      )}
+
+      <div className="flex shrink-0 items-center gap-3 px-4 py-3">
         <button
           onClick={() => toast({ title: "Attach", description: "Not wired in the prototype." })}
           aria-label="Attach"

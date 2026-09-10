@@ -10,6 +10,7 @@ import {
   routeKeyFor,
 } from "@/lib/messages-data/chat-placement";
 import { useChatPlacement } from "@/lib/messages-data/chat-placement-context";
+import { inAppThreads, TWO_WAY_COUNT } from "@/lib/messages-data/mock-threads";
 
 /**
  * The study switcher.
@@ -73,6 +74,13 @@ export function PlacementStrip() {
           {PLACEMENT_META[placement].blurb}
         </p>
 
+        {placement === "roles" && (
+          <p className="text-[8px] leading-tight text-[#FBBF24]">
+            <span className="font-semibold">Tray check:</span> {TWO_WAY_COUNT} of{" "}
+            {inAppThreads().length} threads need a reply, and three are time-boxed —
+            an unanswered confirmation costs the manifest. &quot;Updates&quot; may undersell it.
+          </p>
+        )}
         {absent ? (
           <p className="text-[8px] leading-tight text-[#FBBF24]">
             <span className="font-semibold">No icon here:</span> {absent}
