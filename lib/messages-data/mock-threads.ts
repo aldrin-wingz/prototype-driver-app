@@ -11,8 +11,8 @@
  *   - a thread is bottom-anchored, opens with a grey `Today` date pill, and puts
  *     the tick and the time OUTSIDE the bubble, right-aligned beneath it.
  *
- * `Onboarding Support` is the one that exists today; the other three are the
- * non-support cases this study is proposing.
+ * `Onboarding Support` is the one that exists today; the Market Ops threads are
+ * the non-support cases this study is proposing, mirrored from the CS Tool.
  *
  * ⚠️ Seeded, never computed — timestamps are fixed strings so a screenshot taken
  * next month matches one taken today.
@@ -20,22 +20,42 @@
 
 export type ChatChannel = "in-app" | "support";
 
-/** The six Market Ops conversations, named by the user 2026-09-11. */
+/**
+ * The Market Ops conversations a driver can hold.
+ *
+ * ⭐ THE CS TOOL IS THE SOURCE OF TRUTH. These ids and labels mirror
+ * `lib/comms-conversation-topics.ts` in the comms-chat worktree, because Ops
+ * defines a topic there and the driver only ever receives one. Two prototypes
+ * disagreeing about what a conversation is called is the fastest way to review
+ * the wrong thing.
+ *
+ * ⚠️ Ids are kept through renames on both sides: `on-demand-offers` now reads
+ * "Same-Day Trips & Urgent Dispatch", and `compliance` reads "Compliance &
+ * Document Renewals".
+ *
+ * ⚠️ SUSPENDED OUTREACH IS DELIBERATELY ABSENT. It exists in the CS Tool
+ * scoped to Status = Suspended, and this driver is Active — so they are not in
+ * it. That gap is the membership rule made visible, not a missing thread.
+ */
 export type ChatTopic =
   | "on-demand-offers"
+  | "single-leg-offers"
   | "driver-trip-confirmation"
   | "routed-trips-confirmation"
   | "urgent-app-issues"
+  | "incident-escalations"
   | "compliance"
+  | "earnings-pay-disputes"
+  | "driver-incentives"
   | "policy-updates"
   | "support";
 
 /**
  * Whether a thread expects the driver to answer.
  *
- * ⚠️ Load-bearing for the `roles` option. Four of the six threads are
+ * ⚠️ Load-bearing for the `roles` option. Eight of the ten threads are
  * `two-way` and several are time-boxed — an unanswered Routed Trips
- * Confirmation costs the driver the manifest, and an On-Demand offer expires.
+ * Confirmation costs the driver the manifest, and a same-day offer expires.
  * Calling that surface a "notification tray" undersells what it does.
  */
 export type ChatKind = "two-way" | "broadcast";
@@ -77,7 +97,7 @@ export const MOCK_THREADS: ChatThread[] = [
     channel: "in-app",
     topic: "on-demand-offers",
     kind: "two-way",
-    title: "On-Demand Trip Offers",
+    title: "Same-Day Trips & Urgent Dispatch",
     preview: "Need an answer in the next 20 minutes or it goes to the next driver.",
     consequence: "The offer expires and PAR routes it to another driver.",
     dateLabel: "Today",
@@ -94,6 +114,25 @@ export const MOCK_THREADS: ChatThread[] = [
         from: "them",
         body: "Need an answer in the next 20 minutes or it goes to the next driver.",
         timestamp: "11:52 AM",
+      },
+    ],
+  },
+  {
+    id: "single-leg-offers",
+    channel: "in-app",
+    topic: "single-leg-offers",
+    kind: "two-way",
+    title: "Single-Leg Offers",
+    preview: "One leg, Thu 14th, Dayton → Kettering. Yours if you want it.",
+    consequence: "Unanswered offers go to the next driver on the list.",
+    dateLabel: "Today",
+    unread: 0,
+    messages: [
+      {
+        id: "slo-1",
+        from: "them",
+        body: "One-off leg on Thursday the 14th — 9:40 AM pickup in Dayton, drop in Kettering, ambulatory. You're on the short list for these, so it's yours if you want it.",
+        timestamp: "11:02 AM",
       },
     ],
   },
@@ -120,6 +159,31 @@ export const MOCK_THREADS: ChatThread[] = [
         from: "them",
         body: "You're confirmed. If anything changes tonight, message here — we'd rather line up a recovery driver early than take the reliability hit with the client.",
         timestamp: "9:04 AM",
+      },
+    ],
+  },
+  {
+    id: "routed-trips-confirmation",
+    channel: "in-app",
+    topic: "routed-trips-confirmation",
+    kind: "two-way",
+    title: "Routed Trips Confirmation",
+    preview: "No reply by 6 PM tonight and these come off your manifest.",
+    consequence: "Declining or not replying removes the trips from the manifest.",
+    dateLabel: "Yesterday",
+    unread: 1,
+    messages: [
+      {
+        id: "rtc-1",
+        from: "them",
+        body: "We've routed 4 trips to your Thursday manifest — 7:00 AM through 1:30 PM, all Franklin County. Reply to accept and we'll keep them on you.",
+        timestamp: "3:40 PM",
+      },
+      {
+        id: "rtc-2",
+        from: "them",
+        body: "No reply by 6 PM tonight and these come off your manifest.",
+        timestamp: "4:18 PM",
       },
     ],
   },
@@ -157,27 +221,21 @@ export const MOCK_THREADS: ChatThread[] = [
     ],
   },
   {
-    id: "routed-trips-confirmation",
+    id: "incident-escalations",
     channel: "in-app",
-    topic: "routed-trips-confirmation",
+    topic: "incident-escalations",
     kind: "two-way",
-    title: "Routed Trips Confirmation",
-    preview: "No reply by 6 PM tonight and these come off your manifest.",
-    consequence: "Declining or not replying removes the trips from the manifest.",
-    dateLabel: "Yesterday",
-    unread: 1,
+    title: "Incident Escalations",
+    preview: "Following up on this morning's pickup — what happened at the door?",
+    consequence: "An unanswered incident is closed on the member's account alone.",
+    dateLabel: "Today",
+    unread: 0,
     messages: [
       {
-        id: "rtc-1",
+        id: "inc-1",
         from: "them",
-        body: "We've routed 4 trips to your Thursday manifest — 7:00 AM through 1:30 PM, all Franklin County. Reply to accept and we'll keep them on you.",
-        timestamp: "3:40 PM",
-      },
-      {
-        id: "rtc-2",
-        from: "them",
-        body: "No reply by 6 PM tonight and these come off your manifest.",
-        timestamp: "4:18 PM",
+        body: "The member on your 8:15 says nobody came to the door. Your GPS has you on site for 11 minutes, so I want your side before I close this out.",
+        timestamp: "9:48 AM",
       },
     ],
   },
@@ -186,7 +244,7 @@ export const MOCK_THREADS: ChatThread[] = [
     channel: "in-app",
     topic: "compliance",
     kind: "two-way",
-    title: "Compliance",
+    title: "Compliance & Document Renewals",
     preview: "Send the new declaration page here when the carrier issues it.",
     consequence: "An expired requirement makes the driver ineligible for trips.",
     dateLabel: "Yesterday",
@@ -203,6 +261,49 @@ export const MOCK_THREADS: ChatThread[] = [
         from: "them",
         body: "No rush today — just don't want it to lapse.",
         timestamp: "2:14 PM",
+      },
+    ],
+  },
+  {
+    id: "earnings-pay-disputes",
+    channel: "in-app",
+    topic: "earnings-pay-disputes",
+    kind: "two-way",
+    title: "Earnings & Pay Disputes",
+    preview: "Found it — the Sep 2 return leg was short-paid. Correction is on the next deposit.",
+    dateLabel: "Yesterday",
+    unread: 0,
+    messages: [
+      {
+        id: "pay-1",
+        from: "me",
+        body: "My Sep 2 pay looks short by about $28. There was a return leg that I don't think got counted.",
+        timestamp: "3:20 PM",
+        delivered: true,
+      },
+      {
+        id: "pay-2",
+        from: "them",
+        body: "Found it — the return leg was billed as a cancel. It's been corrected and the difference rides on the next deposit.",
+        timestamp: "4:55 PM",
+      },
+    ],
+  },
+  {
+    id: "driver-incentives",
+    channel: "in-app",
+    topic: "driver-incentives",
+    kind: "broadcast",
+    title: "Driver Incentives",
+    preview: "Complete 12 trips Fri–Sun and earn an extra $60. Nothing to sign up for.",
+    dateLabel: "Sep 9",
+    unread: 0,
+    messages: [
+      {
+        id: "inc2-1",
+        from: "them",
+        body: "Weekend bonus for Dayton: complete 12 trips between Friday and Sunday and you'll earn an extra $60. Nothing to sign up for — it's counted automatically. Questions about a specific payout go in Earnings & Pay Disputes.",
+        timestamp: "8:00 AM",
       },
     ],
   },
