@@ -39,29 +39,41 @@ export type ChatSurface = "in-app" | "support";
  * against the same three names. Do not restore the old "mirror the CS Tool"
  * claim — there is nothing to mirror.
  *
- * ⚠️ Where the old topics went:
- *   trip-offers-dispatch    ← on-demand-offers, single-leg-offers,
- *                             driver-trip-confirmation, routed-trips-confirmation,
- *                             driver-incentives
- *   compliance-requirements ← compliance, policy-updates
- *   safety-reliability      ← incident-escalations
- *   support                 ← urgent-app-issues, earnings-pay-disputes
+ * ⚠️ 2026-09-15: collapsed again, from three Market Ops channels to ONE. Every
+ * Wingz-authored message a driver gets now lands in a single conversation, and the
+ * chooser is two rows: Wingz Support (Zendesk) and this one.
+ *
+ * ⛔ THE NAME IS A PLACEHOLDER AND IT CURRENTLY LIES. `trip-offers-dispatch` /
+ * "Trip Offers and Dispatch" was the biggest of the three, so it is what survived —
+ * but the single channel also carries an insurance-expiry chase and a no-show
+ * investigation, which are not trip offers and not dispatch. The title is the only
+ * thing telling a driver what the channel is for, so this is a real open decision,
+ * not a cosmetic one. Rename `OPS_CHANNEL_LABEL` and the id together when it lands.
+ *
+ * ⚠️ Where everything went:
+ *   trip-offers-dispatch ← on-demand-offers, single-leg-offers,
+ *                          driver-trip-confirmation, routed-trips-confirmation,
+ *                          driver-incentives, compliance, policy-updates,
+ *                          incident-escalations
+ *   support              ← urgent-app-issues, earnings-pay-disputes
  *
  * Those last two have no seeded transcript any more: they belong to Support,
  * and Support is Zendesk, which this prototype reproduces as its own generic
  * conversation list per `c-05a` rather than as Wingz-authored threads.
  */
-export type ChatChannelId =
-  | "trip-offers-dispatch"
-  | "compliance-requirements"
-  | "safety-reliability"
-  | "support";
+export type ChatChannelId = "trip-offers-dispatch" | "support";
+
+/**
+ * The single Ops channel's driver-facing name. One constant because it is about to
+ * change — see the placeholder warning above.
+ */
+export const OPS_CHANNEL_LABEL = "Trip Offers and Dispatch";
 
 /**
  * Whether a channel expects the driver to answer.
  *
- * ⚠️ Load-bearing for the `roles` option. All three Ops channels are `two-way`
- * and several of the things inside them are time-boxed — an unanswered Routed
+ * ⚠️ Load-bearing for the `roles` option. The Ops channel is `two-way`
+ * and several of the things inside it are time-boxed — an unanswered Routed
  * Trips Confirmation costs the driver the manifest, and a same-day offer
  * expires. Calling that surface a "notification tray" undersells what it does.
  *
@@ -117,13 +129,32 @@ export const MOCK_THREADS: ChatThread[] = [
     surface: "in-app",
     channel: "trip-offers-dispatch",
     kind: "two-way",
-    title: "Trip Offers and Dispatch",
+    title: OPS_CHANNEL_LABEL,
     preview: "Need an answer in the next 20 minutes or it goes to the next driver.",
+    /**
+     * ⚠️ One channel now carries offers, compliance chases AND incident follow-ups,
+     * so no single consequence sentence is true of all of them. This names the one
+     * with a clock on it, because that is the one that costs the driver money.
+     */
     consequence:
       "Offers and routed trips run on a clock — unanswered, they go to another driver.",
+    draft: "I waited 11 minutes and called twice",
     dateLabel: "Today",
-    unread: 2,
+    unread: 4,
+    /**
+     * Ordered by day, then by time within the day — NOT by which channel a message
+     * used to belong to. That interleaving is the point: it is what a driver actually
+     * sees once the three channels become one, and it is the thing to look at before
+     * agreeing that one channel is enough.
+     */
     messages: [
+      {
+        id: "cmp-1",
+        from: "them",
+        day: "Sep 8",
+        body: "From Oct 1, the wait at pickup before you can file a Member No-Show goes from 10 minutes to 15. Same rule in every Ohio market. Nothing for you to do — the app will hold you to the new time on its own.",
+        timestamp: "10:00 AM",
+      },
       {
         id: "tod-1",
         from: "them",
@@ -132,9 +163,21 @@ export const MOCK_THREADS: ChatThread[] = [
         timestamp: "8:00 AM",
       },
       {
-        id: "tod-2",
+        id: "cmp-2",
         from: "them",
         day: "Yesterday",
+        body: "The auto insurance we have on file expires Sep 24. Send the new declaration page here when the carrier issues it and we'll get it on your record.",
+        timestamp: "2:11 PM",
+      },
+      {
+        id: "cmp-3",
+        from: "them",
+        body: "No rush today — just don't want it to lapse.",
+        timestamp: "2:14 PM",
+      },
+      {
+        id: "tod-2",
+        from: "them",
         body: "We've routed 4 trips to your Thursday manifest — 7:00 AM through 1:30 PM, all Franklin County. Reply to accept and we'll keep them on you.",
         timestamp: "3:40 PM",
       },
@@ -159,6 +202,12 @@ export const MOCK_THREADS: ChatThread[] = [
         timestamp: "9:04 AM",
       },
       {
+        id: "saf-1",
+        from: "them",
+        body: "The member on your 8:15 says nobody came to the door. Your GPS has you on site for 11 minutes, so I want your side before I close this out.",
+        timestamp: "9:48 AM",
+      },
+      {
         id: "tod-7",
         from: "them",
         body: "One-off leg on Thursday the 14th — 9:40 AM pickup in Dayton, drop in Kettering, ambulatory. You're on the short list for these, so it's yours if you want it.",
@@ -175,59 +224,6 @@ export const MOCK_THREADS: ChatThread[] = [
         from: "them",
         body: "Need an answer in the next 20 minutes or it goes to the next driver.",
         timestamp: "11:52 AM",
-      },
-    ],
-  },
-  {
-    id: "compliance-requirements",
-    surface: "in-app",
-    channel: "compliance-requirements",
-    kind: "two-way",
-    title: "Compliance Requirements",
-    preview: "Send the new declaration page here when the carrier issues it.",
-    consequence: "An expired requirement makes you ineligible for trips until it is renewed.",
-    dateLabel: "Yesterday",
-    unread: 1,
-    messages: [
-      {
-        id: "cmp-1",
-        from: "them",
-        day: "Sep 8",
-        body: "From Oct 1, the wait at pickup before you can file a Member No-Show goes from 10 minutes to 15. Same rule in every Ohio market. Nothing for you to do — the app will hold you to the new time on its own.",
-        timestamp: "10:00 AM",
-      },
-      {
-        id: "cmp-2",
-        from: "them",
-        day: "Yesterday",
-        body: "The auto insurance we have on file expires Sep 24. Send the new declaration page here when the carrier issues it and we'll get it on your record.",
-        timestamp: "2:11 PM",
-      },
-      {
-        id: "cmp-3",
-        from: "them",
-        body: "No rush today — just don't want it to lapse.",
-        timestamp: "2:14 PM",
-      },
-    ],
-  },
-  {
-    id: "safety-reliability",
-    surface: "in-app",
-    channel: "safety-reliability",
-    kind: "two-way",
-    title: "Safety and Reliability",
-    preview: "Following up on this morning's pickup — what happened at the door?",
-    draft: "I waited 11 minutes and called twice",
-    consequence: "An unanswered incident is closed on the member's account alone.",
-    dateLabel: "Today",
-    unread: 1,
-    messages: [
-      {
-        id: "saf-1",
-        from: "them",
-        body: "The member on your 8:15 says nobody came to the door. Your GPS has you on site for 11 minutes, so I want your side before I close this out.",
-        timestamp: "9:48 AM",
       },
     ],
   },

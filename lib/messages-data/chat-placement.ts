@@ -57,7 +57,7 @@ export const PLACEMENT_META: Record<ChatPlacement, PlacementMeta> = {
   merged: {
     label: "Merged",
     blurb:
-      "One bubble. Tapping it opens a chooser of four rows — Wingz Support plus the three Market Ops channels — each carrying its own unread count, and each opening straight into its conversation.",
+      "One bubble. Tapping it opens a chooser of two rows — Wingz Support and the single Market Ops channel — each carrying its own unread count, and each opening straight into its conversation.",
     tradeoff:
       "No new chrome and no icon confusion, at the price of one extra tap on every visit. That tap buys a destination: the merged badge of 7 is a number the driver cannot act on, and four labelled rows are four they can.",
   },

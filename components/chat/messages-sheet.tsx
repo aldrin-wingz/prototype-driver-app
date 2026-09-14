@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Check, ChevronLeft, ChevronRight, FileCheck, Headset, Plus, Route, Send, ShieldCheck, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Headset, Plus, Route, Send, X } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -65,31 +65,36 @@ export function MessagesSheet() {
  *
  * ⭐ THE ROWS ARE DESTINATIONS, NOT A DIRECTORY. Support opens Zendesk's own
  * conversation list, because that is a separate application and pretending
- * otherwise hides a real seam. Each Ops row opens ITS CONVERSATION DIRECTLY —
- * there is no in-app inbox in between, because with three channels a list of
- * three would only ever be a second tap on the way to the same place.
+ * otherwise hides a real seam. The Ops row opens ITS CONVERSATION DIRECTLY —
+ * there is no in-app inbox in between, because a list of one would only ever be a
+ * second tap on the way to the same place.
+ *
+ * ⚠️ At two rows the chooser is doing less than it was built for, and the question
+ * it now raises is whether it earns its tap at all — `roles` already puts Support and
+ * Ops on two separate bubbles with no chooser in front of either. Worth re-testing
+ * against `merged` now that there is only one Ops channel.
  *
  * ⚠️ The counts are read from the threads, not written here. A hand-kept badge
  * beside a hand-kept thread list is two numbers that disagree the first time
  * either is edited.
  */
 
-/** Per-channel chrome. Keyed by id so a missing channel fails loudly in tsc. */
+/**
+ * Per-channel chrome. Keyed by id so a missing channel fails loudly in tsc — still a
+ * map rather than a constant, because one channel is the current answer, not a
+ * permanent one.
+ *
+ * ⚠️ The subtitle is doing real work now. With one channel the title alone
+ * ("Trip Offers and Dispatch") understates what lands there, so the subtitle has to
+ * say the rest out loud or a driver will not look here for an insurance chase.
+ */
 const OPS_CHANNEL_META: Record<
   Exclude<ChatChannelId, "support">,
   { icon: typeof Route; subtitle: string }
 > = {
   "trip-offers-dispatch": {
     icon: Route,
-    subtitle: "Same-day offers, routed trips and confirmations",
-  },
-  "compliance-requirements": {
-    icon: FileCheck,
-    subtitle: "Document renewals and policy changes",
-  },
-  "safety-reliability": {
-    icon: ShieldCheck,
-    subtitle: "Incidents, no-shows and on-trip issues",
+    subtitle: "Offers, routed trips, documents and on-trip issues",
   },
 };
 
