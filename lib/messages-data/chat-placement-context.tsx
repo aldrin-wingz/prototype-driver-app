@@ -25,6 +25,14 @@ interface ChatPlacementValue {
   /** Which in-app thread the sheet is showing; null = the inbox. */
   activeThreadId: string | null;
   openThread: (id: string) => void;
+  /**
+   * Open the sheet STRAIGHT into one conversation, skipping the inbox.
+   *
+   * ⚠️ `openInApp` cannot do this — it nulls `activeThreadId` on the way in, so
+   * it always lands on the list. The merged chooser needs the opposite: its
+   * three Ops rows are channels, and a channel IS its conversation.
+   */
+  openInAppThread: (id: string) => void;
   back: () => void;
 }
 
@@ -76,11 +84,18 @@ export function ChatPlacementProvider({ children }: { children: React.ReactNode 
       },
       activeThreadId,
       openThread: setActiveThreadId,
-      // Inside a thread, back returns to its inbox; from an inbox opened via
-      // the chooser, back returns to the chooser.
+      openInAppThread: (id) => {
+        setActiveThreadId(id);
+        setView("wingz");
+      },
+      // ⚠️ Under `merged` the in-app INBOX is now unreachable — the chooser
+      // opens each channel's conversation directly — so clearing the thread id
+      // and leaving `view="wingz"` would drop the driver on a list they were
+      // never shown. Back out to the chooser instead.
       back: () => {
         if (activeThreadId) {
           setActiveThreadId(null);
+          if (placement === "merged") setView("chooser");
           return;
         }
         setView(placement === "merged" ? "chooser" : null);
@@ -117,6 +132,7 @@ export function useChatPlacement(): ChatPlacementValue {
     close: () => {},
     activeThreadId: null,
     openThread: () => {},
+    openInAppThread: () => {},
     back: () => {},
   };
 }

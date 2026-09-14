@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Check, ChevronLeft, ChevronRight, Headset, MessageCircleQuestion, Plus, Send, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, FileCheck, Headset, Plus, Route, Send, ShieldCheck, X } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -17,9 +17,9 @@ import {
   getThread,
   inAppThreads,
   supportThreads,
-  UNREAD_IN_APP,
   UNREAD_SUPPORT,
-  UNREAD_TOTAL,
+  type ChatChannelId,
+  type ChatMessage,
   type ChatThread,
 } from "@/lib/messages-data/mock-threads";
 
@@ -61,28 +61,46 @@ export function MessagesSheet() {
 /* ── Chooser (the `merged` option) ─────────────────────────────────────── */
 
 /**
- * The extra tap that `merged` buys, and what it buys it for.
+ * What the driver sees first, and why it is one row per channel.
  *
- * A single merged badge of 7 is a number a driver cannot act on — it could be
- * Support waiting on a reply or Ops announcing a schedule change, and those
- * deserve different urgency. So the chooser's job is not routing, it is
- * SPLITTING: 3 from Support, 4 from Market Ops, before anything opens.
+ * ⭐ THE ROWS ARE DESTINATIONS, NOT A DIRECTORY. Support opens Zendesk's own
+ * conversation list, because that is a separate application and pretending
+ * otherwise hides a real seam. Each Ops row opens ITS CONVERSATION DIRECTLY —
+ * there is no in-app inbox in between, because with three channels a list of
+ * three would only ever be a second tap on the way to the same place.
+ *
+ * ⚠️ The counts are read from the threads, not written here. A hand-kept badge
+ * beside a hand-kept thread list is two numbers that disagree the first time
+ * either is edited.
  */
+
+/** Per-channel chrome. Keyed by id so a missing channel fails loudly in tsc. */
+const OPS_CHANNEL_META: Record<
+  Exclude<ChatChannelId, "support">,
+  { icon: typeof Route; subtitle: string }
+> = {
+  "trip-offers-dispatch": {
+    icon: Route,
+    subtitle: "Same-day offers, routed trips and confirmations",
+  },
+  "compliance-requirements": {
+    icon: FileCheck,
+    subtitle: "Document renewals and policy changes",
+  },
+  "safety-reliability": {
+    icon: ShieldCheck,
+    subtitle: "Incidents, no-shows and on-trip issues",
+  },
+};
+
 function ChooserView() {
-  const { openSupport, openInApp, close, placement } = useChatPlacement();
+  const { openSupport, openInAppThread, close } = useChatPlacement();
 
   return (
     <>
       <SheetHeader title="Messages" onClose={close} />
 
-      <div className="px-4 pb-2 pt-1">
-        <p className="text-sm text-gray-500">
-          <span className="font-semibold text-gray-900">{UNREAD_TOTAL} new messages</span> — where
-          do you want to go?
-        </p>
-      </div>
-
-      <div className="flex-1 px-4 pt-2">
+      <div className="flex-1 space-y-3 px-4 pt-3">
         <ChooserRow
           icon={<Headset className="h-6 w-6 text-white" />}
           iconBg={ZENDESK_TEAL}
@@ -91,20 +109,22 @@ function ChooserView() {
           count={UNREAD_SUPPORT}
           onClick={openSupport}
         />
-        <div className="h-3" />
-        <ChooserRow
-          icon={<MessageCircleQuestion className="h-6 w-6 text-white" />}
-          iconBg={CHAT_GREEN}
-          title={inAppLabel(placement)}
-          subtitle="Trip offers, confirmations, compliance and policy"
-          count={UNREAD_IN_APP}
-          onClick={openInApp}
-        />
 
-        <p className="mt-5 px-1 text-xs leading-relaxed text-gray-400">
-          Support Chat runs in Zendesk, a separate app. Messages there stay there
-          — they do not appear in your {inAppLabel(placement)} threads.
-        </p>
+        {inAppThreads().map((thread) => {
+          const meta = OPS_CHANNEL_META[thread.channel as Exclude<ChatChannelId, "support">];
+          const Icon = meta.icon;
+          return (
+            <ChooserRow
+              key={thread.id}
+              icon={<Icon className="h-6 w-6 text-white" />}
+              iconBg={CHAT_GREEN}
+              title={thread.title}
+              subtitle={meta.subtitle}
+              count={thread.unread}
+              onClick={() => openInAppThread(thread.id)}
+            />
+          );
+        })}
       </div>
     </>
   );
@@ -320,6 +340,24 @@ function ZendeskInbox() {
 
 /* ── Thread (c-04a) ────────────────────────────────────────────────────── */
 
+/**
+ * Where a date pill goes once a channel carries several days of conversation.
+ *
+ * ⚠️ The old single pill read `thread.dateLabel` once and stamped it over every
+ * message. That was true while a thread was one topic on one day; a channel
+ * that absorbed five of them spans three days, and one pill would have dated
+ * a Sep 9 bonus notice as "Today".
+ */
+function withDayPills(thread: ChatThread): { message: ChatMessage; dayPill: string | null }[] {
+  let running: string | null = null;
+  return thread.messages.map((message, index) => {
+    const day = message.day ?? (index === 0 ? thread.dateLabel : null);
+    const dayPill = day && day !== running ? day : null;
+    if (day) running = day;
+    return { message, dayPill };
+  });
+}
+
 function ThreadView({ thread }: { thread: ChatThread }) {
   const { close, back } = useChatPlacement();
   const { toast } = useToast();
@@ -330,22 +368,23 @@ function ThreadView({ thread }: { thread: ChatThread }) {
 
       {/* Bottom-anchored, as captured — a short thread sits at the floor. */}
       <div className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-4 pb-3">
-        <div className="flex justify-center py-3">
-          <span
-            className="rounded-full px-4 py-1.5 text-sm font-medium text-gray-700"
-            style={{ backgroundColor: CHAT_DATE_PILL }}
-          >
-            {thread.dateLabel}
-          </span>
-        </div>
-
-        {thread.messages.map((message) => {
+        {withDayPills(thread).map(({ message, dayPill }) => {
           const isMine = message.from === "me";
           return (
             <div
               key={message.id}
               className={`flex flex-col ${isMine ? "items-end" : "items-start"} mt-3`}
             >
+              {dayPill && (
+                <div className="flex w-full justify-center py-3">
+                  <span
+                    className="rounded-full px-4 py-1.5 text-sm font-medium text-gray-700"
+                    style={{ backgroundColor: CHAT_DATE_PILL }}
+                  >
+                    {dayPill}
+                  </span>
+                </div>
+              )}
               <div
                 className="max-w-[78%] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug"
                 style={

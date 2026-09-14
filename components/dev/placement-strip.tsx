@@ -77,8 +77,9 @@ export function PlacementStrip() {
         {placement === "roles" && (
           <p className="text-[8px] leading-tight text-[#FBBF24]">
             <span className="font-semibold">Tray check:</span> {TWO_WAY_COUNT} of{" "}
-            {inAppThreads().length} threads need a reply, and three are time-boxed —
-            an unanswered confirmation costs the manifest. &quot;Updates&quot; may undersell it.
+            {inAppThreads().length} Market Ops channels expect a reply, and what sits inside
+            them is time-boxed — an unanswered confirmation costs the manifest, and an
+            offer expires. &quot;Updates&quot; may undersell it.
           </p>
         )}
         {absent ? (

@@ -64,7 +64,7 @@ Filed 2026-09-11. **The source of truth for the `luis/in-app-chat` placement stu
 
 **The coverage rule these settle:** chat appears **only where the Zendesk support box appears** — Home, Requests, My Rides. The `nav-tab` and `options-row` placements were removed on the back of it.
 
-**The four options now under study** (one axis — each is a whole proposal): `off` (Zendesk bubble alone) · `beside` (green ?-bubble next to it) · `roles` (Zendesk→headset "Support", new one→"Updates" tray) · `merged` (one bubble → a chooser that splits 7 unread into 3 Support + 4 Market Ops).
+**The four options now under study** (one axis — each is a whole proposal): `off` (Zendesk bubble alone) · `beside` (green ?-bubble next to it) · `roles` (Zendesk→headset "Support", new one→"Updates" tray) · `merged` (one bubble → a four-row chooser: Wingz Support plus the three Market Ops channels, each opening straight into its conversation).
 
 **Sampled colours** (added to `constants/driver-app-colors.ts`): chat green `#5FCBAA` — ⚠️ *not* the driver green `#10B981`; it carries both the outbound bubble and the `Draft:` prefix. Date pill `#F4F6F8`. Composer border `#C0C3C9`.
 
