@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft,
   RefreshCw,
@@ -9,18 +11,93 @@ import {
   Users,
   RotateCcw,
   Info,
+  Check,
+  Circle,
+  Car,
+  PersonStanding,
+  CheckCircle2,
+  CornerUpRight,
+  ChevronRight,
+  Hourglass,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
 import { cn } from "@/lib/utils";
-import type { Trip, TripLeg, TimeAnchorType } from "@/lib/driver-data/mock-trips";
+import {
+  getLegStage,
+  getNextSwipe,
+  type Trip,
+  type TripLeg,
+  type TimeAnchorType,
+  type LegSwipeProgress,
+  type LegSwipeStage,
+} from "@/lib/driver-data/mock-trips";
 
-type DetailState = "before-taken" | "needs-action";
+type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
+
+/** Driver-facing label + display order for each swipe mark. */
+const SWIPE_ROWS: Array<{ key: keyof LegSwipeProgress; label: string }> = [
+  { key: "startedAt", label: "Started" },
+  { key: "pickedUpAt", label: "Picked up" },
+  { key: "droppedOffAt", label: "Dropped off" },
+];
+
+/**
+ * Swipe CTA per stage — copy, fill and icon all replicated from reference
+ * screenshots s-01a / s-01b / s-01c. Each stage has its own colour: the
+ * driver reads the button by colour before they read the words.
+ */
+const SWIPE_CTA: Record<
+  "start" | "pick-up" | "drop-off",
+  { label: string; name: string; bg: string; icon: typeof Car }
+> = {
+  start: {
+    label: "SWIPE TO START",
+    name: "Swipe to Start",
+    bg: "bg-[#282828]",
+    icon: Car,
+  },
+  "pick-up": {
+    label: "PICK UP MEMBER",
+    name: "Pick up member",
+    bg: "bg-[#00B090]",
+    icon: PersonStanding,
+  },
+  "drop-off": {
+    label: "DROP OFF MEMBER",
+    name: "Drop off member",
+    bg: "bg-[#E06078]",
+    icon: CheckCircle2,
+  },
+};
+
+
+/**
+ * Header title per swipe stage, per reference screenshots:
+ *   nothing swiped → "Accepted Ride"   (s-01a)
+ *   started        → "Active Ride"     (s-01b)
+ *   picked up      → "Ride"            (s-01c)
+ */
+function getInProgressSubtitle(stage: LegSwipeStage): string {
+  switch (stage) {
+    case "not-started":
+      return "Accepted Ride";
+    case "started":
+      return "Active Ride";
+    case "picked-up":
+      return "Ride";
+    case "completed":
+      return "Completed Ride";
+  }
+}
 
 interface RideDetailLayoutProps {
   trip: Trip;
+  /** Optional banner rendered at the top of the scroll area (e.g. the sent-back penalty notice). */
+  banner?: ReactNode;
   state: DetailState;
   backHref: string;
 }
@@ -39,10 +116,62 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string; 
   }
 }
 
+/**
+ * Swipe record for one leg — which of the three marks have times against them.
+ *
+ * Context only on this branch — nothing here is editable. It is how a driver
+ * confirms they are looking at the leg they think they are.
+ */
+function LegSwipeRecord({ leg }: { leg: TripLeg }) {
+  const progress = leg.progress;
+  if (!progress) return null;
+
+  // Nothing swiped at all — three empty rows is noise on a ride that has not
+  // started, and the real app shows no swipe history. This block exists only to
+  // surface progress once there is some.
+  if (!SWIPE_ROWS.some(({ key }) => progress[key])) return null;
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Swipes
+      </p>
+
+      <dl className="space-y-1.5">
+        {SWIPE_ROWS.map(({ key, label }) => {
+          const time = progress[key];
+
+          return (
+            <div key={key} className="flex items-center justify-between gap-2">
+              <dt className="flex items-center gap-1.5 text-sm">
+                {time ? (
+                  <Check className="h-3.5 w-3.5 flex-shrink-0 text-[#10B981]" />
+                ) : (
+                  <Circle className="h-3.5 w-3.5 flex-shrink-0 text-gray-300" />
+                )}
+                <span className="text-gray-700">{label}</span>
+              </dt>
+              <dd
+                className={cn(
+                  "text-sm font-medium",
+                  time ? "text-gray-900" : "text-gray-400"
+                )}
+              >
+                {time ?? "—"}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
 function LegCard({
   leg,
   isFirst,
   isLast,
+  state,
 }: {
   leg: TripLeg;
   isFirst: boolean;
@@ -89,9 +218,17 @@ function LegCard({
                 OTP
               </span>
             )}
+            {/* Per reference screenshots, an accepted leg puts its fare and
+                caption on the time row rather than stacking it underneath. */}
+            {leg.revenueNote && leg.revenue > 0 && (
+              <span className="ml-auto whitespace-nowrap text-sm font-bold text-gray-900">
+                ${leg.revenue.toFixed(2)}{" "}
+                <span className="font-normal">{leg.revenueNote}</span>
+              </span>
+            )}
           </div>
 
-          {leg.revenue > 0 && (
+          {!leg.revenueNote && leg.revenue > 0 && (
             <RevenueDisplay
               totalRevenue={leg.revenue}
               revenueColor="green"
@@ -102,6 +239,8 @@ function LegCard({
           <p className="mt-1 text-sm text-gray-700">{leg.address.split(",")[0]}</p>
           <p className="text-sm text-gray-600">{leg.address}</p>
           <p className="text-sm text-gray-500">{leg.county}</p>
+
+          {state === "in-progress" && <LegSwipeRecord leg={leg} />}
         </div>
       </div>
     </div>
@@ -115,10 +254,51 @@ function LegCard({
  * inline chips row alongside the status pill. The above-metadata-card banner
  * surface and the variant-switch were stripped in I-0.
  */
-export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProps) {
+export function RideDetailLayout({
+  trip,
+  state,
+  backHref,
+  banner,
+}: RideDetailLayoutProps) {
   const router = useRouter();
+  const { toast } = useToast();
 
-  const subtitle = state === "before-taken" ? "Will-Call Ride" : "Accepted Ride";
+  // The leg the driver is working, and the swipe expected next on it. Only legs
+  // that carry a `progress` object take part in the swipe sequence — the
+  // Appointment Time row is a destination, not a separately swiped leg.
+  const swipeLegs = trip.legs.filter((leg) => leg.progress);
+  const activeLeg =
+    swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
+  const activeStage: LegSwipeStage = activeLeg
+    ? getLegStage(activeLeg)
+    : "not-started";
+  const nextSwipe = activeLeg ? getNextSwipe(activeLeg) : null;
+
+  const cta = nextSwipe ? SWIPE_CTA[nextSwipe] : null;
+
+  /**
+   * The swipe CTA is a real button, and on this branch it only ever toasts.
+   *
+   * Nothing in the prototype advances a swipe mark, so the production swipe has
+   * no behaviour to stand in for. Saying so beats a dead tap that reads as a bug —
+   * the same treatment every unwired More Options tile gets. The way into a form
+   * on this branch is the Member No-Show tile, not this button.
+   */
+  function handleSwipeTap() {
+    toast({
+      title: cta?.name ?? "Swipe",
+      description: "Not wired in the prototype — this is the production action.",
+    });
+  }
+
+  const subtitle =
+    state === "before-taken"
+      ? "Will-Call Ride"
+      : state === "in-progress"
+        ? getInProgressSubtitle(activeStage)
+        : state === "completed"
+          ? "Completed Ride"
+          : "Accepted Ride";
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -148,9 +328,14 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
       <div
         className={cn(
           "flex-1 overflow-y-auto",
-          state === "before-taken" ? "pb-28" : "pb-44"
+          state === "before-taken"
+            ? "pb-28"
+            : state === "completed"
+              ? "pb-8"
+              : "pb-44"
         )}
       >
+        {banner}
         {/* Map preview */}
         <div className="relative h-64 w-full bg-[#1e3a4c]">
           <iframe
@@ -179,6 +364,7 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </div>
           )}
         </div>
+
 
         {/* Trip metadata card */}
         <Card className="mx-4 mt-4 rounded-xl bg-white p-4 shadow-md">
@@ -247,6 +433,40 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </div>
           )}
 
+          {state === "in-progress" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full bg-[#D1FAE5] px-3 py-1 text-xs font-medium text-[#065F46]">
+                In Progress
+              </span>
+              {hasIncentives &&
+                activeIncentiveTypes.map((incentiveType) => (
+                  <ProgramContributionIndicator
+                    key={incentiveType}
+                    incentiveType={incentiveType}
+                    isCompleted={false}
+                    context="detail"
+                  />
+                ))}
+            </div>
+          )}
+
+          {state === "completed" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full bg-[#D1FAE5] px-3 py-1 text-xs font-medium text-[#047857]">
+                Completed
+              </span>
+              {hasIncentives &&
+                activeIncentiveTypes.map((incentiveType) => (
+                  <ProgramContributionIndicator
+                    key={incentiveType}
+                    incentiveType={incentiveType}
+                    isCompleted={true}
+                    context="detail"
+                  />
+                ))}
+            </div>
+          )}
+
           {state === "needs-action" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
@@ -285,7 +505,82 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             </span>
           </div>
         </div>
-      ) : (
+      ) : state === "in-progress" ? (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+          {/* Action row — 4 controls + More, divided into cells by vertical
+              hairlines, per reference screenshots s-01a/b/c. */}
+          <div className="flex items-stretch border-b border-t border-gray-100">
+            <button className="flex flex-1 items-center justify-center py-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#00B090]">
+                <CornerUpRight className="h-5 w-5 fill-[#00B090] text-[#00B090]" />
+              </span>
+            </button>
+            <span className="w-px self-stretch bg-gray-100" />
+            <button className="flex flex-1 items-center justify-center py-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E05878]">
+                <CornerUpRight className="h-5 w-5 fill-[#E05878] text-[#E05878]" />
+              </span>
+            </button>
+            <span className="w-px self-stretch bg-gray-100" />
+            <button className="flex flex-1 items-center justify-center py-3">
+              <Phone className="h-6 w-6 fill-[#303068] text-[#303068]" />
+            </button>
+            <span className="w-px self-stretch bg-gray-100" />
+            <button className="flex flex-1 items-center justify-center py-3">
+              <MessageSquare className="h-6 w-6 fill-[#303068] text-[#303068]" />
+            </button>
+            <span className="w-px self-stretch bg-gray-100" />
+            <button
+              type="button"
+              onClick={() => router.push(`/my-rides/${trip.id}/more`)}
+              className="flex flex-1 items-center justify-center py-3"
+            >
+              <span className="text-sm font-semibold text-[#303068]">More</span>
+            </button>
+          </div>
+
+          <div className="px-4 py-4">
+            {cta ? (
+              (() => {
+                const CtaIcon = cta.icon;
+                const legLine = activeLeg?.legCode
+                  ? `${activeLeg.legCode} Leg`
+                  : "";
+                return (
+                  <button
+                    type="button"
+                    onClick={handleSwipeTap}
+                    className={cn(
+                      "relative flex h-16 w-full items-center justify-center rounded-full",
+                      cta.bg
+                    )}
+                  >
+                    <span className="absolute left-1.5 top-1/2 flex h-[52px] w-[52px] -translate-y-1/2 items-center justify-center rounded-full bg-white">
+                      <CtaIcon className="h-6 w-6 text-[#303068]" />
+                    </span>
+                    <span className="flex flex-col items-center leading-tight">
+                      <span className="text-sm font-medium uppercase tracking-wide text-white">
+                        {cta.label}
+                      </span>
+                      {legLine && (
+                        <span className="text-sm font-bold text-white">
+                          {legLine}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })()
+            ) : (
+              <div className="flex h-16 items-center justify-center rounded-full bg-gray-100">
+                <span className="text-sm font-semibold text-gray-500">
+                  All legs complete
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : state === "needs-action" ? (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <div className="flex items-center justify-around border-b border-gray-100 px-4 py-3">
             <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#10B981]">
@@ -300,22 +595,46 @@ export function RideDetailLayout({ trip, state, backHref }: RideDetailLayoutProp
             <button className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-gray-300">
               <MessageSquare className="h-5 w-5 text-gray-600" />
             </button>
-            <span className="text-sm font-medium text-gray-700">More</span>
+            <button
+              type="button"
+              onClick={() => router.push(`/my-rides/${trip.id}/more`)}
+              className="text-sm font-medium text-gray-700"
+            >
+              More
+            </button>
           </div>
 
           <div className="px-4 py-4">
-            <button className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-                <Phone className="h-5 w-5" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-bold uppercase">I Reached Out to Confirm</p>
-                <p className="text-xs opacity-90">A Leg</p>
-              </div>
-            </button>
+            {(
+              <button
+                type="button"
+                // A production action v1 does not cover. Saying so beats a dead
+                // tap that reads as a bug — the same treatment the More Options
+                // tiles give every unwired action.
+                onClick={() =>
+                  toast({
+                    title: "I Reached Out to Confirm",
+                    description:
+                      "Not wired in the prototype — this is the production action.",
+                  })
+                }
+                className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold uppercase">I Reached Out to Confirm</p>
+                  <p className="text-xs opacity-90">
+                    {activeLeg?.legCode ? `${activeLeg.legCode} Leg` : "A Leg"}
+                  </p>
+                </div>
+              </button>
+            )}
           </div>
         </div>
-      )}
+      ) : null}
+
     </div>
   );
 }

@@ -13,7 +13,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Wingz Driver",
-  description: "Wingz NEMT Driver App - Driver Incentives v1 Prototype",
+  description: "Wingz NEMT Driver App - production mirror (prototype/driver-app-base)",
 };
 
 export default function RootLayout({
@@ -23,6 +23,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="bg-[#F9FAFB]">
+      <head>
+        {/* Wingz brand font (General Sans) + its sanctioned fallback (Inter),
+            used by the v2 payout/wallet surfaces via the .font-wingz utility. */}
+        <link
+          href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className={`${dmSans.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"

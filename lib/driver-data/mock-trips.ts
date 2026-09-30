@@ -1,7 +1,37 @@
 import type { IncentiveType } from "@/lib/data/incentives";
+/**
+ * The day the prototype pretends it is.
+ *
+ * Seeded rather than read off the clock, following the repo's data-driven
+ * convention: anything that windows on "the last N days" has to give the same
+ * answer in a demo next month as it does today. Matches the dates already used by
+ * the needs-action ride.
+ */
+export const MOCK_TODAY = "2026-07-31";
 
 export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress" | "completed";
 export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "scheduled";
+
+/**
+ * The three swipes a driver makes to move a leg forward.
+ *
+ * Sequence per reference screenshots `s-01a/b/c`:
+ *   SWIPE TO START  →  PICK UP MEMBER  →  DROP OFF MEMBER
+ *
+ * Each value is the time the driver swiped, or `null` when that swipe has not been
+ * made. Marks fill left to right; a driver cannot swipe out of order.
+ *
+ * Which mark is set is what gates Rider No-Show: only a leg that is en-route —
+ * started, not yet picked up — can have a member who failed to come out.
+ */
+export interface LegSwipeProgress {
+  /** Swiped "start" — the driver begins the leg / heads to pickup. */
+  startedAt: string | null;
+  /** Swiped "pick up member". */
+  pickedUpAt: string | null;
+  /** Swiped "drop off member" — completes the leg. */
+  droppedOffAt: string | null;
+}
 
 export interface TripLeg {
   id: string;
@@ -11,6 +41,84 @@ export interface TripLeg {
   address: string;
   county: string;
   revenue: number;
+  /**
+   * Leg identifier shown in the timeline marker and the swipe CTA sub-line
+   * ("A Leg"), per reference screenshots.
+   */
+  legCode?: "A" | "B" | "C" | "D";
+  /**
+   * Revenue caption shown to the right of the time, e.g. "Accepted by you".
+   * Per reference screenshots this replaces the stacked revenue display on
+   * accepted/active rides.
+   */
+  revenueNote?: string;
+  /**
+   * Swipe state for this leg. Optional — only legs the driver has accepted
+   * carry it, so the existing seeded trips are unaffected.
+   */
+  progress?: LegSwipeProgress;
+}
+
+/**
+ * How far along a leg is, derived purely from which swipe marks are present.
+ *
+ * Marks fill left to right, always. A driver cannot swipe out of order, so there
+ * is no "gap" state to model — a blank mark simply has not been made yet.
+ *
+ * `started` is the stage this branch cares about: en-route, member not yet
+ * aboard. It is the only window in which a no-show can be filed.
+ */
+export type LegSwipeStage =
+  | "not-started"
+  | "started"
+  | "picked-up"
+  | "completed";
+
+/** Which swipe a driver is expected to make next on a leg. */
+export type NextSwipe = "start" | "pick-up" | "drop-off" | null;
+
+/** Derive a leg's stage from its swipe marks. */
+export function getLegStage(leg: TripLeg): LegSwipeStage {
+  const p = leg.progress;
+  if (!p) return "not-started";
+  if (p.droppedOffAt) return "completed";
+  if (p.pickedUpAt) return "picked-up";
+  if (p.startedAt) return "started";
+  return "not-started";
+}
+
+/** The swipe the driver is expected to make next; null once the leg is done. */
+export function getNextSwipe(leg: TripLeg): NextSwipe {
+  switch (getLegStage(leg)) {
+    case "not-started":
+      return "start";
+    case "started":
+      return "pick-up";
+    case "picked-up":
+      return "drop-off";
+    case "completed":
+      return null;
+  }
+}
+
+/**
+ * Driver-facing status for a leg, derived from its swipe marks.
+ *
+ * ⚠️ Provisional vocabulary. The real app's status names still need confirming —
+ * "Ready for pickup" in particular may be a distinct state we do not model,
+ * since our swipe sequence has no separate "arrived" mark.
+ */
+export function getLegStatusLabel(leg: TripLeg): string {
+  switch (getLegStage(leg)) {
+    case "not-started":
+      return "Not started";
+    case "started":
+      return "Enroute";
+    case "picked-up":
+      return "Onboard";
+    case "completed":
+      return "Completed";
+  }
 }
 
 export interface Trip {
@@ -804,87 +912,440 @@ export const mockUpcomingTrips: Trip[] = [
 ];
 
 // Mock needs action trips
+// Mock needs-action trips — ONE ride, unconfirmed.
+//
+// A single ride on purpose: it is the subject of the "I Reached Out to Confirm"
+// flow, and having one keeps the state transitions unambiguous while
+// prototyping. Data shape follows reference captures s-04a/b/c — Alivi client,
+// multi-passenger, two legs whose ids are cited verbatim in the support-chat
+// template message.
+//
+// The first leg carries an all-null `progress` so that once the ride is
+// confirmed it renders as an accepted ride awaiting its first swipe
+// ("SWIPE TO START") rather than falling through to "All legs complete".
 export const mockNeedsActionTrips: Trip[] = [
   {
-    id: "1000883298451",
-    date: "Sun, Mar 15, 2026",
-    rider: "WINDY PRECISE",
-    client: "Verida",
-    passengerCount: 1,
+    id: "260731-780322",
+    date: "Thu, Jul 31, 2026",
+    rider: "KALLIYAH TYSON",
+    client: "Alivi",
+    passengerCount: 4,
     distance: "",
-    totalRevenue: 45.25,
-    notes: "FOR TESTING PURPOSES ONLY",
+    totalRevenue: 26.29,
+    notes: "Rider has not answered two confirmation calls",
     legs: [
       {
-        id: "1000883298451",
+        id: "1931025",
+        legCode: "A",
         type: "est-pickup",
         label: "Est Pick-up Time",
-        time: "10:00 PM",
-        address: "Braselton Return, 33 Golden Eagle Pkwy, Braselton, GA 30517",
-        county: "Jackson County",
-        revenue: 45.25,
+        time: "9:40 AM",
+        address: "3820 Palm Beach Blvd, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 26.29,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
       },
       {
-        id: "1000883298451-b",
+        id: "1931026",
         type: "appointment",
         label: "Appointment Time",
-        time: "10:46 PM",
-        address: "1920 Briarcliff Rd NE, Atlanta, GA 30329",
-        county: "DeKalb County",
+        time: "10:25 AM",
+        address: "16271 Bass Rd, Fort Myers, FL 33908",
+        county: "Lee County",
         revenue: 0,
       },
     ],
     status: "needs-action",
     pills: [
       { label: "Not Confirmed", variant: "danger" },
+      // ⚠️ Scenario pill removed 2026-09-09 — it labelled a comparison-matrix row
+      // that no longer exists. The ride stays as ordinary Needs Action content so
+      // the tab is not empty; it is simply no longer presented as a demo scenario.
+      // Its finding still stands: the confirmation gate is CLIENT-SIDE — production's
+      // status list is [ACCEPTED, CHECKED, EN_ROUTE] and an unconfirmed trip may well
+      // sit at ACCEPTED, in which case the server would allow the no-show.
     ],
-    // Was: ["weekend-warrior", "early-bird"] — early-bird is completed; weekend-warrior is gold
-    incentiveTypes: ["weekend-warrior"],
-    clientEnrolledInIncentives: true,
-  },
-  {
-    id: "NA-002",
-    date: "Wed, Feb 25, 2026",
-    rider: "Chichi Cormy MTM",
-    client: "MTM",
-    passengerCount: 1,
-    distance: "",
-    totalRevenue: 47.90,
-    notes: "Pick Up: 1254652260 Z1BRV8QHQO...",
-    legs: [
-      {
-        id: "leg-1",
-        type: "scheduled",
-        label: "Scheduled Pick-up Time",
-        time: "10:00 PM",
-        address: "777 MTM Blvd, Alexandria, VA",
-        county: "Alexandria city County",
-        revenue: 23.95,
-      },
-      {
-        id: "leg-2",
-        type: "scheduled",
-        label: "Scheduled Pick-up Time",
-        time: "9:00 PM",
-        address: "666 Return St, Alexandria, VA",
-        county: "Alexandria city County",
-        revenue: 23.95,
-      },
-    ],
-    status: "needs-action",
-    pills: [],
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
 ];
 
-// Mock in-progress trips
-export const mockInProgressTrips: Trip[] = [];
+// ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
+// which case it demos. Demo scaffolding, NOT app data: the real app shows no such
+// pill, and they must be stripped before any capture that stands in for
+// production. They exist because the location-record stream is invisible on the
+// ride list, and it is the entire scenario.
+//
+// SIX SCENARIOS, named against the production `canNoshow` check. Choosing a ride
+// is how you pick one — the demo mechanic.
+//
+// ⚠️ 3.2 and 4.2 were SCRAPPED once it was confirmed the production lookback
+// runs only on Submit — before that the app has checked nothing, so it cannot
+// honestly refuse or show a countdown from the More tile.
+//
+//   1   not started or en-route          → refused, dead end
+//   2   meets every criterion            → files
+//   3   no 10 consecutive min at pickup  → timer
+//   4   location now > 0.5 mi            → form
+//   5   no location points in 20 min     → form
+//   WT  WellTrans IN, not yet pickup+15  → timer
+//
+// Plus two extras: scenario 3 seeded a hair from the boundary, so the countdown
+// runs out while you watch and the button unlocks; and the pre-existing
+// unconfirmed ride in `mockNeedsActionTrips`, which is a client-side gate rather
+// than one of the six.
+export const mockInProgressTrips: Trip[] = [
+  // One ride per swipe stage, so every Ride Details phase is reachable in one tap.
+  // The stage is carried entirely by which marks `progress` holds — nothing else
+  // selects the phase, which is why the seed is the thing that has to be complete:
+  //
+  //   nothing swiped  -> "Accepted Ride"  + SWIPE TO START    (s-01a)
+  //   startedAt       -> "Active Ride"    + PICK UP MEMBER    (s-01b)
+  //   pickedUpAt      -> "Ride"           + DROP OFF MEMBER   (s-01c)
+  //   droppedOffAt    -> "Completed Ride" + all legs complete
+  //
+  // ⚠️ `scripts/verify-base.ts` asserts all four stages appear here, with counts.
+  // A stage that drops out of the seed silently removes a phase from the app.
 
-// Mock completed trips (ride history) — `COMP-*` are historical (Dec 2023);
-// `CURRENT-COMP-*` are dated within the current pay period (Apr 28–May 4, 2026)
-// so the dashboard's EarningsCard can sum the current period's completed trips.
+  // ===== not-started — accepted, not yet begun =====
+  {
+    id: "1049800371",
+    date: "Thu, Jul 31, 2026",
+    rider: "Marcus Ellery",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "8.2 mi",
+    totalRevenue: 47.20,
+    notes: "Gate code 4412 at the Oak Ridge entrance",
+    legs: [
+      {
+        id: "1049800371",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:15 AM",
+        address: "88 Oak Ridge Dr, Douglasville, GA 30134",
+        county: "Douglas County",
+        revenue: 47.20,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800371-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:00 AM",
+        address: "1275 Highland Pkwy, Douglasville, GA 30134",
+        county: "Douglas County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== started — en route to the pick-up =====
+  {
+    id: "1049800373",
+    date: "Thu, Jul 31, 2026",
+    rider: "Desmond Okafor",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "6.4 mi",
+    totalRevenue: 53.40,
+    notes: "Apartment gate on the Cedar St side",
+    legs: [
+      {
+        id: "1049800373",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "10:20 AM",
+        address: "512 Cedar St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 53.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "10:06 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800373-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:00 AM",
+        address: "45 Tanner Medical Way, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== picked-up — member on board, heading to drop-off =====
+  {
+    id: "1049800376",
+    date: "Thu, Jul 31, 2026",
+    rider: "Constance Whitlow",
+    client: "Alivi",
+    passengerCount: 1,
+    distance: "11.9 mi",
+    totalRevenue: 39.75,
+    notes: "Pick-up is the west tower lobby, not the main entrance",
+    legs: [
+      {
+        id: "1049800376",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "2:10 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 39.75,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:52 PM",
+          pickedUpAt: "2:14 PM",
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800376-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:55 PM",
+        address: "3400 Colonial Blvd, Fort Myers, FL 33966",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Wait For Call", variant: "attention" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== completed — every mark set; the footer reads "All legs complete" =====
+  {
+    id: "1049800379",
+    date: "Thu, Jul 31, 2026",
+    rider: "Priya Raghavan",
+    client: "MTM",
+    passengerCount: 2,
+    distance: "14.3 mi",
+    totalRevenue: 61.85,
+    notes: "Return leg collected on a call",
+    legs: [
+      {
+        id: "1049800379",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "7:40 AM",
+        address: "210 Maple Grove Rd, Marietta, GA 30060",
+        county: "Cobb County",
+        revenue: 61.85,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "7:28 AM",
+          pickedUpAt: "7:44 AM",
+          droppedOffAt: "8:19 AM",
+        },
+      },
+      {
+        id: "1049800379-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "8:30 AM",
+        address: "677 Church St, Marietta, GA 30060",
+        county: "Cobb County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+];
+
 export const mockCompletedTrips: Trip[] = [
+  // === RECENT (July 2026) — the member history the Trip Request case reads ===
+  //
+  // A Trip Request is for rides a member told the driver about that aren't in the
+  // app yet, so its member selector offers members the driver has actually driven
+  // in the last 30 days. `RECENT-COMP-005` sits deliberately OUTSIDE that window
+  // (Jun 25, more than 30 days before MOCK_TODAY) so the cutoff excludes something
+  // visible rather than being decorative. KALLIYAH TYSON appears twice on purpose,
+  // to exercise the per-member trip count.
+  {
+    id: "RECENT-COMP-001",
+    date: "Mon, Jul 27, 2026",
+    rider: "MARCUS WHITFIELD",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 68.40,
+    notes: "",
+    legs: [
+      {
+        id: "1928814",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "7:45 AM",
+        address: "118 Bradley St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 34.20,
+      },
+      {
+        id: "1928815",
+        legCode: "B",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "1:15 PM",
+        address: "Tanner Medical Center, 705 Dixie St, Carrollton, GA 30117",
+        county: "Carroll County",
+        revenue: 34.20,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-002",
+    date: "Fri, Jul 24, 2026",
+    rider: "DENISE ALVARADO",
+    client: "Alivi",
+    passengerCount: 2,
+    distance: "",
+    totalRevenue: 52.16,
+    notes: "Member uses a walker",
+    legs: [
+      {
+        id: "1930447",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "10:30 AM",
+        address: "2411 Ortiz Ave, Fort Myers, FL 33905",
+        county: "Lee County",
+        revenue: 26.08,
+      },
+      {
+        id: "1930448",
+        legCode: "B",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "2:00 PM",
+        address: "Lee Health Coconut Point, 23450 Via Coconut Point, Estero, FL 33928",
+        county: "Lee County",
+        revenue: 26.08,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-003",
+    date: "Sat, Jul 18, 2026",
+    rider: "KALLIYAH TYSON",
+    client: "Alivi",
+    passengerCount: 4,
+    distance: "",
+    totalRevenue: 26.29,
+    notes: "",
+    legs: [
+      {
+        id: "1929902",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:40 AM",
+        address: "3702 Broadway Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 26.29,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-004",
+    date: "Mon, Jul 6, 2026",
+    rider: "KALLIYAH TYSON",
+    client: "Alivi",
+    passengerCount: 4,
+    distance: "",
+    totalRevenue: 26.29,
+    notes: "",
+    legs: [
+      {
+        id: "1927331",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:40 AM",
+        address: "3702 Broadway Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 26.29,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+  {
+    id: "RECENT-COMP-005",
+    date: "Thu, Jun 25, 2026",
+    rider: "HAROLD NIXON",
+    client: "MTM",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 41.75,
+    notes: "",
+    legs: [
+      {
+        id: "1921180",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "11:00 AM",
+        address: "980 Powder Springs St, Smyrna, GA 30080",
+        county: "Cobb County",
+        revenue: 41.75,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
   // === CURRENT PERIOD (Apr 28–May 4, 2026): 3 trips totaling $342.50 ===
   {
     id: "CURRENT-COMP-001",
@@ -892,7 +1353,7 @@ export const mockCompletedTrips: Trip[] = [
     rider: "Casey P.",
     client: "Verida",
     passengerCount: 1,
-    distance: "",
+    distance: "22.4 mi",
     totalRevenue: 124.50,
     notes: "Standing weekly transport",
     legs: [
@@ -926,7 +1387,7 @@ export const mockCompletedTrips: Trip[] = [
     rider: "Jordan S.",
     client: "Verida",
     passengerCount: 1,
-    distance: "",
+    distance: "17.1 mi",
     totalRevenue: 97.50,
     notes: "",
     legs: [
@@ -960,7 +1421,7 @@ export const mockCompletedTrips: Trip[] = [
     rider: "Jamie L.",
     client: "MTM",
     passengerCount: 2,
-    distance: "",
+    distance: "21.6 mi",
     totalRevenue: 123.00,
     notes: "Weekend appointment",
     legs: [

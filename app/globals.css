@@ -6,6 +6,12 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Wingz brand font stack (General Sans → Inter → system). Scoped to the v2
+     payout/wallet surfaces so they render in the brand typeface. */
+  .font-wingz {
+    font-family: "General Sans", "Inter", system-ui, -apple-system, "Segoe UI",
+      sans-serif;
+  }
   /* Hide scrollbar for phone preview and similar UI */
   .scrollbar-hide {
     scrollbar-width: none;
