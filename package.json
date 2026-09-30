@@ -13,7 +13,9 @@
     "build": "tsc --noEmit && next build",
     "start": "next start",
     "lint": "next lint",
-    "verify": "bun scripts/verify-base.ts"
+    "verify": "bun scripts/verify-base.ts",
+    "verify:captures": "bun scripts/verify-captures.ts",
+    "build:capture-index": "bun scripts/build-capture-index.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
