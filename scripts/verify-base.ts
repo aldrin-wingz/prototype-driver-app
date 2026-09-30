@@ -21,7 +21,8 @@ import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  PLANNER_COPY, addDays, dailySummary, dateNavState, plannerDateLabel, plannerTripsFor,
+  PLANNER_COPY, SEEDED_TRIP_DAY_OFFSET, addDays, axisLabel, axisTicks, blockWindow,
+  dailySummary, dateNavState, formatClock, plannerDateLabel, plannerDayFor,
 } from "../lib/driver-data/planner";
 import {
   DEFAULT_RIDE_HISTORY_FILTER, RIDE_HISTORY_FILTERS, applyRideHistoryFilter,
@@ -345,47 +346,83 @@ check("late predicate needs an explicit true", `${mockCompletedTrips.filter(isLa
 // ---------------------------------------------------------------------------
 console.log("\n3e. Planner");
 // ---------------------------------------------------------------------------
-// Capture `03-01`. ⛔ ONLY THE EMPTY DAY IS CAPTURED — the populated Planner
-// has never been photographed, so the guard here is that the base keeps
-// rendering the empty state rather than quietly acquiring an invented one.
+// Shoot `DAB-2026-10-01` (`03-01`-`03-08`). Planner is a TIME-AXIS SCHEDULE,
+// which two earlier builds got wrong — one invented the whole screen, one
+// guessed a card list. These assertions pin what the captures actually show.
 
 const pToday = new Date(2026, 6, 31);
 check("date label is the captured long form", plannerDateLabel(new Date(2026, 9, 1)),
   plannerDateLabel(new Date(2026, 9, 1)) === "Thu October 1, 2026");
 
 const navToday = dateNavState(pToday, pToday);
-check("on today: back and Today are inert, forward is live",
-  `back=${navToday.canGoBack} today=${navToday.canGoToday} fwd=${navToday.canGoForward}`,
-  !navToday.canGoBack && !navToday.canGoToday && navToday.canGoForward);
 const navAhead = dateNavState(addDays(pToday, 1), pToday);
-check("a day ahead: all three are live",
-  `back=${navAhead.canGoBack} today=${navAhead.canGoToday} fwd=${navAhead.canGoForward}`,
-  navAhead.canGoBack && navAhead.canGoToday && navAhead.canGoForward);
-const navPast = dateNavState(addDays(pToday, -1), pToday);
-check("never pages before today", `back=${navPast.canGoBack}`, !navPast.canGoBack);
+check("on today: back and Today inert, forward live",
+  `back=${navToday.canGoBack} today=${navToday.canGoToday}`,
+  !navToday.canGoBack && !navToday.canGoToday && navToday.canGoForward);
+check("off today: all three live (confirmed by `03-03`)",
+  `back=${navAhead.canGoBack} today=${navAhead.canGoToday}`,
+  navAhead.canGoBack && navAhead.canGoToday);
+check("never pages before today", `back=${dateNavState(addDays(pToday, -1), pToday).canGoBack}`,
+  !dateNavState(addDays(pToday, -1), pToday).canGoBack);
+
+// The seeded populated day
+const pDay = plannerDayFor(addDays(pToday, SEEDED_TRIP_DAY_OFFSET), pToday);
+check("a populated day exists to render", pDay ? `${pDay.blocks.length} blocks` : "NONE", !!pDay && pDay.blocks.length > 0);
+const emptyDay = plannerDayFor(addDays(pToday, SEEDED_TRIP_DAY_OFFSET + 1), pToday);
+check("other days stay empty", emptyDay ? "populated" : "null", emptyDay === null);
+
+const blocks = pDay!.blocks;
+const travel = blocks.filter((b) => b.kind === "travel");
+const trip = blocks.filter((b) => b.kind === "trip");
+check("both captured block kinds are seeded", `${travel.length} travel, ${trip.length} trip`,
+  travel.length > 0 && trip.length > 0);
+check("the trip block carries what the capture shows",
+  `fare=${trip[0].fare} otp=${trip[0].otp} pickup=${!!trip[0].pickupAddress} dropoff=${!!trip[0].dropoffAddress}`,
+  trip[0].fare !== undefined && trip[0].otp === true && !!trip[0].pickupAddress && !!trip[0].dropoffAddress);
+check("a trip block opens Ride Details", trip[0].tripId ?? "none", !!trip[0].tripId);
 
 /**
- * ⛔ The populated Planner is UNCAPTURED. If this ever returns trips, someone
- * has invented a screen — the empty state is the only shape we have evidence
- * for, and the failure should be loud.
+ * ⭐ The block fare is the LEG fare; Daily Summary is the TRIP total. `03-03`
+ * shows $92.70 on the block and $185.40 in the summary — both legs of one trip.
+ * Summing the blocks would print half the real figure, so this asserts the two
+ * are DIFFERENT rather than merely present.
  */
-const anyDay = [0, 1, 7, 30].map((n) => plannerTripsFor(addDays(pToday, n)).length);
-check("Planner stays empty — the populated layout is uncaptured",
-  `trips on +0/+1/+7/+30 days: ${anyDay.join(", ")}`, anyDay.every((n) => n === 0));
+const pSum = dailySummary(pDay);
+const blockFareTotal = trip.reduce((s2, b) => s2 + (b.fare ?? 0), 0);
+check("Daily Summary counts trips, not blocks", `${pSum.totalTrips} trips vs ${blocks.length} blocks`,
+  pSum.totalTrips === 1 && blocks.length > 1);
+check("Daily Summary is the TRIP total, not the leg fare",
+  `summary=$${pSum.potentialEarnings.toFixed(2)} block=$${blockFareTotal.toFixed(2)}`,
+  pSum.potentialEarnings > blockFareTotal);
+check("empty day summarises to zero", JSON.stringify(dailySummary(null)),
+  dailySummary(null).totalTrips === 0 && dailySummary(null).potentialEarnings === 0);
 
-const sum = dailySummary(plannerTripsFor(pToday));
-check("Daily Summary is derived, not hardcoded", `${sum.totalTrips} trips / $${sum.potentialEarnings.toFixed(2)}`,
-  sum.totalTrips === 0 && sum.potentialEarnings === 0);
-// ...and it must actually compute when given something
-const fake = dailySummary([
-  { totalRevenue: 10 } as never, { totalRevenue: 5.5 } as never,
-]);
-check("Daily Summary sums what it is given", `2 trips -> $${fake.potentialEarnings.toFixed(2)}`,
-  fake.totalTrips === 2 && fake.potentialEarnings === 15.5);
+// Clock + axis
+check("clock format", formatClock(21 * 60 + 38), formatClock(21 * 60 + 38) === "9:38 PM");
+check("clock wraps past midnight", formatClock(24 * 60 + 78), formatClock(24 * 60 + 78) === "1:18 AM");
+check("axis marks the next day (capture `03-06`)", axisLabel(25 * 60).replace("\n", " "),
+  axisLabel(25 * 60).includes("(next day)") && !axisLabel(23 * 60).includes("(next day)"));
+const ticks = axisTicks(blocks);
+check("axis is half-hourly and spans the blocks",
+  `${ticks.length} ticks, ${formatClock(ticks[0])} -> ${formatClock(ticks[ticks.length - 1])}`,
+  ticks.length > 2 && ticks.every((t, i) => i === 0 || t - ticks[i - 1] === 30) &&
+  ticks[0] <= Math.min(...blocks.map((b) => b.startMin)) &&
+  ticks[ticks.length - 1] >= Math.max(...blocks.map((b) => b.endMin)));
+check("block window reads as captured", blockWindow(trip[0]), blockWindow(trip[0]) === "10:40 PM - 1:18 AM");
 
-check("empty-state copy matches the capture", PLANNER_COPY.emptyTitle,
+// Copy, verbatim
+check("captured copy is verbatim",
+  `${PLANNER_COPY.tapToOpen} / ${PLANNER_COPY.schedule}`,
   PLANNER_COPY.emptyTitle === "No trips yet — but they're on the way!" &&
-  PLANNER_COPY.emptyBody.startsWith("Hang tight! Trips are assigned throughout the day."));
+  PLANNER_COPY.tapToOpen === "Tap to Open Ride Details" &&
+  PLANNER_COPY.schedule === "Schedule" &&
+  PLANNER_COPY.earningsTooltip === "This is the potential earnings from accepted trips for this day.");
+
+/** ⛔ Captured rider names and addresses are real. The seed invents its own. */
+const CAPTURED_PII = ["JESSICA STRONG"];
+const plannerLeaked = CAPTURED_PII.filter((n) => blocks.some((b) => b.rider === n));
+check("no captured rider name in the Planner seed", plannerLeaked.join(", ") || `0 of ${CAPTURED_PII.length}`,
+  plannerLeaked.length === 0);
 
 // ---------------------------------------------------------------------------
 console.log("\n4. Colour tokens are literal strings");

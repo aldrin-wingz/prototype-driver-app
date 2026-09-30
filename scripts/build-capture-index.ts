@@ -150,7 +150,7 @@ rows.sort((a, b) => a.name.localeCompare(b.name));
 const NOTE: Record<string, string> = {
   "01 Home": "Weekly view, wallet, payouts, payout detail, help sheet. ⛔ **Home INCENTIVES has zero captures** — the incentive screenshots in the vault are the CS Tool manager, not the driver app.",
   "02 Requests": "Map View, list view, filters, drop-off filter, empty state, Special Offers. The richest section, and the only one with a prose contract: `Project - Map Request View/Help Articles/The Requests Map.md`.",
-  "03 Planner": "The Planner tab. ⭐ Its first capture (`DAB-2026-10-01`) established that Planner has NO app header — it opens on a date bar. ⛔ Only an EMPTY day has been shot, so the trip list and a non-zero Daily Summary remain unknown. More Planner captures (Mar 2026) sit in `Project - Standing Order Offers/Phase 2/References/`, out of scope by decision.",
+  "03 Planner": "The Planner tab. ⭐ `DAB-2026-10-01` established two things nothing else had: Planner has NO app header (it opens on a date bar), and its body is a TIME-AXIS SCHEDULE rather than a list of cards. Empty day, a day with one trip, the month picker and the earnings tooltip are all captured. More Planner captures (Mar 2026) sit in `Project - Standing Order Offers/Phase 2/References/`, out of scope by decision.",
   "04 My Rides": "My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the More Options grid, ride history, and the six-stage Trip Completion flow. 🕐 **Stale build** — nothing here is from B1/B2/B3.",
   "05 Options": "The Options menu and the screens behind its rows. The menu itself is captured (`DAB-2026-10-01`); most of its 11 destinations are not — see that shoot's SHOOT.md for the outstanding list.",
   "06 Chat": "Two distinct SHIPPED surfaces: the Zendesk support bubble, and Onboarding Support messaging inside the sign-up application (`12 - In-App Messages`, B2). ⛔ Neither is Wingz Dispatch, which has not shipped.",
@@ -162,13 +162,19 @@ const NOTE: Record<string, string> = {
 };
 /**
  * A short standing caveat per section — things a count cannot tell you.
- * ⚠️ These must NOT assert counts. Anything countable is derived below, because
- * a hardcoded "zero captures" keeps saying zero after the first upload.
+ *
+ * ⚠️ These must NOT assert counts, and must not claim a section LACKS
+ * something that a later shoot can supply. Anything countable is derived
+ * below. This has gone stale four times: "zero captures" survived the first
+ * upload, "blocks the Settings build" survived the menu being shot, and
+ * "the populated Planner is unshot" survived it being shot. Write a caveat as
+ * what is STILL OUTSTANDING, phrased so that adding captures makes it wrong
+ * loudly rather than quietly — and re-read them when a shoot lands.
  */
 const CAVEAT: Record<string, string> = {
   "01 Home": "⛔ nothing for incentives",
   "02 Requests": "richest section; has a prose contract",
-  "03 Planner": "empty day only; the populated Planner is unshot",
+  "03 Planner": "multi-trip day and past days still unshot",
   "04 My Rides": "",
   "05 Options": "menu captured; most destinations behind its rows are not",
   "06 Chat": "shipped surfaces only",

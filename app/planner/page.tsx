@@ -3,25 +3,20 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { BottomNav } from "@/components/driver/bottom-nav";
+import { PlannerSchedule } from "@/components/driver/planner-schedule";
+import { PlannerDatePicker } from "@/components/driver/planner-date-picker";
 import { cn } from "@/lib/utils";
 import {
-  PLANNER_COPY, addDays, dailySummary, dateNavState,
-  plannerDateLabel, plannerTripsFor,
+  PLANNER_COPY, addDays, dailySummary, dateNavState, plannerDateLabel, plannerDayFor,
 } from "@/lib/driver-data/planner";
 import { MOCK_TODAY } from "@/lib/driver-data/mock-trips";
 
 /**
- * Planner — replicated from capture `03-01` (shoot `DAB-2026-10-01`).
+ * Planner — replicated from shoot `DAB-2026-10-01` (`03-01` … `03-08`).
  *
- * ⛔ The previous version was invented: a generic app Header, a grey calendar
- * circle, "Schedule and plan your rides here." and "(Placeholder - not part of
- * prototype scope)". None of it is in the capture.
- *
- * ⭐ The real screen has NO app header at all. It opens on a date bar.
- *
- * ⛔ ONLY THE EMPTY DAY IS CAPTURED, so this always renders the empty state —
- * see `plannerTripsFor`. A populated Planner has never been photographed and is
- * not guessed at here.
+ * ⭐ No app header: the screen opens on a date bar. ⭐ The body is a TIME-AXIS
+ * schedule, not a list of cards — the earlier build guessed a list and an
+ * earlier one before that invented the whole screen.
  */
 export default function PlannerPage() {
   // Seeded "today", so a demo gives the same answer next month.
@@ -30,23 +25,27 @@ export default function PlannerPage() {
     return new Date(y, m - 1, d);
   }, []);
   const [selected, setSelected] = useState<Date>(today);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
 
-  const trips = plannerTripsFor(selected);
-  const summary = dailySummary(trips);
+  const day = plannerDayFor(selected, today);
+  const summary = dailySummary(day);
   const nav = dateNavState(selected, today);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6F8] pb-20">
-      {/* Date bar — this is the top of the screen; there is no app header. */}
+      {/* Date bar — the top of the screen; there is no app header. */}
       <div className="flex items-center gap-2 border-b border-gray-200 bg-white px-4 py-3">
-        {/* The capture shows the date on ONE line. At phone width the long form
-            wraps, so the pill shrinks its text rather than growing taller. */}
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-300 px-3 py-3">
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-300 px-3 py-3"
+        >
           <CalendarDays className="h-5 w-5 flex-shrink-0 text-gray-900" />
           <span className="truncate whitespace-nowrap text-[15px] text-gray-900">
             {plannerDateLabel(selected)}
           </span>
-        </div>
+        </button>
 
         <button
           type="button"
@@ -84,7 +83,7 @@ export default function PlannerPage() {
       </div>
 
       <main className="flex-1 space-y-5 p-4">
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <section className="relative rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900">{PLANNER_COPY.summaryTitle}</h2>
           <div className="flex items-start justify-around pt-4">
             <div className="flex flex-col items-center gap-1">
@@ -95,21 +94,50 @@ export default function PlannerPage() {
               <p className="text-2xl font-bold text-gray-900">
                 ${summary.potentialEarnings.toFixed(2)}
               </p>
-              <p className="flex items-center gap-1 text-gray-500">
+              <button
+                type="button"
+                onClick={() => setTipOpen((o) => !o)}
+                className="flex items-center gap-1 text-gray-500"
+              >
                 {PLANNER_COPY.potentialEarnings}
                 <Info className="h-4 w-4 text-gray-400" />
-              </p>
+              </button>
             </div>
           </div>
+
+          {tipOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="Dismiss"
+                onClick={() => setTipOpen(false)}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              <div className="absolute right-4 top-[72%] z-20 w-64 rounded-lg bg-white p-4 text-[15px] leading-snug text-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
+                {PLANNER_COPY.earningsTooltip}
+              </div>
+            </>
+          )}
         </section>
 
-        <section className="flex min-h-[380px] flex-col items-center justify-center rounded-2xl bg-white px-8 text-center shadow-sm">
-          <CalendarDays className="h-14 w-14 text-gray-900" strokeWidth={1.5} />
-          <p className="pt-6 text-xl font-bold text-gray-900">{PLANNER_COPY.emptyTitle}</p>
-          <p className="pt-3 text-[17px] leading-snug text-gray-700">{PLANNER_COPY.emptyBody}</p>
-        </section>
+        {day ? (
+          <PlannerSchedule blocks={day.blocks} />
+        ) : (
+          <section className="flex min-h-[380px] flex-col items-center justify-center rounded-2xl bg-white px-8 text-center shadow-sm">
+            <CalendarDays className="h-14 w-14 text-gray-900" strokeWidth={1.5} />
+            <p className="pt-6 text-xl font-bold text-gray-900">{PLANNER_COPY.emptyTitle}</p>
+            <p className="pt-3 text-[17px] leading-snug text-gray-700">{PLANNER_COPY.emptyBody}</p>
+          </section>
+        )}
       </main>
 
+      {pickerOpen && (
+        <PlannerDatePicker
+          selected={selected}
+          onPick={setSelected}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
       <BottomNav />
     </div>
   );
