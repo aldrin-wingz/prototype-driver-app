@@ -57,7 +57,7 @@ and predates the build in any case. It is not a source.
 | --- | ---: | ---: | --- | --- |
 | **01 Home** | 29 | 13.3 | BAL-B1×21, BAL-B2×5, Apr-2026×3 | 🕐 mostly stale — 5 of 29 current — ⛔ nothing for incentives |
 | **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
-| **03 Planner** | 2 | 0.9 | DAB-2026-10-01×2 | ✅ 2 of 2 from a current shoot — ships in the base unverified |
+| **03 Planner** | 2 | 0.9 | DAB-2026-10-01×2 | ✅ 2 of 2 from a current shoot — empty day only; the populated Planner is unshot |
 | **04 My Rides** | 29 | 11.2 | Apr-2026×24, DAB-2026-10-01×4, MRV-B2×1 | 🕐 mostly stale — 5 of 29 current |
 | **05 Options** | 7 | 3.2 | DAB-2026-10-01×7 | ✅ 7 of 7 from a current shoot — menu captured; most destinations behind its rows are not |
 | **06 Chat** | 14 | 6.7 | Sep-2026×10, MRV-B2×4 | 🕐 mostly stale — 4 of 14 current — shipped surfaces only |
@@ -220,7 +220,7 @@ Map View, list view, filters, drop-off filter, empty state, Special Offers. The 
 
 ## 03 Planner
 
-Planner dashboard, timeblocks and their states. The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.
+The Planner tab. ⭐ Its first capture (`DAB-2026-10-01`) established that Planner has NO app header — it opens on a date bar. ⛔ Only an EMPTY day has been shot, so the trip list and a non-zero Daily Summary remain unknown. More Planner captures (Mar 2026) sit in `Project - Standing Order Offers/Phase 2/References/`, out of scope by decision.
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |

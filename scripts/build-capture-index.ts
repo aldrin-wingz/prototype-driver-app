@@ -150,7 +150,7 @@ rows.sort((a, b) => a.name.localeCompare(b.name));
 const NOTE: Record<string, string> = {
   "01 Home": "Weekly view, wallet, payouts, payout detail, help sheet. ⛔ **Home INCENTIVES has zero captures** — the incentive screenshots in the vault are the CS Tool manager, not the driver app.",
   "02 Requests": "Map View, list view, filters, drop-off filter, empty state, Special Offers. The richest section, and the only one with a prose contract: `Project - Map Request View/Help Articles/The Requests Map.md`.",
-  "03 Planner": "Planner dashboard, timeblocks and their states. The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.",
+  "03 Planner": "The Planner tab. ⭐ Its first capture (`DAB-2026-10-01`) established that Planner has NO app header — it opens on a date bar. ⛔ Only an EMPTY day has been shot, so the trip list and a non-zero Daily Summary remain unknown. More Planner captures (Mar 2026) sit in `Project - Standing Order Offers/Phase 2/References/`, out of scope by decision.",
   "04 My Rides": "My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the More Options grid, ride history, and the six-stage Trip Completion flow. 🕐 **Stale build** — nothing here is from B1/B2/B3.",
   "05 Options": "The Options menu and the screens behind its rows. The menu itself is captured (`DAB-2026-10-01`); most of its 11 destinations are not — see that shoot's SHOOT.md for the outstanding list.",
   "06 Chat": "Two distinct SHIPPED surfaces: the Zendesk support bubble, and Onboarding Support messaging inside the sign-up application (`12 - In-App Messages`, B2). ⛔ Neither is Wingz Dispatch, which has not shipped.",
@@ -168,7 +168,7 @@ const NOTE: Record<string, string> = {
 const CAVEAT: Record<string, string> = {
   "01 Home": "⛔ nothing for incentives",
   "02 Requests": "richest section; has a prose contract",
-  "03 Planner": "ships in the base unverified",
+  "03 Planner": "empty day only; the populated Planner is unshot",
   "04 My Rides": "",
   "05 Options": "menu captured; most destinations behind its rows are not",
   "06 Chat": "shipped surfaces only",
