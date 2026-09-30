@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/driver/bottom-nav";
 import { RideCard } from "@/components/driver/ride-card";
 import { Card } from "@/components/ui/card";
 import { DashboardIncentiveSection } from "@/components/driver/dashboard-incentive-section";
+import { WalletCard } from "@/components/driver/wallet-card";
 import {
   mockRequestTrips,
   mockNeedsActionTrips,
@@ -68,7 +69,7 @@ function EarningsCard({
           <p className="text-2xl font-bold text-gray-900">{data.trips}</p>
           <div className="flex items-center justify-center gap-1">
             <span className="text-xs font-medium tracking-wide text-gray-500">
-              {data.period === "this-month" ? "TRIPS" : "COMPLETED"}
+              RIDES
             </span>
             <Info className="h-3 w-3 text-gray-400" />
           </div>
@@ -142,7 +143,10 @@ export default function HomePage() {
       <Header title="Home" />
 
       <main className="flex-1 pt-4">
-        {/* 1. Earnings Card */}
+        {/* 1. Wingz Wallet */}
+        <WalletCard />
+
+        {/* 2. Earnings Card */}
         <EarningsCard
           data={earningsData}
           onPrevious={() => setPeriod("this-month")}
@@ -151,7 +155,7 @@ export default function HomePage() {
           showNext={period === "this-month"}
         />
 
-        {/* 2. Confirm Trip Prompt */}
+        {/* 3. Confirm Trip Prompt */}
         <ConfirmTripPrompt />
 
         {/* 3. Driver Incentives — locked variant: dashboard-card-section */}

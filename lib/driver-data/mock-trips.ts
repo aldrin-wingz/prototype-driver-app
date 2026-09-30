@@ -7,6 +7,11 @@ import type { IncentiveType } from "@/lib/data/incentives";
  * answer in a demo next month as it does today. Matches the dates already used by
  * the needs-action ride.
  */
+/**
+ * ⚠️ Every rider name here is INVENTED. Names shown in the production captures
+ * are real members', so they are never copied into the seed — only their SHAPE
+ * is (the app renders some names in caps, which the seed reproduces).
+ */
 export const MOCK_TODAY = "2026-07-31";
 
 export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress" | "completed";
@@ -153,7 +158,7 @@ export const mockRequestTrips: Trip[] = [
   {
     id: "REQ-WW-001",
     date: "Sun, Nov 1, 2026",
-    rider: "WINDY PRECISE",
+    rider: "ROSALIND PEMBER",
     client: "Verida",
     passengerCount: 1,
     distance: "8.2 mi away",
@@ -927,7 +932,7 @@ export const mockNeedsActionTrips: Trip[] = [
   {
     id: "260731-780322",
     date: "Thu, Jul 31, 2026",
-    rider: "KALLIYAH TYSON",
+    rider: "AMARA OKONKWO",
     client: "Alivi",
     passengerCount: 4,
     distance: "",
@@ -1193,12 +1198,12 @@ export const mockCompletedTrips: Trip[] = [
   // app yet, so its member selector offers members the driver has actually driven
   // in the last 30 days. `RECENT-COMP-005` sits deliberately OUTSIDE that window
   // (Jun 25, more than 30 days before MOCK_TODAY) so the cutoff excludes something
-  // visible rather than being decorative. KALLIYAH TYSON appears twice on purpose,
+  // visible rather than being decorative. AMARA OKONKWO appears twice on purpose,
   // to exercise the per-member trip count.
   {
     id: "RECENT-COMP-001",
     date: "Mon, Jul 27, 2026",
-    rider: "MARCUS WHITFIELD",
+    rider: "THEODORE ASHBY",
     client: "Verida",
     passengerCount: 1,
     distance: "",
@@ -1234,7 +1239,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "RECENT-COMP-002",
     date: "Fri, Jul 24, 2026",
-    rider: "DENISE ALVARADO",
+    rider: "LORETTA BRANSCOMBE",
     client: "Alivi",
     passengerCount: 2,
     distance: "",
@@ -1270,7 +1275,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "RECENT-COMP-003",
     date: "Sat, Jul 18, 2026",
-    rider: "KALLIYAH TYSON",
+    rider: "AMARA OKONKWO",
     client: "Alivi",
     passengerCount: 4,
     distance: "",
@@ -1296,7 +1301,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "RECENT-COMP-004",
     date: "Mon, Jul 6, 2026",
-    rider: "KALLIYAH TYSON",
+    rider: "AMARA OKONKWO",
     client: "Alivi",
     passengerCount: 4,
     distance: "",
@@ -1322,7 +1327,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "RECENT-COMP-005",
     date: "Thu, Jun 25, 2026",
-    rider: "HAROLD NIXON",
+    rider: "EDWIN CASTELLANOS",
     client: "MTM",
     passengerCount: 1,
     distance: "",
@@ -1453,7 +1458,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "COMP-001",
     date: "Fri, Dec 29, 2023",
-    rider: "Jackie Giese",
+    rider: "Hollis Danvers",
     client: "Verida",
     passengerCount: 1,
     distance: "",
@@ -1497,7 +1502,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "COMP-002",
     date: "Thu, Dec 28, 2023",
-    rider: "Jackie Giese",
+    rider: "Hollis Danvers",
     client: "Verida",
     passengerCount: 1,
     distance: "",
@@ -1540,7 +1545,7 @@ export const mockCompletedTrips: Trip[] = [
   {
     id: "COMP-003",
     date: "Thu, Dec 28, 2023",
-    rider: "STEPHANIE FIELDS",
+    rider: "BEATRIX HALLORAN",
     client: "Verida",
     passengerCount: 2,
     distance: "",
