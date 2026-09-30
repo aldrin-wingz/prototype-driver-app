@@ -21,6 +21,10 @@ import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  BANNER, DEFAULT_DETENT, EXPOSED_PCT, SORT_OPTIONS, countLine, groupByPickupDay,
+  isWillCall, pinPosition, sortTrips, visibleTrips,
+} from "../lib/driver-data/map-view";
+import {
   getLegStage,
   getNextSwipe,
   mockRequestTrips,
@@ -177,6 +181,74 @@ for (const s of ["before-taken", "in-progress", "needs-action", "completed"]) {
   ).length;
   check(`detail state "${s}" reachable`, `${n} of ${all.length} trips`, n > 0);
 }
+
+// ---------------------------------------------------------------------------
+console.log("\n3b. Map View rules");
+// ---------------------------------------------------------------------------
+// Replicated from the prose contract + B2 captures, so the rules are the thing
+// worth guarding — a renderer can drift from them silently.
+
+const reqDays = groupByPickupDay(mockRequestTrips);
+check("request trips group into pickup days", `${mockRequestTrips.length} trips -> ${reqDays.length} days`, reqDays.length > 0);
+
+// The map is pointless with one pin per day; the canonical capture shows 16.
+const biggest = reqDays.reduce((a, b) => (b.trips.length > a.trips.length ? b : a));
+check("a day exists with enough trips to exercise the map", `busiest day ${biggest.key} has ${biggest.trips.length}`, biggest.trips.length >= 10);
+
+// Count line format, exactly as capture 03-10 renders it.
+const sample = countLine(16, 16, "Thu, Sep 24");
+check("count line format", `"${sample}"`, sample === "16 of 16 trips shown · Thu, Sep 24");
+
+/**
+ * The two counts must be able to DIFFER. If visible always equalled total the
+ * number would be decorative and the default-zoom control meaningless — so this
+ * asserts the gap exists, not merely that the function returns something.
+ */
+const dayTrips = biggest.trips;
+const vDown = visibleTrips(dayTrips, "down", 1).length;
+const vHalf = visibleTrips(dayTrips, "halfway", 1).length;
+const vZoom = visibleTrips(dayTrips, "halfway", 2).length;
+check("visible count shrinks as the sheet rises", `down=${vDown} halfway=${vHalf} of ${dayTrips.length}`, vDown >= vHalf);
+check("visible count shrinks as you zoom in", `halfway z1=${vHalf} z2=${vZoom}`, vZoom <= vHalf);
+check("the two counts actually differ somewhere", `halfway shows ${vHalf} of ${dayTrips.length}`, vHalf < dayTrips.length);
+check("default detent is halfway", DEFAULT_DETENT, DEFAULT_DETENT === "halfway");
+check("exposed fraction falls as the sheet rises", `down=${EXPOSED_PCT.down} halfway=${EXPOSED_PCT.halfway} up=${EXPOSED_PCT.up}`,
+  EXPOSED_PCT.down > EXPOSED_PCT.halfway && EXPOSED_PCT.halfway > EXPOSED_PCT.up);
+
+// Pins: deterministic, in bounds, and actually spread out.
+const positions = dayTrips.map((t) => pinPosition(t));
+const stable = dayTrips.every((t) => {
+  const a = pinPosition(t), b = pinPosition(t);
+  return a.leftPct === b.leftPct && a.topPct === b.topPct;
+});
+check("pin positions are deterministic", `${dayTrips.length} pins re-derived identically`, stable);
+const inBounds = positions.filter((p) => p.leftPct >= 0 && p.leftPct <= 100 && p.topPct >= 0 && p.topPct <= 100).length;
+check("pin positions in bounds", `${inBounds} of ${positions.length}`, inBounds === positions.length);
+
+/**
+ * ⚠️ Pins legitimately OVERLAP (they never cluster into a numbered bubble), but
+ * a weak hash makes ids sharing a prefix land on top of each other and 16 trips
+ * render as 6 pins. This bounds accidental collisions without banning real ones.
+ */
+let collisions = 0;
+for (let i = 0; i < positions.length; i++)
+  for (let j = i + 1; j < positions.length; j++)
+    if (Math.abs(positions[i].leftPct - positions[j].leftPct) < 4 &&
+        Math.abs(positions[i].topPct - positions[j].topPct) < 4) collisions++;
+const pairs = (positions.length * (positions.length - 1)) / 2;
+check("pins are spread, not stacked by a weak hash", `${collisions} colliding pairs of ${pairs}`, collisions <= pairs * 0.05);
+
+const willCall = mockRequestTrips.filter(isWillCall).length;
+check("will-call trips exist to badge", `${willCall} of ${mockRequestTrips.length} request trips`, willCall > 0);
+
+// Sort must be total and order-changing, not a no-op.
+const orders = SORT_OPTIONS.map((o) => sortTrips(dayTrips, o.key).map((t) => t.id).join(","));
+check("every sort returns every trip", `${SORT_OPTIONS.length} sorts x ${dayTrips.length} trips`,
+  orders.every((o) => o.split(",").length === dayTrips.length));
+check("sorts produce different orders", `${new Set(orders).size} distinct of ${orders.length}`, new Set(orders).size > 1);
+
+check("both card banners defined", `${BANNER.standard.label} / ${BANNER["special-offers"].label}`,
+  BANNER.standard.note === "Instant assignment" && BANNER["special-offers"].note === "Manual review");
 
 // ---------------------------------------------------------------------------
 console.log("\n4. Colour tokens are literal strings");

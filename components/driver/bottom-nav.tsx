@@ -32,13 +32,10 @@ export function BottomNav() {
                 isActive ? "text-[#10B981]" : "text-gray-400"
               )}
             >
-              <Icon
-                className={cn(
-                  "h-6 w-6",
-                  isActive ? "fill-[#10B981] stroke-[#10B981]" : "stroke-current"
-                )}
-                fill={isActive ? "#10B981" : "none"}
-              />
+              {/* ⚠️ Outlined, never filled. `fill` turns ClipboardList into a
+                  solid green block; every B2 capture shows the active tab as an
+                  OUTLINED glyph tinted green (see `03-10`, `04-04`). */}
+              <Icon className="h-6 w-6 stroke-current" fill="none" />
               <span className="text-xs font-medium">{item.label}</span>
             </Link>
           );

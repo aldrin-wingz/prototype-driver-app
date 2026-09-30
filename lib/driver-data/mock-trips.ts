@@ -154,10 +154,16 @@ export interface TripPill {
 // Some trips have no incentive at all — incentiveTypes: [].
 // Spread across 8 incentives with 2-3 qualifying trips each.
 export const mockRequestTrips: Trip[] = [
+  // ⚠️ DATES CLUSTERED for the map view. Requests filters by pickup day, so a
+  // seed with one trip per day renders a map with one pin and never exercises
+  // the screen. The 23 trips are grouped 16 / 4 / 3 across three days; the 16
+  // reproduces the canonical capture's count line — "16 of 16 trips shown ·
+  // Thu, Sep 24" (CAP row for `03-10 - B2 Map - Collapsed Loaded`) — so a
+  // render can be held against that capture directly. Only the dates moved.
   // ===== WEEKEND WARRIOR (3 trips) =====
   {
     id: "REQ-WW-001",
-    date: "Sun, Nov 1, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "ROSALIND PEMBER",
     client: "Verida",
     passengerCount: 1,
@@ -191,7 +197,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-WW-002",
-    date: "Sat, May 2, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Jamie L.",
     client: "MTM",
     passengerCount: 2,
@@ -219,7 +225,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-WW-003",
-    date: "Sun, May 3, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Taylor R.",
     client: "Verida",
     passengerCount: 1,
@@ -255,7 +261,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== EARLY BIRD (3 trips, pre-9am pickups) =====
   {
     id: "REQ-EB-001",
-    date: "Mon, May 4, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Casey P.",
     client: "Verida",
     passengerCount: 1,
@@ -289,7 +295,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-EB-002",
-    date: "Tue, May 5, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Robin H.",
     client: "Verida",
     passengerCount: 1,
@@ -317,7 +323,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-EB-003",
-    date: "Wed, May 6, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Sam K.",
     client: "MTM",
     passengerCount: 1,
@@ -344,7 +350,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== PEAK PERFORMER (3 trips, 5-9am or 4-8pm) =====
   {
     id: "REQ-PH-001",
-    date: "Thu, May 7, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Jordan S.",
     client: "Verida",
     passengerCount: 1,
@@ -369,7 +375,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-PH-002",
-    date: "Fri, May 8, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Riley T.",
     client: "Verida",
     passengerCount: 1,
@@ -394,7 +400,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-PH-003",
-    date: "Mon, May 11, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Drew C.",
     client: "MTM",
     passengerCount: 1,
@@ -421,7 +427,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== LOYALTY STREAK (2 trips) =====
   {
     id: "REQ-LS-001",
-    date: "Tue, May 12, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Pat L.",
     client: "Verida",
     passengerCount: 1,
@@ -446,7 +452,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-LS-002",
-    date: "Wed, May 13, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Quinn N.",
     client: "Verida",
     passengerCount: 1,
@@ -473,7 +479,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== WHITE GLOVE (3 trips, door-to-door) =====
   {
     id: "REQ-WG-001",
-    date: "Thu, May 14, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Skyler V.",
     client: "Verida",
     passengerCount: 1,
@@ -498,7 +504,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-WG-002",
-    date: "Fri, May 15, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Charlie B.",
     client: "Verida",
     passengerCount: 1,
@@ -523,7 +529,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-WG-003",
-    date: "Mon, May 18, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Avery M.",
     client: "MTM",
     passengerCount: 1,
@@ -550,7 +556,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== QUICK WINS (2 trips, short distance) =====
   {
     id: "REQ-QW-001",
-    date: "Tue, May 19, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Reese O.",
     client: "Verida",
     passengerCount: 1,
@@ -578,7 +584,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-QW-002",
-    date: "Wed, May 20, 2026",
+    date: "Thu, Sep 24, 2026",
     rider: "Quincy E.",
     client: "Verida",
     passengerCount: 1,
@@ -605,7 +611,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== HOMETOWN HERO (2 trips, same county pickup+dropoff) =====
   {
     id: "REQ-HH-001",
-    date: "Sat, May 23, 2026",
+    date: "Fri, Sep 25, 2026",
     rider: "Frankie P.",
     client: "Verida",
     passengerCount: 1,
@@ -639,7 +645,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-HH-002",
-    date: "Mon, May 25, 2026",
+    date: "Fri, Sep 25, 2026",
     rider: "Bailey H.",
     client: "MTM",
     passengerCount: 1,
@@ -675,7 +681,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== SQUAD GOALS (2 trips, multi-rider) =====
   {
     id: "REQ-SG-001",
-    date: "Wed, May 27, 2026",
+    date: "Fri, Sep 25, 2026",
     rider: "Group: 3 riders",
     client: "Verida",
     passengerCount: 3,
@@ -700,7 +706,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-SG-002",
-    date: "Thu, May 28, 2026",
+    date: "Fri, Sep 25, 2026",
     rider: "Group: 4 riders",
     client: "MTM",
     passengerCount: 4,
@@ -727,7 +733,7 @@ export const mockRequestTrips: Trip[] = [
   // ===== NON-INCENTIVIZED (3 trips — no chip) =====
   {
     id: "REQ-NONE-001",
-    date: "Mon, May 4, 2026",
+    date: "Sat, Sep 26, 2026",
     rider: "Morgan K.",
     client: "CareSource",
     passengerCount: 1,
@@ -755,7 +761,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-NONE-002",
-    date: "Thu, Apr 30, 2026",
+    date: "Sat, Sep 26, 2026",
     rider: "Andrew Test",
     client: "Verida",
     passengerCount: 1,
@@ -783,7 +789,7 @@ export const mockRequestTrips: Trip[] = [
   },
   {
     id: "REQ-NONE-003",
-    date: "Fri, May 22, 2026",
+    date: "Sat, Sep 26, 2026",
     rider: "Test Rider",
     client: "CareSource",
     passengerCount: 1,

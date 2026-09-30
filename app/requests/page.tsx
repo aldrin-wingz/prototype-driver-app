@@ -1,16 +1,48 @@
 "use client";
 
-import { Suspense } from "react";
+import React, { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import React from "react";
+import { CalendarDays, ChevronDown, Clock, SlidersHorizontal } from "lucide-react";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
-import { RideCard } from "@/components/driver/ride-card";
+import { RequestMap } from "@/components/driver/request-map";
+import { RequestListSheet } from "@/components/driver/request-list-sheet";
 import { FilterRequestsModal, type RequestFilters } from "@/components/driver/filter-requests-modal";
-import { Button } from "@/components/ui/button";
 import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  DEFAULT_DETENT, defaultDayKey, groupByPickupDay, visibleTrips,
+  type RequestTab, type SheetDetent,
+} from "@/lib/driver-data/map-view";
 import type { IncentiveType } from "@/lib/data/incentives";
+
+/**
+ * Requests — the map view.
+ *
+ * Replicated from `Project - Map Request View/Help Articles/The Requests Map.md`
+ * and the B2 captures. The rules it obeys live in `lib/driver-data/map-view.ts`.
+ *
+ * ⚠️ Special Offers run in selected states only. Where they do not run there is
+ * NO TAB ROW AT ALL — not a disabled tab (capture `10-01`). `SPECIAL_OFFERS_ON`
+ * is the switch; flip it to see the other shape.
+ */
+const SPECIAL_OFFERS_ON = true;
+
+function DayChip({ label, count, onClick }: { label: string; count: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full bg-[#111827] px-4 py-2.5 text-white"
+    >
+      <CalendarDays className="h-4 w-4 text-[#34D399]" />
+      <span className="font-semibold">{label}</span>
+      <span className="text-gray-300">· {count} trips</span>
+      <ChevronDown className="h-4 w-4" />
+    </button>
+  );
+}
 
 function RequestsPageContent() {
   const router = useRouter();
@@ -19,12 +51,16 @@ function RequestsPageContent() {
 
   const incentiveParam = searchParams.get("incentive") as IncentiveType | null;
 
-  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
-  const [appliedFilters, setAppliedFilters] = React.useState<RequestFilters>(() => ({
+  const [tab, setTab] = useState<RequestTab>("standard");
+  const [detent, setDetent] = useState<SheetDetent>(DEFAULT_DETENT);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<RequestFilters>(() => ({
     incentiveType: incentiveParam ?? undefined,
   }));
 
-  const filteredTrips = React.useMemo(() => {
+  const filtered = useMemo(() => {
     let result = mockRequestTrips;
     if (appliedFilters.incentiveType) {
       result = result.filter((t) => t.incentiveTypes.includes(appliedFilters.incentiveType as IncentiveType));
@@ -32,85 +68,138 @@ function RequestsPageContent() {
     return result;
   }, [appliedFilters]);
 
+  // Grouped by pickup day — a day with no trips is ABSENT, not greyed out.
+  const groups = useMemo(() => groupByPickupDay(filtered), [filtered]);
+  const [dayKey, setDayKey] = useState<string | null>(null);
+  const activeKey = dayKey ?? defaultDayKey(groups);
+  const active = groups.find((g) => g.key === activeKey) ?? groups[0];
+  const dayTrips = active?.trips ?? [];
+
   React.useEffect(() => {
-    if (incentiveParam) {
-      setAppliedFilters({ incentiveType: incentiveParam });
-    }
+    if (incentiveParam) setAppliedFilters({ incentiveType: incentiveParam });
   }, [incentiveParam]);
 
-  const handleFilterClick = () => setIsFilterOpen(true);
+  /**
+   * The first count is trips ON SCREEN; the second is the total for the day
+   * under the filters, which moves only when a filter changes. They are
+   * measured from different things on purpose — that is the distinction the
+   * contract spells out, because drivers misread it.
+   */
+  const visibleCount = useMemo(
+    () => visibleTrips(dayTrips, detent, zoom).length,
+    [dayTrips, detent, zoom],
+  );
 
-  const handleFilterUpdate = (filters: RequestFilters) => {
-    setAppliedFilters(filters);
+  // Count of filters BEYOND day and time — that is what the badge counts.
+  const extraFilterCount = Object.values(appliedFilters).filter(Boolean).length;
+
+  function clearFilters() {
+    setAppliedFilters({});
+    setDayKey(null);
     router.replace("/requests", { scroll: false });
-  };
-
-  const handleClearFilters = () => {
-    setAppliedFilters({ mode: "full-trip" });
-    router.replace("/requests", { scroll: false });
-  };
-
-  const handleRefreshClick = () => {
-    toast({ title: "Refreshing...", description: "Request list refreshed." });
-  };
+  }
 
   return (
-    <div className="flex min-h-screen flex-col pb-20">
+    <div className="flex h-screen flex-col overflow-hidden">
       <Header
         title="Requests"
-        showFilter={true}
+        showFilter={false}
         showRefresh={true}
-        onFilterClick={handleFilterClick}
-        onRefreshClick={handleRefreshClick}
+        onRefreshClick={() => toast({ title: "Refreshing...", description: "Request list refreshed." })}
       />
+
+      {/* Filter icon carries a badge counting filters beyond day and time */}
+      <button
+        type="button"
+        onClick={() => setIsFilterOpen(true)}
+        aria-label="Filter Requests"
+        className="absolute right-14 top-2 z-[60] flex h-10 w-10 items-center justify-center text-gray-700"
+      >
+        <SlidersHorizontal className="h-5 w-5" />
+        {extraFilterCount > 0 && (
+          <span className="absolute -right-0.5 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#10B981] text-[10px] font-bold text-white">
+            {extraFilterCount}
+          </span>
+        )}
+      </button>
+
+      {/* ⛔ No tab row at all where Special Offers do not run */}
+      {SPECIAL_OFFERS_ON && (
+        <div data-request-tabs className="flex shrink-0 gap-6 border-b border-gray-200 bg-white px-4">
+          {([["standard", "Standard"], ["special-offers", "Special Offers"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => { setTab(key); setSelectedId(null); }}
+              className={cn(
+                "-mb-px border-b-[3px] pb-2 pt-3 text-lg",
+                tab === key
+                  ? "border-[#10B981] font-bold text-gray-900"
+                  : "border-transparent text-gray-500",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Chips. Pickup Time is always shown, even when empty, so it can be
+          tapped without hunting for it. They wrap when the day chip is wide. */}
+      <div className="flex shrink-0 flex-wrap gap-2 bg-white px-4 py-3">
+        {active && (
+          <DayChip
+            label={active.short}
+            count={active.trips.length}
+            onClick={() => {
+              const i = groups.findIndex((g) => g.key === active.key);
+              setDayKey(groups[(i + 1) % groups.length].key);
+              setSelectedId(null);
+            }}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setIsFilterOpen(true)}
+          className="flex items-center gap-2 rounded-full border border-[#10B981] bg-[#ECFDF5] px-4 py-2.5 text-gray-900"
+        >
+          <Clock className="h-4 w-4" />
+          <span className="font-semibold">Pickup Time</span>
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      </div>
 
       <FilterRequestsModal
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
-        onUpdate={handleFilterUpdate}
+        onUpdate={(f) => { setAppliedFilters(f); router.replace("/requests", { scroll: false }); }}
         initialFilters={appliedFilters}
       />
 
-      <main className="flex-1 p-4">
-        {filteredTrips.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-12">
-            <div className="flex flex-col items-center gap-2">
-              <div className="h-32 w-32 opacity-20">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 1H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm0 16H6V3h12v14zm-6-10h3v3h-3v-3zm0 6h3v3h-3v-3zm-4-6h3v3H8v-3zm0 6h3v3H8v-3z" fill="currentColor"/>
-                </svg>
-              </div>
-              <p className="text-center text-lg font-semibold text-gray-900">
-                Looking for requests.
-              </p>
-              <p className="text-center text-sm text-gray-600">
-                We&apos;re checking for available ride requests.
-              </p>
-            </div>
-            <div className="mt-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#10B981]" />
-            {Object.keys(appliedFilters).length > 0 && (
-              <Button
-                variant="outline"
-                onClick={handleClearFilters}
-                className="mt-4"
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredTrips.map((trip) => (
-              <RideCard
-                key={trip.id}
-                trip={trip}
-                revenueColor="green"
-                onClick={() => router.push(`/requests/${trip.id}`)}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+      {/* Map with the sheet over it.
+          pb-16 clears the FIXED bottom nav — without it the sheet runs underneath
+          it and the last card is cut off. */}
+      <div className="relative flex-1 overflow-hidden pb-16">
+        <RequestMap
+          trips={dayTrips}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          zoom={zoom}
+          onZoom={setZoom}
+        />
+        <RequestListSheet
+          detent={detent}
+          onDetent={setDetent}
+          trips={dayTrips}
+          visibleCount={visibleCount}
+          dayLabel={active?.short ?? ""}
+          tab={tab}
+          selectedId={selectedId}
+          onOpenTrip={(id) => router.push(`/requests/${id}`)}
+          onClearFilters={clearFilters}
+          hasFilters={extraFilterCount > 0}
+        />
+      </div>
 
       <BottomNav />
     </div>
@@ -122,7 +211,7 @@ export default function RequestsPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen flex-col pb-20">
-          <Header title="Requests" showFilter={true} showRefresh={true} />
+          <Header title="Requests" showRefresh={true} />
           <main className="flex flex-1 items-center justify-center p-4">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#10B981]" />
           </main>
