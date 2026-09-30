@@ -21,6 +21,10 @@ const OUT = join(REPO, "references/captures/INDEX.md");
 const EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
 const SOURCES = [
+  // ⭐ The drop folder for NEW shoots. Section subfolder, then a DATED shoot
+  // folder: `Captures/05 Options/2026-10-02/...`. The date becomes the build
+  // stamp, so an undated shoot is refused rather than silently unstamped.
+  "Project - Driver App Base/Captures",
   "Project - Map Request View",
   "Project - In-App Balance Dashboard/Internal Guide/Screenshots",
   "Project - In-App Balance Dashboard/Slack Attachments - Copy Updates",
@@ -47,6 +51,19 @@ const MRV_SECTION: Record<string, string> = {
  */
 function classify(rel: string): { section: string; build: string } {
   const b = basename(rel);
+
+  // New shoots: Captures/<NN Section>/<YYYY-MM-DD>/<file>
+  const drop = rel.match(/^Project - Driver App Base\/Captures\/([^/]+)\/(\d{4}-\d\d-\d\d)\//);
+  if (drop) {
+    const section = SECTIONS.includes(drop[1]) ? drop[1] : "_unregistered";
+    return { section, build: `DAB-${drop[2]}` };
+  }
+  // ⚠️ In the drop folder but NOT in a dated shoot folder. Refused to
+  // `_unregistered` rather than guessed at: an unstamped capture is one nobody
+  // can later tell apart from a current one.
+  if (rel.startsWith("Project - Driver App Base/Captures/")) {
+    return { section: "_unregistered", build: "unknown (undated shoot folder)" };
+  }
   // ⚠️ Build tags are NAMESPACED BY PROJECT. Map Request View and the Balance
   // Dashboard each ran their own shoots and each label them "B2" in-file, but
   // they are different batches on different dates. A bare "B2" would claim two
@@ -133,9 +150,9 @@ rows.sort((a, b) => a.name.localeCompare(b.name));
 const NOTE: Record<string, string> = {
   "01 Home": "Weekly view, wallet, payouts, payout detail, help sheet. ⛔ **Home INCENTIVES has zero captures** — the incentive screenshots in the vault are the CS Tool manager, not the driver app.",
   "02 Requests": "Map View, list view, filters, drop-off filter, empty state, Special Offers. The richest section, and the only one with a prose contract: `Project - Map Request View/Help Articles/The Requests Map.md`.",
-  "03 Planner": "⛔ **EMPTY.** No production capture of Planner exists in any in-scope source, so Planner ships in the base unverified (🕐 No capture). The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.",
+  "03 Planner": "Planner dashboard, timeblocks and their states. The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.",
   "04 My Rides": "My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the More Options grid, ride history, and the six-stage Trip Completion flow. 🕐 **Stale build** — nothing here is from B1/B2/B3.",
-  "05 Options": "⛔ **EMPTY.** Settings/Options has no capture in any in-scope source. This is what blocks the Settings build. Shot list is in the Working Plan.",
+  "05 Options": "The Options menu and every Settings sub-screen. Settings cannot be replicated until this section has captures — the shot list is in the Working Plan.",
   "06 Chat": "Two distinct SHIPPED surfaces: the Zendesk support bubble, and Onboarding Support messaging inside the sign-up application (`12 - In-App Messages`, B2). ⛔ Neither is Wingz Dispatch, which has not shipped.",
   "07 Onboarding and Auth": "Login/OTP, intro screens, sign-up application, migration. **Shipped, captured, and deliberately NOT built into the base** — indexed so the boundary stays visible.",
   "_annotated": "Numbered-callout derivatives rendered for help articles (`DG-`, `LG-`, `MG-`, `SU-`, `GA-`). Outputs, not captures. ⚠️ Badge coordinates never transfer between builds — B2 is aspect 0.60 vs B1's 0.44, so a re-shoot is a re-render, never a re-crop.",
@@ -143,13 +160,41 @@ const NOTE: Record<string, string> = {
   "_out-of-app": "The web Onboarding Portal (CS-side), not the driver app.",
   "_unregistered": "Raw camera rolls, unprocessed `_inbox` dumps and Slack release crops. No canonical name, no description, content unverified. Triage before citing any of these.",
 };
-const VERDICT: Record<string, string> = {
-  "01 Home": "✅ strong for balance/wallet/payouts; ⛔ **zero for incentives**", "02 Requests": "✅ strongest section",
-  "03 Planner": "🔴 **zero captures**", "04 My Rides": "🕐 **stale build** — 24 of 25 predate every MRV batch",
-  "05 Options": "🔴 **zero captures** — blocks Settings", "06 Chat": "✅ for the shipped surfaces",
-  "07 Onboarding and Auth": "✅ captured, not built (by decision)", "_annotated": "— derivatives",
-  "_out-of-scope": "— excluded feature", "_out-of-app": "— not the driver app", "_unregistered": "⚠️ untriaged",
+/**
+ * A short standing caveat per section — things a count cannot tell you.
+ * ⚠️ These must NOT assert counts. Anything countable is derived below, because
+ * a hardcoded "zero captures" keeps saying zero after the first upload.
+ */
+const CAVEAT: Record<string, string> = {
+  "01 Home": "⛔ nothing for incentives",
+  "02 Requests": "richest section; has a prose contract",
+  "03 Planner": "ships in the base unverified",
+  "04 My Rides": "",
+  "05 Options": "blocks the Settings build",
+  "06 Chat": "shipped surfaces only",
+  "07 Onboarding and Auth": "captured, not built (by decision)",
+  "_annotated": "derivatives, not captures",
+  "_out-of-scope": "excluded feature",
+  "_out-of-app": "not the driver app",
+  "_unregistered": "untriaged — triage before citing",
 };
+
+/** Shoots that count as current. A new dated drop (DAB-*) always does. */
+const CURRENT = new Set(["MRV-B2", "MRV-B3", "BAL-B2"]);
+const isCurrent = (b: string) => CURRENT.has(b) || b.startsWith("DAB-");
+
+/** Derived from the rows, so the table cannot contradict its own counts. */
+function verdict(section: string, rs: Row[]): string {
+  const caveat = CAVEAT[section] ? CAVEAT[section] : "";
+  // `_` buckets are holding pens, not sections to cover — an empty one is fine.
+  if (section.startsWith("_")) return rs.length ? `— ${caveat}` : `— none`;
+  if (rs.length === 0) return `🔴 **zero captures**${caveat ? ` — ${caveat}` : ""}`;
+  const cur = rs.filter((r) => isCurrent(r.build)).length;
+  const tail = caveat ? ` — ${caveat}` : "";
+  if (cur === 0) return `🕐 **stale build** — 0 of ${rs.length} from a current shoot${tail}`;
+  if (cur * 2 < rs.length) return `🕐 mostly stale — ${cur} of ${rs.length} current${tail}`;
+  return `✅ ${cur} of ${rs.length} from a current shoot${tail}`;
+}
 
 const L: string[] = [];
 const w = (s = "") => L.push(s);
@@ -218,7 +263,7 @@ for (const s of SECTIONS) {
   // current one is a stale section, and "newest: B2" would hide exactly that.
   const mix = [...rs.reduce((m2, r) => m2.set(r.build, (m2.get(r.build) ?? 0) + 1), new Map<string, number>())]
     .sort((a, b2) => b2[1] - a[1]).map(([b2, n]) => `${b2}×${n}`).join(", ") || "—";
-  w(`| **${s}** | ${rs.length} | ${mb(rs.reduce((a, r) => a + r.bytes, 0))} | ${mix} | ${VERDICT[s]} |`);
+  w(`| **${s}** | ${rs.length} | ${mb(rs.reduce((a, r) => a + r.bytes, 0))} | ${mix} | ${verdict(s, rs)} |`);
 }
 w(`| **TOTAL** | **${rows.length}** | **${mb(rows.reduce((a, r) => a + r.bytes, 0))}** | | ${scanned} files on disk, ${rows.length} unique |`);
 w("");
@@ -228,7 +273,7 @@ let i = 0;
 for (const s of SECTIONS) {
   w(`## ${s}`); w(""); w(NOTE[s]); w("");
   const rs = rows.filter((r) => r.section === s);
-  if (!rs.length) { w("_No captures._"); w(""); continue; }
+  if (!rs.length) { w("🔴 **No captures.** Nothing here has been photographed."); w(""); continue; }
   w("| CAP | Name | Build | SHA-256 | Dup | Shows |");
   w("| --- | --- | --- | --- | ---: | --- |");
   for (const r of rs) {

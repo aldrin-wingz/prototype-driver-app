@@ -25,6 +25,7 @@ const INDEX = join(REPO, "references/captures/INDEX.md");
 // The sources the index claims to cover. Adding a source here without
 // regenerating the index is meant to fail check 2.
 const SOURCES = [
+  "Project - Driver App Base/Captures",
   "Project - Map Request View",
   "Project - In-App Balance Dashboard/Internal Guide/Screenshots",
   "Project - In-App Balance Dashboard/Slack Attachments - Copy Updates",

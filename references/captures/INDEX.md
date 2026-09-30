@@ -55,17 +55,17 @@ and predates the build in any case. It is not a source.
 
 | Section | Captures | MB | Build mix | Verdict |
 | --- | ---: | ---: | --- | --- |
-| **01 Home** | 29 | 13.3 | BAL-B1×21, BAL-B2×5, Apr-2026×3 | ✅ strong for balance/wallet/payouts; ⛔ **zero for incentives** |
-| **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ strongest section |
-| **03 Planner** | 0 | 0.0 | — | 🔴 **zero captures** |
-| **04 My Rides** | 25 | 8.8 | Apr-2026×24, MRV-B2×1 | 🕐 **stale build** — 24 of 25 predate every MRV batch |
-| **05 Options** | 0 | 0.0 | — | 🔴 **zero captures** — blocks Settings |
-| **06 Chat** | 14 | 6.7 | Sep-2026×10, MRV-B2×4 | ✅ for the shipped surfaces |
-| **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ captured, not built (by decision) |
-| **_annotated** | 64 | 16.4 | derived×64 | — derivatives |
+| **01 Home** | 29 | 13.3 | BAL-B1×21, BAL-B2×5, Apr-2026×3 | 🕐 mostly stale — 5 of 29 current — ⛔ nothing for incentives |
+| **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
+| **03 Planner** | 0 | 0.0 | — | 🔴 **zero captures** — ships in the base unverified |
+| **04 My Rides** | 25 | 8.8 | Apr-2026×24, MRV-B2×1 | 🕐 mostly stale — 1 of 25 current |
+| **05 Options** | 0 | 0.0 | — | 🔴 **zero captures** — blocks the Settings build |
+| **06 Chat** | 14 | 6.7 | Sep-2026×10, MRV-B2×4 | 🕐 mostly stale — 4 of 14 current — shipped surfaces only |
+| **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ 31 of 37 from a current shoot — captured, not built (by decision) |
+| **_annotated** | 64 | 16.4 | derived×64 | — derivatives, not captures |
 | **_out-of-scope** | 10 | 2.5 | Apr-2026×10 | — excluded feature |
-| **_out-of-app** | 0 | 0.0 | — | — not the driver app |
-| **_unregistered** | 82 | 40.6 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | ⚠️ untriaged |
+| **_out-of-app** | 0 | 0.0 | — | — none |
+| **_unregistered** | 82 | 40.6 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
 | **TOTAL** | **294** | **126.6** | | 400 files on disk, 294 unique |
 
 ---
@@ -220,9 +220,9 @@ Map View, list view, filters, drop-off filter, empty state, Special Offers. The 
 
 ## 03 Planner
 
-⛔ **EMPTY.** No production capture of Planner exists in any in-scope source, so Planner ships in the base unverified (🕐 No capture). The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.
+Planner dashboard, timeblocks and their states. The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.
 
-_No captures._
+🔴 **No captures.** Nothing here has been photographed.
 
 ## 04 My Rides
 
@@ -288,9 +288,9 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 
 ## 05 Options
 
-⛔ **EMPTY.** Settings/Options has no capture in any in-scope source. This is what blocks the Settings build. Shot list is in the Working Plan.
+The Options menu and every Settings sub-screen. Settings cannot be replicated until this section has captures — the shot list is in the Working Plan.
 
-_No captures._
+🔴 **No captures.** Nothing here has been photographed.
 
 ## 06 Chat
 
@@ -594,7 +594,7 @@ Rider no-show and support-form captures — real production captures of a featur
 
 The web Onboarding Portal (CS-side), not the driver app.
 
-_No captures._
+🔴 **No captures.** Nothing here has been photographed.
 
 ## _unregistered
 
