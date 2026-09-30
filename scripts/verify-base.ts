@@ -21,6 +21,10 @@ import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  DEFAULT_RIDE_HISTORY_FILTER, RIDE_HISTORY_FILTERS, applyRideHistoryFilter,
+  isLateTrip, isMissingSignature,
+} from "../lib/driver-data/ride-history";
+import {
   APP_VERSION, DRIVER_NAME, INSTALL_ID_PLACEHOLDER, OPTIONS_ROWS,
 } from "../lib/driver-data/options-menu";
 import {
@@ -278,9 +282,17 @@ const INVENTED = ["Settings", "Help & Support", "Log Out"];
 const reintroduced = INVENTED.filter((i) => labels.includes(i));
 check("no invented rows", reintroduced.length ? reintroduced.join(", ") : `0 of ${INVENTED.length} present`, reintroduced.length === 0);
 
-const wired = OPTIONS_ROWS.filter((r) => r.href);
-check("only captured destinations are wired", `${wired.length} of ${OPTIONS_ROWS.length} wired (${wired.map((r) => r.label).join(", ") || "none"})`,
-  wired.length === 1 && wired[0].id === "ride-history");
+/**
+ * Exactly the destinations the 2026-10-01 shoot captured, and no others.
+ * Wiring an uncaptured row means inventing a screen.
+ */
+const CAPTURED_DESTINATIONS = ["ride-history", "id-badge"];
+const wired = OPTIONS_ROWS.filter((r) => r.href).map((r) => r.id).sort();
+check(
+  "only captured destinations are wired",
+  `${wired.length} wired (${wired.join(", ") || "none"}) of ${OPTIONS_ROWS.length} rows`,
+  wired.join(",") === CAPTURED_DESTINATIONS.slice().sort().join(","),
+);
 
 const destructive = OPTIONS_ROWS.filter((r) => r.destructive).map((r) => r.label);
 check("Logout is the only destructive row", destructive.join(", ") || "none", destructive.length === 1 && destructive[0] === "Logout");
@@ -295,6 +307,37 @@ check("every row but Logout has a sub-line", noDesc.join(", ") || "none", noDesc
 check("install id is a placeholder", INSTALL_ID_PLACEHOLDER, /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(INSTALL_ID_PLACEHOLDER));
 check("app version matches the captured footer", APP_VERSION, APP_VERSION.startsWith("v6.0.537"));
 check("driver name is the seeded test account", DRIVER_NAME, DRIVER_NAME.includes("Test Driver"));
+
+// ---------------------------------------------------------------------------
+console.log("\n3d. Ride History filter");
+// ---------------------------------------------------------------------------
+// Captures `04-02` / `04-03`. Only the LABELS are captured; the predicates are
+// inferred and the data they match is seeded, so what is guarded here is that
+// the control is real — three options, and each returning a DIFFERENT,
+// non-empty set. A filter whose options all return everything is a dead
+// control that still looks alive.
+
+const rhLabels = RIDE_HISTORY_FILTERS.map((f) => f.label);
+check("filter options match the capture", rhLabels.join(" | "),
+  rhLabels.join(" | ") === "All | Missing Signatures | Late Trips");
+check("default filter is All", DEFAULT_RIDE_HISTORY_FILTER, DEFAULT_RIDE_HISTORY_FILTER === "all");
+
+const rhAll = applyRideHistoryFilter(mockCompletedTrips, "all").length;
+const rhSig = applyRideHistoryFilter(mockCompletedTrips, "missing-signatures").length;
+const rhLate = applyRideHistoryFilter(mockCompletedTrips, "late-trips").length;
+check("All returns every completed trip", `${rhAll} of ${mockCompletedTrips.length}`, rhAll === mockCompletedTrips.length);
+check("Missing Signatures is seeded and narrows", `${rhSig} of ${rhAll}`, rhSig > 0 && rhSig < rhAll);
+check("Late Trips is seeded and narrows", `${rhLate} of ${rhAll}`, rhLate > 0 && rhLate < rhAll);
+check("the two filters select different sets",
+  `signatures=${rhSig} late=${rhLate}`,
+  applyRideHistoryFilter(mockCompletedTrips, "missing-signatures").map((t) => t.id).join(",") !==
+  applyRideHistoryFilter(mockCompletedTrips, "late-trips").map((t) => t.id).join(","));
+// absent must NOT read as missing — only an explicit false does
+const absent = mockCompletedTrips.filter((t) => t.signatureCaptured === undefined);
+check("absent signature is not 'missing'", `${absent.length} trips leave it unset, 0 counted as missing`,
+  absent.every((t) => !isMissingSignature(t)));
+check("late predicate needs an explicit true", `${mockCompletedTrips.filter(isLateTrip).length} late`,
+  mockCompletedTrips.filter((t) => t.wasLate === undefined).every((t) => !isLateTrip(t)));
 
 // ---------------------------------------------------------------------------
 console.log("\n4. Colour tokens are literal strings");

@@ -31,7 +31,7 @@ export interface OptionsRow {
 export const OPTIONS_ROWS: OptionsRow[] = [
   { id: "ride-history", label: "Ride History", description: "View all your Ride History", href: "/ride-history" },
   { id: "driver-dashboard", label: "Driver Dashboard", description: "View your Driver Dashboard" },
-  { id: "id-badge", label: "ID Badge", description: "View your ID Badge" },
+  { id: "id-badge", label: "ID Badge", description: "View your ID Badge", href: "/id-badge" },
   { id: "contact-support", label: "Contact Support", description: "Contact Support for any issues" },
   { id: "driver-notes", label: "Driver Notes", description: "Leave notes for trip routing and dispatch" },
   { id: "default-map-service", label: "Default Map Service", description: "Manage default map service" },

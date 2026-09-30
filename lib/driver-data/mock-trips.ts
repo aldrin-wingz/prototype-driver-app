@@ -142,6 +142,26 @@ export interface Trip {
   incentiveTypes: IncentiveType[];
   /** Whether this client/market is enrolled in incentive programs. */
   clientEnrolledInIncentives?: boolean;
+  /**
+   * Whether the rider's signature was captured on completion.
+   *
+   * ⚠️ **SEEDED.** The prototype captures no signatures. It exists because
+   * Ride History's filter offers **Missing Signatures** (capture `04-03`) and a
+   * filter with nothing to filter is a dead control. Completed Ride Details
+   * shows a Signatures section (capture `04-04`), so the state is real in
+   * production — only these values are invented.
+   *
+   * Absent is treated as captured; only an explicit `false` is "missing".
+   */
+  signatureCaptured?: boolean;
+  /**
+   * Whether the trip ran late against its appointment time.
+   *
+   * ⚠️ **SEEDED**, for the same reason — Ride History filters on **Late Trips**.
+   * Not derived from the leg times, because the prototype has no clock to
+   * compare them against.
+   */
+  wasLate?: boolean;
 }
 
 export interface TripPill {
@@ -1244,6 +1264,7 @@ export const mockCompletedTrips: Trip[] = [
   },
   {
     id: "RECENT-COMP-002",
+    signatureCaptured: false,
     date: "Fri, Jul 24, 2026",
     rider: "LORETTA BRANSCOMBE",
     client: "Alivi",
@@ -1280,6 +1301,7 @@ export const mockCompletedTrips: Trip[] = [
   },
   {
     id: "RECENT-COMP-003",
+    wasLate: true,
     date: "Sat, Jul 18, 2026",
     rider: "AMARA OKONKWO",
     client: "Alivi",
@@ -1332,6 +1354,8 @@ export const mockCompletedTrips: Trip[] = [
   },
   {
     id: "RECENT-COMP-005",
+    signatureCaptured: false,
+    wasLate: true,
     date: "Thu, Jun 25, 2026",
     rider: "EDWIN CASTELLANOS",
     client: "MTM",
@@ -1360,6 +1384,7 @@ export const mockCompletedTrips: Trip[] = [
   // === CURRENT PERIOD (Apr 28–May 4, 2026): 3 trips totaling $342.50 ===
   {
     id: "CURRENT-COMP-001",
+    wasLate: true,
     date: "Tue, Apr 28, 2026",
     rider: "Casey P.",
     client: "Verida",
@@ -1428,6 +1453,7 @@ export const mockCompletedTrips: Trip[] = [
   },
   {
     id: "CURRENT-COMP-003",
+    signatureCaptured: false,
     date: "Sat, May 2, 2026",
     rider: "Jamie L.",
     client: "MTM",
@@ -1507,6 +1533,7 @@ export const mockCompletedTrips: Trip[] = [
   },
   {
     id: "COMP-002",
+    wasLate: true,
     date: "Thu, Dec 28, 2023",
     rider: "Hollis Danvers",
     client: "Verida",

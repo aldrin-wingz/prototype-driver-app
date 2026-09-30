@@ -24,9 +24,12 @@ import {
  * scope)". Production has eleven rows and no row called Settings. The row list
  * now lives in `lib/driver-data/options-menu.ts`.
  *
- * ⚠️ Only Ride History is wired. The other destinations have not been captured,
- * so replicating them would be invention — they take the repo's standard
- * unwired-action toast instead, which is honest about what the prototype knows.
+ * ⚠️ Only Ride History and ID Badge are wired — the only two destinations this
+ * shoot captured (`04-01`, `05-06`/`05-07`). The other nine have not been
+ * captured, so replicating them would be invention; they take the repo's
+ * standard unwired-action toast instead, which is honest about what the
+ * prototype knows. Driver Notes is the exception: it is a modal, and `05-05`
+ * captures it.
  */
 const ICONS: Record<OptionsRowId, typeof History> = {
   "ride-history": History,
