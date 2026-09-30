@@ -21,6 +21,9 @@ import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  APP_VERSION, DRIVER_NAME, INSTALL_ID_PLACEHOLDER, OPTIONS_ROWS,
+} from "../lib/driver-data/options-menu";
+import {
   BANNER, DEFAULT_DETENT, EXPOSED_PCT, SORT_OPTIONS, countLine, groupByPickupDay,
   isWillCall, pinPosition, sortTrips, visibleTrips,
 } from "../lib/driver-data/map-view";
@@ -249,6 +252,49 @@ check("sorts produce different orders", `${new Set(orders).size} distinct of ${o
 
 check("both card banners defined", `${BANNER.standard.label} / ${BANNER["special-offers"].label}`,
   BANNER.standard.note === "Instant assignment" && BANNER["special-offers"].note === "Manual review");
+
+// ---------------------------------------------------------------------------
+console.log("\n3c. Options menu");
+// ---------------------------------------------------------------------------
+// Replicated from capture shoot DAB-2026-10-01 (`05-01`-`05-04`). This is the
+// section the base got MOST wrong: the stub listed four invented rows and only
+// one of them existed. These assertions are what stop it drifting back.
+
+const CAPTURED_ORDER = [
+  "Ride History", "Driver Dashboard", "ID Badge", "Contact Support",
+  "Driver Notes", "Default Map Service", "Location", "Privacy Policy",
+  "Driver Terms and Conditions", "Check for updates", "Logout",
+];
+const labels = OPTIONS_ROWS.map((r) => r.label);
+check("Options row count", `${labels.length} rows`, labels.length === CAPTURED_ORDER.length);
+check(
+  "Options rows match the capture, in order",
+  labels.join(" | ") === CAPTURED_ORDER.join(" | ") ? `all ${labels.length} in captured order` : `got: ${labels.join(", ")}`,
+  labels.join(" | ") === CAPTURED_ORDER.join(" | "),
+);
+
+// The stub's invented rows must never come back.
+const INVENTED = ["Settings", "Help & Support", "Log Out"];
+const reintroduced = INVENTED.filter((i) => labels.includes(i));
+check("no invented rows", reintroduced.length ? reintroduced.join(", ") : `0 of ${INVENTED.length} present`, reintroduced.length === 0);
+
+const wired = OPTIONS_ROWS.filter((r) => r.href);
+check("only captured destinations are wired", `${wired.length} of ${OPTIONS_ROWS.length} wired (${wired.map((r) => r.label).join(", ") || "none"})`,
+  wired.length === 1 && wired[0].id === "ride-history");
+
+const destructive = OPTIONS_ROWS.filter((r) => r.destructive).map((r) => r.label);
+check("Logout is the only destructive row", destructive.join(", ") || "none", destructive.length === 1 && destructive[0] === "Logout");
+
+const noDesc = OPTIONS_ROWS.filter((r) => !r.description).map((r) => r.label);
+check("every row but Logout has a sub-line", noDesc.join(", ") || "none", noDesc.length === 1 && noDesc[0] === "Logout");
+
+/**
+ * ⛔ The captured footer appends a real install UUID, and the captured account's
+ * ID Badge carries a real person's photograph. Neither may be replicated.
+ */
+check("install id is a placeholder", INSTALL_ID_PLACEHOLDER, /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(INSTALL_ID_PLACEHOLDER));
+check("app version matches the captured footer", APP_VERSION, APP_VERSION.startsWith("v6.0.537"));
+check("driver name is the seeded test account", DRIVER_NAME, DRIVER_NAME.includes("Test Driver"));
 
 // ---------------------------------------------------------------------------
 console.log("\n4. Colour tokens are literal strings");
