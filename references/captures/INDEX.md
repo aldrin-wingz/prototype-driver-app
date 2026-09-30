@@ -13,7 +13,7 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~132.2 MB of binaries into a branch that every future prototype clones — and
+~133.1 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
@@ -57,7 +57,7 @@ and predates the build in any case. It is not a source.
 | --- | ---: | ---: | --- | --- |
 | **01 Home** | 29 | 13.3 | BAL-B1×21, BAL-B2×5, Apr-2026×3 | 🕐 mostly stale — 5 of 29 current — ⛔ nothing for incentives |
 | **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
-| **03 Planner** | 0 | 0.0 | — | 🔴 **zero captures** — ships in the base unverified |
+| **03 Planner** | 2 | 0.9 | DAB-2026-10-01×2 | ✅ 2 of 2 from a current shoot — ships in the base unverified |
 | **04 My Rides** | 29 | 11.2 | Apr-2026×24, DAB-2026-10-01×4, MRV-B2×1 | 🕐 mostly stale — 5 of 29 current |
 | **05 Options** | 7 | 3.2 | DAB-2026-10-01×7 | ✅ 7 of 7 from a current shoot — menu captured; most destinations behind its rows are not |
 | **06 Chat** | 14 | 6.7 | Sep-2026×10, MRV-B2×4 | 🕐 mostly stale — 4 of 14 current — shipped surfaces only |
@@ -66,7 +66,7 @@ and predates the build in any case. It is not a source.
 | **_out-of-scope** | 10 | 2.5 | Apr-2026×10 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
 | **_unregistered** | 82 | 40.6 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **305** | **132.2** | | 411 files on disk, 305 unique |
+| **TOTAL** | **307** | **133.1** | | 413 files on disk, 307 unique |
 
 ---
 
@@ -222,7 +222,17 @@ Map View, list view, filters, drop-off filter, empty state, Special Offers. The 
 
 Planner dashboard, timeblocks and their states. The vault's only Planner captures are in `Project - Standing Order Offers/Phase 2/References/` (Mar 2026), out of scope by decision — open that folder before shooting.
 
-🔴 **No captures.** Nothing here has been photographed.
+| CAP | Name | Build | SHA-256 | Dup | Shows |
+| --- | --- | --- | --- | ---: | --- |
+| CAP-063 | `03-01 - Planner - Empty Day.png` | DAB-2026-10-01 | `a4c3313aaec58d6f` | 0 |  |
+| CAP-064 | `03-02 - Planner - Empty Day Narrow Window.png` | DAB-2026-10-01 | `f0ecd53826787b49` | 0 |  |
+
+<details><summary>Source paths</summary>
+
+- `CAP-063` — `Project - Driver App Base/Captures/03 Planner/2026-10-01/03-01 - Planner - Empty Day.png`
+- `CAP-064` — `Project - Driver App Base/Captures/03 Planner/2026-10-01/03-02 - Planner - Empty Day Narrow Window.png`
+
+</details>
 
 ## 04 My Rides
 
@@ -230,67 +240,67 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-063 | `03a - My Rides - Needs Action Tab.png` | Apr-2026 | `ba310c0b8e97c2b3` | 1 |  |
-| CAP-064 | `04-01 - Ride History - List.png` | DAB-2026-10-01 | `a4f24bafca041f98` | 0 |  |
-| CAP-065 | `04-02 - Ride History - Filter Sheet.png` | DAB-2026-10-01 | `e2e3a87bf433fda1` | 0 |  |
-| CAP-066 | `04-03 - Ride History - Filter Options Open.png` | DAB-2026-10-01 | `3217717b762eefec` | 0 |  |
-| CAP-067 | `04-04 - Ride Details - Completed From History.png` | DAB-2026-10-01 | `fa8e467764d48a10` | 0 |  |
-| CAP-068 | `04a - Ride Details - Before Taken - Top.png` | Apr-2026 | `aba024b50b98b74f` | 1 |  |
-| CAP-069 | `04b - Ride Details - Before Taken - Scrolled.png` | Apr-2026 | `4bf7c543bc94d87b` | 1 |  |
-| CAP-070 | `05a - Ride Details - Needs Action - Top.png` | Apr-2026 | `f366065f4b78530a` | 1 |  |
-| CAP-071 | `05b - Ride Details - Needs Action - Scrolled.png` | Apr-2026 | `dcdbe83178ae3125` | 1 |  |
-| CAP-072 | `07 - Ride History.png` | Apr-2026 | `ccfe36e86cb1a7eb` | 1 |  |
-| CAP-073 | `08-02 - B2 Claim - Ride Details Swipe.png` | MRV-B2 | `0269294834e32c33` | 0 | Ride Details with the reject / accept swipe bar. Source for `DG-07`. ⚠️ The first annotation pass boxed the trip-detail paragraph instead of the control — re-boxed on the bar itself |
-| CAP-074 | `s-03a - More Options - Grid.jpg` | Apr-2026 | `0638d9819621afc9` | 1 |  |
-| CAP-075 | `s-06d - More Options - Ready To Start Or En-Route Refusal.jpg` | Apr-2026 | `26a4e0759da1981e` | 1 |  |
-| CAP-076 | `s-06e - More Options - Call Member Or Support Sheet.jpg` | Apr-2026 | `3d4a0807453fa36a` | 1 |  |
-| CAP-077 | `Stage 01 - Member Confirmation - Accepted Ride screen.webp` | Apr-2026 | `89c9a26dc78ece69` | 0 |  |
-| CAP-078 | `Stage 01 - Member Confirmation - More Options menu.png` | Apr-2026 | `fc790608d4206010` | 0 |  |
-| CAP-079 | `Stage 01 - Member Confirmation - Phone options popup.png` | Apr-2026 | `175341a87bc679bf` | 0 |  |
-| CAP-080 | `Stage 01 - Member Confirmation - Reach Rider modal (same-day).webp` | Apr-2026 | `589c267b48cbdff0` | 0 |  |
-| CAP-081 | `Stage 01 - Member Confirmation - Reach Rider modal (standard).webp` | Apr-2026 | `4440996c9cb4b7e2` | 0 |  |
-| CAP-082 | `Stage 01 - Member Confirmation - Rider Declined popup.webp` | Apr-2026 | `fd821ede09cda48d` | 0 |  |
-| CAP-083 | `Stage 01 - Member Confirmation - SMS templates popup.png` | Apr-2026 | `b5fe2a582ad16ee7` | 0 |  |
-| CAP-084 | `Stage 02 - Start Trip - Confirmed Accepted Ride screen.webp` | Apr-2026 | `166648f866203bc0` | 2 |  |
-| CAP-085 | `Stage 02 - Start Trip - Pre-Check Confirmation popup.webp` | Apr-2026 | `904cbef61e73e2d1` | 0 |  |
-| CAP-086 | `Stage 03 - Pick Up Member - Active Ride screen.webp` | Apr-2026 | `1fc81fe3c273c34c` | 2 |  |
-| CAP-087 | `Stage 03 - Pick Up Member - Pickup Odometer Reading popup.webp` | Apr-2026 | `028ff700a0e369fa` | 0 |  |
-| CAP-088 | `Stage 03 - Pick Up Member - Seatbelt Check popup.webp` | Apr-2026 | `4fb536beba927cea` | 0 |  |
-| CAP-089 | `Stage 04 - Drop Off Member - Drop Off CTA screen.webp` | Apr-2026 | `160271ffb9b47175` | 2 |  |
-| CAP-090 | `Stage 05 - Ride Signature - Signature capture screen.webp` | Apr-2026 | `ee2017527e4580f9` | 0 |  |
-| CAP-091 | `Stage 06 - Completed Ride - Completion screen.webp` | Apr-2026 | `9951b700ed36e45b` | 0 |  |
+| CAP-065 | `03a - My Rides - Needs Action Tab.png` | Apr-2026 | `ba310c0b8e97c2b3` | 1 |  |
+| CAP-066 | `04-01 - Ride History - List.png` | DAB-2026-10-01 | `a4f24bafca041f98` | 0 |  |
+| CAP-067 | `04-02 - Ride History - Filter Sheet.png` | DAB-2026-10-01 | `e2e3a87bf433fda1` | 0 |  |
+| CAP-068 | `04-03 - Ride History - Filter Options Open.png` | DAB-2026-10-01 | `3217717b762eefec` | 0 |  |
+| CAP-069 | `04-04 - Ride Details - Completed From History.png` | DAB-2026-10-01 | `fa8e467764d48a10` | 0 |  |
+| CAP-070 | `04a - Ride Details - Before Taken - Top.png` | Apr-2026 | `aba024b50b98b74f` | 1 |  |
+| CAP-071 | `04b - Ride Details - Before Taken - Scrolled.png` | Apr-2026 | `4bf7c543bc94d87b` | 1 |  |
+| CAP-072 | `05a - Ride Details - Needs Action - Top.png` | Apr-2026 | `f366065f4b78530a` | 1 |  |
+| CAP-073 | `05b - Ride Details - Needs Action - Scrolled.png` | Apr-2026 | `dcdbe83178ae3125` | 1 |  |
+| CAP-074 | `07 - Ride History.png` | Apr-2026 | `ccfe36e86cb1a7eb` | 1 |  |
+| CAP-075 | `08-02 - B2 Claim - Ride Details Swipe.png` | MRV-B2 | `0269294834e32c33` | 0 | Ride Details with the reject / accept swipe bar. Source for `DG-07`. ⚠️ The first annotation pass boxed the trip-detail paragraph instead of the control — re-boxed on the bar itself |
+| CAP-076 | `s-03a - More Options - Grid.jpg` | Apr-2026 | `0638d9819621afc9` | 1 |  |
+| CAP-077 | `s-06d - More Options - Ready To Start Or En-Route Refusal.jpg` | Apr-2026 | `26a4e0759da1981e` | 1 |  |
+| CAP-078 | `s-06e - More Options - Call Member Or Support Sheet.jpg` | Apr-2026 | `3d4a0807453fa36a` | 1 |  |
+| CAP-079 | `Stage 01 - Member Confirmation - Accepted Ride screen.webp` | Apr-2026 | `89c9a26dc78ece69` | 0 |  |
+| CAP-080 | `Stage 01 - Member Confirmation - More Options menu.png` | Apr-2026 | `fc790608d4206010` | 0 |  |
+| CAP-081 | `Stage 01 - Member Confirmation - Phone options popup.png` | Apr-2026 | `175341a87bc679bf` | 0 |  |
+| CAP-082 | `Stage 01 - Member Confirmation - Reach Rider modal (same-day).webp` | Apr-2026 | `589c267b48cbdff0` | 0 |  |
+| CAP-083 | `Stage 01 - Member Confirmation - Reach Rider modal (standard).webp` | Apr-2026 | `4440996c9cb4b7e2` | 0 |  |
+| CAP-084 | `Stage 01 - Member Confirmation - Rider Declined popup.webp` | Apr-2026 | `fd821ede09cda48d` | 0 |  |
+| CAP-085 | `Stage 01 - Member Confirmation - SMS templates popup.png` | Apr-2026 | `b5fe2a582ad16ee7` | 0 |  |
+| CAP-086 | `Stage 02 - Start Trip - Confirmed Accepted Ride screen.webp` | Apr-2026 | `166648f866203bc0` | 2 |  |
+| CAP-087 | `Stage 02 - Start Trip - Pre-Check Confirmation popup.webp` | Apr-2026 | `904cbef61e73e2d1` | 0 |  |
+| CAP-088 | `Stage 03 - Pick Up Member - Active Ride screen.webp` | Apr-2026 | `1fc81fe3c273c34c` | 2 |  |
+| CAP-089 | `Stage 03 - Pick Up Member - Pickup Odometer Reading popup.webp` | Apr-2026 | `028ff700a0e369fa` | 0 |  |
+| CAP-090 | `Stage 03 - Pick Up Member - Seatbelt Check popup.webp` | Apr-2026 | `4fb536beba927cea` | 0 |  |
+| CAP-091 | `Stage 04 - Drop Off Member - Drop Off CTA screen.webp` | Apr-2026 | `160271ffb9b47175` | 2 |  |
+| CAP-092 | `Stage 05 - Ride Signature - Signature capture screen.webp` | Apr-2026 | `ee2017527e4580f9` | 0 |  |
+| CAP-093 | `Stage 06 - Completed Ride - Completion screen.webp` | Apr-2026 | `9951b700ed36e45b` | 0 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-063` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/03a - My Rides - Needs Action Tab.png`
-- `CAP-064` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-01 - Ride History - List.png`
-- `CAP-065` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-02 - Ride History - Filter Sheet.png`
-- `CAP-066` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-03 - Ride History - Filter Options Open.png`
-- `CAP-067` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-04 - Ride Details - Completed From History.png`
-- `CAP-068` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04a - Ride Details - Before Taken - Top.png`
-- `CAP-069` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04b - Ride Details - Before Taken - Scrolled.png`
-- `CAP-070` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/05a - Ride Details - Needs Action - Top.png`
-- `CAP-071` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/05b - Ride Details - Needs Action - Scrolled.png`
-- `CAP-072` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/07 - Ride History.png`
-- `CAP-073` — `Project - Map Request View/Internal Guide/Screenshots/08 - Claiming/08-02 - B2 Claim - Ride Details Swipe.png`
-- `CAP-074` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-03a - More Options - Grid.jpg`
-- `CAP-075` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06d - More Options - Ready To Start Or En-Route Refusal.jpg`
-- `CAP-076` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06e - More Options - Call Member Or Support Sheet.jpg`
-- `CAP-077` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Accepted Ride screen.webp`
-- `CAP-078` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - More Options menu.png`
-- `CAP-079` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Phone options popup.png`
-- `CAP-080` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Reach Rider modal (same-day).webp`
-- `CAP-081` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Reach Rider modal (standard).webp`
-- `CAP-082` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Rider Declined popup.webp`
-- `CAP-083` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - SMS templates popup.png`
-- `CAP-084` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 02 - Start Trip - Confirmed Accepted Ride screen.webp`
-- `CAP-085` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 02 - Start Trip - Pre-Check Confirmation popup.webp`
-- `CAP-086` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 03 - Pick Up Member - Active Ride screen.webp`
-- `CAP-087` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 03 - Pick Up Member - Pickup Odometer Reading popup.webp`
-- `CAP-088` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 03 - Pick Up Member - Seatbelt Check popup.webp`
-- `CAP-089` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 04 - Drop Off Member - Drop Off CTA screen.webp`
-- `CAP-090` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 05 - Ride Signature - Signature capture screen.webp`
-- `CAP-091` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 06 - Completed Ride - Completion screen.webp`
+- `CAP-065` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/03a - My Rides - Needs Action Tab.png`
+- `CAP-066` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-01 - Ride History - List.png`
+- `CAP-067` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-02 - Ride History - Filter Sheet.png`
+- `CAP-068` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-03 - Ride History - Filter Options Open.png`
+- `CAP-069` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-04 - Ride Details - Completed From History.png`
+- `CAP-070` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04a - Ride Details - Before Taken - Top.png`
+- `CAP-071` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04b - Ride Details - Before Taken - Scrolled.png`
+- `CAP-072` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/05a - Ride Details - Needs Action - Top.png`
+- `CAP-073` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/05b - Ride Details - Needs Action - Scrolled.png`
+- `CAP-074` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/07 - Ride History.png`
+- `CAP-075` — `Project - Map Request View/Internal Guide/Screenshots/08 - Claiming/08-02 - B2 Claim - Ride Details Swipe.png`
+- `CAP-076` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-03a - More Options - Grid.jpg`
+- `CAP-077` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06d - More Options - Ready To Start Or En-Route Refusal.jpg`
+- `CAP-078` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06e - More Options - Call Member Or Support Sheet.jpg`
+- `CAP-079` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Accepted Ride screen.webp`
+- `CAP-080` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - More Options menu.png`
+- `CAP-081` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Phone options popup.png`
+- `CAP-082` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Reach Rider modal (same-day).webp`
+- `CAP-083` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Reach Rider modal (standard).webp`
+- `CAP-084` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - Rider Declined popup.webp`
+- `CAP-085` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 01 - Member Confirmation - SMS templates popup.png`
+- `CAP-086` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 02 - Start Trip - Confirmed Accepted Ride screen.webp`
+- `CAP-087` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 02 - Start Trip - Pre-Check Confirmation popup.webp`
+- `CAP-088` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 03 - Pick Up Member - Active Ride screen.webp`
+- `CAP-089` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 03 - Pick Up Member - Pickup Odometer Reading popup.webp`
+- `CAP-090` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 03 - Pick Up Member - Seatbelt Check popup.webp`
+- `CAP-091` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 04 - Drop Off Member - Drop Off CTA screen.webp`
+- `CAP-092` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 05 - Ride Signature - Signature capture screen.webp`
+- `CAP-093` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Stage 06 - Completed Ride - Completion screen.webp`
 
 </details>
 
@@ -300,23 +310,23 @@ The Options menu and the screens behind its rows. The menu itself is captured (`
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-092 | `05-01 - Options - Menu Top.png` | DAB-2026-10-01 | `075d9c3e31e121f6` | 0 |  |
-| CAP-093 | `05-02 - Options - Menu Scrolled.png` | DAB-2026-10-01 | `51bcfd0129726272` | 0 |  |
-| CAP-094 | `05-03 - Options - Menu Lower.png` | DAB-2026-10-01 | `4960b96fc319b86a` | 0 |  |
-| CAP-095 | `05-04 - Options - Menu Bottom With Version.png` | DAB-2026-10-01 | `475a7de3c8dc0c6f` | 0 |  |
-| CAP-096 | `05-05 - Driver Notes - Empty Modal.png` | DAB-2026-10-01 | `f851ca8d5b3d194a` | 0 |  |
-| CAP-097 | `05-06 - ID Badge - Top.png` | DAB-2026-10-01 | `064444aae88ecbc5` | 0 |  |
-| CAP-098 | `05-07 - ID Badge - Scrolled With Print Link.png` | DAB-2026-10-01 | `5d7cdf107164a413` | 0 |  |
+| CAP-094 | `05-01 - Options - Menu Top.png` | DAB-2026-10-01 | `075d9c3e31e121f6` | 0 |  |
+| CAP-095 | `05-02 - Options - Menu Scrolled.png` | DAB-2026-10-01 | `51bcfd0129726272` | 0 |  |
+| CAP-096 | `05-03 - Options - Menu Lower.png` | DAB-2026-10-01 | `4960b96fc319b86a` | 0 |  |
+| CAP-097 | `05-04 - Options - Menu Bottom With Version.png` | DAB-2026-10-01 | `475a7de3c8dc0c6f` | 0 |  |
+| CAP-098 | `05-05 - Driver Notes - Empty Modal.png` | DAB-2026-10-01 | `f851ca8d5b3d194a` | 0 |  |
+| CAP-099 | `05-06 - ID Badge - Top.png` | DAB-2026-10-01 | `064444aae88ecbc5` | 0 |  |
+| CAP-100 | `05-07 - ID Badge - Scrolled With Print Link.png` | DAB-2026-10-01 | `5d7cdf107164a413` | 0 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-092` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-01 - Options - Menu Top.png`
-- `CAP-093` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-02 - Options - Menu Scrolled.png`
-- `CAP-094` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-03 - Options - Menu Lower.png`
-- `CAP-095` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-04 - Options - Menu Bottom With Version.png`
-- `CAP-096` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-05 - Driver Notes - Empty Modal.png`
-- `CAP-097` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-06 - ID Badge - Top.png`
-- `CAP-098` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-07 - ID Badge - Scrolled With Print Link.png`
+- `CAP-094` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-01 - Options - Menu Top.png`
+- `CAP-095` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-02 - Options - Menu Scrolled.png`
+- `CAP-096` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-03 - Options - Menu Lower.png`
+- `CAP-097` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-04 - Options - Menu Bottom With Version.png`
+- `CAP-098` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-05 - Driver Notes - Empty Modal.png`
+- `CAP-099` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-06 - ID Badge - Top.png`
+- `CAP-100` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-07 - ID Badge - Scrolled With Print Link.png`
 
 </details>
 
@@ -326,37 +336,37 @@ Two distinct SHIPPED surfaces: the Zendesk support bubble, and Onboarding Suppor
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-099 | `12-01 - B2 Messages - List Empty.png` | MRV-B2 | `356bcddbaba31563` | 0 | Messages list, empty — one row, **Onboarding Support**, *No messages yet*. The conversation exists before anything is said |
-| CAP-100 | `12-02 - B2 Messages - List Unread.png` | MRV-B2 | `46b1d67273cb9d57` | 0 | Messages list with an unread — **Onboarding Support · 4:07 AM**, preview *Luis: Need any help?*, green unread count, red dot on the header icon |
-| CAP-101 | `12-03 - B2 Messages - Thread Empty.png` | MRV-B2 | `d8c723b5c19d9b3b` | 0 | Open thread, empty — *No chats here yet…*, **+** attach control and *Send a message* box with a greyed send arrow |
-| CAP-102 | `12-04 - B2 Messages - Composing.png` | MRV-B2 | `bc661bdf741b2981` | 0 | Composing — incoming message present, *Lets get started!* typed, send arrow now green |
-| CAP-103 | `c-01a - Home - Chat Bubble In Header.png` | Sep-2026 | `2ecc0730dc59f0f4` | 0 |  |
-| CAP-104 | `c-01b - Requests - Chat Bubble In Header.png` | Sep-2026 | `9de420254d2a963f` | 0 |  |
-| CAP-105 | `c-01c - My Rides - Chat Bubble In Header.png` | Sep-2026 | `6dc8e30f6871b9ac` | 0 |  |
-| CAP-106 | `c-01d - Planner - No Chat Bubble.png` | Sep-2026 | `97109d6776f99242` | 0 |  |
-| CAP-107 | `c-01e - Options - No Chat Bubble.png` | Sep-2026 | `4574b8f91a77f4dc` | 0 |  |
-| CAP-108 | `c-01f - Ride Details - Back Chevron Wins.png` | Sep-2026 | `cb4e77ac91ef5e97` | 0 |  |
-| CAP-109 | `c-02a - Onboarding - Help Bubble Entry Point.png` | Sep-2026 | `2bcee49e3e6dca0b` | 0 |  |
-| CAP-110 | `c-03a - In-App Chat - Messages Inbox Sheet.png` | Sep-2026 | `86cada76c01f7952` | 0 |  |
-| CAP-111 | `c-04a - In-App Chat - Thread And Composer.png` | Sep-2026 | `1d24ff4f5e60e81e` | 0 |  |
-| CAP-112 | `c-05a - Zendesk Support Chat - Conversation Inbox.png` | Sep-2026 | `9e965553db83d272` | 0 |  |
+| CAP-101 | `12-01 - B2 Messages - List Empty.png` | MRV-B2 | `356bcddbaba31563` | 0 | Messages list, empty — one row, **Onboarding Support**, *No messages yet*. The conversation exists before anything is said |
+| CAP-102 | `12-02 - B2 Messages - List Unread.png` | MRV-B2 | `46b1d67273cb9d57` | 0 | Messages list with an unread — **Onboarding Support · 4:07 AM**, preview *Luis: Need any help?*, green unread count, red dot on the header icon |
+| CAP-103 | `12-03 - B2 Messages - Thread Empty.png` | MRV-B2 | `d8c723b5c19d9b3b` | 0 | Open thread, empty — *No chats here yet…*, **+** attach control and *Send a message* box with a greyed send arrow |
+| CAP-104 | `12-04 - B2 Messages - Composing.png` | MRV-B2 | `bc661bdf741b2981` | 0 | Composing — incoming message present, *Lets get started!* typed, send arrow now green |
+| CAP-105 | `c-01a - Home - Chat Bubble In Header.png` | Sep-2026 | `2ecc0730dc59f0f4` | 0 |  |
+| CAP-106 | `c-01b - Requests - Chat Bubble In Header.png` | Sep-2026 | `9de420254d2a963f` | 0 |  |
+| CAP-107 | `c-01c - My Rides - Chat Bubble In Header.png` | Sep-2026 | `6dc8e30f6871b9ac` | 0 |  |
+| CAP-108 | `c-01d - Planner - No Chat Bubble.png` | Sep-2026 | `97109d6776f99242` | 0 |  |
+| CAP-109 | `c-01e - Options - No Chat Bubble.png` | Sep-2026 | `4574b8f91a77f4dc` | 0 |  |
+| CAP-110 | `c-01f - Ride Details - Back Chevron Wins.png` | Sep-2026 | `cb4e77ac91ef5e97` | 0 |  |
+| CAP-111 | `c-02a - Onboarding - Help Bubble Entry Point.png` | Sep-2026 | `2bcee49e3e6dca0b` | 0 |  |
+| CAP-112 | `c-03a - In-App Chat - Messages Inbox Sheet.png` | Sep-2026 | `86cada76c01f7952` | 0 |  |
+| CAP-113 | `c-04a - In-App Chat - Thread And Composer.png` | Sep-2026 | `1d24ff4f5e60e81e` | 0 |  |
+| CAP-114 | `c-05a - Zendesk Support Chat - Conversation Inbox.png` | Sep-2026 | `9e965553db83d272` | 0 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-099` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-01 - B2 Messages - List Empty.png`
-- `CAP-100` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-02 - B2 Messages - List Unread.png`
-- `CAP-101` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-03 - B2 Messages - Thread Empty.png`
-- `CAP-102` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-04 - B2 Messages - Composing.png`
-- `CAP-103` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01a - Home - Chat Bubble In Header.png`
-- `CAP-104` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01b - Requests - Chat Bubble In Header.png`
-- `CAP-105` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01c - My Rides - Chat Bubble In Header.png`
-- `CAP-106` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01d - Planner - No Chat Bubble.png`
-- `CAP-107` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01e - Options - No Chat Bubble.png`
-- `CAP-108` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01f - Ride Details - Back Chevron Wins.png`
-- `CAP-109` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-02a - Onboarding - Help Bubble Entry Point.png`
-- `CAP-110` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-03a - In-App Chat - Messages Inbox Sheet.png`
-- `CAP-111` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-04a - In-App Chat - Thread And Composer.png`
-- `CAP-112` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-05a - Zendesk Support Chat - Conversation Inbox.png`
+- `CAP-101` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-01 - B2 Messages - List Empty.png`
+- `CAP-102` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-02 - B2 Messages - List Unread.png`
+- `CAP-103` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-03 - B2 Messages - Thread Empty.png`
+- `CAP-104` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-04 - B2 Messages - Composing.png`
+- `CAP-105` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01a - Home - Chat Bubble In Header.png`
+- `CAP-106` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01b - Requests - Chat Bubble In Header.png`
+- `CAP-107` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01c - My Rides - Chat Bubble In Header.png`
+- `CAP-108` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01d - Planner - No Chat Bubble.png`
+- `CAP-109` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01e - Options - No Chat Bubble.png`
+- `CAP-110` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-01f - Ride Details - Back Chevron Wins.png`
+- `CAP-111` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-02a - Onboarding - Help Bubble Entry Point.png`
+- `CAP-112` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-03a - In-App Chat - Messages Inbox Sheet.png`
+- `CAP-113` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-04a - In-App Chat - Thread And Composer.png`
+- `CAP-114` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/c-05a - Zendesk Support Chat - Conversation Inbox.png`
 
 </details>
 
@@ -366,83 +376,83 @@ Login/OTP, intro screens, sign-up application, migration. **Shipped, captured, a
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-113 | `01-04 - Before - Tap Sign In With Email.jpg` | MRV-B1 | `f2bb1476b3ffcdb2` | 0 | BEFORE: red box on **Sign in with email instead** — the route back to the old login |
-| CAP-114 | `01-05 - B2 Login - Phone Number Entry.png` | MRV-B2 | `a78db4b92e5c4ebe` | 0 | Sign in to Wingz — phone number field with **+1** prefilled, greyed **Send code**, *Sign in with email instead*, *Not a driver yet? Sign up* |
-| CAP-115 | `01-06 - B2 Login - Verification Code.png` | MRV-B2 | `5a60d56f42439ee0` | 0 | Enter verification code — six boxes, first focused, **Resend code in 88s** countdown, *Change phone number* |
-| CAP-116 | `01-07 - B2 Login - Invalid Or Expired OTP.png` | MRV-B2 | `bc714fb0d73cdcb3` | 0 | ⭐ Code rejected — six filled boxes and the red error **"Invalid or expired OTP."**, Verify now enabled, resend at 83s |
-| CAP-117 | `01-08 - B2 Login - OTP Rate Limit.png` | MRV-B2 | `2e625c31706dabe2` | 0 | ⭐ Rate limit — red **"You must wait 90 seconds to request an OTP again."** under the number field. A second, distinct failure mode from the invalid-code error |
-| CAP-118 | `01-09 - B2 Login - Email And Password.png` | MRV-B2 | `27ce56c7975fbebb` | 0 | Email sign-in — Email, Password with a show/hide eye, **Forgot password?**, greyed **Sign in**, *Sign in with phone instead* |
-| CAP-119 | `01-10 - B2 Login - Reset Password.png` | MRV-B2 | `c2c8316365c27a11` | 0 | ⭐ **Reset Password** — asks for the account email and sends reset instructions. Previously undocumented; the old article named the link but could not say where it led |
-| CAP-120 | `01-11 - B2 Login - Home After Sign In.png` | MRV-B2 | `427a2911c370ffee` | 0 | Home after signing in — Balance card, This Month earnings, and the five-tab bottom row (Home · Requests · Planner · My Rides · Options). ⚠️ Carries the Balance Dashboard release UI |
-| CAP-121 | `02-05 - B2 Intro - Care For Riders.png` | MRV-B2 | `345834c78ae16dac` | 0 | Intro 1 of 3 — *Care for riders. Empower drivers.* with **Next** |
-| CAP-122 | `02-06 - B2 Intro - Built For Care.png` | MRV-B2 | `78a48a7fb055229a` | 0 | Intro 2 of 3 — *Transportation you can trust—built for care.* with **Next** |
-| CAP-123 | `02-07 - B2 Intro - Wingz CARES Become A Driver.png` | MRV-B2 | `1e87c72f7fa3b1f7` | 0 | Intro 3 of 3 — *Values behind every trip—the Wingz CARES standard.* with **Become a driver** and **Sign in**. The fork the sign-up article turns on |
-| CAP-124 | `11-01 - B2 Application - Getting Started Top.png` | MRV-B2 | `2747b07893aa17af` | 0 | ⭐⭐ **Your application** — DRIVER ONBOARDING header, **Stages** button, *Basic Information · Getting Started*, **9%**, progress bar, help icon. Fields: Date of Birth (with a **25 years of age** requ… |
-| CAP-125 | `11-02 - B2 Application - Getting Started Continue.png` | MRV-B2 | `ff8d530c918cb783` | 0 | Same stage scrolled to its foot, showing the green **Continue** button |
-| CAP-126 | `11-03 - B2 Application - Progress Stages Top.png` | MRV-B2 | `b450139d6c294689` | 0 | ⭐⭐ **Progress** panel — **0 of 13 stages completed · 9%**. Basic Information open with Getting Started active and Phone/Email Verification ticked; Terms & Conditions, Wingz Introduction Overview, I… |
-| CAP-127 | `11-04 - B2 Application - Progress Stages Bottom.png` | MRV-B2 | `bbffed9f8772a441` | 0 | Progress panel scrolled — Vehicle Inspection, CTAA PASS Training, Background Check, Drug Screening, Training (0/3), Payment & Tax Setup (0/2), Final Review |
-| CAP-128 | `11-05 - B2 Application - Help Icon Unread Badge.png` | MRV-B2 | `5ed6892a62a65536` | 0 | ⭐ The application header with a **red unread dot** on the help icon — the entry point to in-app messaging |
-| CAP-129 | `13-01 - B3 Home - Two Identical Icons.png` | MRV-B3 | `989fd12806421445` | 0 | ⭐⭐ **Two Wingz Driver icons side by side on one home screen — identical artwork, identical label.** The evidence that the home screen cannot tell the old build from the new. Source for `GA-02`. ⚠️ … |
-| CAP-130 | `13-02 - B3 Home - Long Press Old App.png` | MRV-B3 | `52d0bb9850e1f0de` | 0 | Long-press menu (ⓘ / bin) on the **left** icon while both apps are installed. Source for `GA-08` left panel |
-| CAP-131 | `13-03 - B3 Home - Uninstall Confirm Two Apps.png` | MRV-B3 | `dfcdb5f5d68c97e2` | 0 | System **Uninstall Wingz Driver?** dialog with both icons behind it. ⚠️ Captured before the blue dot appeared, so it is one frame out of step with `13-02` — not visible at article size |
-| CAP-132 | `13-04 - B3 Home - Long Press Single App.png` | MRV-B3 | `0f71e0e53afdd7da` | 0 | Long-press menu on the **single** remaining app, before anything is installed. Source for `GA-01` left panel |
-| CAP-133 | `13-05 - B3 Home - Uninstall Confirm Single App.png` | MRV-B3 | `1064f0834d1c9164` | 0 | System **Uninstall Wingz Driver?** dialog, one app behind it. Source for `GA-01` right panel |
-| CAP-134 | `13-06 - B3 Home - After Delete.png` | MRV-B3 | `0864ed5156116f22` | 0 | Home screen after the delete — one Wingz Driver icon. Source for `GA-08` right panel |
-| CAP-135 | `13-07 - B3 Login - Old Email Password.png` | MRV-B3 | `5ef348f56f6dc5bd` | 0 | ⭐ **Old build sign-in — Email and Password only, no phone option anywhere.** The Support tell that works over the phone. Source for `GA-03` left panel |
-| CAP-136 | `13-08 - B3 Login - New Phone Number.png` | MRV-B3 | `dfa137a0a7b01664` | 0 | ⭐ **New build sign-in — phone number first**, with *Sign in with email instead* beneath. Source for `GA-03` right panel and `GA-07` |
-| CAP-137 | `13-09 - B3 Requests - Old List Only.png` | MRV-B3 | `e5abaa7802f6603e` | 0 | Old build **Requests as a list only** — no map, no date or Pickup Time chips. Rider names blurred. Source for `GA-04` left panel |
-| CAP-138 | `13-10 - B3 Requests - New Map.png` | MRV-B3 | `0982b2745c09ad6a` | 0 | New build **Requests as a map** with the pull-up list drawer. Rider name blurred. ⚠️ **Light** map — does not match the dark B2 maps in [[The Requests Map]]. Source for `GA-04` right panel |
-| CAP-139 | `13-11 - B3 Store iOS - Product Page.png` | MRV-B3 | `c44a909ca29001dc` | 0 | App Store product page — **Wingz Driver · Wingz, Inc. · Get**. Source for `GA-05` left panel |
-| CAP-140 | `13-12 - B3 Store Android - Product Page.png` | MRV-B3 | `b1065e143dc4d9ef` | 0 | Google Play product page — **Wingz Driver · Wingz Tech · Install**. ⭐ Publisher name differs from iOS. Source for `GA-05` right panel |
-| CAP-141 | `13-13 - B3 Store Android - Search Results.png` | MRV-B3 | `abe109927b6a8523` | 0 | ⭐⭐ **Play Store search for "wingz driver" returns five confusable apps** — WingDriver, Wingz (Food & Drink), WingZ On-Demand, Transferz Driver — with the real listing fourth, under a paid advert. T… |
-| CAP-142 | `13-14 - B3 Store Android - Search Typing.png` | MRV-B3 | `c2adf6bb9615537b` | 0 | Play Store search box mid-type. Context only, not bound |
-| CAP-143 | `13-15 - B3 Store iOS - Search Typing.png` | MRV-B3 | `6f8336c5133cc890` | 0 | App Store search box mid-type. Context only, not bound |
-| CAP-144 | `13-16 - B3 Store iOS - Search Results.png` | MRV-B3 | `f6a1d41332abd20f` | 0 | App Store search results. ⛔ **Not bound** — mid-transition frame with ghosting, and a Manila-region advert below the listing |
-| CAP-145 | `C1 - Delete The Old App.png` | MRV-B1 | `51c2224dbf7b47f9` | 0 |  |
-| CAP-146 | `C2 - Sign In Old Vs New.png` | MRV-B1 | `1d888afcd7127ce9` | 0 |  |
-| CAP-147 | `C3 - Requests Old Vs New.png` | MRV-B1 | `df7c0c09c0674c1e` | 0 |  |
-| CAP-148 | `C4 - Store Listings.png` | MRV-B1 | `8eb35ea7caf2398e` | 0 |  |
-| CAP-149 | `C5 - Remove The Old One.png` | MRV-B1 | `ed360c98878543c5` | 0 |  |
+| CAP-115 | `01-04 - Before - Tap Sign In With Email.jpg` | MRV-B1 | `f2bb1476b3ffcdb2` | 0 | BEFORE: red box on **Sign in with email instead** — the route back to the old login |
+| CAP-116 | `01-05 - B2 Login - Phone Number Entry.png` | MRV-B2 | `a78db4b92e5c4ebe` | 0 | Sign in to Wingz — phone number field with **+1** prefilled, greyed **Send code**, *Sign in with email instead*, *Not a driver yet? Sign up* |
+| CAP-117 | `01-06 - B2 Login - Verification Code.png` | MRV-B2 | `5a60d56f42439ee0` | 0 | Enter verification code — six boxes, first focused, **Resend code in 88s** countdown, *Change phone number* |
+| CAP-118 | `01-07 - B2 Login - Invalid Or Expired OTP.png` | MRV-B2 | `bc714fb0d73cdcb3` | 0 | ⭐ Code rejected — six filled boxes and the red error **"Invalid or expired OTP."**, Verify now enabled, resend at 83s |
+| CAP-119 | `01-08 - B2 Login - OTP Rate Limit.png` | MRV-B2 | `2e625c31706dabe2` | 0 | ⭐ Rate limit — red **"You must wait 90 seconds to request an OTP again."** under the number field. A second, distinct failure mode from the invalid-code error |
+| CAP-120 | `01-09 - B2 Login - Email And Password.png` | MRV-B2 | `27ce56c7975fbebb` | 0 | Email sign-in — Email, Password with a show/hide eye, **Forgot password?**, greyed **Sign in**, *Sign in with phone instead* |
+| CAP-121 | `01-10 - B2 Login - Reset Password.png` | MRV-B2 | `c2c8316365c27a11` | 0 | ⭐ **Reset Password** — asks for the account email and sends reset instructions. Previously undocumented; the old article named the link but could not say where it led |
+| CAP-122 | `01-11 - B2 Login - Home After Sign In.png` | MRV-B2 | `427a2911c370ffee` | 0 | Home after signing in — Balance card, This Month earnings, and the five-tab bottom row (Home · Requests · Planner · My Rides · Options). ⚠️ Carries the Balance Dashboard release UI |
+| CAP-123 | `02-05 - B2 Intro - Care For Riders.png` | MRV-B2 | `345834c78ae16dac` | 0 | Intro 1 of 3 — *Care for riders. Empower drivers.* with **Next** |
+| CAP-124 | `02-06 - B2 Intro - Built For Care.png` | MRV-B2 | `78a48a7fb055229a` | 0 | Intro 2 of 3 — *Transportation you can trust—built for care.* with **Next** |
+| CAP-125 | `02-07 - B2 Intro - Wingz CARES Become A Driver.png` | MRV-B2 | `1e87c72f7fa3b1f7` | 0 | Intro 3 of 3 — *Values behind every trip—the Wingz CARES standard.* with **Become a driver** and **Sign in**. The fork the sign-up article turns on |
+| CAP-126 | `11-01 - B2 Application - Getting Started Top.png` | MRV-B2 | `2747b07893aa17af` | 0 | ⭐⭐ **Your application** — DRIVER ONBOARDING header, **Stages** button, *Basic Information · Getting Started*, **9%**, progress bar, help icon. Fields: Date of Birth (with a **25 years of age** requ… |
+| CAP-127 | `11-02 - B2 Application - Getting Started Continue.png` | MRV-B2 | `ff8d530c918cb783` | 0 | Same stage scrolled to its foot, showing the green **Continue** button |
+| CAP-128 | `11-03 - B2 Application - Progress Stages Top.png` | MRV-B2 | `b450139d6c294689` | 0 | ⭐⭐ **Progress** panel — **0 of 13 stages completed · 9%**. Basic Information open with Getting Started active and Phone/Email Verification ticked; Terms & Conditions, Wingz Introduction Overview, I… |
+| CAP-129 | `11-04 - B2 Application - Progress Stages Bottom.png` | MRV-B2 | `bbffed9f8772a441` | 0 | Progress panel scrolled — Vehicle Inspection, CTAA PASS Training, Background Check, Drug Screening, Training (0/3), Payment & Tax Setup (0/2), Final Review |
+| CAP-130 | `11-05 - B2 Application - Help Icon Unread Badge.png` | MRV-B2 | `5ed6892a62a65536` | 0 | ⭐ The application header with a **red unread dot** on the help icon — the entry point to in-app messaging |
+| CAP-131 | `13-01 - B3 Home - Two Identical Icons.png` | MRV-B3 | `989fd12806421445` | 0 | ⭐⭐ **Two Wingz Driver icons side by side on one home screen — identical artwork, identical label.** The evidence that the home screen cannot tell the old build from the new. Source for `GA-02`. ⚠️ … |
+| CAP-132 | `13-02 - B3 Home - Long Press Old App.png` | MRV-B3 | `52d0bb9850e1f0de` | 0 | Long-press menu (ⓘ / bin) on the **left** icon while both apps are installed. Source for `GA-08` left panel |
+| CAP-133 | `13-03 - B3 Home - Uninstall Confirm Two Apps.png` | MRV-B3 | `dfcdb5f5d68c97e2` | 0 | System **Uninstall Wingz Driver?** dialog with both icons behind it. ⚠️ Captured before the blue dot appeared, so it is one frame out of step with `13-02` — not visible at article size |
+| CAP-134 | `13-04 - B3 Home - Long Press Single App.png` | MRV-B3 | `0f71e0e53afdd7da` | 0 | Long-press menu on the **single** remaining app, before anything is installed. Source for `GA-01` left panel |
+| CAP-135 | `13-05 - B3 Home - Uninstall Confirm Single App.png` | MRV-B3 | `1064f0834d1c9164` | 0 | System **Uninstall Wingz Driver?** dialog, one app behind it. Source for `GA-01` right panel |
+| CAP-136 | `13-06 - B3 Home - After Delete.png` | MRV-B3 | `0864ed5156116f22` | 0 | Home screen after the delete — one Wingz Driver icon. Source for `GA-08` right panel |
+| CAP-137 | `13-07 - B3 Login - Old Email Password.png` | MRV-B3 | `5ef348f56f6dc5bd` | 0 | ⭐ **Old build sign-in — Email and Password only, no phone option anywhere.** The Support tell that works over the phone. Source for `GA-03` left panel |
+| CAP-138 | `13-08 - B3 Login - New Phone Number.png` | MRV-B3 | `dfa137a0a7b01664` | 0 | ⭐ **New build sign-in — phone number first**, with *Sign in with email instead* beneath. Source for `GA-03` right panel and `GA-07` |
+| CAP-139 | `13-09 - B3 Requests - Old List Only.png` | MRV-B3 | `e5abaa7802f6603e` | 0 | Old build **Requests as a list only** — no map, no date or Pickup Time chips. Rider names blurred. Source for `GA-04` left panel |
+| CAP-140 | `13-10 - B3 Requests - New Map.png` | MRV-B3 | `0982b2745c09ad6a` | 0 | New build **Requests as a map** with the pull-up list drawer. Rider name blurred. ⚠️ **Light** map — does not match the dark B2 maps in [[The Requests Map]]. Source for `GA-04` right panel |
+| CAP-141 | `13-11 - B3 Store iOS - Product Page.png` | MRV-B3 | `c44a909ca29001dc` | 0 | App Store product page — **Wingz Driver · Wingz, Inc. · Get**. Source for `GA-05` left panel |
+| CAP-142 | `13-12 - B3 Store Android - Product Page.png` | MRV-B3 | `b1065e143dc4d9ef` | 0 | Google Play product page — **Wingz Driver · Wingz Tech · Install**. ⭐ Publisher name differs from iOS. Source for `GA-05` right panel |
+| CAP-143 | `13-13 - B3 Store Android - Search Results.png` | MRV-B3 | `abe109927b6a8523` | 0 | ⭐⭐ **Play Store search for "wingz driver" returns five confusable apps** — WingDriver, Wingz (Food & Drink), WingZ On-Demand, Transferz Driver — with the real listing fourth, under a paid advert. T… |
+| CAP-144 | `13-14 - B3 Store Android - Search Typing.png` | MRV-B3 | `c2adf6bb9615537b` | 0 | Play Store search box mid-type. Context only, not bound |
+| CAP-145 | `13-15 - B3 Store iOS - Search Typing.png` | MRV-B3 | `6f8336c5133cc890` | 0 | App Store search box mid-type. Context only, not bound |
+| CAP-146 | `13-16 - B3 Store iOS - Search Results.png` | MRV-B3 | `f6a1d41332abd20f` | 0 | App Store search results. ⛔ **Not bound** — mid-transition frame with ghosting, and a Manila-region advert below the listing |
+| CAP-147 | `C1 - Delete The Old App.png` | MRV-B1 | `51c2224dbf7b47f9` | 0 |  |
+| CAP-148 | `C2 - Sign In Old Vs New.png` | MRV-B1 | `1d888afcd7127ce9` | 0 |  |
+| CAP-149 | `C3 - Requests Old Vs New.png` | MRV-B1 | `df7c0c09c0674c1e` | 0 |  |
+| CAP-150 | `C4 - Store Listings.png` | MRV-B1 | `8eb35ea7caf2398e` | 0 |  |
+| CAP-151 | `C5 - Remove The Old One.png` | MRV-B1 | `ed360c98878543c5` | 0 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-113` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-04 - Before - Tap Sign In With Email.jpg`
-- `CAP-114` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-05 - B2 Login - Phone Number Entry.png`
-- `CAP-115` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-06 - B2 Login - Verification Code.png`
-- `CAP-116` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-07 - B2 Login - Invalid Or Expired OTP.png`
-- `CAP-117` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-08 - B2 Login - OTP Rate Limit.png`
-- `CAP-118` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-09 - B2 Login - Email And Password.png`
-- `CAP-119` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-10 - B2 Login - Reset Password.png`
-- `CAP-120` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-11 - B2 Login - Home After Sign In.png`
-- `CAP-121` — `Project - Map Request View/Internal Guide/Screenshots/02 - Intro Screens/02-05 - B2 Intro - Care For Riders.png`
-- `CAP-122` — `Project - Map Request View/Internal Guide/Screenshots/02 - Intro Screens/02-06 - B2 Intro - Built For Care.png`
-- `CAP-123` — `Project - Map Request View/Internal Guide/Screenshots/02 - Intro Screens/02-07 - B2 Intro - Wingz CARES Become A Driver.png`
-- `CAP-124` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-01 - B2 Application - Getting Started Top.png`
-- `CAP-125` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-02 - B2 Application - Getting Started Continue.png`
-- `CAP-126` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-03 - B2 Application - Progress Stages Top.png`
-- `CAP-127` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-04 - B2 Application - Progress Stages Bottom.png`
-- `CAP-128` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-05 - B2 Application - Help Icon Unread Badge.png`
-- `CAP-129` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-01 - B3 Home - Two Identical Icons.png`
-- `CAP-130` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-02 - B3 Home - Long Press Old App.png`
-- `CAP-131` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-03 - B3 Home - Uninstall Confirm Two Apps.png`
-- `CAP-132` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-04 - B3 Home - Long Press Single App.png`
-- `CAP-133` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-05 - B3 Home - Uninstall Confirm Single App.png`
-- `CAP-134` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-06 - B3 Home - After Delete.png`
-- `CAP-135` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-07 - B3 Login - Old Email Password.png`
-- `CAP-136` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-08 - B3 Login - New Phone Number.png`
-- `CAP-137` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-09 - B3 Requests - Old List Only.png`
-- `CAP-138` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-10 - B3 Requests - New Map.png`
-- `CAP-139` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-11 - B3 Store iOS - Product Page.png`
-- `CAP-140` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-12 - B3 Store Android - Product Page.png`
-- `CAP-141` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-13 - B3 Store Android - Search Results.png`
-- `CAP-142` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-14 - B3 Store Android - Search Typing.png`
-- `CAP-143` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-15 - B3 Store iOS - Search Typing.png`
-- `CAP-144` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-16 - B3 Store iOS - Search Results.png`
-- `CAP-145` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C1 - Delete The Old App.png`
-- `CAP-146` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C2 - Sign In Old Vs New.png`
-- `CAP-147` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C3 - Requests Old Vs New.png`
-- `CAP-148` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C4 - Store Listings.png`
-- `CAP-149` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C5 - Remove The Old One.png`
+- `CAP-115` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-04 - Before - Tap Sign In With Email.jpg`
+- `CAP-116` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-05 - B2 Login - Phone Number Entry.png`
+- `CAP-117` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-06 - B2 Login - Verification Code.png`
+- `CAP-118` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-07 - B2 Login - Invalid Or Expired OTP.png`
+- `CAP-119` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-08 - B2 Login - OTP Rate Limit.png`
+- `CAP-120` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-09 - B2 Login - Email And Password.png`
+- `CAP-121` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-10 - B2 Login - Reset Password.png`
+- `CAP-122` — `Project - Map Request View/Internal Guide/Screenshots/01 - Login/01-11 - B2 Login - Home After Sign In.png`
+- `CAP-123` — `Project - Map Request View/Internal Guide/Screenshots/02 - Intro Screens/02-05 - B2 Intro - Care For Riders.png`
+- `CAP-124` — `Project - Map Request View/Internal Guide/Screenshots/02 - Intro Screens/02-06 - B2 Intro - Built For Care.png`
+- `CAP-125` — `Project - Map Request View/Internal Guide/Screenshots/02 - Intro Screens/02-07 - B2 Intro - Wingz CARES Become A Driver.png`
+- `CAP-126` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-01 - B2 Application - Getting Started Top.png`
+- `CAP-127` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-02 - B2 Application - Getting Started Continue.png`
+- `CAP-128` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-03 - B2 Application - Progress Stages Top.png`
+- `CAP-129` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-04 - B2 Application - Progress Stages Bottom.png`
+- `CAP-130` — `Project - Map Request View/Internal Guide/Screenshots/11 - Sign Up Application/11-05 - B2 Application - Help Icon Unread Badge.png`
+- `CAP-131` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-01 - B3 Home - Two Identical Icons.png`
+- `CAP-132` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-02 - B3 Home - Long Press Old App.png`
+- `CAP-133` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-03 - B3 Home - Uninstall Confirm Two Apps.png`
+- `CAP-134` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-04 - B3 Home - Long Press Single App.png`
+- `CAP-135` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-05 - B3 Home - Uninstall Confirm Single App.png`
+- `CAP-136` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-06 - B3 Home - After Delete.png`
+- `CAP-137` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-07 - B3 Login - Old Email Password.png`
+- `CAP-138` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-08 - B3 Login - New Phone Number.png`
+- `CAP-139` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-09 - B3 Requests - Old List Only.png`
+- `CAP-140` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-10 - B3 Requests - New Map.png`
+- `CAP-141` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-11 - B3 Store iOS - Product Page.png`
+- `CAP-142` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-12 - B3 Store Android - Product Page.png`
+- `CAP-143` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-13 - B3 Store Android - Search Results.png`
+- `CAP-144` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-14 - B3 Store Android - Search Typing.png`
+- `CAP-145` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-15 - B3 Store iOS - Search Typing.png`
+- `CAP-146` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/13-16 - B3 Store iOS - Search Results.png`
+- `CAP-147` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C1 - Delete The Old App.png`
+- `CAP-148` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C2 - Sign In Old Vs New.png`
+- `CAP-149` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C3 - Requests Old Vs New.png`
+- `CAP-150` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C4 - Store Listings.png`
+- `CAP-151` — `Project - Map Request View/Internal Guide/Screenshots/13 - Migration/_composites/C5 - Remove The Old One.png`
 
 </details>
 
@@ -452,137 +462,137 @@ Numbered-callout derivatives rendered for help articles (`DG-`, `LG-`, `MG-`, `S
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-150 | `A1 - Wallet Help Sheet - Copy Changes.png` | derived | `6fff3681fd5060e9` | 0 |  |
-| CAP-151 | `A2 - Home State 5a - Copy Changes.png` | derived | `bb1d2a87946d021b` | 0 |  |
-| CAP-152 | `A3 - Wallet State 5b - Copy Changes.png` | derived | `10995c497ec85b03` | 0 |  |
-| CAP-153 | `B1 - Home State 1 Zero - Label Change.png` | derived | `6c4cb6451acabaa9` | 0 |  |
-| CAP-154 | `B2 - Home State 4 Positive - Label Change.png` | derived | `c4c534e756ae825f` | 0 |  |
-| CAP-155 | `B3 - Wallet State 4 Positive - Label Change.png` | derived | `5e89641261ed435b` | 0 |  |
-| CAP-156 | `B4 - Home State 5a Negative - Red Icon and Sheet.png` | derived | `15e97e58c3fbce36` | 0 |  |
-| CAP-157 | `B5 - Home State 5b Negative - Red Icon and Line.png` | derived | `a175ded51177a46d` | 0 |  |
-| CAP-158 | `B6 - Wallet State 5b Negative - Red Icon and Line.png` | derived | `e1cfdcd8af710f41` | 0 |  |
-| CAP-159 | `DG-01 - Part 1 - Balance Card.png` | derived | `7a2377ed91bdc8ff` | 0 |  |
-| CAP-160 | `DG-01 - Part 1 - Halfway Default.png` | derived | `02c344d2bea83535` | 0 |  |
-| CAP-161 | `DG-02 - Part 1 - Collapsed Full Map.png` | derived | `711979855907a441` | 0 |  |
-| CAP-162 | `DG-02 - Part 2 - Wallet.png` | derived | `835355ab3a7abf0b` | 0 |  |
-| CAP-163 | `DG-03 - Part 1 - Full List.png` | derived | `d68a989d8ecee8a6` | 0 |  |
-| CAP-164 | `DG-03 - Part 3 - Negative Balance.png` | derived | `f25ee3ce5ee97325` | 0 |  |
-| CAP-165 | `DG-04 - Part 2 - Map Controls And Counts.png` | derived | `0d7ccfdc7666d4f9` | 0 |  |
-| CAP-166 | `DG-04 - Part 3 - Info Explainer.png` | derived | `2b65888d9dea84c9` | 0 |  |
-| CAP-167 | `DG-05 - Part 3 - Pin Types.png` | derived | `7ac15bbeeb392aca` | 0 |  |
-| CAP-168 | `DG-05 - Part 4 - Payouts List.png` | derived | `35a6d0f4099de507` | 0 |  |
-| CAP-169 | `DG-06 - Part 3 - Route View.png` | derived | `6754995151c3da5b` | 0 |  |
-| CAP-170 | `DG-06 - Part 5 - Payout Scheduled.png` | derived | `1355bb868541096b` | 0 |  |
-| CAP-171 | `DG-07 - Part 3 - Ride Details Swipe.png` | derived | `733c60d826fdf598` | 0 |  |
-| CAP-172 | `DG-07 - Part 5 - Payout Paid.png` | derived | `0c6add79a91649e7` | 0 |  |
-| CAP-173 | `DG-08 - Part 4 - Ride Cards And Sort.png` | derived | `12ebe7b999102c87` | 0 |  |
-| CAP-174 | `DG-09 - Part 5 - Filter Chips.png` | derived | `c2f4d8571a595bc9` | 0 |  |
-| CAP-175 | `DG-10 - Part 5 - Full Filter Sheet.png` | derived | `d5bbeca3961eaa20` | 0 |  |
-| CAP-176 | `DG-11 - Part 6 - Tabs And Standard Banner.png` | derived | `7c63e3bc9d0dd1f8` | 0 |  |
-| CAP-177 | `DG-12 - Part 6 - Special Offer Banner.png` | derived | `1d71cd27b95b585a` | 0 |  |
-| CAP-178 | `DG-13 - Part 4 - Sort Options.png` | derived | `43f74a825765c7eb` | 0 |  |
-| CAP-179 | `DG-14 - Part 6 - No Special Offers Tabs.png` | derived | `71936e9d47a68546` | 0 |  |
-| CAP-180 | `GA-01 - Part 1 - Delete The Old App.png` | derived | `ecd6861ba41ba06b` | 0 |  |
-| CAP-181 | `GA-02 - Part 2 - Store Listings.png` | derived | `f35090915171ab0d` | 0 |  |
-| CAP-182 | `GA-03 - Part 2 - Search Results Lookalikes.png` | derived | `46c1edb1ae78eaa1` | 0 |  |
-| CAP-183 | `GA-04 - Part 3 - Sign In With Your Phone.png` | derived | `f12424aaa78d2ec4` | 0 |  |
-| CAP-184 | `GA-05 - Both Apps - Two Identical Icons.png` | derived | `509eba19f0f3193a` | 0 |  |
-| CAP-185 | `GA-06 - Both Apps - Sign In Old Vs New.png` | derived | `ee3fa26c8f503ee1` | 0 |  |
-| CAP-186 | `GA-07 - Both Apps - Requests Old Vs New.png` | derived | `7624b4e8897483ca` | 0 |  |
-| CAP-187 | `GA-08 - Both Apps - Remove The Old One.png` | derived | `a247f3c02c14e726` | 0 |  |
-| CAP-188 | `LG-01 - Part 1 - Phone Number Entry.png` | derived | `ae5b0bf18b9c39e9` | 0 |  |
-| CAP-189 | `LG-02 - Part 2 - Verification Code.png` | derived | `39712783c984d572` | 0 |  |
-| CAP-190 | `LG-03 - Part 3 - Invalid Or Expired Code.png` | derived | `698d3fd972ec46a3` | 0 |  |
-| CAP-191 | `LG-04 - Part 3 - Too Many Requests.png` | derived | `b47117fd15c8cb08` | 0 |  |
-| CAP-192 | `LG-05 - Part 4 - Email And Password.png` | derived | `ee0ae963730787fe` | 0 |  |
-| CAP-193 | `LG-06 - Part 4 - Reset Password.png` | derived | `7a83e628add32746` | 0 |  |
-| CAP-194 | `LG-07 - Part 5 - Home After Sign In.png` | derived | `d06f0c9cfa088740` | 0 |  |
-| CAP-195 | `MG-01 - Part 1 - Help Icon With Unread.png` | derived | `c283a6b9f7c989e7` | 0 |  |
-| CAP-196 | `MG-02 - Part 2 - Messages List Unread.png` | derived | `ebdfd949e3365ed7` | 0 |  |
-| CAP-197 | `MG-03 - Part 2 - Messages List Empty.png` | derived | `32d6b4137bfeeac8` | 0 |  |
-| CAP-198 | `MG-04 - Part 3 - Thread Empty.png` | derived | `aadbcd1a146d4c9c` | 0 |  |
-| CAP-199 | `MG-05 - Part 3 - Composing.png` | derived | `9d9d97a6043ea8c5` | 0 |  |
-| CAP-200 | `MG-06 - Part 3 - Thread With Replies.png` | derived | `0362b8a21cb59644` | 0 |  |
-| CAP-201 | `S01.png` | derived | `579a0cb302c7fb98` | 1 |  |
-| CAP-202 | `S02.png` | derived | `3a0931d59d36fb8d` | 1 |  |
-| CAP-203 | `S03.png` | derived | `e6f06f1b9a31d01d` | 1 |  |
-| CAP-204 | `S04.png` | derived | `494d82579d0744fd` | 1 |  |
-| CAP-205 | `S05.png` | derived | `f0e209ed83dcf6c7` | 1 |  |
-| CAP-206 | `SU-01 - Part 1 - Become A Driver Or Sign In.png` | derived | `531da764f13ad7e1` | 0 |  |
-| CAP-207 | `SU-02 - Part 1 - Intro One.png` | derived | `23d566dcef1df690` | 0 |  |
-| CAP-208 | `SU-03 - Part 1 - Intro Two.png` | derived | `85c32ef5378de8d8` | 0 |  |
-| CAP-209 | `SU-04 - Part 2 - Your Application.png` | derived | `0ee9827017aa35b3` | 0 |  |
-| CAP-210 | `SU-05 - Part 2 - Continue.png` | derived | `75d20d13995aafdf` | 0 |  |
-| CAP-211 | `SU-06 - Part 3 - Progress Stages.png` | derived | `a9cffefba2a7dbea` | 0 |  |
-| CAP-212 | `SU-07 - Part 3 - Progress Stages Rest.png` | derived | `14b138500ea8a908` | 0 |  |
-| CAP-213 | `SU-08 - Part 5 - Sign In To Resume.png` | derived | `ac56dd7e68a53265` | 0 |  |
+| CAP-152 | `A1 - Wallet Help Sheet - Copy Changes.png` | derived | `6fff3681fd5060e9` | 0 |  |
+| CAP-153 | `A2 - Home State 5a - Copy Changes.png` | derived | `bb1d2a87946d021b` | 0 |  |
+| CAP-154 | `A3 - Wallet State 5b - Copy Changes.png` | derived | `10995c497ec85b03` | 0 |  |
+| CAP-155 | `B1 - Home State 1 Zero - Label Change.png` | derived | `6c4cb6451acabaa9` | 0 |  |
+| CAP-156 | `B2 - Home State 4 Positive - Label Change.png` | derived | `c4c534e756ae825f` | 0 |  |
+| CAP-157 | `B3 - Wallet State 4 Positive - Label Change.png` | derived | `5e89641261ed435b` | 0 |  |
+| CAP-158 | `B4 - Home State 5a Negative - Red Icon and Sheet.png` | derived | `15e97e58c3fbce36` | 0 |  |
+| CAP-159 | `B5 - Home State 5b Negative - Red Icon and Line.png` | derived | `a175ded51177a46d` | 0 |  |
+| CAP-160 | `B6 - Wallet State 5b Negative - Red Icon and Line.png` | derived | `e1cfdcd8af710f41` | 0 |  |
+| CAP-161 | `DG-01 - Part 1 - Balance Card.png` | derived | `7a2377ed91bdc8ff` | 0 |  |
+| CAP-162 | `DG-01 - Part 1 - Halfway Default.png` | derived | `02c344d2bea83535` | 0 |  |
+| CAP-163 | `DG-02 - Part 1 - Collapsed Full Map.png` | derived | `711979855907a441` | 0 |  |
+| CAP-164 | `DG-02 - Part 2 - Wallet.png` | derived | `835355ab3a7abf0b` | 0 |  |
+| CAP-165 | `DG-03 - Part 1 - Full List.png` | derived | `d68a989d8ecee8a6` | 0 |  |
+| CAP-166 | `DG-03 - Part 3 - Negative Balance.png` | derived | `f25ee3ce5ee97325` | 0 |  |
+| CAP-167 | `DG-04 - Part 2 - Map Controls And Counts.png` | derived | `0d7ccfdc7666d4f9` | 0 |  |
+| CAP-168 | `DG-04 - Part 3 - Info Explainer.png` | derived | `2b65888d9dea84c9` | 0 |  |
+| CAP-169 | `DG-05 - Part 3 - Pin Types.png` | derived | `7ac15bbeeb392aca` | 0 |  |
+| CAP-170 | `DG-05 - Part 4 - Payouts List.png` | derived | `35a6d0f4099de507` | 0 |  |
+| CAP-171 | `DG-06 - Part 3 - Route View.png` | derived | `6754995151c3da5b` | 0 |  |
+| CAP-172 | `DG-06 - Part 5 - Payout Scheduled.png` | derived | `1355bb868541096b` | 0 |  |
+| CAP-173 | `DG-07 - Part 3 - Ride Details Swipe.png` | derived | `733c60d826fdf598` | 0 |  |
+| CAP-174 | `DG-07 - Part 5 - Payout Paid.png` | derived | `0c6add79a91649e7` | 0 |  |
+| CAP-175 | `DG-08 - Part 4 - Ride Cards And Sort.png` | derived | `12ebe7b999102c87` | 0 |  |
+| CAP-176 | `DG-09 - Part 5 - Filter Chips.png` | derived | `c2f4d8571a595bc9` | 0 |  |
+| CAP-177 | `DG-10 - Part 5 - Full Filter Sheet.png` | derived | `d5bbeca3961eaa20` | 0 |  |
+| CAP-178 | `DG-11 - Part 6 - Tabs And Standard Banner.png` | derived | `7c63e3bc9d0dd1f8` | 0 |  |
+| CAP-179 | `DG-12 - Part 6 - Special Offer Banner.png` | derived | `1d71cd27b95b585a` | 0 |  |
+| CAP-180 | `DG-13 - Part 4 - Sort Options.png` | derived | `43f74a825765c7eb` | 0 |  |
+| CAP-181 | `DG-14 - Part 6 - No Special Offers Tabs.png` | derived | `71936e9d47a68546` | 0 |  |
+| CAP-182 | `GA-01 - Part 1 - Delete The Old App.png` | derived | `ecd6861ba41ba06b` | 0 |  |
+| CAP-183 | `GA-02 - Part 2 - Store Listings.png` | derived | `f35090915171ab0d` | 0 |  |
+| CAP-184 | `GA-03 - Part 2 - Search Results Lookalikes.png` | derived | `46c1edb1ae78eaa1` | 0 |  |
+| CAP-185 | `GA-04 - Part 3 - Sign In With Your Phone.png` | derived | `f12424aaa78d2ec4` | 0 |  |
+| CAP-186 | `GA-05 - Both Apps - Two Identical Icons.png` | derived | `509eba19f0f3193a` | 0 |  |
+| CAP-187 | `GA-06 - Both Apps - Sign In Old Vs New.png` | derived | `ee3fa26c8f503ee1` | 0 |  |
+| CAP-188 | `GA-07 - Both Apps - Requests Old Vs New.png` | derived | `7624b4e8897483ca` | 0 |  |
+| CAP-189 | `GA-08 - Both Apps - Remove The Old One.png` | derived | `a247f3c02c14e726` | 0 |  |
+| CAP-190 | `LG-01 - Part 1 - Phone Number Entry.png` | derived | `ae5b0bf18b9c39e9` | 0 |  |
+| CAP-191 | `LG-02 - Part 2 - Verification Code.png` | derived | `39712783c984d572` | 0 |  |
+| CAP-192 | `LG-03 - Part 3 - Invalid Or Expired Code.png` | derived | `698d3fd972ec46a3` | 0 |  |
+| CAP-193 | `LG-04 - Part 3 - Too Many Requests.png` | derived | `b47117fd15c8cb08` | 0 |  |
+| CAP-194 | `LG-05 - Part 4 - Email And Password.png` | derived | `ee0ae963730787fe` | 0 |  |
+| CAP-195 | `LG-06 - Part 4 - Reset Password.png` | derived | `7a83e628add32746` | 0 |  |
+| CAP-196 | `LG-07 - Part 5 - Home After Sign In.png` | derived | `d06f0c9cfa088740` | 0 |  |
+| CAP-197 | `MG-01 - Part 1 - Help Icon With Unread.png` | derived | `c283a6b9f7c989e7` | 0 |  |
+| CAP-198 | `MG-02 - Part 2 - Messages List Unread.png` | derived | `ebdfd949e3365ed7` | 0 |  |
+| CAP-199 | `MG-03 - Part 2 - Messages List Empty.png` | derived | `32d6b4137bfeeac8` | 0 |  |
+| CAP-200 | `MG-04 - Part 3 - Thread Empty.png` | derived | `aadbcd1a146d4c9c` | 0 |  |
+| CAP-201 | `MG-05 - Part 3 - Composing.png` | derived | `9d9d97a6043ea8c5` | 0 |  |
+| CAP-202 | `MG-06 - Part 3 - Thread With Replies.png` | derived | `0362b8a21cb59644` | 0 |  |
+| CAP-203 | `S01.png` | derived | `579a0cb302c7fb98` | 1 |  |
+| CAP-204 | `S02.png` | derived | `3a0931d59d36fb8d` | 1 |  |
+| CAP-205 | `S03.png` | derived | `e6f06f1b9a31d01d` | 1 |  |
+| CAP-206 | `S04.png` | derived | `494d82579d0744fd` | 1 |  |
+| CAP-207 | `S05.png` | derived | `f0e209ed83dcf6c7` | 1 |  |
+| CAP-208 | `SU-01 - Part 1 - Become A Driver Or Sign In.png` | derived | `531da764f13ad7e1` | 0 |  |
+| CAP-209 | `SU-02 - Part 1 - Intro One.png` | derived | `23d566dcef1df690` | 0 |  |
+| CAP-210 | `SU-03 - Part 1 - Intro Two.png` | derived | `85c32ef5378de8d8` | 0 |  |
+| CAP-211 | `SU-04 - Part 2 - Your Application.png` | derived | `0ee9827017aa35b3` | 0 |  |
+| CAP-212 | `SU-05 - Part 2 - Continue.png` | derived | `75d20d13995aafdf` | 0 |  |
+| CAP-213 | `SU-06 - Part 3 - Progress Stages.png` | derived | `a9cffefba2a7dbea` | 0 |  |
+| CAP-214 | `SU-07 - Part 3 - Progress Stages Rest.png` | derived | `14b138500ea8a908` | 0 |  |
+| CAP-215 | `SU-08 - Part 5 - Sign In To Resume.png` | derived | `ac56dd7e68a53265` | 0 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-150` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/A1 - Wallet Help Sheet - Copy Changes.png`
-- `CAP-151` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/A2 - Home State 5a - Copy Changes.png`
-- `CAP-152` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/A3 - Wallet State 5b - Copy Changes.png`
-- `CAP-153` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B1 - Home State 1 Zero - Label Change.png`
-- `CAP-154` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B2 - Home State 4 Positive - Label Change.png`
-- `CAP-155` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B3 - Wallet State 4 Positive - Label Change.png`
-- `CAP-156` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B4 - Home State 5a Negative - Red Icon and Sheet.png`
-- `CAP-157` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B5 - Home State 5b Negative - Red Icon and Line.png`
-- `CAP-158` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B6 - Wallet State 5b Negative - Red Icon and Line.png`
-- `CAP-159` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-01 - Part 1 - Balance Card.png`
-- `CAP-160` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-01 - Part 1 - Halfway Default.png`
-- `CAP-161` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-02 - Part 1 - Collapsed Full Map.png`
-- `CAP-162` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-02 - Part 2 - Wallet.png`
-- `CAP-163` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-03 - Part 1 - Full List.png`
-- `CAP-164` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-03 - Part 3 - Negative Balance.png`
-- `CAP-165` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-04 - Part 2 - Map Controls And Counts.png`
-- `CAP-166` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-04 - Part 3 - Info Explainer.png`
-- `CAP-167` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-05 - Part 3 - Pin Types.png`
-- `CAP-168` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-05 - Part 4 - Payouts List.png`
-- `CAP-169` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-06 - Part 3 - Route View.png`
-- `CAP-170` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-06 - Part 5 - Payout Scheduled.png`
-- `CAP-171` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-07 - Part 3 - Ride Details Swipe.png`
-- `CAP-172` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-07 - Part 5 - Payout Paid.png`
-- `CAP-173` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-08 - Part 4 - Ride Cards And Sort.png`
-- `CAP-174` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-09 - Part 5 - Filter Chips.png`
-- `CAP-175` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-10 - Part 5 - Full Filter Sheet.png`
-- `CAP-176` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-11 - Part 6 - Tabs And Standard Banner.png`
-- `CAP-177` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-12 - Part 6 - Special Offer Banner.png`
-- `CAP-178` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-13 - Part 4 - Sort Options.png`
-- `CAP-179` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-14 - Part 6 - No Special Offers Tabs.png`
-- `CAP-180` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-01 - Part 1 - Delete The Old App.png`
-- `CAP-181` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-02 - Part 2 - Store Listings.png`
-- `CAP-182` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-03 - Part 2 - Search Results Lookalikes.png`
-- `CAP-183` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-04 - Part 3 - Sign In With Your Phone.png`
-- `CAP-184` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-05 - Both Apps - Two Identical Icons.png`
-- `CAP-185` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-06 - Both Apps - Sign In Old Vs New.png`
-- `CAP-186` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-07 - Both Apps - Requests Old Vs New.png`
-- `CAP-187` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-08 - Both Apps - Remove The Old One.png`
-- `CAP-188` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-01 - Part 1 - Phone Number Entry.png`
-- `CAP-189` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-02 - Part 2 - Verification Code.png`
-- `CAP-190` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-03 - Part 3 - Invalid Or Expired Code.png`
-- `CAP-191` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-04 - Part 3 - Too Many Requests.png`
-- `CAP-192` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-05 - Part 4 - Email And Password.png`
-- `CAP-193` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-06 - Part 4 - Reset Password.png`
-- `CAP-194` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-07 - Part 5 - Home After Sign In.png`
-- `CAP-195` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-01 - Part 1 - Help Icon With Unread.png`
-- `CAP-196` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-02 - Part 2 - Messages List Unread.png`
-- `CAP-197` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-03 - Part 2 - Messages List Empty.png`
-- `CAP-198` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-04 - Part 3 - Thread Empty.png`
-- `CAP-199` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-05 - Part 3 - Composing.png`
-- `CAP-200` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-06 - Part 3 - Thread With Replies.png`
-- `CAP-201` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S01.png`
-- `CAP-202` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S02.png`
-- `CAP-203` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S03.png`
-- `CAP-204` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S04.png`
-- `CAP-205` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S05.png`
-- `CAP-206` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-01 - Part 1 - Become A Driver Or Sign In.png`
-- `CAP-207` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-02 - Part 1 - Intro One.png`
-- `CAP-208` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-03 - Part 1 - Intro Two.png`
-- `CAP-209` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-04 - Part 2 - Your Application.png`
-- `CAP-210` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-05 - Part 2 - Continue.png`
-- `CAP-211` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-06 - Part 3 - Progress Stages.png`
-- `CAP-212` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-07 - Part 3 - Progress Stages Rest.png`
-- `CAP-213` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-08 - Part 5 - Sign In To Resume.png`
+- `CAP-152` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/A1 - Wallet Help Sheet - Copy Changes.png`
+- `CAP-153` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/A2 - Home State 5a - Copy Changes.png`
+- `CAP-154` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/A3 - Wallet State 5b - Copy Changes.png`
+- `CAP-155` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B1 - Home State 1 Zero - Label Change.png`
+- `CAP-156` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B2 - Home State 4 Positive - Label Change.png`
+- `CAP-157` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B3 - Wallet State 4 Positive - Label Change.png`
+- `CAP-158` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B4 - Home State 5a Negative - Red Icon and Sheet.png`
+- `CAP-159` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B5 - Home State 5b Negative - Red Icon and Line.png`
+- `CAP-160` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/B6 - Wallet State 5b Negative - Red Icon and Line.png`
+- `CAP-161` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-01 - Part 1 - Balance Card.png`
+- `CAP-162` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-01 - Part 1 - Halfway Default.png`
+- `CAP-163` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-02 - Part 1 - Collapsed Full Map.png`
+- `CAP-164` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-02 - Part 2 - Wallet.png`
+- `CAP-165` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-03 - Part 1 - Full List.png`
+- `CAP-166` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-03 - Part 3 - Negative Balance.png`
+- `CAP-167` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-04 - Part 2 - Map Controls And Counts.png`
+- `CAP-168` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-04 - Part 3 - Info Explainer.png`
+- `CAP-169` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-05 - Part 3 - Pin Types.png`
+- `CAP-170` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-05 - Part 4 - Payouts List.png`
+- `CAP-171` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-06 - Part 3 - Route View.png`
+- `CAP-172` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-06 - Part 5 - Payout Scheduled.png`
+- `CAP-173` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-07 - Part 3 - Ride Details Swipe.png`
+- `CAP-174` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/driver-guide/DG-07 - Part 5 - Payout Paid.png`
+- `CAP-175` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-08 - Part 4 - Ride Cards And Sort.png`
+- `CAP-176` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-09 - Part 5 - Filter Chips.png`
+- `CAP-177` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-10 - Part 5 - Full Filter Sheet.png`
+- `CAP-178` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-11 - Part 6 - Tabs And Standard Banner.png`
+- `CAP-179` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-12 - Part 6 - Special Offer Banner.png`
+- `CAP-180` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-13 - Part 4 - Sort Options.png`
+- `CAP-181` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/driver-guide/DG-14 - Part 6 - No Special Offers Tabs.png`
+- `CAP-182` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-01 - Part 1 - Delete The Old App.png`
+- `CAP-183` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-02 - Part 2 - Store Listings.png`
+- `CAP-184` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-03 - Part 2 - Search Results Lookalikes.png`
+- `CAP-185` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-04 - Part 3 - Sign In With Your Phone.png`
+- `CAP-186` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-05 - Both Apps - Two Identical Icons.png`
+- `CAP-187` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-06 - Both Apps - Sign In Old Vs New.png`
+- `CAP-188` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-07 - Both Apps - Requests Old Vs New.png`
+- `CAP-189` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/GA-08 - Both Apps - Remove The Old One.png`
+- `CAP-190` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-01 - Part 1 - Phone Number Entry.png`
+- `CAP-191` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-02 - Part 2 - Verification Code.png`
+- `CAP-192` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-03 - Part 3 - Invalid Or Expired Code.png`
+- `CAP-193` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-04 - Part 3 - Too Many Requests.png`
+- `CAP-194` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-05 - Part 4 - Email And Password.png`
+- `CAP-195` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-06 - Part 4 - Reset Password.png`
+- `CAP-196` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/LG-07 - Part 5 - Home After Sign In.png`
+- `CAP-197` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-01 - Part 1 - Help Icon With Unread.png`
+- `CAP-198` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-02 - Part 2 - Messages List Unread.png`
+- `CAP-199` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-03 - Part 2 - Messages List Empty.png`
+- `CAP-200` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-04 - Part 3 - Thread Empty.png`
+- `CAP-201` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-05 - Part 3 - Composing.png`
+- `CAP-202` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/MG-06 - Part 3 - Thread With Replies.png`
+- `CAP-203` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S01.png`
+- `CAP-204` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S02.png`
+- `CAP-205` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S03.png`
+- `CAP-206` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S04.png`
+- `CAP-207` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_annotated/S05.png`
+- `CAP-208` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-01 - Part 1 - Become A Driver Or Sign In.png`
+- `CAP-209` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-02 - Part 1 - Intro One.png`
+- `CAP-210` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-03 - Part 1 - Intro Two.png`
+- `CAP-211` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-04 - Part 2 - Your Application.png`
+- `CAP-212` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-05 - Part 2 - Continue.png`
+- `CAP-213` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-06 - Part 3 - Progress Stages.png`
+- `CAP-214` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-07 - Part 3 - Progress Stages Rest.png`
+- `CAP-215` — `Project - Map Request View/Internal Guide/Screenshots/_annotated/help-articles/SU-08 - Part 5 - Sign In To Resume.png`
 
 </details>
 
@@ -592,29 +602,29 @@ Rider no-show and support-form captures — real production captures of a featur
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-214 | `s-02a - Form Request - Late Pickup Reason.png` | Apr-2026 | `859d0c2ef4456468` | 1 |  |
-| CAP-215 | `s-04a - Confirm Flow - Were You Able To Reach The Rider.jpg` | Apr-2026 | `4407ec2f952e6aff` | 1 |  |
-| CAP-216 | `s-04b - Confirm Flow - Rider Declined The Trip.jpg` | Apr-2026 | `dd7473fb649a2564` | 1 |  |
-| CAP-217 | `s-04c - Support Chat - Decline Template Message.jpg` | Apr-2026 | `bf1cac2b7f119fdf` | 1 |  |
-| CAP-218 | `s-05a - Web Form - Trip Data Update - Top.png` | Apr-2026 | `b9fdb14a5a97af8d` | 1 |  |
-| CAP-219 | `s-05b - Web Form - Trip Data Update - Times.png` | Apr-2026 | `eb09c2246f0339e9` | 1 |  |
-| CAP-220 | `s-05c - Web Form - Trip Data Update - Reason And Submit.png` | Apr-2026 | `25d4a3046a5097aa` | 1 |  |
-| CAP-221 | `s-06a - Member No-Show - Empty.jpg` | Apr-2026 | `f3ba4f10fe68c788` | 1 |  |
-| CAP-222 | `s-06b - Member No-Show - No-Show Type Picker.jpg` | Apr-2026 | `6c750c86466c1a53` | 1 |  |
-| CAP-223 | `s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg` | Apr-2026 | `c20673e8bc83a759` | 1 |  |
+| CAP-216 | `s-02a - Form Request - Late Pickup Reason.png` | Apr-2026 | `859d0c2ef4456468` | 1 |  |
+| CAP-217 | `s-04a - Confirm Flow - Were You Able To Reach The Rider.jpg` | Apr-2026 | `4407ec2f952e6aff` | 1 |  |
+| CAP-218 | `s-04b - Confirm Flow - Rider Declined The Trip.jpg` | Apr-2026 | `dd7473fb649a2564` | 1 |  |
+| CAP-219 | `s-04c - Support Chat - Decline Template Message.jpg` | Apr-2026 | `bf1cac2b7f119fdf` | 1 |  |
+| CAP-220 | `s-05a - Web Form - Trip Data Update - Top.png` | Apr-2026 | `b9fdb14a5a97af8d` | 1 |  |
+| CAP-221 | `s-05b - Web Form - Trip Data Update - Times.png` | Apr-2026 | `eb09c2246f0339e9` | 1 |  |
+| CAP-222 | `s-05c - Web Form - Trip Data Update - Reason And Submit.png` | Apr-2026 | `25d4a3046a5097aa` | 1 |  |
+| CAP-223 | `s-06a - Member No-Show - Empty.jpg` | Apr-2026 | `f3ba4f10fe68c788` | 1 |  |
+| CAP-224 | `s-06b - Member No-Show - No-Show Type Picker.jpg` | Apr-2026 | `6c750c86466c1a53` | 1 |  |
+| CAP-225 | `s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg` | Apr-2026 | `c20673e8bc83a759` | 1 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-214` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-02a - Form Request - Late Pickup Reason.png`
-- `CAP-215` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-04a - Confirm Flow - Were You Able To Reach The Rider.jpg`
-- `CAP-216` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-04b - Confirm Flow - Rider Declined The Trip.jpg`
-- `CAP-217` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-04c - Support Chat - Decline Template Message.jpg`
-- `CAP-218` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-05a - Web Form - Trip Data Update - Top.png`
-- `CAP-219` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-05b - Web Form - Trip Data Update - Times.png`
-- `CAP-220` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-05c - Web Form - Trip Data Update - Reason And Submit.png`
-- `CAP-221` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06a - Member No-Show - Empty.jpg`
-- `CAP-222` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06b - Member No-Show - No-Show Type Picker.jpg`
-- `CAP-223` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg`
+- `CAP-216` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-02a - Form Request - Late Pickup Reason.png`
+- `CAP-217` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-04a - Confirm Flow - Were You Able To Reach The Rider.jpg`
+- `CAP-218` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-04b - Confirm Flow - Rider Declined The Trip.jpg`
+- `CAP-219` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-04c - Support Chat - Decline Template Message.jpg`
+- `CAP-220` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-05a - Web Form - Trip Data Update - Top.png`
+- `CAP-221` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-05b - Web Form - Trip Data Update - Times.png`
+- `CAP-222` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-05c - Web Form - Trip Data Update - Reason And Submit.png`
+- `CAP-223` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06a - Member No-Show - Empty.jpg`
+- `CAP-224` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06b - Member No-Show - No-Show Type Picker.jpg`
+- `CAP-225` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg`
 
 </details>
 
@@ -630,172 +640,172 @@ Raw camera rolls, unprocessed `_inbox` dumps and Slack release crops. No canonic
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-224 | `01 - Inbox splits into SMS and Chat.jpg` | slack | `33930ff0783a2989` | 1 |  |
-| CAP-225 | `02 - Which channel youre in.jpg` | slack | `e68fe6c644ecdaa2` | 1 |  |
-| CAP-226 | `03 - Profile - SMS only.jpg` | slack | `4c046924f78ac24c` | 1 |  |
-| CAP-227 | `04 - Profile - has in-app chat.jpg` | slack | `e4d904e060570905` | 1 |  |
-| CAP-228 | `04 - Sign up or sign in, in the app.jpg` | slack | `3b19cb6fa7f74fb7` | 1 |  |
-| CAP-229 | `1000155769.jpg` | MRV-B1-raw | `a5c54ca729a2637c` | 2 |  |
-| CAP-230 | `1000155770.jpg` | MRV-B1-raw | `ed1b8adf6e9e744e` | 2 |  |
-| CAP-231 | `1000155771.jpg` | MRV-B1-raw | `80b5ad7b821ad420` | 2 |  |
-| CAP-232 | `1000155772.jpg` | MRV-B1-raw | `86a79c3411f6c070` | 2 |  |
-| CAP-233 | `1000155775.jpg` | MRV-B1-raw | `22304dd3d531e2ff` | 2 |  |
-| CAP-234 | `1000155776.jpg` | MRV-B1-raw | `909eed3608838da7` | 2 |  |
-| CAP-235 | `1000155777.jpg` | MRV-B1-raw | `bbca011fe20cb2a9` | 2 |  |
-| CAP-236 | `1000155778.jpg` | MRV-B1-raw | `629b46b333cc3314` | 1 |  |
-| CAP-237 | `1000155779.jpg` | MRV-B1-raw | `5a403c12a92337a5` | 1 |  |
-| CAP-238 | `1000155780.jpg` | MRV-B1-raw | `9cf070b2219ab416` | 1 |  |
-| CAP-239 | `1000155781.jpg` | MRV-B1-raw | `6bb29feaa08c5ce0` | 2 |  |
-| CAP-240 | `1000155783.jpg` | MRV-B1-raw | `40ebce58d3ebf276` | 2 |  |
-| CAP-241 | `1000155784.jpg` | MRV-B1-raw | `72808f2246eb52eb` | 2 |  |
-| CAP-242 | `1000155785.jpg` | MRV-B1-raw | `d8b879fc119396bd` | 2 |  |
-| CAP-243 | `1000155786.jpg` | MRV-B1-raw | `bb07747df8468e1f` | 1 |  |
-| CAP-244 | `1000155787.jpg` | MRV-B1-raw | `cd70adf6ebb71edd` | 1 |  |
-| CAP-245 | `1000155788.jpg` | MRV-B1-raw | `d538e751cc04e681` | 1 |  |
-| CAP-246 | `1000155789.jpg` | MRV-B1-raw | `16465aab0fbb5c1a` | 1 |  |
-| CAP-247 | `1000155790.jpg` | MRV-B1-raw | `4d7d17af7f77a34a` | 2 |  |
-| CAP-248 | `1000155791.jpg` | MRV-B1-raw | `831a73046bb9c382` | 1 |  |
-| CAP-249 | `1000155795.jpg` | MRV-B1-raw | `2209eb0606a40401` | 1 |  |
-| CAP-250 | `1000155798.jpg` | MRV-B1-raw | `f5dba491e47fc1bc` | 2 |  |
-| CAP-251 | `1000155799.jpg` | MRV-B1-raw | `4bafcafc16026d41` | 1 |  |
-| CAP-252 | `1000155800.jpg` | MRV-B1-raw | `e56718a57c1f3c35` | 1 |  |
-| CAP-253 | `1000155802.jpg` | MRV-B1-raw | `bbecf54f98ad32c3` | 2 |  |
-| CAP-254 | `1000155803.jpg` | MRV-B1-raw | `d7125f123ef710b4` | 1 |  |
-| CAP-255 | `1000155804.jpg` | MRV-B1-raw | `4808c2b3bfee4181` | 2 |  |
-| CAP-256 | `1000162490.jpg` | unknown | `aa82e1b08d509fd1` | 0 |  |
-| CAP-257 | `1000162491.jpg` | unknown | `822fb975ae11c8a8` | 0 |  |
-| CAP-258 | `1000162492 (1).jpg` | unknown | `423186d785dddf50` | 1 |  |
-| CAP-259 | `1000162496.jpg` | unknown | `0e6d88d0624d2c35` | 0 |  |
-| CAP-260 | `1000162497.jpg` | unknown | `38037b2ab35fdd48` | 1 |  |
-| CAP-261 | `1000162498.jpg` | unknown | `f6c7c1ea30b7247a` | 0 |  |
-| CAP-262 | `1000162499.jpg` | unknown | `cf243ff1e7b9f68a` | 0 |  |
-| CAP-263 | `1000162500.jpg` | unknown | `9bff650b392b728c` | 0 |  |
-| CAP-264 | `1000162501.jpg` | unknown | `eb86cd1974efc45f` | 0 |  |
-| CAP-265 | `1000162503.jpg` | unknown | `b97d85ba33dc5f74` | 0 |  |
-| CAP-266 | `1000162505.jpg` | unknown | `2a67f633fbe49936` | 1 |  |
-| CAP-267 | `1000162506.jpg` | unknown | `f6acba1149ce7275` | 0 |  |
-| CAP-268 | `1000162507.jpg` | unknown | `117d5d8f08fda8fb` | 0 |  |
-| CAP-269 | `1000162508.jpg` | unknown | `8ea6f6155d932cec` | 0 |  |
-| CAP-270 | `1000162509.jpg` | unknown | `e6eb8b90181decf9` | 0 |  |
-| CAP-271 | `1000162510.jpg` | unknown | `865c4e7a018340c3` | 0 |  |
-| CAP-272 | `1000162511.jpg` | unknown | `9dc3fe2a4772ccb7` | 0 |  |
-| CAP-273 | `1000162513.jpg` | unknown | `b9251ae0ea7cd872` | 0 |  |
-| CAP-274 | `Screenshot 2026-04-24 at 11.16.23 PM.png` | unknown (2026-04-24) | `ccc9ae23e18a92e3` | 0 |  |
-| CAP-275 | `Screenshot 2026-04-24 at 8.56.03 PM.png` | unknown (2026-04-24) | `2e57f7b1c51edba7` | 0 |  |
-| CAP-276 | `Screenshot 2026-04-27 at 9.30.40 AM.png` | unknown (2026-04-27) | `74c9af68a2d1cc0c` | 0 |  |
-| CAP-277 | `Screenshot 2026-04-27 at 9.31.09 AM.png` | unknown (2026-04-27) | `66c641720250a3e4` | 0 |  |
-| CAP-278 | `Screenshot 2026-09-08 at 1.28.55 AM.png` | MRV-B1-raw | `14b338cbdf1145b4` | 0 |  |
-| CAP-279 | `Screenshot 2026-09-08 at 1.29.46 AM.png` | MRV-B1-raw | `7c0b14f159382084` | 0 |  |
-| CAP-280 | `Screenshot 2026-09-08 at 1.30.12 AM.png` | MRV-B1-raw | `4d9400924da47941` | 0 |  |
-| CAP-281 | `Screenshot 2026-09-08 at 1.30.22 AM.png` | MRV-B1-raw | `6c59a11b98c83599` | 0 |  |
-| CAP-282 | `Screenshot 2026-09-08 at 10.51.26 PM.png` | MRV-B1-raw | `16c9ebbd692e250a` | 0 |  |
-| CAP-283 | `Screenshot 2026-09-10 at 10.57.01 PM.png` | unknown (2026-09-10) | `1258581f969b9a70` | 0 |  |
-| CAP-284 | `Screenshot 2026-09-14 at 11.56.43 PM.png` | unknown (2026-09-14) | `59f018e12688d5a7` | 0 |  |
-| CAP-285 | `Screenshot 2026-09-15 at 1.08.06 AM.png` | unknown (2026-09-15) | `12a8ed1e4a414e91` | 0 |  |
-| CAP-286 | `Screenshot 2026-09-15 at 10.24.38 PM.png` | unknown (2026-09-15) | `4a060ccc790baf19` | 1 |  |
-| CAP-287 | `Screenshot 2026-09-15 at 10.24.41 PM.png` | unknown (2026-09-15) | `2e937ce513125351` | 1 |  |
-| CAP-288 | `Screenshot 2026-09-15 at 10.24.45 PM.png` | unknown (2026-09-15) | `83745da1aa006072` | 1 |  |
-| CAP-289 | `Screenshot 2026-09-15 at 10.25.12 PM.png` | unknown (2026-09-15) | `205ac1a338cecec5` | 1 |  |
-| CAP-290 | `Screenshot 2026-09-15 at 10.25.15 PM.png` | unknown (2026-09-15) | `135291dbafeabd12` | 1 |  |
-| CAP-291 | `Screenshot 2026-09-16 at 11.58.56 PM.png` | unknown (2026-09-16) | `9d800d656502de7d` | 1 |  |
-| CAP-292 | `Screenshot 2026-09-16 at 11.59.01 PM.png` | unknown (2026-09-16) | `31a027cca82a858f` | 1 |  |
-| CAP-293 | `Screenshot 2026-09-16 at 11.59.05 PM.png` | unknown (2026-09-16) | `1c6e100029eb38fe` | 1 |  |
-| CAP-294 | `Screenshot 2026-09-17 at 12.00.12 AM.png` | unknown (2026-09-17) | `30369548032df38b` | 1 |  |
-| CAP-295 | `Screenshot 2026-09-17 at 12.00.15 AM.png` | unknown (2026-09-17) | `b9273a8a27eb1b85` | 1 |  |
-| CAP-296 | `Screenshot 2026-09-17 at 12.00.18 AM.png` | unknown (2026-09-17) | `a9488467bb5b6c2c` | 1 |  |
-| CAP-297 | `Screenshot 2026-09-17 at 12.00.32 AM.png` | unknown (2026-09-17) | `fa114c748324dc49` | 1 |  |
-| CAP-298 | `Screenshot 2026-09-17 at 12.01.09 AM.png` | unknown (2026-09-17) | `6d1ab2eb49deb88c` | 1 |  |
-| CAP-299 | `Screenshot 2026-09-17 at 12.28.15 AM.png` | unknown (2026-09-17) | `d93663b76e683652` | 0 |  |
-| CAP-300 | `Screenshot 2026-09-24 at 11.45.12 PM.png` | unknown (2026-09-24) | `00afe9514bb63c49` | 0 |  |
-| CAP-301 | `Screenshot 2026-09-24 at 11.45.15 PM.png` | unknown (2026-09-24) | `6a18fab7fb922a05` | 0 |  |
-| CAP-302 | `Screenshot 2026-09-24 at 3.10.20 AM.png` | unknown (2026-09-24) | `36aedc1b6d902e28` | 0 |  |
-| CAP-303 | `Screenshot 2026-09-24 at 4.08.51 AM.png` | unknown (2026-09-24) | `a995f7e61d5b8a58` | 1 |  |
-| CAP-304 | `Screenshot 2026-09-25 at 1.00.08 AM.png` | unknown (2026-09-25) | `4b0b4f7cf08a1460` | 0 |  |
-| CAP-305 | `Screenshot 2026-09-25 at 1.16.35 AM.png` | unknown (2026-09-25) | `6d3d582b27900e06` | 0 |  |
+| CAP-226 | `01 - Inbox splits into SMS and Chat.jpg` | slack | `33930ff0783a2989` | 1 |  |
+| CAP-227 | `02 - Which channel youre in.jpg` | slack | `e68fe6c644ecdaa2` | 1 |  |
+| CAP-228 | `03 - Profile - SMS only.jpg` | slack | `4c046924f78ac24c` | 1 |  |
+| CAP-229 | `04 - Profile - has in-app chat.jpg` | slack | `e4d904e060570905` | 1 |  |
+| CAP-230 | `04 - Sign up or sign in, in the app.jpg` | slack | `3b19cb6fa7f74fb7` | 1 |  |
+| CAP-231 | `1000155769.jpg` | MRV-B1-raw | `a5c54ca729a2637c` | 2 |  |
+| CAP-232 | `1000155770.jpg` | MRV-B1-raw | `ed1b8adf6e9e744e` | 2 |  |
+| CAP-233 | `1000155771.jpg` | MRV-B1-raw | `80b5ad7b821ad420` | 2 |  |
+| CAP-234 | `1000155772.jpg` | MRV-B1-raw | `86a79c3411f6c070` | 2 |  |
+| CAP-235 | `1000155775.jpg` | MRV-B1-raw | `22304dd3d531e2ff` | 2 |  |
+| CAP-236 | `1000155776.jpg` | MRV-B1-raw | `909eed3608838da7` | 2 |  |
+| CAP-237 | `1000155777.jpg` | MRV-B1-raw | `bbca011fe20cb2a9` | 2 |  |
+| CAP-238 | `1000155778.jpg` | MRV-B1-raw | `629b46b333cc3314` | 1 |  |
+| CAP-239 | `1000155779.jpg` | MRV-B1-raw | `5a403c12a92337a5` | 1 |  |
+| CAP-240 | `1000155780.jpg` | MRV-B1-raw | `9cf070b2219ab416` | 1 |  |
+| CAP-241 | `1000155781.jpg` | MRV-B1-raw | `6bb29feaa08c5ce0` | 2 |  |
+| CAP-242 | `1000155783.jpg` | MRV-B1-raw | `40ebce58d3ebf276` | 2 |  |
+| CAP-243 | `1000155784.jpg` | MRV-B1-raw | `72808f2246eb52eb` | 2 |  |
+| CAP-244 | `1000155785.jpg` | MRV-B1-raw | `d8b879fc119396bd` | 2 |  |
+| CAP-245 | `1000155786.jpg` | MRV-B1-raw | `bb07747df8468e1f` | 1 |  |
+| CAP-246 | `1000155787.jpg` | MRV-B1-raw | `cd70adf6ebb71edd` | 1 |  |
+| CAP-247 | `1000155788.jpg` | MRV-B1-raw | `d538e751cc04e681` | 1 |  |
+| CAP-248 | `1000155789.jpg` | MRV-B1-raw | `16465aab0fbb5c1a` | 1 |  |
+| CAP-249 | `1000155790.jpg` | MRV-B1-raw | `4d7d17af7f77a34a` | 2 |  |
+| CAP-250 | `1000155791.jpg` | MRV-B1-raw | `831a73046bb9c382` | 1 |  |
+| CAP-251 | `1000155795.jpg` | MRV-B1-raw | `2209eb0606a40401` | 1 |  |
+| CAP-252 | `1000155798.jpg` | MRV-B1-raw | `f5dba491e47fc1bc` | 2 |  |
+| CAP-253 | `1000155799.jpg` | MRV-B1-raw | `4bafcafc16026d41` | 1 |  |
+| CAP-254 | `1000155800.jpg` | MRV-B1-raw | `e56718a57c1f3c35` | 1 |  |
+| CAP-255 | `1000155802.jpg` | MRV-B1-raw | `bbecf54f98ad32c3` | 2 |  |
+| CAP-256 | `1000155803.jpg` | MRV-B1-raw | `d7125f123ef710b4` | 1 |  |
+| CAP-257 | `1000155804.jpg` | MRV-B1-raw | `4808c2b3bfee4181` | 2 |  |
+| CAP-258 | `1000162490.jpg` | unknown | `aa82e1b08d509fd1` | 0 |  |
+| CAP-259 | `1000162491.jpg` | unknown | `822fb975ae11c8a8` | 0 |  |
+| CAP-260 | `1000162492 (1).jpg` | unknown | `423186d785dddf50` | 1 |  |
+| CAP-261 | `1000162496.jpg` | unknown | `0e6d88d0624d2c35` | 0 |  |
+| CAP-262 | `1000162497.jpg` | unknown | `38037b2ab35fdd48` | 1 |  |
+| CAP-263 | `1000162498.jpg` | unknown | `f6c7c1ea30b7247a` | 0 |  |
+| CAP-264 | `1000162499.jpg` | unknown | `cf243ff1e7b9f68a` | 0 |  |
+| CAP-265 | `1000162500.jpg` | unknown | `9bff650b392b728c` | 0 |  |
+| CAP-266 | `1000162501.jpg` | unknown | `eb86cd1974efc45f` | 0 |  |
+| CAP-267 | `1000162503.jpg` | unknown | `b97d85ba33dc5f74` | 0 |  |
+| CAP-268 | `1000162505.jpg` | unknown | `2a67f633fbe49936` | 1 |  |
+| CAP-269 | `1000162506.jpg` | unknown | `f6acba1149ce7275` | 0 |  |
+| CAP-270 | `1000162507.jpg` | unknown | `117d5d8f08fda8fb` | 0 |  |
+| CAP-271 | `1000162508.jpg` | unknown | `8ea6f6155d932cec` | 0 |  |
+| CAP-272 | `1000162509.jpg` | unknown | `e6eb8b90181decf9` | 0 |  |
+| CAP-273 | `1000162510.jpg` | unknown | `865c4e7a018340c3` | 0 |  |
+| CAP-274 | `1000162511.jpg` | unknown | `9dc3fe2a4772ccb7` | 0 |  |
+| CAP-275 | `1000162513.jpg` | unknown | `b9251ae0ea7cd872` | 0 |  |
+| CAP-276 | `Screenshot 2026-04-24 at 11.16.23 PM.png` | unknown (2026-04-24) | `ccc9ae23e18a92e3` | 0 |  |
+| CAP-277 | `Screenshot 2026-04-24 at 8.56.03 PM.png` | unknown (2026-04-24) | `2e57f7b1c51edba7` | 0 |  |
+| CAP-278 | `Screenshot 2026-04-27 at 9.30.40 AM.png` | unknown (2026-04-27) | `74c9af68a2d1cc0c` | 0 |  |
+| CAP-279 | `Screenshot 2026-04-27 at 9.31.09 AM.png` | unknown (2026-04-27) | `66c641720250a3e4` | 0 |  |
+| CAP-280 | `Screenshot 2026-09-08 at 1.28.55 AM.png` | MRV-B1-raw | `14b338cbdf1145b4` | 0 |  |
+| CAP-281 | `Screenshot 2026-09-08 at 1.29.46 AM.png` | MRV-B1-raw | `7c0b14f159382084` | 0 |  |
+| CAP-282 | `Screenshot 2026-09-08 at 1.30.12 AM.png` | MRV-B1-raw | `4d9400924da47941` | 0 |  |
+| CAP-283 | `Screenshot 2026-09-08 at 1.30.22 AM.png` | MRV-B1-raw | `6c59a11b98c83599` | 0 |  |
+| CAP-284 | `Screenshot 2026-09-08 at 10.51.26 PM.png` | MRV-B1-raw | `16c9ebbd692e250a` | 0 |  |
+| CAP-285 | `Screenshot 2026-09-10 at 10.57.01 PM.png` | unknown (2026-09-10) | `1258581f969b9a70` | 0 |  |
+| CAP-286 | `Screenshot 2026-09-14 at 11.56.43 PM.png` | unknown (2026-09-14) | `59f018e12688d5a7` | 0 |  |
+| CAP-287 | `Screenshot 2026-09-15 at 1.08.06 AM.png` | unknown (2026-09-15) | `12a8ed1e4a414e91` | 0 |  |
+| CAP-288 | `Screenshot 2026-09-15 at 10.24.38 PM.png` | unknown (2026-09-15) | `4a060ccc790baf19` | 1 |  |
+| CAP-289 | `Screenshot 2026-09-15 at 10.24.41 PM.png` | unknown (2026-09-15) | `2e937ce513125351` | 1 |  |
+| CAP-290 | `Screenshot 2026-09-15 at 10.24.45 PM.png` | unknown (2026-09-15) | `83745da1aa006072` | 1 |  |
+| CAP-291 | `Screenshot 2026-09-15 at 10.25.12 PM.png` | unknown (2026-09-15) | `205ac1a338cecec5` | 1 |  |
+| CAP-292 | `Screenshot 2026-09-15 at 10.25.15 PM.png` | unknown (2026-09-15) | `135291dbafeabd12` | 1 |  |
+| CAP-293 | `Screenshot 2026-09-16 at 11.58.56 PM.png` | unknown (2026-09-16) | `9d800d656502de7d` | 1 |  |
+| CAP-294 | `Screenshot 2026-09-16 at 11.59.01 PM.png` | unknown (2026-09-16) | `31a027cca82a858f` | 1 |  |
+| CAP-295 | `Screenshot 2026-09-16 at 11.59.05 PM.png` | unknown (2026-09-16) | `1c6e100029eb38fe` | 1 |  |
+| CAP-296 | `Screenshot 2026-09-17 at 12.00.12 AM.png` | unknown (2026-09-17) | `30369548032df38b` | 1 |  |
+| CAP-297 | `Screenshot 2026-09-17 at 12.00.15 AM.png` | unknown (2026-09-17) | `b9273a8a27eb1b85` | 1 |  |
+| CAP-298 | `Screenshot 2026-09-17 at 12.00.18 AM.png` | unknown (2026-09-17) | `a9488467bb5b6c2c` | 1 |  |
+| CAP-299 | `Screenshot 2026-09-17 at 12.00.32 AM.png` | unknown (2026-09-17) | `fa114c748324dc49` | 1 |  |
+| CAP-300 | `Screenshot 2026-09-17 at 12.01.09 AM.png` | unknown (2026-09-17) | `6d1ab2eb49deb88c` | 1 |  |
+| CAP-301 | `Screenshot 2026-09-17 at 12.28.15 AM.png` | unknown (2026-09-17) | `d93663b76e683652` | 0 |  |
+| CAP-302 | `Screenshot 2026-09-24 at 11.45.12 PM.png` | unknown (2026-09-24) | `00afe9514bb63c49` | 0 |  |
+| CAP-303 | `Screenshot 2026-09-24 at 11.45.15 PM.png` | unknown (2026-09-24) | `6a18fab7fb922a05` | 0 |  |
+| CAP-304 | `Screenshot 2026-09-24 at 3.10.20 AM.png` | unknown (2026-09-24) | `36aedc1b6d902e28` | 0 |  |
+| CAP-305 | `Screenshot 2026-09-24 at 4.08.51 AM.png` | unknown (2026-09-24) | `a995f7e61d5b8a58` | 1 |  |
+| CAP-306 | `Screenshot 2026-09-25 at 1.00.08 AM.png` | unknown (2026-09-25) | `4b0b4f7cf08a1460` | 0 |  |
+| CAP-307 | `Screenshot 2026-09-25 at 1.16.35 AM.png` | unknown (2026-09-25) | `6d3d582b27900e06` | 0 |  |
 
 <details><summary>Source paths</summary>
 
-- `CAP-224` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/01 - Inbox splits into SMS and Chat.jpg`
-- `CAP-225` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/02 - Which channel youre in.jpg`
-- `CAP-226` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/03 - Profile - SMS only.jpg`
-- `CAP-227` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/04 - Profile - has in-app chat.jpg`
-- `CAP-228` — `Project - Map Request View/Release Info - Screenshots for Slack/3 - In-App Onboarding and Chat/04 - Sign up or sign in, in the app.jpg`
-- `CAP-229` — `Project - Map Request View/References/1000155769.jpg`
-- `CAP-230` — `Project - Map Request View/References/1000155770.jpg`
-- `CAP-231` — `Project - Map Request View/References/1000155771.jpg`
-- `CAP-232` — `Project - Map Request View/References/1000155772.jpg`
-- `CAP-233` — `Project - Map Request View/References/1000155775.jpg`
-- `CAP-234` — `Project - Map Request View/References/1000155776.jpg`
-- `CAP-235` — `Project - Map Request View/References/1000155777.jpg`
-- `CAP-236` — `Project - Map Request View/References/1000155778.jpg`
-- `CAP-237` — `Project - Map Request View/References/1000155779.jpg`
-- `CAP-238` — `Project - Map Request View/References/1000155780.jpg`
-- `CAP-239` — `Project - Map Request View/References/1000155781.jpg`
-- `CAP-240` — `Project - Map Request View/References/1000155783.jpg`
-- `CAP-241` — `Project - Map Request View/References/1000155784.jpg`
-- `CAP-242` — `Project - Map Request View/References/1000155785.jpg`
-- `CAP-243` — `Project - Map Request View/References/1000155786.jpg`
-- `CAP-244` — `Project - Map Request View/References/1000155787.jpg`
-- `CAP-245` — `Project - Map Request View/References/1000155788.jpg`
-- `CAP-246` — `Project - Map Request View/References/1000155789.jpg`
-- `CAP-247` — `Project - Map Request View/References/1000155790.jpg`
-- `CAP-248` — `Project - Map Request View/References/1000155791.jpg`
-- `CAP-249` — `Project - Map Request View/References/1000155795.jpg`
-- `CAP-250` — `Project - Map Request View/References/1000155798.jpg`
-- `CAP-251` — `Project - Map Request View/References/1000155799.jpg`
-- `CAP-252` — `Project - Map Request View/References/1000155800.jpg`
-- `CAP-253` — `Project - Map Request View/References/1000155802.jpg`
-- `CAP-254` — `Project - Map Request View/References/1000155803.jpg`
-- `CAP-255` — `Project - Map Request View/References/1000155804.jpg`
-- `CAP-256` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162490.jpg`
-- `CAP-257` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162491.jpg`
-- `CAP-258` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162492 (1).jpg`
-- `CAP-259` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162496.jpg`
-- `CAP-260` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162497.jpg`
-- `CAP-261` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162498.jpg`
-- `CAP-262` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162499.jpg`
-- `CAP-263` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162500.jpg`
-- `CAP-264` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162501.jpg`
-- `CAP-265` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162503.jpg`
-- `CAP-266` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162505.jpg`
-- `CAP-267` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162506.jpg`
-- `CAP-268` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162507.jpg`
-- `CAP-269` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162508.jpg`
-- `CAP-270` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162509.jpg`
-- `CAP-271` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162510.jpg`
-- `CAP-272` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162511.jpg`
-- `CAP-273` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162513.jpg`
-- `CAP-274` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 11.16.23 PM.png`
-- `CAP-275` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 8.56.03 PM.png`
-- `CAP-276` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.30.40 AM.png`
-- `CAP-277` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.31.09 AM.png`
-- `CAP-278` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.28.55 AM.png`
-- `CAP-279` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.29.46 AM.png`
-- `CAP-280` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.12 AM.png`
-- `CAP-281` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.22 AM.png`
-- `CAP-282` — `Project - Map Request View/References/Screenshot 2026-09-08 at 10.51.26 PM.png`
-- `CAP-283` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-10 at 10.57.01 PM.png`
-- `CAP-284` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-14 at 11.56.43 PM.png`
-- `CAP-285` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 1.08.06 AM.png`
-- `CAP-286` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.38 PM.png`
-- `CAP-287` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.41 PM.png`
-- `CAP-288` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.45 PM.png`
-- `CAP-289` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.12 PM.png`
-- `CAP-290` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.15 PM.png`
-- `CAP-291` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.58.56 PM.png`
-- `CAP-292` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.01 PM.png`
-- `CAP-293` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.05 PM.png`
-- `CAP-294` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.12 AM.png`
-- `CAP-295` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.15 AM.png`
-- `CAP-296` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.18 AM.png`
-- `CAP-297` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.32 AM.png`
-- `CAP-298` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.01.09 AM.png`
-- `CAP-299` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.28.15 AM.png`
-- `CAP-300` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.12 PM.png`
-- `CAP-301` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.15 PM.png`
-- `CAP-302` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 3.10.20 AM.png`
-- `CAP-303` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 4.08.51 AM.png`
-- `CAP-304` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.00.08 AM.png`
-- `CAP-305` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.16.35 AM.png`
+- `CAP-226` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/01 - Inbox splits into SMS and Chat.jpg`
+- `CAP-227` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/02 - Which channel youre in.jpg`
+- `CAP-228` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/03 - Profile - SMS only.jpg`
+- `CAP-229` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/04 - Profile - has in-app chat.jpg`
+- `CAP-230` — `Project - Map Request View/Release Info - Screenshots for Slack/3 - In-App Onboarding and Chat/04 - Sign up or sign in, in the app.jpg`
+- `CAP-231` — `Project - Map Request View/References/1000155769.jpg`
+- `CAP-232` — `Project - Map Request View/References/1000155770.jpg`
+- `CAP-233` — `Project - Map Request View/References/1000155771.jpg`
+- `CAP-234` — `Project - Map Request View/References/1000155772.jpg`
+- `CAP-235` — `Project - Map Request View/References/1000155775.jpg`
+- `CAP-236` — `Project - Map Request View/References/1000155776.jpg`
+- `CAP-237` — `Project - Map Request View/References/1000155777.jpg`
+- `CAP-238` — `Project - Map Request View/References/1000155778.jpg`
+- `CAP-239` — `Project - Map Request View/References/1000155779.jpg`
+- `CAP-240` — `Project - Map Request View/References/1000155780.jpg`
+- `CAP-241` — `Project - Map Request View/References/1000155781.jpg`
+- `CAP-242` — `Project - Map Request View/References/1000155783.jpg`
+- `CAP-243` — `Project - Map Request View/References/1000155784.jpg`
+- `CAP-244` — `Project - Map Request View/References/1000155785.jpg`
+- `CAP-245` — `Project - Map Request View/References/1000155786.jpg`
+- `CAP-246` — `Project - Map Request View/References/1000155787.jpg`
+- `CAP-247` — `Project - Map Request View/References/1000155788.jpg`
+- `CAP-248` — `Project - Map Request View/References/1000155789.jpg`
+- `CAP-249` — `Project - Map Request View/References/1000155790.jpg`
+- `CAP-250` — `Project - Map Request View/References/1000155791.jpg`
+- `CAP-251` — `Project - Map Request View/References/1000155795.jpg`
+- `CAP-252` — `Project - Map Request View/References/1000155798.jpg`
+- `CAP-253` — `Project - Map Request View/References/1000155799.jpg`
+- `CAP-254` — `Project - Map Request View/References/1000155800.jpg`
+- `CAP-255` — `Project - Map Request View/References/1000155802.jpg`
+- `CAP-256` — `Project - Map Request View/References/1000155803.jpg`
+- `CAP-257` — `Project - Map Request View/References/1000155804.jpg`
+- `CAP-258` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162490.jpg`
+- `CAP-259` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162491.jpg`
+- `CAP-260` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162492 (1).jpg`
+- `CAP-261` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162496.jpg`
+- `CAP-262` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162497.jpg`
+- `CAP-263` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162498.jpg`
+- `CAP-264` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162499.jpg`
+- `CAP-265` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162500.jpg`
+- `CAP-266` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162501.jpg`
+- `CAP-267` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162503.jpg`
+- `CAP-268` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162505.jpg`
+- `CAP-269` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162506.jpg`
+- `CAP-270` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162507.jpg`
+- `CAP-271` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162508.jpg`
+- `CAP-272` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162509.jpg`
+- `CAP-273` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162510.jpg`
+- `CAP-274` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162511.jpg`
+- `CAP-275` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162513.jpg`
+- `CAP-276` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 11.16.23 PM.png`
+- `CAP-277` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 8.56.03 PM.png`
+- `CAP-278` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.30.40 AM.png`
+- `CAP-279` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.31.09 AM.png`
+- `CAP-280` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.28.55 AM.png`
+- `CAP-281` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.29.46 AM.png`
+- `CAP-282` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.12 AM.png`
+- `CAP-283` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.22 AM.png`
+- `CAP-284` — `Project - Map Request View/References/Screenshot 2026-09-08 at 10.51.26 PM.png`
+- `CAP-285` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-10 at 10.57.01 PM.png`
+- `CAP-286` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-14 at 11.56.43 PM.png`
+- `CAP-287` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 1.08.06 AM.png`
+- `CAP-288` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.38 PM.png`
+- `CAP-289` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.41 PM.png`
+- `CAP-290` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.45 PM.png`
+- `CAP-291` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.12 PM.png`
+- `CAP-292` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.15 PM.png`
+- `CAP-293` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.58.56 PM.png`
+- `CAP-294` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.01 PM.png`
+- `CAP-295` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.05 PM.png`
+- `CAP-296` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.12 AM.png`
+- `CAP-297` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.15 AM.png`
+- `CAP-298` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.18 AM.png`
+- `CAP-299` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.32 AM.png`
+- `CAP-300` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.01.09 AM.png`
+- `CAP-301` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.28.15 AM.png`
+- `CAP-302` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.12 PM.png`
+- `CAP-303` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.15 PM.png`
+- `CAP-304` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 3.10.20 AM.png`
+- `CAP-305` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 4.08.51 AM.png`
+- `CAP-306` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.00.08 AM.png`
+- `CAP-307` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.16.35 AM.png`
 
 </details>

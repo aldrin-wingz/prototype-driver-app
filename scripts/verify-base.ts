@@ -21,6 +21,9 @@ import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  PLANNER_COPY, addDays, dailySummary, dateNavState, plannerDateLabel, plannerTripsFor,
+} from "../lib/driver-data/planner";
+import {
   DEFAULT_RIDE_HISTORY_FILTER, RIDE_HISTORY_FILTERS, applyRideHistoryFilter,
   isLateTrip, isMissingSignature,
 } from "../lib/driver-data/ride-history";
@@ -338,6 +341,51 @@ check("absent signature is not 'missing'", `${absent.length} trips leave it unse
   absent.every((t) => !isMissingSignature(t)));
 check("late predicate needs an explicit true", `${mockCompletedTrips.filter(isLateTrip).length} late`,
   mockCompletedTrips.filter((t) => t.wasLate === undefined).every((t) => !isLateTrip(t)));
+
+// ---------------------------------------------------------------------------
+console.log("\n3e. Planner");
+// ---------------------------------------------------------------------------
+// Capture `03-01`. ⛔ ONLY THE EMPTY DAY IS CAPTURED — the populated Planner
+// has never been photographed, so the guard here is that the base keeps
+// rendering the empty state rather than quietly acquiring an invented one.
+
+const pToday = new Date(2026, 6, 31);
+check("date label is the captured long form", plannerDateLabel(new Date(2026, 9, 1)),
+  plannerDateLabel(new Date(2026, 9, 1)) === "Thu October 1, 2026");
+
+const navToday = dateNavState(pToday, pToday);
+check("on today: back and Today are inert, forward is live",
+  `back=${navToday.canGoBack} today=${navToday.canGoToday} fwd=${navToday.canGoForward}`,
+  !navToday.canGoBack && !navToday.canGoToday && navToday.canGoForward);
+const navAhead = dateNavState(addDays(pToday, 1), pToday);
+check("a day ahead: all three are live",
+  `back=${navAhead.canGoBack} today=${navAhead.canGoToday} fwd=${navAhead.canGoForward}`,
+  navAhead.canGoBack && navAhead.canGoToday && navAhead.canGoForward);
+const navPast = dateNavState(addDays(pToday, -1), pToday);
+check("never pages before today", `back=${navPast.canGoBack}`, !navPast.canGoBack);
+
+/**
+ * ⛔ The populated Planner is UNCAPTURED. If this ever returns trips, someone
+ * has invented a screen — the empty state is the only shape we have evidence
+ * for, and the failure should be loud.
+ */
+const anyDay = [0, 1, 7, 30].map((n) => plannerTripsFor(addDays(pToday, n)).length);
+check("Planner stays empty — the populated layout is uncaptured",
+  `trips on +0/+1/+7/+30 days: ${anyDay.join(", ")}`, anyDay.every((n) => n === 0));
+
+const sum = dailySummary(plannerTripsFor(pToday));
+check("Daily Summary is derived, not hardcoded", `${sum.totalTrips} trips / $${sum.potentialEarnings.toFixed(2)}`,
+  sum.totalTrips === 0 && sum.potentialEarnings === 0);
+// ...and it must actually compute when given something
+const fake = dailySummary([
+  { totalRevenue: 10 } as never, { totalRevenue: 5.5 } as never,
+]);
+check("Daily Summary sums what it is given", `2 trips -> $${fake.potentialEarnings.toFixed(2)}`,
+  fake.totalTrips === 2 && fake.potentialEarnings === 15.5);
+
+check("empty-state copy matches the capture", PLANNER_COPY.emptyTitle,
+  PLANNER_COPY.emptyTitle === "No trips yet — but they're on the way!" &&
+  PLANNER_COPY.emptyBody.startsWith("Hang tight! Trips are assigned throughout the day."));
 
 // ---------------------------------------------------------------------------
 console.log("\n4. Colour tokens are literal strings");
