@@ -13,7 +13,7 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~137.7 MB of binaries into a branch that every future prototype clones — and
+~137.9 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
@@ -65,8 +65,8 @@ and predates the build in any case. It is not a source.
 | **_annotated** | 64 | 16.4 | derived×64 | — derivatives, not captures |
 | **_out-of-scope** | 13 | 2.7 | Apr-2026×10, DAB-2026-10-09×3 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
-| **_unregistered** | 84 | 41.9 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (undated shoot folder)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **318** | **137.7** | | 424 files on disk, 318 unique |
+| **_unregistered** | 85 | 42.2 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (undated shoot folder)×3, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
+| **TOTAL** | **319** | **137.9** | | 425 files on disk, 319 unique |
 
 ---
 
@@ -708,40 +708,41 @@ Raw camera rolls, unprocessed `_inbox` dumps and Slack release crops. No canonic
 | CAP-282 | `1000162510.jpg` | unknown | `865c4e7a018340c3` | 0 |  |
 | CAP-283 | `1000162511.jpg` | unknown | `9dc3fe2a4772ccb7` | 0 |  |
 | CAP-284 | `1000162513.jpg` | unknown | `b9251ae0ea7cd872` | 0 |  |
-| CAP-285 | `Screenshot 2026-04-24 at 11.16.23 PM.png` | unknown (2026-04-24) | `ccc9ae23e18a92e3` | 0 |  |
-| CAP-286 | `Screenshot 2026-04-24 at 8.56.03 PM.png` | unknown (2026-04-24) | `2e57f7b1c51edba7` | 0 |  |
-| CAP-287 | `Screenshot 2026-04-27 at 9.30.40 AM.png` | unknown (2026-04-27) | `74c9af68a2d1cc0c` | 0 |  |
-| CAP-288 | `Screenshot 2026-04-27 at 9.31.09 AM.png` | unknown (2026-04-27) | `66c641720250a3e4` | 0 |  |
-| CAP-289 | `Screenshot 2026-09-08 at 1.28.55 AM.png` | MRV-B1-raw | `14b338cbdf1145b4` | 0 |  |
-| CAP-290 | `Screenshot 2026-09-08 at 1.29.46 AM.png` | MRV-B1-raw | `7c0b14f159382084` | 0 |  |
-| CAP-291 | `Screenshot 2026-09-08 at 1.30.12 AM.png` | MRV-B1-raw | `4d9400924da47941` | 0 |  |
-| CAP-292 | `Screenshot 2026-09-08 at 1.30.22 AM.png` | MRV-B1-raw | `6c59a11b98c83599` | 0 |  |
-| CAP-293 | `Screenshot 2026-09-08 at 10.51.26 PM.png` | MRV-B1-raw | `16c9ebbd692e250a` | 0 |  |
-| CAP-294 | `Screenshot 2026-09-10 at 10.57.01 PM.png` | unknown (2026-09-10) | `1258581f969b9a70` | 0 |  |
-| CAP-295 | `Screenshot 2026-09-14 at 11.56.43 PM.png` | unknown (2026-09-14) | `59f018e12688d5a7` | 0 |  |
-| CAP-296 | `Screenshot 2026-09-15 at 1.08.06 AM.png` | unknown (2026-09-15) | `12a8ed1e4a414e91` | 0 |  |
-| CAP-297 | `Screenshot 2026-09-15 at 10.24.38 PM.png` | unknown (2026-09-15) | `4a060ccc790baf19` | 1 |  |
-| CAP-298 | `Screenshot 2026-09-15 at 10.24.41 PM.png` | unknown (2026-09-15) | `2e937ce513125351` | 1 |  |
-| CAP-299 | `Screenshot 2026-09-15 at 10.24.45 PM.png` | unknown (2026-09-15) | `83745da1aa006072` | 1 |  |
-| CAP-300 | `Screenshot 2026-09-15 at 10.25.12 PM.png` | unknown (2026-09-15) | `205ac1a338cecec5` | 1 |  |
-| CAP-301 | `Screenshot 2026-09-15 at 10.25.15 PM.png` | unknown (2026-09-15) | `135291dbafeabd12` | 1 |  |
-| CAP-302 | `Screenshot 2026-09-16 at 11.58.56 PM.png` | unknown (2026-09-16) | `9d800d656502de7d` | 1 |  |
-| CAP-303 | `Screenshot 2026-09-16 at 11.59.01 PM.png` | unknown (2026-09-16) | `31a027cca82a858f` | 1 |  |
-| CAP-304 | `Screenshot 2026-09-16 at 11.59.05 PM.png` | unknown (2026-09-16) | `1c6e100029eb38fe` | 1 |  |
-| CAP-305 | `Screenshot 2026-09-17 at 12.00.12 AM.png` | unknown (2026-09-17) | `30369548032df38b` | 1 |  |
-| CAP-306 | `Screenshot 2026-09-17 at 12.00.15 AM.png` | unknown (2026-09-17) | `b9273a8a27eb1b85` | 1 |  |
-| CAP-307 | `Screenshot 2026-09-17 at 12.00.18 AM.png` | unknown (2026-09-17) | `a9488467bb5b6c2c` | 1 |  |
-| CAP-308 | `Screenshot 2026-09-17 at 12.00.32 AM.png` | unknown (2026-09-17) | `fa114c748324dc49` | 1 |  |
-| CAP-309 | `Screenshot 2026-09-17 at 12.01.09 AM.png` | unknown (2026-09-17) | `6d1ab2eb49deb88c` | 1 |  |
-| CAP-310 | `Screenshot 2026-09-17 at 12.28.15 AM.png` | unknown (2026-09-17) | `d93663b76e683652` | 0 |  |
-| CAP-311 | `Screenshot 2026-09-24 at 11.45.12 PM.png` | unknown (2026-09-24) | `00afe9514bb63c49` | 0 |  |
-| CAP-312 | `Screenshot 2026-09-24 at 11.45.15 PM.png` | unknown (2026-09-24) | `6a18fab7fb922a05` | 0 |  |
-| CAP-313 | `Screenshot 2026-09-24 at 3.10.20 AM.png` | unknown (2026-09-24) | `36aedc1b6d902e28` | 0 |  |
-| CAP-314 | `Screenshot 2026-09-24 at 4.08.51 AM.png` | unknown (2026-09-24) | `a995f7e61d5b8a58` | 1 |  |
-| CAP-315 | `Screenshot 2026-09-25 at 1.00.08 AM.png` | unknown (2026-09-25) | `4b0b4f7cf08a1460` | 0 |  |
-| CAP-316 | `Screenshot 2026-09-25 at 1.16.35 AM.png` | unknown (2026-09-25) | `6d3d582b27900e06` | 0 |  |
-| CAP-317 | `Screenshot 2026-10-01 at 9.21.01 PM.png` | unknown (undated shoot folder) | `166c0445ba8e81eb` | 0 |  |
-| CAP-318 | `Screenshot 2026-10-01 at 9.21.04 PM.png` | unknown (undated shoot folder) | `d01d8002246b0796` | 0 |  |
+| CAP-285 | `2026-10-09 - two-up Home with Driver's Licence expiry - NOT VERIFIED AS PRODUCTION.png` | unknown (undated shoot folder) | `be4525575b8ec69a` | 0 |  |
+| CAP-286 | `Screenshot 2026-04-24 at 11.16.23 PM.png` | unknown (2026-04-24) | `ccc9ae23e18a92e3` | 0 |  |
+| CAP-287 | `Screenshot 2026-04-24 at 8.56.03 PM.png` | unknown (2026-04-24) | `2e57f7b1c51edba7` | 0 |  |
+| CAP-288 | `Screenshot 2026-04-27 at 9.30.40 AM.png` | unknown (2026-04-27) | `74c9af68a2d1cc0c` | 0 |  |
+| CAP-289 | `Screenshot 2026-04-27 at 9.31.09 AM.png` | unknown (2026-04-27) | `66c641720250a3e4` | 0 |  |
+| CAP-290 | `Screenshot 2026-09-08 at 1.28.55 AM.png` | MRV-B1-raw | `14b338cbdf1145b4` | 0 |  |
+| CAP-291 | `Screenshot 2026-09-08 at 1.29.46 AM.png` | MRV-B1-raw | `7c0b14f159382084` | 0 |  |
+| CAP-292 | `Screenshot 2026-09-08 at 1.30.12 AM.png` | MRV-B1-raw | `4d9400924da47941` | 0 |  |
+| CAP-293 | `Screenshot 2026-09-08 at 1.30.22 AM.png` | MRV-B1-raw | `6c59a11b98c83599` | 0 |  |
+| CAP-294 | `Screenshot 2026-09-08 at 10.51.26 PM.png` | MRV-B1-raw | `16c9ebbd692e250a` | 0 |  |
+| CAP-295 | `Screenshot 2026-09-10 at 10.57.01 PM.png` | unknown (2026-09-10) | `1258581f969b9a70` | 0 |  |
+| CAP-296 | `Screenshot 2026-09-14 at 11.56.43 PM.png` | unknown (2026-09-14) | `59f018e12688d5a7` | 0 |  |
+| CAP-297 | `Screenshot 2026-09-15 at 1.08.06 AM.png` | unknown (2026-09-15) | `12a8ed1e4a414e91` | 0 |  |
+| CAP-298 | `Screenshot 2026-09-15 at 10.24.38 PM.png` | unknown (2026-09-15) | `4a060ccc790baf19` | 1 |  |
+| CAP-299 | `Screenshot 2026-09-15 at 10.24.41 PM.png` | unknown (2026-09-15) | `2e937ce513125351` | 1 |  |
+| CAP-300 | `Screenshot 2026-09-15 at 10.24.45 PM.png` | unknown (2026-09-15) | `83745da1aa006072` | 1 |  |
+| CAP-301 | `Screenshot 2026-09-15 at 10.25.12 PM.png` | unknown (2026-09-15) | `205ac1a338cecec5` | 1 |  |
+| CAP-302 | `Screenshot 2026-09-15 at 10.25.15 PM.png` | unknown (2026-09-15) | `135291dbafeabd12` | 1 |  |
+| CAP-303 | `Screenshot 2026-09-16 at 11.58.56 PM.png` | unknown (2026-09-16) | `9d800d656502de7d` | 1 |  |
+| CAP-304 | `Screenshot 2026-09-16 at 11.59.01 PM.png` | unknown (2026-09-16) | `31a027cca82a858f` | 1 |  |
+| CAP-305 | `Screenshot 2026-09-16 at 11.59.05 PM.png` | unknown (2026-09-16) | `1c6e100029eb38fe` | 1 |  |
+| CAP-306 | `Screenshot 2026-09-17 at 12.00.12 AM.png` | unknown (2026-09-17) | `30369548032df38b` | 1 |  |
+| CAP-307 | `Screenshot 2026-09-17 at 12.00.15 AM.png` | unknown (2026-09-17) | `b9273a8a27eb1b85` | 1 |  |
+| CAP-308 | `Screenshot 2026-09-17 at 12.00.18 AM.png` | unknown (2026-09-17) | `a9488467bb5b6c2c` | 1 |  |
+| CAP-309 | `Screenshot 2026-09-17 at 12.00.32 AM.png` | unknown (2026-09-17) | `fa114c748324dc49` | 1 |  |
+| CAP-310 | `Screenshot 2026-09-17 at 12.01.09 AM.png` | unknown (2026-09-17) | `6d1ab2eb49deb88c` | 1 |  |
+| CAP-311 | `Screenshot 2026-09-17 at 12.28.15 AM.png` | unknown (2026-09-17) | `d93663b76e683652` | 0 |  |
+| CAP-312 | `Screenshot 2026-09-24 at 11.45.12 PM.png` | unknown (2026-09-24) | `00afe9514bb63c49` | 0 |  |
+| CAP-313 | `Screenshot 2026-09-24 at 11.45.15 PM.png` | unknown (2026-09-24) | `6a18fab7fb922a05` | 0 |  |
+| CAP-314 | `Screenshot 2026-09-24 at 3.10.20 AM.png` | unknown (2026-09-24) | `36aedc1b6d902e28` | 0 |  |
+| CAP-315 | `Screenshot 2026-09-24 at 4.08.51 AM.png` | unknown (2026-09-24) | `a995f7e61d5b8a58` | 1 |  |
+| CAP-316 | `Screenshot 2026-09-25 at 1.00.08 AM.png` | unknown (2026-09-25) | `4b0b4f7cf08a1460` | 0 |  |
+| CAP-317 | `Screenshot 2026-09-25 at 1.16.35 AM.png` | unknown (2026-09-25) | `6d3d582b27900e06` | 0 |  |
+| CAP-318 | `Screenshot 2026-10-01 at 9.21.01 PM.png` | unknown (undated shoot folder) | `166c0445ba8e81eb` | 0 |  |
+| CAP-319 | `Screenshot 2026-10-01 at 9.21.04 PM.png` | unknown (undated shoot folder) | `d01d8002246b0796` | 0 |  |
 
 <details><summary>Source paths</summary>
 
@@ -795,39 +796,40 @@ Raw camera rolls, unprocessed `_inbox` dumps and Slack release crops. No canonic
 - `CAP-282` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162510.jpg`
 - `CAP-283` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162511.jpg`
 - `CAP-284` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/1000162513.jpg`
-- `CAP-285` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 11.16.23 PM.png`
-- `CAP-286` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 8.56.03 PM.png`
-- `CAP-287` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.30.40 AM.png`
-- `CAP-288` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.31.09 AM.png`
-- `CAP-289` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.28.55 AM.png`
-- `CAP-290` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.29.46 AM.png`
-- `CAP-291` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.12 AM.png`
-- `CAP-292` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.22 AM.png`
-- `CAP-293` — `Project - Map Request View/References/Screenshot 2026-09-08 at 10.51.26 PM.png`
-- `CAP-294` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-10 at 10.57.01 PM.png`
-- `CAP-295` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-14 at 11.56.43 PM.png`
-- `CAP-296` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 1.08.06 AM.png`
-- `CAP-297` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.38 PM.png`
-- `CAP-298` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.41 PM.png`
-- `CAP-299` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.45 PM.png`
-- `CAP-300` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.12 PM.png`
-- `CAP-301` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.15 PM.png`
-- `CAP-302` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.58.56 PM.png`
-- `CAP-303` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.01 PM.png`
-- `CAP-304` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.05 PM.png`
-- `CAP-305` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.12 AM.png`
-- `CAP-306` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.15 AM.png`
-- `CAP-307` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.18 AM.png`
-- `CAP-308` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.32 AM.png`
-- `CAP-309` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.01.09 AM.png`
-- `CAP-310` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.28.15 AM.png`
-- `CAP-311` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.12 PM.png`
-- `CAP-312` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.15 PM.png`
-- `CAP-313` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 3.10.20 AM.png`
-- `CAP-314` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 4.08.51 AM.png`
-- `CAP-315` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.00.08 AM.png`
-- `CAP-316` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.16.35 AM.png`
-- `CAP-317` — `Project - Driver App Base/Captures/03 Planner/Screenshot 2026-10-01 at 9.21.01 PM.png`
-- `CAP-318` — `Project - Driver App Base/Captures/03 Planner/Screenshot 2026-10-01 at 9.21.04 PM.png`
+- `CAP-285` — `Project - Driver App Base/Captures/_unregistered/2026-10-09 - two-up Home with Driver's Licence expiry - NOT VERIFIED AS PRODUCTION.png`
+- `CAP-286` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 11.16.23 PM.png`
+- `CAP-287` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-24 at 8.56.03 PM.png`
+- `CAP-288` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.30.40 AM.png`
+- `CAP-289` — `Other/NEMT Driver App/Flow Reference/Trip Completion Flow/Screenshots/Screenshot 2026-04-27 at 9.31.09 AM.png`
+- `CAP-290` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.28.55 AM.png`
+- `CAP-291` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.29.46 AM.png`
+- `CAP-292` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.12 AM.png`
+- `CAP-293` — `Project - Map Request View/References/Screenshot 2026-09-08 at 1.30.22 AM.png`
+- `CAP-294` — `Project - Map Request View/References/Screenshot 2026-09-08 at 10.51.26 PM.png`
+- `CAP-295` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-10 at 10.57.01 PM.png`
+- `CAP-296` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-14 at 11.56.43 PM.png`
+- `CAP-297` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 1.08.06 AM.png`
+- `CAP-298` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.38 PM.png`
+- `CAP-299` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.41 PM.png`
+- `CAP-300` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.24.45 PM.png`
+- `CAP-301` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.12 PM.png`
+- `CAP-302` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-15 at 10.25.15 PM.png`
+- `CAP-303` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.58.56 PM.png`
+- `CAP-304` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.01 PM.png`
+- `CAP-305` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-16 at 11.59.05 PM.png`
+- `CAP-306` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.12 AM.png`
+- `CAP-307` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.15 AM.png`
+- `CAP-308` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.18 AM.png`
+- `CAP-309` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.00.32 AM.png`
+- `CAP-310` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.01.09 AM.png`
+- `CAP-311` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-17 at 12.28.15 AM.png`
+- `CAP-312` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.12 PM.png`
+- `CAP-313` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 11.45.15 PM.png`
+- `CAP-314` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 3.10.20 AM.png`
+- `CAP-315` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-24 at 4.08.51 AM.png`
+- `CAP-316` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.00.08 AM.png`
+- `CAP-317` — `Project - Map Request View/Internal Guide/Screenshots/_inbox/Screenshot 2026-09-25 at 1.16.35 AM.png`
+- `CAP-318` — `Project - Driver App Base/Captures/03 Planner/Screenshot 2026-10-01 at 9.21.01 PM.png`
+- `CAP-319` — `Project - Driver App Base/Captures/03 Planner/Screenshot 2026-10-01 at 9.21.04 PM.png`
 
 </details>
