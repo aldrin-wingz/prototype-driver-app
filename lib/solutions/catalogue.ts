@@ -68,6 +68,23 @@ export interface Solution {
   noSurfaceReason?: string;
 }
 
+/**
+ * ⚠️ Production ALREADY collects the proof that row 02 proposes to act on.
+ *
+ * Selecting `Cancel At Door` on the production Member No-Show screen swaps
+ * `Driver Signature` for `Member Signature` and adds a required free-text
+ * `Spoke with`. Confirmed three ways: a 2026-10 production screenshot; the
+ * warehouse columns `bronze.ride_observation.noshow_type` and `.spoke_with`;
+ * and the shape of the data — `spoke_with` holds 3,601 DISTINCT values across
+ * 6,940 Cancel At Door observations in the last 12 months (real names), versus
+ * 122 and 51 distinct for the other two types, which are placeholders.
+ *
+ * ⛔ The Apr-2026 captures (CAP-229/230/231) show only the EMPTY state, so the
+ * capture library does not contain this variant. The screenshot needs
+ * registering before anything is built against it.
+ *
+ * So row 02 is not "add a signature". It is "stop discarding one".
+ */
 const NO_SHOW =
   "Driver waits → gives up and leaves → remembers the no-show → now too far for the app to accept it → calls Support";
 
@@ -95,9 +112,9 @@ export const SOLUTIONS: Solution[] = [
     calls: 882,
     problem: "Driver must still wait 10 min even after selecting Cancel at Door",
     useCase:
-      "Driver selects Cancel at Door → app enforces the 10-minute wait anyway → driver calls Support",
+      "Driver selects Cancel at Door → signs the member's refusal and names who they spoke with → app enforces the 10-minute wait anyway → driver calls Support",
     proposedFeature:
-      "Capture the member's signature on the refusal, and let that signature skip the 10-minute wait — proof by capture instead of proof by waiting",
+      "Let the member signature the app ALREADY captures on Cancel at Door skip the 10-minute wait — the proof exists, it is just discarded",
     klass: "form",
     buildState: "not-yet",
     entry: null,

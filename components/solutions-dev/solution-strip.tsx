@@ -10,6 +10,7 @@ import {
   SOLUTIONS,
 } from "@/lib/solutions/catalogue";
 import { useSolution } from "@/lib/solutions/solution-context";
+import { UseCaseFlow } from "./use-case-flow";
 import { cn } from "@/lib/utils";
 
 /**
@@ -29,15 +30,15 @@ import { cn } from "@/lib/utils";
  * error — `verify-base` §4 guards this.
  */
 
-function Column({ heading, body }: { heading: string; body: string }) {
+function Column({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0 border-l border-[#2A3B37] px-3 py-2 first:border-l-0 first:pl-0">
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7D9A92]">
         {heading}
       </p>
-      <p className="mt-1 whitespace-pre-line text-xs leading-snug text-[#E6EFEC]">
-        {body}
-      </p>
+      <div className="mt-1 whitespace-pre-line text-xs leading-snug text-[#E6EFEC]">
+        {children}
+      </div>
     </div>
   );
 }
@@ -124,9 +125,11 @@ export function SolutionStrip() {
                 !briefingOpen && "hidden",
               )}
             >
-              <Column heading="Problem" body={active.problem} />
-              <Column heading="Use case" body={active.useCase} />
-              <Column heading="Proposed feature" body={active.proposedFeature} />
+              <Column heading="Problem">{active.problem}</Column>
+              <Column heading="Use case">
+                <UseCaseFlow text={active.useCase} tone="dark" />
+              </Column>
+              <Column heading="Proposed feature">{active.proposedFeature}</Column>
             </div>
 
             {active.noSurfaceReason && (

@@ -14,6 +14,7 @@ import {
 } from "@/lib/solutions/catalogue";
 import { useSolution } from "@/lib/solutions/solution-context";
 import { cn } from "@/lib/utils";
+import { UseCaseFlow } from "./use-case-flow";
 
 /**
  * The prototype selector's menu half — every proposed feature from the support
@@ -50,7 +51,15 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
         <span className="block text-sm leading-snug text-gray-900">
           {solution.proposedFeature}
         </span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+
+        {/* The call as it actually unfolds. Each arrow is a step where the
+            driver could have been helped and was not — which is what the
+            proposed feature above is trying to remove. */}
+        <span className="mt-1.5 block text-[11px] leading-snug">
+          <UseCaseFlow text={solution.useCase} tone="light" />
+        </span>
+
+        <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span
             className={cn(
               "rounded-full px-2 py-0.5 text-[10px] font-semibold",

@@ -27,6 +27,7 @@ import {
   subjectAreaGroups,
   type SolutionClass,
 } from "../lib/solutions/catalogue";
+import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
   mockRequestTrips,
   mockNeedsActionTrips,
@@ -278,6 +279,64 @@ check(
   "no banned vocabulary in the catalogue",
   offenders.length ? offenders.join("; ") : `0 hits across ${BANNED.length} terms x ${fieldsScanned} fields`,
   offenders.length === 0,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n5. Use cases are chains, not sentences");
+// ---------------------------------------------------------------------------
+/**
+ * The selector renders each use case as its steps, split on the literal `→`.
+ * That only works while the catalogue keeps writing them as chains — a row
+ * reworded into prose would render as one undifferentiated step and look fine,
+ * which is exactly the kind of silent flattening a denominator catches.
+ */
+const EXPECTED_MULTILINE_ROWS = 1; // the catch-all row carries three examples
+const EXPECTED_LABELLED_LINES = 8; // "Ex 1" … across Trip Confirmation, Questions, catch-all
+
+let lineCount = 0;
+let stepCount = 0;
+let labelledLines = 0;
+let multiLineRows = 0;
+const flattened: string[] = [];
+const emptySteps: string[] = [];
+
+for (const s of SOLUTIONS) {
+  const lines = splitUseCase(s.useCase);
+  if (lines.length > 1) multiLineRows++;
+  for (const line of lines) {
+    lineCount++;
+    stepCount += line.steps.length;
+    if (line.label) labelledLines++;
+    if (line.steps.length < 2) flattened.push(s.id);
+    if (line.steps.some((step) => step.trim() === "")) emptySteps.push(s.id);
+  }
+}
+
+check(
+  "every use case splits into at least two steps",
+  flattened.length ? `flat: ${[...new Set(flattened)].join(", ")}` : `${stepCount} steps across ${lineCount} lines in ${SOLUTIONS.length} rows`,
+  flattened.length === 0,
+);
+check(
+  "no step is empty",
+  emptySteps.length ? [...new Set(emptySteps)].join(", ") : `0 of ${stepCount} steps`,
+  emptySteps.length === 0,
+);
+check(
+  "the multi-example row survives",
+  `${multiLineRows} of ${SOLUTIONS.length} rows carry several examples (expected ${EXPECTED_MULTILINE_ROWS})`,
+  multiLineRows === EXPECTED_MULTILINE_ROWS,
+);
+check(
+  "example labels survive",
+  `${labelledLines} labelled lines of ${lineCount} (expected ${EXPECTED_LABELLED_LINES})`,
+  labelledLines === EXPECTED_LABELLED_LINES,
+);
+/** A renderer that returned one step per line would satisfy the count checks. */
+check(
+  "steps genuinely outnumber lines",
+  `${stepCount} steps vs ${lineCount} lines`,
+  stepCount > lineCount * 1.5,
 );
 
 // ---------------------------------------------------------------------------
