@@ -1,4 +1,6 @@
 import type { IncentiveType } from "@/lib/data/incentives";
+import type { NoShowDemoRow } from "./no-show-rules";
+
 /**
  * The day the prototype pretends it is.
  *
@@ -16,6 +18,15 @@ export const MOCK_TODAY = "2026-07-31";
 
 export type TripStatus = "request" | "upcoming" | "needs-action" | "in-progress" | "completed";
 export type TimeAnchorType = "est-pickup" | "wait-for-call" | "appointment" | "scheduled";
+
+/**
+ * The market a trip belongs to.
+ *
+ * New with the Rider No-Show case, which is the first rule that varies by market
+ * rather than by client alone. Nothing before this needed geography, so it is
+ * optional — an absent market means "not one of the markets with a special rule".
+ */
+export type MarketCode = "GA" | "FL" | "NC" | "TN" | "IN";
 
 /**
  * The three swipes a driver makes to move a leg forward.
@@ -36,6 +47,24 @@ export interface LegSwipeProgress {
   pickedUpAt: string | null;
   /** Swiped "drop off member" — completes the leg. */
   droppedOffAt: string | null;
+}
+
+/**
+ * One location fix, as the server would have stored it.
+ *
+ * ⚠️ **SEEDED.** The prototype has no GPS. `ageMinutes` is the age at the moment
+ * the screen mounted; a live clock advances it, so a countdown really does run
+ * down and the gate really does open when it reaches zero.
+ *
+ * Declared here rather than beside the rule that reads it, because this is seed
+ * data and `no-show-rules` already imports from this module — the other
+ * direction would be a cycle.
+ */
+export interface LocationRecord {
+  /** Minutes before "now" this fix was recorded, at mount. */
+  ageMinutes: number;
+  /** Straight-line miles from the pick-up. */
+  distanceMiles: number;
 }
 
 export interface TripLeg {
@@ -62,6 +91,24 @@ export interface TripLeg {
    * carry it, so the existing seeded trips are unaffected.
    */
   progress?: LegSwipeProgress;
+  /**
+   * The driver's location fixes, as the server would have them.
+   *
+   * ⚠️ **SEEDED, and the whole scenario lives here.** Every Rider No-Show
+   * outcome is a different shape of this array — which is the point: the real
+   * check is a walk over these records, so seeding the records rather than the
+   * verdict means each ride genuinely exercises the rule.
+   *
+   * Newest-first is not required; `walkLocationRecords` sorts by age.
+   */
+  locationRecords?: LocationRecord[];
+  /**
+   * Minutes since the leg's scheduled pick-up time, at mount. Negative = early.
+   *
+   * ⚠️ Only read by the WellTrans Indiana rule, and only seeded on those rides.
+   * Not derived from `time` because the prototype has no clock to compare it to.
+   */
+  minutesSinceScheduledPickup?: number;
 }
 
 /**
@@ -131,6 +178,13 @@ export interface Trip {
   date: string;
   rider: string;
   client: string;
+  /**
+   * Market this trip runs in. Optional — only seeded where a rule depends on it.
+   *
+   * Geography was previously inferrable only from `leg.address` / `leg.county`
+   * free text, which is not something a rule should parse.
+   */
+  market?: MarketCode;
   passengerCount: number;
   distance: string;
   totalRevenue: number;
@@ -162,6 +216,12 @@ export interface Trip {
    * compare them against.
    */
   wasLate?: boolean;
+  /**
+   * ⚠️ **DEMO SCAFFOLDING.** Which row of the Member No-Show comparison matrix
+   * this ride demonstrates — a plain number is production today, a decimal is a
+   * proposal. See `NoShowDemoRow`. Absent means today's behaviour.
+   */
+  noShowDemo?: NoShowDemoRow;
 }
 
 export interface TripPill {
@@ -960,6 +1020,7 @@ export const mockNeedsActionTrips: Trip[] = [
     date: "Thu, Jul 31, 2026",
     rider: "AMARA OKONKWO",
     client: "Alivi",
+    market: "FL",
     passengerCount: 4,
     distance: "",
     totalRevenue: 26.29,
@@ -1069,6 +1130,16 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
+        // Inside the radius continuously for fourteen minutes, so the walk
+        // succeeds and the no-show FILES. Untagged on purpose: it is ordinary
+        // behaviour, not a demo row.
+        locationRecords: [
+          { ageMinutes: 0, distanceMiles: 0.2 },
+          { ageMinutes: 3, distanceMiles: 0.2 },
+          { ageMinutes: 7, distanceMiles: 0.3 },
+          { ageMinutes: 11, distanceMiles: 0.2 },
+          { ageMinutes: 14, distanceMiles: 0.3 },
+        ],
       },
       {
         id: "1049800371-appt",
@@ -1092,6 +1163,7 @@ export const mockInProgressTrips: Trip[] = [
     date: "Thu, Jul 31, 2026",
     rider: "Desmond Okafor",
     client: "Verida",
+    market: "GA",
     passengerCount: 1,
     distance: "6.4 mi",
     totalRevenue: 53.40,
@@ -1112,6 +1184,16 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: null,
           droppedOffAt: null,
         },
+        locationRecords: [
+            { ageMinutes: 0, distanceMiles: 0.2 },
+            { ageMinutes: 1, distanceMiles: 0.2 },
+            { ageMinutes: 2, distanceMiles: 0.2 },
+            { ageMinutes: 4, distanceMiles: 1.9 },
+            { ageMinutes: 6, distanceMiles: 2.4 },
+            { ageMinutes: 9, distanceMiles: 0.3 },
+            { ageMinutes: 14, distanceMiles: 0.3 },
+            { ageMinutes: 18, distanceMiles: 0.4 },
+        ],
       },
       {
         id: "1049800373-appt",
@@ -1124,7 +1206,68 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    noShowDemo: "3.1",
+    pills: [{ label: "3.1 · No 10 consec min · refusal carries a countdown", variant: "warning" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== started — a facility bigger than the no-show radius =====
+  //
+  // ⚠️ Demo row 4.1. The driver has not moved in seventeen minutes and is 0.6
+  // miles out the whole time: a hospital campus where the pick-up pin is one
+  // tower and the driver is at another. Waiting can never clear this, because
+  // the app will never place them inside 0.5 miles. So it is a form — and the
+  // callout names the distance, which is what makes it legible to Support.
+  {
+    id: "1049800377",
+    date: "Thu, Jul 31, 2026",
+    rider: "Nadine Oyelaran",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "9.4 mi",
+    totalRevenue: 52.40,
+    notes: "Pick-up is the east tower entrance",
+    legs: [
+      {
+        id: "1049800377",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "1:50 PM",
+        address: "6900 Medical Center Pkwy, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 52.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:38 PM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        locationRecords: [
+          { ageMinutes: 0, distanceMiles: 0.61 },
+          { ageMinutes: 3, distanceMiles: 0.6 },
+          { ageMinutes: 7, distanceMiles: 0.62 },
+          { ageMinutes: 12, distanceMiles: 0.59 },
+          { ageMinutes: 17, distanceMiles: 0.63 },
+        ],
+      },
+      {
+        id: "1049800377-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:30 PM",
+        address: "4211 Cleveland Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "4.1",
+    pills: [
+      { label: "4.1 · Not at pickup · revised copy + 4-question form", variant: "warning" },
+    ],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

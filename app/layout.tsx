@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
 import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup";
+import { RideFlowProvider } from "@/lib/support-data/ride-flow-context";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -43,8 +44,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <IncentiveEarnedProvider>
-            {children}
-            <IncentiveEarnedPopup />
+            <RideFlowProvider>
+              {children}
+              <IncentiveEarnedPopup />
+            </RideFlowProvider>
           </IncentiveEarnedProvider>
           <Toaster />
         </ThemeProvider>

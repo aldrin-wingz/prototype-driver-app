@@ -35,6 +35,7 @@ import {
   type LegSwipeProgress,
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
+import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
@@ -262,6 +263,8 @@ export function RideDetailLayout({
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { getPendingRequest } = useRideFlow();
+  const pendingRequest = getPendingRequest(trip.id);
 
   // The leg the driver is working, and the swipe expected next on it. Only legs
   // that carry a `progress` object take part in the swipe sequence — the
@@ -348,7 +351,10 @@ export function RideDetailLayout({
             <div className="h-1 w-32 rounded-full bg-[#10B981]/60" />
           </div>
 
-          {state === "needs-action" && (
+          {/* Suppressed once Support has the ride: "please call the rider first"
+              and "nothing more is needed from you" cannot both be true, and the
+              driver who just filed the form is the one who would read both. */}
+          {state === "needs-action" && !pendingRequest && (
             <div className="absolute bottom-4 left-4 right-4">
               <div className="rounded-lg bg-[#FEE2E2] border border-[#F87171] px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -365,6 +371,23 @@ export function RideDetailLayout({
           )}
         </div>
 
+        {pendingRequest && (
+          <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
+            <div className="flex items-start gap-3">
+              <Hourglass className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#92400E]">
+                  Waiting on Support
+                </p>
+                <p className="mt-0.5 text-sm text-[#92400E]">
+                  Your {pendingRequest.caseTitle} request was sent{" "}
+                  {pendingRequest.submittedAt.toLowerCase()}. Support is
+                  reviewing it — nothing more is needed from you.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Trip metadata card */}
         <Card className="mx-4 mt-4 rounded-xl bg-white p-4 shadow-md">
@@ -540,7 +563,14 @@ export function RideDetailLayout({
           </div>
 
           <div className="px-4 py-4">
-            {cta ? (
+            {pendingRequest ? (
+              <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
+                <Hourglass className="h-5 w-5 text-[#92400E]" />
+                <span className="text-sm font-bold uppercase text-[#92400E]">
+                  Pending Support Review
+                </span>
+              </div>
+            ) : cta ? (
               (() => {
                 const CtaIcon = cta.icon;
                 const legLine = activeLeg?.legCode
@@ -605,7 +635,17 @@ export function RideDetailLayout({
           </div>
 
           <div className="px-4 py-4">
-            {(
+            {/* Same swap the in-progress region makes: once Support holds the
+                ride, re-offering the whole confirmation flow would invite a
+                second request for something already filed. */}
+            {pendingRequest ? (
+              <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
+                <Hourglass className="h-5 w-5 text-[#92400E]" />
+                <span className="text-sm font-bold uppercase text-[#92400E]">
+                  Pending Support Review
+                </span>
+              </div>
+            ) : (
               <button
                 type="button"
                 // A production action v1 does not cover. Saying so beats a dead

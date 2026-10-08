@@ -1,0 +1,311 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { X, Clock, AlertTriangle, Info } from "lucide-react";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { SupportFieldRenderer } from "./support-field-renderer";
+import { TripSummaryBanner } from "./trip-summary-banner";
+import { findLegOption } from "@/lib/support-data/leg-options";
+import {
+  getIssueDescription,
+  getIssueLabel,
+} from "@/lib/support-data/issue-types";
+import { deriveFromLeg } from "@/lib/support/prefill";
+import {
+  canSubmitCase,
+  emptyValues,
+  isFieldVisible,
+} from "@/lib/support/field-rules";
+import { getTimeOrderWarnings } from "@/lib/support/time-order";
+import { WAIT_TIME_SEQUENCE } from "@/lib/support-data/case-registry";
+import type {
+  SupportCallout,
+  SupportCalloutTone,
+  SupportCaseDefinition,
+} from "@/types/support";
+
+const CALLOUT_TONE: Record<
+  SupportCalloutTone,
+  { bg: string; border: string; icon: string; Icon: typeof Clock }
+> = {
+  danger: {
+    bg: "bg-[#FEF2F2]",
+    border: "border-[#FECACA]",
+    icon: "text-[#EF4444]",
+    Icon: Clock,
+  },
+  warning: {
+    bg: "bg-[#FFFBEB]",
+    border: "border-[#FDE68A]",
+    icon: "text-[#D97706]",
+    Icon: AlertTriangle,
+  },
+  info: {
+    bg: "bg-[#EFF6FF]",
+    border: "border-[#BFDBFE]",
+    icon: "text-[#2563EB]",
+    Icon: Info,
+  },
+};
+
+/**
+ * The base support-form sheet, replicating reference screenshot `s-02a`
+ * ("Late pickup reason"). Every support case renders through this — the sheet is
+ * the pattern, the case is the data.
+ *
+ * Anatomy, top to bottom: drag handle · title + close · context callout ·
+ * fields · Cancel / primary action.
+ */
+export function SupportFormSheet({
+  supportCase,
+  callout,
+  initialValues,
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  supportCase: SupportCaseDefinition;
+  callout?: SupportCallout;
+  /** Values the app already knows, so the driver only supplies what is new. */
+  initialValues?: Record<string, string>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: Record<string, string>) => void;
+}) {
+  const blank = () => ({
+    ...emptyValues(supportCase.fields),
+    ...(initialValues ?? {}),
+  });
+  const [values, setValues] = useState<Record<string, string>>(blank);
+
+  /**
+   * Fields whose current value came from the app, not the driver.
+   *
+   * `lockWhenPrefilled` has to mean "we already know this", not "this has a
+   * value" — otherwise picking a member from the search would lock the driver out
+   * of changing their mind. Tracked as a set rather than inferred, because the
+   * same field can be app-supplied on one leg and empty on the next.
+   */
+  const suppliedIds = (source: Record<string, string>) =>
+    new Set(
+      Object.entries(source)
+        .filter(([, value]) => value.trim().length > 0)
+        .map(([id]) => id)
+    );
+  const [appSupplied, setAppSupplied] = useState<Set<string>>(() =>
+    suppliedIds(initialValues ?? {})
+  );
+
+  // The leg the driver picked drives the summary banner and every timestamp we
+  // can fill. Re-derive on change rather than only at mount.
+  //
+  // Read from whichever leg picker is currently VISIBLE rather than a fixed field
+  // id, because more than one issue owns a leg picker now and each needs its own
+  // (one locked to the ride it came from, one freely re-pickable).
+  const legField = supportCase.fields.find(
+    (field) => field.type === "leg-picker" && isFieldVisible(field, values)
+  );
+  const legValue = legField ? (values[legField.id] ?? "") : "";
+  const selectedLeg = legValue ? findLegOption(legValue) : undefined;
+
+  useEffect(() => {
+    if (!selectedLeg) return;
+    const derived = deriveFromLeg(supportCase, selectedLeg.trip, selectedLeg.leg);
+    setValues((previous) => ({ ...previous, ...derived }));
+    // A timestamp the newly picked leg has is app-supplied; one it doesn't have
+    // stops being, so the driver can fill it in.
+    setAppSupplied((previous) => {
+      const next = new Set(previous);
+      for (const [id, value] of Object.entries(derived)) {
+        if (value.trim()) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+    // Keyed on the leg id so this runs once per selection, not every render.
+  }, [selectedLeg?.legId]);
+
+  // The chosen issue's purpose line wins over the case's own, since the issue is
+  // what determines which form the driver is actually filling in.
+  const description =
+    (values.issue ? getIssueDescription(values.issue) : undefined) ??
+    supportCase.description ??
+    supportCase.summary;
+
+  /**
+   * When the issue was chosen for the driver, the sheet takes that issue's name.
+   *
+   * They tapped something that named it, so a different name at the top of the
+   * sheet reads like they landed on the wrong thing. The case's own title is the
+   * fallback for a form where the issue is still an open question.
+   */
+  const title =
+    (appSupplied.has("issue") && values.issue
+      ? getIssueLabel(values.issue)
+      : undefined) ?? supportCase.title;
+
+  const visibleFields = supportCase.fields.filter((field) =>
+    isFieldVisible(field, values)
+  );
+
+  /**
+   * Cautions about the times entered, keyed by field.
+   *
+   * Computed here because a warning depends on the whole set of values and the
+   * sheet is the only thing holding them. Deliberately kept out of
+   * `canSubmitCase` below — the driver was on the trip and we were not, so a
+   * time that looks impossible to us is a question, not a rejection.
+   *
+   * The sequence comes from the case, since which fields are ordered is a
+   * property of what is being collected, not of the sheet.
+   */
+  const warnings = getTimeOrderWarnings(
+    supportCase.fields,
+    values,
+    WAIT_TIME_SEQUENCE
+  );
+  // Per `s-02a`, the primary action sits disabled (muted green) until every
+  // required field has a value — and stays disabled for an issue whose field set
+  // isn't built, since there is nothing to send.
+  const canSubmit = canSubmitCase(supportCase.fields, values);
+
+  function setValue(id: string, value: string) {
+    setValues((previous) => ({ ...previous, [id]: value }));
+    // The driver touched it, so it is theirs now.
+    setAppSupplied((previous) => {
+      if (!previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function reset() {
+    setValues(blank());
+    setAppSupplied(suppliedIds(initialValues ?? {}));
+  }
+
+  /**
+   * Every route out of the sheet lands here, including twice for one tap: Cancel
+   * and the X call it directly, and the Drawer reports the same close through its
+   * own `onOpenChange`. Safe, because closing and resetting are both idempotent.
+   */
+  function handleClose() {
+    onOpenChange(false);
+    reset();
+  }
+
+  function handleSubmit() {
+    if (!canSubmit) return;
+    onSubmit(values);
+    reset();
+  }
+
+  const tone = callout ? CALLOUT_TONE[callout.tone] : null;
+  const CalloutIcon = tone?.Icon;
+
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={(next) => {
+        if (next) onOpenChange(true);
+        else handleClose();
+      }}
+    >
+      <DrawerContent className="flex max-h-[92vh] flex-col rounded-t-3xl border-0 px-6 pb-8">
+        {/* Header and footer stay put; only the fields scroll. A long form must
+            never push its Submit button off screen. */}
+        <div className="mx-auto flex w-full min-h-0 max-w-md flex-col">
+          <div className="flex flex-shrink-0 items-start justify-between pt-2">
+            <DrawerTitle className="text-2xl font-bold text-gray-900">
+              {title}
+            </DrawerTitle>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close"
+              className="-mr-2 -mt-1 p-2 text-gray-400"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Purpose reminder. Quiet grey body copy, deliberately NOT a callout —
+              the tinted callout below carries warnings, and the two must not read
+              as the same kind of thing. */}
+          {description && (
+            <p className="mt-2 flex-shrink-0 text-sm leading-relaxed text-gray-500">
+              {description}
+            </p>
+          )}
+
+          {callout && tone && CalloutIcon && (
+            <div
+              className={cn(
+                "mt-5 flex flex-shrink-0 items-start gap-3 rounded-xl border px-4 py-3.5",
+                tone.bg,
+                tone.border
+              )}
+            >
+              <CalloutIcon
+                className={cn("mt-0.5 h-5 w-5 flex-shrink-0", tone.icon)}
+              />
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-gray-900">
+                  {callout.title}
+                </p>
+                {callout.detail && (
+                  <p className="text-sm text-gray-600">{callout.detail}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
+            {visibleFields.map((field) => (
+              <div key={field.id} className="space-y-3">
+                <SupportFieldRenderer
+                  field={field}
+                  value={values[field.id] ?? ""}
+                  locked={
+                    Boolean(field.lockWhenPrefilled) &&
+                    appSupplied.has(field.id)
+                  }
+                  warning={warnings[field.id]}
+                  onChange={(value) => setValue(field.id, value)}
+                  values={values}
+                  setValue={setValue}
+                />
+                {/* The summary sits directly under the picker that produced it. */}
+                {field.type === "leg-picker" && selectedLeg && (
+                  <TripSummaryBanner option={selectedLeg} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid flex-shrink-0 grid-cols-[1fr_1.4fr] gap-4 border-t border-gray-100 pt-5">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              className="h-14 rounded-xl border-gray-300 text-base font-bold text-gray-900"
+            >
+              {supportCase.cancelLabel ?? "Cancel"}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="h-14 rounded-xl bg-[#10B981] text-base font-bold text-white hover:bg-[#059669] disabled:bg-[#6EE7B7] disabled:opacity-100"
+            >
+              {supportCase.submitLabel}
+            </Button>
+          </div>
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}

@@ -1,0 +1,76 @@
+import type { SupportField } from "@/types/support";
+
+/** Whether a field should render, given the form's current values. */
+export function isFieldVisible(
+  field: SupportField,
+  values: Record<string, string>
+): boolean {
+  if (!field.showIf) return true;
+  return field.showIf.equals.includes(values[field.showIf.field] ?? "");
+}
+
+/**
+ * Whether every visible required field has a value.
+ *
+ * Drives the primary button's disabled state. Per reference screenshot `s-02a`,
+ * "Save Reason" is a muted green while the required Reason field is empty — the
+ * form does not let you submit an incomplete request.
+ */
+export function areRequiredFieldsFilled(
+  fields: SupportField[],
+  values: Record<string, string>
+): boolean {
+  return fields
+    .filter(
+      (field) =>
+        field.required &&
+        // Required in the real flow, but the prototype must not hold a demo
+        // hostage to a file nobody has to hand.
+        !field.requiredNotEnforced &&
+        isFieldVisible(field, values)
+    )
+    .every((field) => (values[field.id] ?? "").trim().length > 0);
+}
+
+/**
+ * Whether the form can be sent at all.
+ *
+ * A visible `notice` blocks it outright: a notice stands in for a field set that
+ * does not exist, so there is nothing to submit. Without this the driver could
+ * send an empty request for an issue nobody has specified, which reads as a
+ * working flow and isn't one.
+ */
+export function canSubmitCase(
+  fields: SupportField[],
+  values: Record<string, string>
+): boolean {
+  const blocked = fields.some(
+    (field) => field.type === "notice" && isFieldVisible(field, values)
+  );
+  return !blocked && areRequiredFieldsFilled(fields, values);
+}
+
+/**
+ * ⚠️ **`requireOneOf` was removed with the `Cancel At Door` variant.**
+ *
+ * It expressed "either the signature or the photo, not both and not neither" —
+ * the only either/or rule any case here ever had. With that variant out of scope
+ * nothing uses it, and it is deleted rather than parked because it carries a real
+ * landmine: `areRequiredFieldsFilled` runs BEFORE any group check, so a field
+ * that is both `required` and in a group can never be satisfied by its partner.
+ * That bug shipped for one commit and needed `conflictingOneOfFields` to guard
+ * it. Leaving the machinery in place, unexercised, is leaving that trap for
+ * whoever adds case two.
+ *
+ * Restoring it is one revert: `areOneOfGroupsSatisfied`, `conflictingOneOfFields`,
+ * the `requireOneOf` field on `SupportCaseDefinition`, and the third argument to
+ * `canSubmitCase`.
+ */
+
+
+/** Blank starting values for a case, so inputs stay controlled from mount. */
+export function emptyValues(fields: SupportField[]): Record<string, string> {
+  return Object.fromEntries(
+    fields.map((field) => [field.id, field.defaultValue ?? ""])
+  );
+}

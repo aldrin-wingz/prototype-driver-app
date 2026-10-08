@@ -1,6 +1,11 @@
 "use client";
 
-import { MessageCircle, RefreshCw, SlidersHorizontal, ChevronLeft } from "lucide-react";
+import {
+  MessageCircle,
+  RefreshCw,
+  SlidersHorizontal,
+  ChevronLeft,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface HeaderProps {
@@ -14,6 +19,13 @@ interface HeaderProps {
   messageCount?: number;
 }
 
+/**
+ * The app header, unmodified from the production driver app.
+ *
+ * v1 deliberately adds nothing here. A support form belongs to a trip, so the
+ * only way into one is from the trip — there is no trip-independent entry point
+ * and no support surface in the app chrome.
+ */
 export function Header({
   title,
   showMessages = true,

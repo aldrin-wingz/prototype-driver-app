@@ -23,7 +23,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { type Trip } from "@/lib/driver-data/mock-trips";
+import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import {
+  getLegStage,
+  type Trip,
+  type TripLeg,
+} from "@/lib/driver-data/mock-trips";
+import {
+  canFileNoShow,
+  NO_SHOW_POST_PICKUP_MINUTES,
+  NO_SHOW_REFUSAL_COPY,
+  NO_SHOW_STAGE_REFUSAL,
+  NO_SHOW_WAIT_MINUTES,
+  postPickupAvailableAt,
+  postPickupRefusalCopy,
+  postPickupThresholdMinutes,
+  treatmentFor,
+  type NoShowOutcome,
+  type NoShowTreatment,
+} from "@/lib/driver-data/no-show-rules";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -126,6 +144,43 @@ const PRODUCTION_TILES: OptionTile[] = [
   },
 ];
 
+/**
+ * The refusal wording, per treatment.
+ *
+ * ⚠️ `production` is the exact string production raises today, including where it
+ * is **wrong** — a driver who has already left is told to wait at a pick-up they
+ * are not at. Reproducing that faithfully is the whole point of the as-is rows;
+ * `revised` is the proposal.
+ */
+export function refusalCopyFor(
+  outcome: NoShowOutcome | null,
+  treatment: NoShowTreatment,
+  /** The leg, so the availability time can come off its own pick-up. */
+  leg?: TripLeg,
+  /** The trip, which is what decides the threshold — 15 in Indiana, 0 elsewhere. */
+  trip?: Trip
+): string {
+  if (!outcome) return "";
+  if (outcome.kind === "timer") {
+    if (outcome.reason !== "post-pickup") return NO_SHOW_REFUSAL_COPY.presence;
+    // ⚠️ The threshold has to come from the TRIP, not from the constant. Reading
+    // `NO_SHOW_POST_PICKUP_MINUTES` here would print "wait at least 15 minutes"
+    // to a Georgia driver whose actual boundary is the pick-up time itself.
+    const threshold = (trip && postPickupThresholdMinutes(trip)) ?? 0;
+    return postPickupRefusalCopy({
+      copy: treatment.copy,
+      remainingMinutes: outcome.minutesRemaining,
+      availableAt: leg ? postPickupAvailableAt(leg, threshold) : null,
+      thresholdMinutes: threshold,
+    });
+  }
+  if (outcome.kind !== "form") return "";
+  return treatment.copy === "revised"
+    ? NO_SHOW_REFUSAL_COPY[outcome.gap]
+    : // Production has ONE message for every location failure.
+      NO_SHOW_REFUSAL_COPY.presence;
+}
+
 function TileIcon({ tile }: { tile: OptionTile }) {
   const Icon = tile.icon;
 
@@ -207,6 +262,27 @@ export function MoreOptionsScreen({
   const router = useRouter();
   const { toast } = useToast();
 
+  const { getPendingRequest } = useRideFlow();
+  const pending = getPendingRequest(trip.id);
+
+  const swipeLegs = trip.legs.filter((leg) => leg.progress);
+  const activeLeg =
+    swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
+
+  const [stageRefused, setStageRefused] = useState(false);
+
+  /**
+   * ⚠️ Nothing about guardrail 2 is known here.
+   *
+   * The production lookback runs only on Submit, so at this point the app has
+   * performed no location check at all — no distance, no dwell, nothing. There
+   * used to be a countdown pill on this tile and a refusal dialog on the tap;
+   * both were scrapped, because they were claiming knowledge the app does not
+   * have until the driver submits.
+   *
+   * Guardrail 1 is different and stays: it reads the ride's own status, which is
+   * available immediately and needs no location at all.
+   */
 
   /**
    * ⚠️ The grid never changes shape. All seven production tiles, always, with
@@ -226,6 +302,28 @@ export function MoreOptionsScreen({
     });
   }
 
+  function handleGridTile(id: string) {
+    if (id === "no-show") {
+      // Guardrail 1 only — the ride's status, which needs no location check.
+      if (!activeLeg || !canFileNoShow(trip, activeLeg)) {
+        setStageRefused(true);
+        return;
+      }
+      // The prototype's own guard, which production has no concept of: one
+      // request per ride, or the driver files the same claim twice.
+      if (pending) {
+        toast({
+          title: "Member No-Show",
+          description: "This ride is already with Support.",
+        });
+        return;
+      }
+      router.push(`/my-rides/${trip.id}/no-show`);
+      return;
+    }
+    handleProductionTile(id);
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <header className="sticky top-0 z-20 flex items-center bg-white px-4 py-4">
@@ -242,6 +340,32 @@ export function MoreOptionsScreen({
         </h1>
       </header>
 
+      <AlertDialog
+        open={stageRefused}
+        onOpenChange={(open) => !open && setStageRefused(false)}
+      >
+        <AlertDialogContent className="max-w-[20rem] rounded-2xl">
+          {/* No VISIBLE title, matching the capture — the sentence is the whole
+              message and a heading above it would only restate it. But Radix
+              requires one for screen readers (it errors without it), so it is
+              present and `sr-only`: a driver using a reader hears what the dialog
+              is before hearing the rule. */}
+          <AlertDialogTitle className="sr-only">
+            Member No-Show unavailable
+          </AlertDialogTitle>
+          <AlertDialogDescription className="py-2 text-base text-gray-900">
+            {NO_SHOW_STAGE_REFUSAL}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            {/* Deliberately the only way out. A member already in the car cannot
+                have failed to show, so there is nothing to collect. */}
+            <AlertDialogAction className="bg-transparent text-base font-bold text-[#00B090] shadow-none hover:bg-transparent">
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="grid grid-cols-2 border-t border-[#F0F0F0]">
         {gridTiles.map((tile, index) => (
           <div
@@ -254,7 +378,7 @@ export function MoreOptionsScreen({
             )}
             style={tile.fullWidth ? { gridColumn: "span 2" } : undefined}
           >
-            <Tile tile={tile} onSelect={handleProductionTile} />
+            <Tile tile={tile} onSelect={handleGridTile} />
           </div>
         ))}
       </div>

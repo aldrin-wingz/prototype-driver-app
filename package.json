@@ -10,10 +10,12 @@
   "scripts": {
     "dev": "next dev --turbo",
     "typecheck": "tsc --noEmit",
+    "verify": "bun run verify:base && bun run verify:no-show",
+    "verify:base": "bun scripts/verify-base.ts",
+    "verify:no-show": "bun scripts/verify-no-show.ts",
     "build": "tsc --noEmit && next build",
     "start": "next start",
     "lint": "next lint",
-    "verify": "bun scripts/verify-base.ts",
     "verify:captures": "bun scripts/verify-captures.ts",
     "build:capture-index": "bun scripts/build-capture-index.ts"
   },

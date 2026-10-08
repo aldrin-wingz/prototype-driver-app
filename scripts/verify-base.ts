@@ -76,17 +76,17 @@ function sourceFiles(): string[] {
 // ---------------------------------------------------------------------------
 console.log("\n1. Feature-namespace boundary");
 // ---------------------------------------------------------------------------
-// The failure this base exists to prevent: an unagreed feature arriving through
-// a shared file. Anything importing these namespaces is not shipped behaviour.
+// ⚠️ INVERTED ON THIS BRANCH, deliberately.
+//
+// On `prototype/driver-app-base` the support namespaces are FORBIDDEN, because
+// the base carries only shipped behaviour. This is the feature branch that OWNS
+// them, so the check is turned around rather than weakened: namespaces belonging
+// to OTHER branches stay banned, and ours must be PRESENT. Restore the base's
+// lists at fold-in time.
 const FORBIDDEN = [
-  "@/lib/support",
-  "@/lib/support-data",
-  "@/components/support",
-  "@/components/dev",
   "@/lib/messages-data",
   "@/components/chat",
-  "no-show-rules",
-  "use-no-show-clock",
+  "@/components/dev",
 ];
 const files = sourceFiles();
 check("source files scanned", `${files.length} .ts/.tsx files`, files.length > 50);
@@ -99,21 +99,42 @@ for (const f of files) {
   }
 }
 check(
-  "no forbidden imports",
+  "no other feature's namespace leaks in",
   offenders.length ? offenders.join("; ") : `0 hits across ${FORBIDDEN.length} namespaces`,
   offenders.length === 0,
 );
 
-const ORPHANS = [
-  "lib/support", "lib/support-data", "components/support", "components/dev",
-  "lib/messages-data", "components/chat", "lib/driver-data/no-show-rules.ts",
-  "types/support.ts", "hooks/use-no-show-clock.ts", "app/my-rides/[id]/no-show",
-];
+const ORPHANS = ["lib/messages-data", "components/chat", "components/dev"];
 const present = ORPHANS.filter((p) => existsSync(join(ROOT, p)));
 check(
-  "no feature directories on disk",
+  "no other feature's directories on disk",
   present.length ? present.join(", ") : `0 of ${ORPHANS.length} present`,
   present.length === 0,
+);
+
+/**
+ * ⭐ The inverse assertion, and the reason trimming the lists above is not a
+ * weakening. These are THIS branch's own namespaces. The expectation is
+ * DECLARED here as a literal rather than derived from what happens to sit on
+ * disk — a set derived from the thing it checks cannot fail, and a namespace
+ * that silently disappeared would otherwise pass vacuously.
+ */
+const REQUIRED = [
+  "lib/support",
+  "lib/support-data",
+  "components/support",
+  "types/support.ts",
+  "lib/driver-data/no-show-rules.ts",
+  "hooks/use-no-show-clock.ts",
+  "app/my-rides/[id]/no-show",
+];
+const missingNs = REQUIRED.filter((p) => !existsSync(join(ROOT, p)));
+check(
+  "this branch's own namespaces are present",
+  missingNs.length
+    ? `MISSING: ${missingNs.join(", ")}`
+    : `${REQUIRED.length} of ${REQUIRED.length} present`,
+  missingNs.length === 0,
 );
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,62 @@ Reference captures of the **existing production Wingz NEMT Driver App**. These a
 | `i-4/` | 04a/04b/05a/05b | Ride detail callout variants apply to both Before Taken and Needs Action states. |
 | `i-5/` | 02a, 02b, 11 (Filter Requests Modal) | Existing filter pattern is a bottom-anchored modal — the incentive filter extends this modal. |
 
+## Support slice packs (`s-*`)
+
+Captures for the **In-App Support Requests** prototype use `s-*` slots so they never collide with the `01a`–`11` incentives numbering. New captures are dropped in `inbox/` and filed from there — see `inbox/README.md`.
+
+| Slot | Filename | Screen | What it pins down |
+|------|----------|--------|-------------------|
+| s-01a | `s-01a - Ride Details - Accepted Ride - Swipe To Start.webp` | Accepted ride, nothing swiped | Header reads `#<id> - Accepted Ride`. CTA **SWIPE TO START / A Leg** on near-black `#1F2937`, car glyph in a white circle |
+| s-01b | `s-01b - Ride Details - Active Ride - Pick Up Member.webp` | Started, en route to pickup | Header reads `#<id> - Active Ride`. CTA **PICK UP MEMBER / A Leg** on green `#10B981`, person glyph |
+| s-01c | `s-01c - Ride Details - Ride - Drop Off Member.webp` | Member on board | Header reads `#<id> - Ride`. CTA **DROP OFF MEMBER / A Leg** on pink `#EC4899`, check glyph |
+
+| s-02a | `s-02a - Form Request - Late Pickup Reason.png` | The app's existing "Late pickup reason" form | **The base pattern for every support form.** Bottom sheet w/ drag handle · bold title + ✕ · pink context callout (`Scheduled time` / `N mins late`) · required = red asterisk · optional-ness in the label text · Cancel (outline) + case-specific primary · **primary DISABLED while required fields are empty** (which is why "Save Reason" is muted green) |
+| s-03a | `s-03a - More Options - Grid.jpg` | The screen behind `More` | **Full pushed page, not a sheet.** Back chevron + centred "More Options", no bottom nav. Two-column icon grid, hairline dividers, odd last tile full-width. 7 actions: Map to Pickup · Map to Drop-off · Call Member or Support · Email Support · Add Event To Calendar · Member No-Show · Send Back Trip |
+
+### Member No-Show pack (`s-06*`)
+
+Filed 2026-09-03. **The source of truth for the Rider No-Show branch** (`luis/rider-no-show`) — the production screen and both of its refusals.
+
+| Slot | Filename | Screen | What it pins down |
+|------|----------|--------|-------------------|
+| s-06a | `s-06a - Member No-Show - Empty.jpg` | The Member No-Show screen, untouched | **A pushed page, not a sheet.** Back chevron + centred title · bold `No-Show Type:` + a `Select:` box · bold `Driver Signature` + a tall **full-bleed** canvas · centred **blue** Clear · full-width teal Submit pinned at the bottom. ⚠️ **Submit is bright/enabled with nothing filled** — production lets you submit and then refuses |
+| s-06b | `s-06b - Member No-Show - No-Show Type Picker.jpg` | The type picker, open | **All three options: `Member Not Home` · `Cancel At Door` · `Member Not Ready`.** A native action sheet, blue text, options-then-gap-then-Cancel — the same shape as `s-06e`, and nothing sits in the gap, which is how we know the list is complete |
+| s-06c | `s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg` | Guardrail 2 refusing | Title **"Unable to complete action"** + *"Please wait at least 10 minutes at the pick up location before requesting a Member no-show."* + a single teal **OK**. ⚠️ Type is already picked and the signature already drawn — **the check runs at Submit, after the work** |
+| s-06d | `s-06d - More Options - Ready To Start Or En-Route Refusal.jpg` | Guardrail 1 refusing | **No title** — just *"Member No-Show is only allowed for rides that are ready to start or en-route."* + teal OK. Fires over the More Options grid, and proves the **tile is always present** rather than hidden |
+| s-06e | `s-06e - More Options - Call Member Or Support Sheet.jpg` | The Call action sheet | Not a support surface — filed as the **control comparison** for `s-06b`. Four options (Rider Phone · Pickup Phone · Dropoff Phone · Wingz Support), then the gap, then Cancel |
+
+**Step packs:** `by-step/s-1/` (three swipe stages) · `by-step/s-2/` (form pattern) · `by-step/s-3/` (More Options) · `by-step/s-6/` (Member No-Show, all five).
+
+### Sampled colours
+
+Taken from the captures directly rather than eyeballed, and codified in `constants/driver-app-colors.ts`. Several differ from the template defaults, so prefer these on replicated surfaces:
+
+| Token | Value | Where |
+|---|---|---|
+| Navy | `#303068` | all plain glyphs — phone, chat, mail, calendar. **Indigo, not charcoal** |
+| Teal | `#00B090` | pickup-side ring + PICK UP MEMBER CTA |
+| Rose | `#E05878` | drop-off-side ring |
+| Rose deep | `#D85878` | filled Member No-Show circle |
+| Gold | `#E0C878` | filled Send Back Trip circle |
+| Ink | `#282828` | SWIPE TO START CTA fill |
+| Drop-off | `#E06078` | DROP OFF MEMBER CTA fill |
+| Divider | `#F0F0F0` | grid hairlines |
+
+### Icon fidelity gap
+
+`s-03a` shows the plain glyphs as SOLID shapes. Lucide is stroke-based, so filling only works for single closed paths — the phone fills correctly, but filling the mail or calendar collapses their interior detail into a blob. Those two are stroked at a heavier weight instead. Exact solid versions would need hand-drawn SVG.
+
+Shared anatomy these three establish for the in-progress detail surface:
+- **Swipe sequence is Start → Pick Up → Drop Off.** There is no "arrived" swipe.
+- **Header title changes per swipe stage** — `Accepted Ride` → `Active Ride` → `Ride`.
+- **Action row is 4 controls + More**, split into equal cells by vertical hairlines: green ring w/ turn arrow, pink ring w/ turn arrow, solid navy phone, solid navy chat, then `More` as plain text.
+- **Leg fare sits on the time row**, right-aligned, as `$52.52 Accepted by you` — not stacked beneath.
+- One "A Leg" = **two timeline rows** (Est Pick-up Time + Appointment Time). The swipe sequence belongs to the leg, anchored on the pickup row.
+- **No swipe history is shown.** The prototype's `SWIPES` block is net-new, added so a driver can see a missing swipe; it renders only once a swipe exists or one was skipped.
+
+Still needed: the **open `More` menu** (blocks the ride options menu build — container pattern is undecided), and the swipe control's own interaction.
+
 ## Naming convention
 
 Canonical filenames follow `<slot>(<sub>) - <Surface> - <Detail>.png`:
