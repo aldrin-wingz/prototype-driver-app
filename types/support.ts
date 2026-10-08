@@ -71,7 +71,23 @@ export type SupportPrefillSource =
   /** When the app saw the driver arrive at the pick-up, if it did. */
   | "waitArrivedAt"
   /** When the app saw them leave, if it did. */
-  | "waitLeftAt";
+  | "waitLeftAt"
+  // ---- Missed Swipe ---------------------------------------------------
+  // ⚠️ Five sources rather than two, because PROVENANCE is the thing the driver
+  // has to be able to tell apart. A `recorded*` value is a swipe the driver made
+  // and the app stored; a `*SeenAt` value is the app's own guess off the
+  // location trail. One is a fact and locks; the other is a proposal and must
+  // stay editable, and a single shared source would make them look alike.
+  /** The recorded en-route mark — the one swipe a missed-swipe leg always has. */
+  | "enRouteTime"
+  /** The recorded pick-up mark, when there is one. */
+  | "recordedPickupAt"
+  /** The recorded drop-off mark, when there is one. */
+  | "recordedDropoffAt"
+  /** When the location trail first places the driver at the pick-up. */
+  | "pickupSeenAt"
+  /** When the location trail first places them at the drop-off. */
+  | "dropoffSeenAt";
 
 export interface SupportFieldOption {
   value: string;
@@ -224,6 +240,16 @@ export interface SupportCaseDefinition {
   /** Label on the secondary footer button. */
   cancelLabel?: string;
   fields: SupportField[];
+  /**
+   * Field ids whose values happened in this order, for `getTimeOrderWarnings`.
+   *
+   * On the case rather than imported by the sheet, because which times form a
+   * sequence is a property of the CASE: a no-show's wait (arrived, then left)
+   * and a missed swipe's marks (en-route, pick-up, drop-off) are different
+   * sequences on the same form. A sheet that names one of them can only ever
+   * check that one, and silently checks nothing on every other case.
+   */
+  timeSequence?: readonly string[];
   resolution: SupportResolutionPath;
   /** Confirmation copy shown after a successful submit. */
   successMessage?: string;

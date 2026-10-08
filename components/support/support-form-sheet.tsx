@@ -19,7 +19,6 @@ import {
   isFieldVisible,
 } from "@/lib/support/field-rules";
 import { getTimeOrderWarnings } from "@/lib/support/time-order";
-import { WAIT_TIME_SEQUENCE } from "@/lib/support-data/case-registry";
 import type {
   SupportCallout,
   SupportCalloutTone,
@@ -164,7 +163,7 @@ export function SupportFormSheet({
   const warnings = getTimeOrderWarnings(
     supportCase.fields,
     values,
-    WAIT_TIME_SEQUENCE
+    supportCase.timeSequence ?? []
   );
   // Per `s-02a`, the primary action sits disabled (muted green) until every
   // required field has a value — and stays disabled for an issue whose field set

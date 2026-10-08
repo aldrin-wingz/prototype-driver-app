@@ -44,6 +44,7 @@ const NOT_YET_SUFFIX = " — ⚠️ not in prototype yet";
 
 export const ISSUE_RIDER_NO_SHOW = "rider-no-show";
 export const ISSUE_CANCEL_AT_DOOR = "cancel-at-door";
+export const ISSUE_MISSED_SWIPE = "missed-swipe";
 
 /**
  * The support issues a driver can file.
@@ -80,6 +81,19 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Opens automatically after Submit on the Member No-Show screen when the type is Cancel At Door and the ten-minute wait has not been served. It is the evidence the waiver rests on, so it exists only on the paths that use the waiver.",
+  },
+  {
+    value: ISSUE_MISSED_SWIPE,
+    label: "Missed Swipe",
+    description:
+      "For a leg you drove but could not mark. Tell us when each end happened — anything your location history can confirm is filled in already.",
+    // Hidden like the other two: reached from the ride whose swipe is missing,
+    // which already knows the leg and which mark is absent. A driver choosing
+    // "Missed Swipe" from a dropdown would then have to tell the form the one
+    // thing the entry point already knew.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from the Missed Swipe tile in More Options, on a leg with an unrecorded mark. A missed PICK-UP asks whether the member is still in the car before it asks anything else — if they are, no form opens at all until the drop-off is swiped.",
   },
 ];
 

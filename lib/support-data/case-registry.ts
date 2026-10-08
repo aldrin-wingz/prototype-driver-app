@@ -1,8 +1,10 @@
 import {
   getIssueOptions,
   ISSUE_CANCEL_AT_DOOR,
+  ISSUE_MISSED_SWIPE,
   ISSUE_RIDER_NO_SHOW,
 } from "./issue-types";
+import type { SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
 import {
   CONTACT_RELATION_OPTIONS,
   NO_SHOW_TYPES,
@@ -32,6 +34,29 @@ const EITHER_NO_SHOW_CASE = {
   field: "issue",
   equals: [ISSUE_RIDER_NO_SHOW, ISSUE_CANCEL_AT_DOOR],
 };
+const ONLY_MISSED_SWIPE = { field: "issue", equals: [ISSUE_MISSED_SWIPE] };
+
+/**
+ * Every case that is filed against one leg.
+ *
+ * `legId` belongs to all of them, so it is declared once under this gate rather
+ * than copied per case — two identical-looking leg pickers under different gates
+ * are two fields that can drift.
+ */
+const ANY_LEG_CASE = {
+  field: "issue",
+  equals: [ISSUE_RIDER_NO_SHOW, ISSUE_CANCEL_AT_DOOR, ISSUE_MISSED_SWIPE],
+};
+
+/** The time fields of a Missed Swipe, in the order they must have happened. */
+export const SWIPE_TIME_SEQUENCE = ["enRouteTime", "pickupTime", "dropOffTime"];
+
+/** One end of a missed-swipe leg, and whether the location trail confirmed it. */
+export interface MissedSwipeAsk {
+  anchor: SwipeAnchor;
+  /** The trail placed the driver at this address. */
+  confirmed: boolean;
+}
 
 const SUPPORT_FORM_CASE_ID = "support-form";
 
@@ -76,6 +101,7 @@ export function buildSupportFormCase({
   askNoShowType = false,
   askSignature = false,
   askWaitTimes = true,
+  missedSwipe,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -108,7 +134,21 @@ export function buildSupportFormCase({
    * and asking anyway is the interrogation this form exists to avoid.
    */
   askWaitTimes?: boolean;
+  /**
+   * The ends of a missed-swipe leg to ask about, and what the trail confirmed.
+   *
+   * ⚠️ Anchor AND evidence together, never two parallel lists. Which end is
+   * asked and whether the app can already place the driver there decide
+   * different things — the time field's prefill, and whether the "where were
+   * you" field exists at all — and two lists that could disagree would let the
+   * form ask where someone was while telling them it knows.
+   */
+  missedSwipe?: MissedSwipeAsk[];
 } = {}): SupportCaseDefinition {
+  const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
+  const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
+  const confirmed = (anchor: SwipeAnchor) =>
+    missedSwipe?.find((a) => a.anchor === anchor)?.confirmed ?? false;
   return {
     id: SUPPORT_FORM_CASE_ID,
     title: "Submit Support Form",
@@ -121,7 +161,8 @@ export function buildSupportFormCase({
     submitLabel: "Submit",
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: "Member no-show",
+    zendeskEquivalent: missedSwipe ? "Missed swipe" : "Member no-show",
+    timeSequence: missedSwipe ? SWIPE_TIME_SEQUENCE : WAIT_TIME_SEQUENCE,
     fields: [
       {
         id: "issue",
@@ -170,7 +211,7 @@ export function buildSupportFormCase({
         label: "Which trip?",
         placeholder: "Search your rides by leg ID, rider or date",
         required: true,
-        showIf: EITHER_NO_SHOW_CASE,
+        showIf: ANY_LEG_CASE,
         prefillFrom: "legId",
         // A no-show is only actionable on a trip that is under way.
         legScope: "in-progress",
@@ -272,6 +313,123 @@ export function buildSupportFormCase({
          */
         showIf: { field: "spokeWithWho", equals: [SPOKE_WITH_CONTACT] },
       },
+
+      // ---- Missed Swipe --------------------------------------------------
+      // A leg the driver DROVE but could not mark. Every question here is one
+      // the app would have answered itself if the swipe had happened — which is
+      // why each one carries what the location trail could and could not say,
+      // rather than presenting a blank box and letting the driver guess whether
+      // we already knew.
+      ...(missedSwipe
+        ? ([
+            {
+              id: "enRouteTime",
+              type: "time",
+              label: "En-route time",
+              helpText: "When you swiped to start. This is the one mark we have.",
+              prefillFrom: "enRouteTime",
+              lockWhenPrefilled: true,
+              showIf: ONLY_MISSED_SWIPE,
+            },
+            asksPickup
+              ? {
+                  id: "pickupTime",
+                  type: "time",
+                  label: "What time did you pick the member up?",
+                  shortLabel: "pick-up time",
+                  required: true,
+                  prefillFrom: "pickupSeenAt",
+                  // ⚠️ NOT locked even when it prefills. What fills it is the
+                  // app's own guess off the trail — the time it first saw the
+                  // driver AT the address, which is when they arrived, not when
+                  // the member got in. Locking a guess would make the driver
+                  // file a time they can see is wrong.
+                  helpText: confirmed("pickup")
+                    ? "Your location history puts you at the pick-up around this time. Change it if the member got in later."
+                    : "We could not place you at the pick-up, so this one is yours to fill in.",
+                  showIf: ONLY_MISSED_SWIPE,
+                }
+              : {
+                  id: "pickupTime",
+                  type: "time",
+                  label: "Pick-up time",
+                  prefillFrom: "recordedPickupAt",
+                  lockWhenPrefilled: true,
+                  showIf: ONLY_MISSED_SWIPE,
+                },
+            // Only when the trail could NOT place them there. Asking where the
+            // pick-up happened while the app can already see they were at the
+            // pick-up address is exactly the interrogation this case exists to
+            // remove.
+            ...(asksPickup && !confirmed("pickup")
+              ? [
+                  {
+                    id: "pickupWhere",
+                    type: "text",
+                    label: "Where did you pick them up?",
+                    placeholder:
+                      "e.g. west tower lobby, the side entrance, in the driveway",
+                    helpText:
+                      "Be specific — with no location record of the pick-up, this is what Support has.",
+                    required: true,
+                    showIf: ONLY_MISSED_SWIPE,
+                  },
+                ]
+              : []),
+            asksDropoff
+              ? {
+                  id: "dropOffTime",
+                  type: "time",
+                  label: "What time did you drop the member off?",
+                  shortLabel: "drop-off time",
+                  required: true,
+                  prefillFrom: "dropoffSeenAt",
+                  helpText: confirmed("dropoff")
+                    ? "Your location history puts you at the drop-off around this time. Change it if you left later."
+                    : "We could not place you at the drop-off, so this one is yours to fill in.",
+                  showIf: ONLY_MISSED_SWIPE,
+                }
+              : {
+                  id: "dropOffTime",
+                  type: "time",
+                  label: "Drop-off time",
+                  prefillFrom: "recordedDropoffAt",
+                  lockWhenPrefilled: true,
+                  showIf: ONLY_MISSED_SWIPE,
+                },
+            ...(asksDropoff && !confirmed("dropoff")
+              ? [
+                  {
+                    id: "dropoffWhere",
+                    type: "text",
+                    label: "Where did you drop them off?",
+                    placeholder: "e.g. the main entrance, bay 3, the front desk",
+                    helpText:
+                      "Be specific — with no location record of the drop-off, this is what Support has.",
+                    required: true,
+                    showIf: ONLY_MISSED_SWIPE,
+                  },
+                ]
+              : []),
+            {
+              id: "reason",
+              type: "textarea",
+              label: "Why weren't you able to swipe this trip?",
+              placeholder:
+                "Tell us briefly why you weren't able to swipe during the ride.",
+              required: true,
+              maxLength: 500,
+              showIf: ONLY_MISSED_SWIPE,
+            },
+            {
+              id: "attachment",
+              type: "file",
+              label: "Attachments (optional)",
+              helpText: "Add a photo or screenshot if it helps explain.",
+              showIf: ONLY_MISSED_SWIPE,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
 
       // ⚠️ The signature is conditional, and where it lives is a real decision.
       //

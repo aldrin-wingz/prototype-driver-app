@@ -3,6 +3,12 @@
 import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { getIssueLabel } from "./issue-types";
 import { findPendingForTrip } from "@/lib/support/request-visibility";
+import { swipeClockFor, type SwipeMark } from "@/lib/driver-data/missed-swipe-rules";
+import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
+import {
+  applySessionSwipes as applyOverlay,
+  recordSessionSwipe,
+} from "@/lib/driver-data/session-swipes";
 
 /**
  * One support request the driver has submitted.
@@ -82,6 +88,45 @@ interface RideFlowValue {
    * concerned, because the app has nothing true to say about it.
    */
   getPendingRequest: (tripId: string) => PendingSupportRequest | undefined;
+
+  // ---- Missed Swipe ----------------------------------------------------
+  /**
+   * The trip with any swipes the driver made THIS SESSION laid over the seed.
+   *
+   * ⚠️ An overlay, not an edit. `mock-trips` is the seeded ground truth every
+   * demo restarts from, and the Missed Swipe slice is the first thing here that
+   * needs a mark to appear while the app is running — the postponed pick-up form
+   * is defined as "after the drop-off swipe", so without a drop-off that can
+   * actually land there is no after. Writing into the seed instead would make
+   * the demo unrepeatable and would quietly change what every other slice sees.
+   */
+  applySessionSwipes: (trip: Trip) => Trip;
+  /**
+   * Record a swipe the driver just made.
+   *
+   * ⚠️ Takes the LEG, not just its id, because the clock to stamp comes from the
+   * leg's own trail — see `swipeClockFor`. A device clock here puts the new mark
+   * in a different frame from every mark beside it.
+   */
+  recordSwipe: (leg: TripLeg, mark: SwipeMark) => void;
+  /**
+   * The driver said the member is still in the car, so the pick-up is deferred.
+   *
+   * Held per leg because it is a claim about THIS leg's missing mark, and it is
+   * what makes the drop-off swipe available on a leg production would have
+   * blocked.
+   */
+  isPickupPostponed: (legId: string) => boolean;
+  postponePickup: (legId: string) => void;
+  clearPostponedPickup: (legId: string) => void;
+}
+
+/** A wall clock in the seed's own format, e.g. "2:14 PM". */
+function nowClock(): string {
+  const now = new Date();
+  const hour = now.getHours();
+  const shown = hour % 12 === 0 ? 12 : hour % 12;
+  return `${shown}:${String(now.getMinutes()).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
 }
 
 const RideFlowContext = createContext<RideFlowValue | null>(null);
@@ -99,6 +144,11 @@ const RideFlowContext = createContext<RideFlowValue | null>(null);
  */
 export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [records, setRecords] = useState<SupportFormRecord[]>([]);
+  // ⚠️ A revision counter, not the swipes themselves. The overlay lives in
+  // `session-swipes` so the leg-options registry sees it too; this is only how
+  // React is told to look again.
+  const [swipeRevision, setSwipeRevision] = useState(0);
+  const [postponed, setPostponed] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -136,8 +186,21 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
           submittedAt: match.updatedAt,
         };
       },
+
+      applySessionSwipes: (trip) => applyOverlay(trip),
+      recordSwipe: (leg, mark) => {
+        recordSessionSwipe(leg.id, mark, swipeClockFor(leg) ?? nowClock());
+        setSwipeRevision((previous) => previous + 1);
+      },
+      isPickupPostponed: (legId) => postponed.includes(legId),
+      postponePickup: (legId) =>
+        setPostponed((previous) =>
+          previous.includes(legId) ? previous : [...previous, legId]
+        ),
+      clearPostponedPickup: (legId) =>
+        setPostponed((previous) => previous.filter((id) => id !== legId)),
     }),
-    [records]
+    [records, swipeRevision, postponed]
   );
 
   return (

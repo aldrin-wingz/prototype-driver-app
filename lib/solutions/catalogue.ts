@@ -156,12 +156,31 @@ export const SOLUTIONS: Solution[] = [
     calls: 805,
     problem: "Missed swipe",
     useCase:
-      "Driver completes the trip → forgets to swipe at pick-up/drop-off → already left → calls Support to correct the record",
+      "Driver forgets to swipe the pick-up → the app will not offer the drop-off until the pick-up exists → the whole rest of the leg goes unrecorded → driver calls Support to reconstruct the trip from memory",
+    /**
+     * ⚠️ Reworded on 2026-10-09 against `silver.ride_silver` and
+     * `bronze.location`. Two measurements moved it:
+     *
+     * 1. A missed pick-up is not one missing timestamp, it is the whole leg.
+     *    Over 30 days, 14 legs missed ONLY the pick-up against 2,521 that
+     *    missed both — because the pick-up swipe gates the drop-off swipe. So
+     *    the feature is an UNBLOCK first and a form second.
+     * 2. "Times prefilled" was doing a lot of unexamined work. The background
+     *    location trail is real (median 271 fixes a leg, present on 99% of
+     *    them) but it places the driver at the pick-up on only 53.3% of
+     *    missed-swipe legs and at the drop-off on 33.6%, against 89.6% / 92.6%
+     *    on a swiped control. Prefill is worth building and is NOT the common
+     *    case, so the proposal has to carry what happens when it misses.
+     */
     proposedFeature:
-      "In-app form to correct the swipe record after the fact, with the leg and times prefilled",
+      "Ask one question first — is the member still in the car → if yes, offer the drop-off swipe the app is withholding and collect the pick-up after it, so one missed mark stops costing the whole leg → then a form that fills in every end the location trail can place them at, asks where they were only for the ends it cannot, and says which is which",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides/1049800381",
+      label:
+        "The ride detail, on a leg swiped to start and never picked up. Tap 'I already made this swipe' → say the member is in the car → the button becomes DROP OFF MEMBER, which production would not offer → swipe it and the pick-up form opens with the arrival time already filled from the trail. Rides 1049800382 (both ends confirmed — nothing to reconstruct) and 1049800383 (drop-off unconfirmable — it asks where instead) are the other two states.",
+    },
   },
   {
     id: "tag-number-invalid",

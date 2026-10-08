@@ -89,18 +89,42 @@ for (const trip of asIs) {
 }
 
 // ── No refusing ride may be untagged ─────────────────────────────
+/**
+ * Rides that refuse a no-show while belonging to ANOTHER slice.
+ *
+ * ⚠️ A literal list, declared here, never derived from `noShowDemo` being
+ * absent — deriving it would make the check assert "every untagged ride is
+ * untagged" and pass forever. These three are the Missed Swipe seeds (slice 03):
+ * their location records are tens of minutes old, so the no-show walk finds
+ * nothing in its 20-minute lookback and falls through to the form. That is the
+ * right answer for a ride nobody is filing a no-show on, and tagging them with a
+ * comparison-matrix row they do not demonstrate would be worse than exempting
+ * them.
+ */
+const OTHER_SLICE_RIDES = new Set(["1049800381", "1049800382", "1049800383"]);
+
 let refusing = 0;
+let exempted = 0;
 for (const trip of mockInProgressTrips) {
   const leg = activeLeg(trip);
   if (!leg) continue;
   const outcome = resolveNoShow(trip, leg, 0);
   if (outcome.kind === "timer" || outcome.kind === "form") {
+    if (OTHER_SLICE_RIDES.has(trip.id)) {
+      exempted += 1;
+      continue;
+    }
     refusing += 1;
     check(`refusing ride ${trip.id} is tagged`, Boolean(trip.noShowDemo),
       `${outcome.kind} with no noShowDemo`);
   }
 }
 check("some ride actually refuses", refusing > 0, `${refusing}`);
+// The exemption must stay a narrow carve-out, not a hole. If a Missed Swipe ride
+// stops refusing — or one is deleted — this says so rather than quietly
+// shrinking the population the check above runs on.
+check("every exempt ride is still exercised", exempted === 2,
+  `${exempted} of ${OTHER_SLICE_RIDES.size} exempt ids refuse (1049800383 is past pick-up, so no-show never applies)`);
 
 // ── The two stories, one ride each ──────────────────────────────
 // These replace the matrix checks. They assert the branch each ride demonstrates,

@@ -36,6 +36,15 @@ import {
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import {
+  canFileMissedSwipe,
+  getMissingAnchors,
+  offeredSwipe,
+  routeMissedSwipe,
+  type SwipeAnchor,
+} from "@/lib/driver-data/missed-swipe-rules";
+import { MissedSwipePrompt } from "@/components/support/missed-swipe-prompt";
+import { MissedSwipeForm } from "@/components/support/missed-swipe-form";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
@@ -256,15 +265,32 @@ function LegCard({
  * surface and the variant-switch were stripped in I-0.
  */
 export function RideDetailLayout({
-  trip,
+  trip: seededTrip,
   state,
   backHref,
   banner,
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { getPendingRequest } = useRideFlow();
+  const {
+    getPendingRequest,
+    applySessionSwipes,
+    recordSwipe,
+    isPickupPostponed,
+    postponePickup,
+    clearPostponedPickup,
+  } = useRideFlow();
+
+  // Any swipe the driver made in this session, laid over the seed. Everything
+  // below reads the overlaid trip, so a drop-off recorded a moment ago moves the
+  // stage, the header and the swipe record together.
+  const trip = applySessionSwipes(seededTrip);
   const pendingRequest = getPendingRequest(trip.id);
+
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
+    null
+  );
 
   // The leg the driver is working, and the swipe expected next on it. Only legs
   // that carry a `progress` object take part in the swipe sequence — the
@@ -275,23 +301,100 @@ export function RideDetailLayout({
   const activeStage: LegSwipeStage = activeLeg
     ? getLegStage(activeLeg)
     : "not-started";
-  const nextSwipe = activeLeg ? getNextSwipe(activeLeg) : null;
+  const pickupPostponed = activeLeg ? isPickupPostponed(activeLeg.id) : false;
+  // ⚠️ The OFFERED swipe, not the next one in the sequence. A driver who told us
+  // the member is in the car is offered the drop-off production would withhold.
+  const nextSwipe = offeredSwipe(
+    activeLeg ? getNextSwipe(activeLeg) : null,
+    pickupPostponed
+  );
 
   const cta = nextSwipe ? SWIPE_CTA[nextSwipe] : null;
 
   /**
-   * The swipe CTA is a real button, and on this branch it only ever toasts.
+   * The swipe CTA toasts, EXCEPT on a leg whose pick-up has been postponed.
    *
-   * Nothing in the prototype advances a swipe mark, so the production swipe has
-   * no behaviour to stand in for. Saying so beats a dead tap that reads as a bug —
-   * the same treatment every unwired More Options tile gets. The way into a form
-   * on this branch is the Member No-Show tile, not this button.
+   * ⚠️ Deliberately that narrow. Nothing in the prototype advances a swipe mark,
+   * and making every swipe real would change what Phases 1 and 2 demo — a
+   * no-show ride sits at `started` on purpose. The postponed drop-off is the one
+   * swipe this slice genuinely needs to land, because "ask about the pick-up
+   * after the drop-off" has no "after" without it.
    */
   function handleSwipeTap() {
+    if (pickupPostponed && nextSwipe === "drop-off" && activeLeg) {
+      recordSwipe(activeLeg, "droppedOffAt");
+      clearPostponedPickup(activeLeg.id);
+      /**
+       * Now, and only now, ask about what is STILL missing.
+       *
+       * ⚠️ Derived, not the literal `["pickup"]` it obviously is today. The
+       * seed's state is read back minus the mark just recorded, so if a leg ever
+       * reaches here missing something else, the form asks about that too
+       * instead of quietly dropping it. `getMissingAnchors` cannot see the mark
+       * we just wrote — that is React state landing on the next render — which
+       * is exactly why it is subtracted here rather than re-read.
+       */
+      const remaining = getMissingAnchors(activeLeg).filter(
+        (anchor) => anchor !== "dropoff"
+      );
+      if (remaining.length > 0) setMissedSwipeAsks(remaining);
+      return;
+    }
     toast({
       title: cta?.name ?? "Swipe",
       description: "Not wired in the prototype — this is the production action.",
     });
+  }
+
+  /**
+   * Open the form for every end of this leg that is still missing.
+   *
+   * ⚠️ Routed, never hardcoded. The first version asked only about the drop-off
+   * whenever the button said DROP OFF MEMBER — which is right on an ordinary leg
+   * and WRONG on a postponed one, where the button says drop-off precisely
+   * because the pick-up is still missing. Going through the rule is what stops
+   * the two paths disagreeing.
+   */
+  function fileMissedSwipe(leg: TripLeg) {
+    const route = routeMissedSwipe({
+      missing: getMissingAnchors(leg),
+      // The driver is telling us a swipe already happened, so the leg is behind
+      // the record rather than live — whatever they said earlier about the
+      // member no longer describes now.
+      memberAboard: false,
+    });
+    if (route.kind === "form") setMissedSwipeAsks(route.asks);
+  }
+
+  /** The driver says they already made the swipe the app is still asking for. */
+  function handleMissedSwipeTap() {
+    if (!activeLeg) return;
+    // A missing pick-up nobody has answered for yet: ask the one question that
+    // decides whether a form is the right answer at all.
+    if (getMissingAnchors(activeLeg).includes("pickup") && !pickupPostponed) {
+      setPromptOpen(true);
+      return;
+    }
+    fileMissedSwipe(activeLeg);
+  }
+
+  function handleMemberAboard(memberAboard: boolean) {
+    setPromptOpen(false);
+    if (!activeLeg) return;
+    if (memberAboard) {
+      postponePickup(activeLeg.id);
+      toast({
+        title: "We'll come back to the pick-up",
+        description:
+          "Drop the member off as normal — we'll ask about the pick-up straight after.",
+      });
+      return;
+    }
+    // The ride is over, so every missing end has to be reconstructed. Defer by a
+    // tick: vaul reports the dismissal before the handler that caused it, and
+    // opening the next sheet inside that window leaves the first one's scroll
+    // lock on.
+    setTimeout(() => fileMissedSwipe(activeLeg), 0);
   }
 
   const subtitle =
@@ -608,6 +711,24 @@ export function RideDetailLayout({
                 </span>
               </div>
             )}
+
+            {/*
+              The way into Missed Swipe.
+              ⚠️ A quiet secondary link, never a tile. The More Options grid is
+              replicated from `DAB-2026-10-01` and does not change shape, and the
+              claim here is the DRIVER's ("I already did this") — the app is not
+              detecting anything, so it must not present itself as having
+              noticed.
+            */}
+            {!pendingRequest && canFileMissedSwipe(nextSwipe) && (
+              <button
+                type="button"
+                onClick={handleMissedSwipeTap}
+                className="mx-auto mt-3 block text-sm font-semibold text-[#303068] underline underline-offset-4"
+              >
+                I already made this swipe
+              </button>
+            )}
           </div>
         </div>
       ) : state === "needs-action" ? (
@@ -675,6 +796,29 @@ export function RideDetailLayout({
         </div>
       ) : null}
 
+      <MissedSwipePrompt
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        onAnswer={handleMemberAboard}
+      />
+      {missedSwipeAsks && (
+        <MissedSwipeForm
+          /*
+            ⚠️ Keyed on what it asks. The postponed path opens this component a
+            second time with a different `asks`, and without a key React keeps
+            the first mount's field values — so the pick-up form would open
+            holding the answers to the drop-off form.
+          */
+          key={`missed-swipe-${missedSwipeAsks.join("-")}`}
+          trip={trip}
+          leg={activeLeg}
+          asks={missedSwipeAsks}
+          open
+          onOpenChange={(next) => {
+            if (!next) setMissedSwipeAsks(null);
+          }}
+        />
+      )}
     </div>
   );
 }

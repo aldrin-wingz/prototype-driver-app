@@ -1,6 +1,7 @@
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import { getLegOptions } from "@/lib/support-data/leg-options";
 import { inferNearWindow } from "@/lib/driver-data/no-show-rules";
+import { matchAnchor, type SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
 import type {
   SupportCaseDefinition,
   SupportField,
@@ -83,7 +84,43 @@ function resolve(
       return clockFromMinutesAgo(
         leg ? inferNearWindow(leg)?.lastSeenAgoMinutes : undefined
       );
+    // ---- Missed Swipe ------------------------------------------------
+    // A recorded mark is already a clock face ("2:14 PM"), so it converts; a
+    // mark the driver never made is empty, which is the whole case.
+    case "enRouteTime":
+      return toTimeInputValue(leg?.progress?.startedAt);
+    case "recordedPickupAt":
+      return toTimeInputValue(leg?.progress?.pickedUpAt);
+    case "recordedDropoffAt":
+      return toTimeInputValue(leg?.progress?.droppedOffAt);
+    case "pickupSeenAt":
+      return seenAt(leg, "pickup");
+    case "dropoffSeenAt":
+      return seenAt(leg, "dropoff");
   }
+}
+
+/**
+ * When the location trail first places the driver at one end of the leg.
+ *
+ * ⚠️ Empty unless the trail actually matched. Both other answers — a trail that
+ * never came near, and no trail at all — resolve to "" here on purpose: the
+ * field must open blank so the driver fills it. WHICH of the two it was is not
+ * thrown away; the form reads it from `matchAnchor` directly and says so, because
+ * "you were never there" and "we have no record of you" are different claims and
+ * an empty box tells the driver neither.
+ */
+function seenAt(leg: TripLeg | undefined, anchor: SwipeAnchor): string {
+  if (!leg) return "";
+  const evidence = matchAnchor(leg, anchor);
+  if (evidence.kind !== "matched") return "";
+  // ⚠️ The fix's own clock when it has one, because a missed swipe is
+  // reconstructed against the leg's OTHER marks and has to sit in their frame.
+  // Falling back to the live clock only for a record seeded without one, which
+  // is every pre-Missed-Swipe ride and none that reaches this form.
+  return evidence.arrivedAt
+    ? toTimeInputValue(evidence.arrivedAt)
+    : clockFromMinutesAgo(evidence.arrivedAgoMinutes);
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   type Trip,
   type TripLeg,
 } from "@/lib/driver-data/mock-trips";
+import { withSessionSwipes } from "@/lib/driver-data/session-swipes";
 import type { LegScope } from "@/types/support";
 
 /** One selectable leg, flattened out of the driver's rides. */
@@ -43,6 +44,10 @@ export function getLegOptions(scope: LegScope = "all"): LegOption[] {
   return allRides.flatMap((trip) =>
     trip.legs
       .filter((leg) => leg.progress)
+      // ⛔ Through the session overlay, always. This registry is the SECOND
+      // reader of the seed, and a swipe the driver just made has to be visible
+      // here or the form's re-derive silently undoes it. See `session-swipes`.
+      .map(withSessionSwipes)
       .map((leg) => ({
         legId: leg.id,
         trip,

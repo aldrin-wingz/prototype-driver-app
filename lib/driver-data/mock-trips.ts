@@ -63,8 +63,43 @@ export interface LegSwipeProgress {
 export interface LocationRecord {
   /** Minutes before "now" this fix was recorded, at mount. */
   ageMinutes: number;
-  /** Straight-line miles from the pick-up. */
+  /**
+   * Straight-line miles from the PICK-UP.
+   *
+   * ⚠️ The name predates there being a second anchor, and is kept because
+   * `walkLocationRecords` is a line-for-line port of production and reads it.
+   * Renaming it would make that port stop matching the code it mirrors.
+   */
   distanceMiles: number;
+  /**
+   * Straight-line miles from the DROP-OFF.
+   *
+   * Optional, and only the Missed Swipe rides seed it — the no-show rule only
+   * ever asks about the pick-up, so every ride that predates this slice has one
+   * anchor and needs no second distance. A fix with no value here simply cannot
+   * corroborate a drop-off, which is the honest reading of a record stored
+   * before anyone asked the question.
+   */
+  dropoffDistanceMiles?: number;
+  /**
+   * The wall clock this fix was recorded at, e.g. "11:20 AM".
+   *
+   * ⛔⛔ **Why both this and `ageMinutes`.** `ageMinutes` is relative to the
+   * driver's REAL phone clock, which is right for Rider No-Show — that case is
+   * about the last twenty minutes, so a countdown has to run against now. It is
+   * wrong for Missed Swipe, which reconstructs a leg whose other marks are
+   * seeded clock faces on `MOCK_TODAY`: prefilling from `ageMinutes` produced a
+   * pick-up of 3:19 AM against an en-route mark of 11:08 AM, and the form's own
+   * time-order warning then told the driver their own prefilled answer was
+   * impossible.
+   *
+   * So the missed-swipe rides seed the clock directly and the no-show rides do
+   * not. `ageMinutes` still drives every rule — radius, ordering, the lookback —
+   * and `at` is only how a matched fix is SHOWN. `verify-missed-swipe` asserts
+   * the two agree in ordering, so a seed cannot drift into saying one thing by
+   * age and another by clock.
+   */
+  at?: string;
 }
 
 export interface TripLeg {
@@ -1354,6 +1389,185 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // ===== Missed Swipe (slice 03) ==========================================
+  //
+  // Three rides, one per state the production data actually produces. Each is a
+  // different shape of `locationRecords`, not a different declared verdict —
+  // `matchAnchor` walks the records, so the ride genuinely exercises the rule.
+  //
+  // ⚠️ `dropoffDistanceMiles` and `at` appear only on these three. Every earlier
+  // ride predates there being a second anchor, and times its records against the
+  // live clock because a no-show is about the last twenty minutes.
+  //
+  // ⚠️ Ages are tens of minutes, well outside the no-show rule's 20-minute
+  // lookback. That is correct: these are legs being reconstructed after the
+  // fact, not waits being timed.
+
+  // --- the member is still in the car: the postpone path -------------------
+  {
+    id: "1049800381",
+    date: "Thu, Jul 31, 2026",
+    rider: "Lorraine Petrakis",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "8.4 mi",
+    totalRevenue: 31.20,
+    notes: "Member uses a walker — allow extra time at the kerb",
+    legs: [
+      {
+        id: "1049800381",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:20 AM",
+        address: "415 Rosewood Ave, Smyrna, GA 30080",
+        county: "Cobb County",
+        revenue: 31.20,
+        revenueNote: "Accepted by you",
+        // Swiped to start, never swiped the pick-up — and so cannot swipe the
+        // drop-off either. This is the state 2,521 legs a month end in.
+        progress: {
+          startedAt: "11:08 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // The trail puts the driver at the pick-up and then on the move. Once
+        // the drop-off is swiped, the postponed pick-up form opens with this
+        // arrival already filled in.
+        locationRecords: [
+          { ageMinutes: 34, distanceMiles: 0.08, dropoffDistanceMiles: 7.9, at: "11:20 AM" },
+          { ageMinutes: 31, distanceMiles: 0.06, dropoffDistanceMiles: 7.8, at: "11:23 AM" },
+          { ageMinutes: 24, distanceMiles: 1.4, dropoffDistanceMiles: 6.1, at: "11:30 AM" },
+          { ageMinutes: 12, distanceMiles: 5.2, dropoffDistanceMiles: 2.4, at: "11:42 AM" },
+          { ageMinutes: 3, distanceMiles: 7.6, dropoffDistanceMiles: 0.9, at: "11:51 AM" },
+        ],
+      },
+      {
+        id: "1049800381-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "12:05 PM",
+        address: "1800 Howell Mill Rd, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Wheelchair", variant: "attention" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // --- the ride is over and the trail confirms both ends --------------------
+  {
+    id: "1049800382",
+    date: "Thu, Jul 31, 2026",
+    rider: "Emmett Caldwell",
+    client: "MTM",
+    passengerCount: 1,
+    distance: "6.1 mi",
+    totalRevenue: 27.45,
+    notes: "",
+    legs: [
+      {
+        id: "1049800382",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:15 AM",
+        address: "72 Cedar Hollow Dr, Austell, GA 30106",
+        county: "Cobb County",
+        revenue: 27.45,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "9:02 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // ⭐ The "all they need to do is click submit" ride: the trail sits
+        // inside the radius at BOTH ends, so both times prefill and neither
+        // "where were you" field is asked at all.
+        locationRecords: [
+          { ageMinutes: 96, distanceMiles: 4.4, dropoffDistanceMiles: 9.8, at: "9:04 AM" },
+          { ageMinutes: 88, distanceMiles: 0.21, dropoffDistanceMiles: 5.9, at: "9:12 AM" },
+          { ageMinutes: 85, distanceMiles: 0.07, dropoffDistanceMiles: 5.8, at: "9:15 AM" },
+          { ageMinutes: 70, distanceMiles: 3.3, dropoffDistanceMiles: 2.6, at: "9:30 AM" },
+          { ageMinutes: 58, distanceMiles: 5.7, dropoffDistanceMiles: 0.19, at: "9:42 AM" },
+          { ageMinutes: 54, distanceMiles: 5.8, dropoffDistanceMiles: 0.05, at: "9:46 AM" },
+          { ageMinutes: 40, distanceMiles: 9.1, dropoffDistanceMiles: 3.4, at: "10:00 AM" },
+        ],
+      },
+      {
+        id: "1049800382-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:50 AM",
+        address: "3215 Barrett Pkwy, Kennesaw, GA 30144",
+        county: "Cobb County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
+  // --- the drop-off alone is missing, and the trail cannot place it ---------
+  {
+    id: "1049800383",
+    date: "Thu, Jul 31, 2026",
+    rider: "Beatrix Ngoma",
+    client: "Alivi",
+    passengerCount: 1,
+    distance: "15.7 mi",
+    totalRevenue: 48.90,
+    notes: "Drop-off is the rear entrance by the pharmacy",
+    legs: [
+      {
+        id: "1049800383",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "1:30 PM",
+        address: "9 Juniper Ct, Lithia Springs, GA 30122",
+        county: "Douglas County",
+        revenue: 48.90,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:18 PM",
+          pickedUpAt: "1:41 PM",
+          droppedOffAt: null,
+        },
+        // ⛔ The common case, and the one a demo must not skip: the trail exists
+        // and is good at the pick-up, but never comes within a quarter-mile of
+        // the drop-off. Measured at 66.4% of real missed-swipe legs. The form
+        // leaves the time blank and asks where they dropped the member instead
+        // of pretending to a match.
+        locationRecords: [
+          { ageMinutes: 74, distanceMiles: 0.11, dropoffDistanceMiles: 14.2, at: "1:30 PM" },
+          { ageMinutes: 70, distanceMiles: 0.04, dropoffDistanceMiles: 14.1, at: "1:34 PM" },
+          { ageMinutes: 52, distanceMiles: 6.8, dropoffDistanceMiles: 7.4, at: "1:52 PM" },
+          { ageMinutes: 38, distanceMiles: 12.9, dropoffDistanceMiles: 1.8, at: "2:06 PM" },
+          { ageMinutes: 20, distanceMiles: 16.4, dropoffDistanceMiles: 4.9, at: "2:24 PM" },
+        ],
+      },
+      {
+        id: "1049800383-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:15 PM",
+        address: "1200 Thornton Rd, Lithia Springs, GA 30122",
+        county: "Douglas County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [{ label: "Wait For Call", variant: "attention" }],
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

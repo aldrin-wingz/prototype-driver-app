@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "next dev --turbo",
     "typecheck": "tsc --noEmit",
-    "verify": "bun run verify:base && bun run verify:no-show && bun run verify:solutions",
+    "verify": "bun run verify:base && bun run verify:no-show && bun run verify:missed-swipe && bun run verify:solutions",
+    "verify:missed-swipe": "bun scripts/verify-missed-swipe.ts",
     "verify:base": "bun scripts/verify-base.ts",
     "verify:no-show": "bun scripts/verify-no-show.ts",
     "verify:solutions": "bun scripts/verify-solutions.ts",
