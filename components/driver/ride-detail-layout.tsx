@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft,
@@ -37,14 +37,18 @@ import {
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
-  canFileMissedSwipe,
+  detectMissedSwipe,
   getMissingAnchors,
   offeredSwipe,
   routeMissedSwipe,
   type SwipeAnchor,
 } from "@/lib/driver-data/missed-swipe-rules";
-import { MissedSwipePrompt } from "@/components/support/missed-swipe-prompt";
+import {
+  MissedSwipePrompt,
+  type MissedSwipeAnswer,
+} from "@/components/support/missed-swipe-prompt";
 import { MissedSwipeForm } from "@/components/support/missed-swipe-form";
+import { findAnyForTrip } from "@/lib/support/request-visibility";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
@@ -274,11 +278,14 @@ export function RideDetailLayout({
   const { toast } = useToast();
   const {
     getPendingRequest,
+    submittedForms,
     applySessionSwipes,
     recordSwipe,
     isPickupPostponed,
     postponePickup,
     clearPostponedPickup,
+    hasSeenDetection,
+    markDetectionSeen,
   } = useRideFlow();
 
   // Any swipe the driver made in this session, laid over the seed. Everything
@@ -366,22 +373,48 @@ export function RideDetailLayout({
     if (route.kind === "form") setMissedSwipeAsks(route.asks);
   }
 
-  /** The driver says they already made the swipe the app is still asking for. */
-  function handleMissedSwipeTap() {
-    if (!activeLeg) return;
-    // A missing pick-up nobody has answered for yet: ask the one question that
-    // decides whether a form is the right answer at all.
-    if (getMissingAnchors(activeLeg).includes("pickup") && !pickupPostponed) {
-      setPromptOpen(true);
-      return;
-    }
-    fileMissedSwipe(activeLeg);
-  }
+  /**
+   * The app's own notice that a swipe is owed.
+   *
+   * ⛔⛔ **This is the entry point now — there is no "I already made this swipe"
+   * link any more.** A driver who forgot to swipe is not thinking about
+   * swiping, so asking them to remember to report forgetting is asking for the
+   * thing that already failed. The trail is the app's, so the app raises it.
+   *
+   * Suppressed while a request for this ride already exists — ANY request, not
+   * just a trackable one. A Rider No-Show goes to Zendesk and leaves no pending
+   * state, and a driver who has just filed one must not then be asked whether
+   * they picked the member up.
+   */
+  const detection =
+    activeLeg && !pickupPostponed && !findAnyForTrip(submittedForms, trip.id)
+      ? detectMissedSwipe(activeLeg)
+      : null;
 
-  function handleMemberAboard(memberAboard: boolean) {
+  // Raise it once per mark, then leave the banner. A notice that reopens every
+  // time the ride is opened is a modal the driver cannot get past.
+  useEffect(() => {
+    if (!detection || !activeLeg) return;
+    if (hasSeenDetection(activeLeg.id, detection.anchor)) return;
+    markDetectionSeen(activeLeg.id, detection.anchor);
+    setPromptOpen(true);
+  }, [detection?.anchor, activeLeg?.id]);
+
+  function handleAnswer(answer: MissedSwipeAnswer) {
     setPromptOpen(false);
     if (!activeLeg) return;
-    if (memberAboard) {
+
+    if (answer === "not-yet") return;
+
+    if (answer === "no-show") {
+      // ⚠️ Handed to the case that actually fits. A member who never came out
+      // is a no-show, and filing it as a missed swipe would record a ride that
+      // did not happen.
+      router.push(`/my-rides/${trip.id}/no-show`);
+      return;
+    }
+
+    if (answer === "member-aboard") {
       postponePickup(activeLeg.id);
       toast({
         title: "We'll come back to the pick-up",
@@ -390,10 +423,10 @@ export function RideDetailLayout({
       });
       return;
     }
-    // The ride is over, so every missing end has to be reconstructed. Defer by a
-    // tick: vaul reports the dismissal before the handler that caused it, and
-    // opening the next sheet inside that window leaves the first one's scroll
-    // lock on.
+
+    // "ride-over" — every missing end has to be reconstructed. Defer by a tick:
+    // vaul reports the dismissal before the handler that caused it, and opening
+    // the next sheet inside that window leaves the first one's scroll lock on.
     setTimeout(() => fileMissedSwipe(activeLeg), 0);
   }
 
@@ -442,6 +475,38 @@ export function RideDetailLayout({
         )}
       >
         {banner}
+
+        {/*
+          The standing notice.
+
+          ⚠️ In the SCROLL AREA, beside the existing banner slot — not in the
+          fixed action bar. The first version sat under the swipe CTA inside that
+          bar, which has a fixed height replicated from the capture: the notice
+          was clipped by the viewport edge and its icon sat behind the floating
+          nav button. A bar built to hold one control holds one control.
+
+          ⚠️ It reports what the APP observed, never what the driver claims. The
+          entry point is the app's now, so the copy has to be too.
+        */}
+        {detection && !promptOpen && (
+          <button
+            type="button"
+            onClick={() => setPromptOpen(true)}
+            className="flex w-full items-start gap-2 border-b border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-left"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#D97706]" />
+            <span className="flex min-w-0 flex-col">
+              <span className="text-sm font-semibold text-[#92400E]">
+                No {detection.anchor === "pickup" ? "pick-up" : "drop-off"}{" "}
+                recorded for this leg
+              </span>
+              <span className="text-xs text-[#92400E]/80">
+                Tell us what happened
+              </span>
+            </span>
+          </button>
+        )}
+
         {/* Map preview */}
         <div className="relative h-64 w-full bg-[#1e3a4c]">
           <iframe
@@ -712,23 +777,6 @@ export function RideDetailLayout({
               </div>
             )}
 
-            {/*
-              The way into Missed Swipe.
-              ⚠️ A quiet secondary link, never a tile. The More Options grid is
-              replicated from `DAB-2026-10-01` and does not change shape, and the
-              claim here is the DRIVER's ("I already did this") — the app is not
-              detecting anything, so it must not present itself as having
-              noticed.
-            */}
-            {!pendingRequest && canFileMissedSwipe(nextSwipe) && (
-              <button
-                type="button"
-                onClick={handleMissedSwipeTap}
-                className="mx-auto mt-3 block text-sm font-semibold text-[#303068] underline underline-offset-4"
-              >
-                I already made this swipe
-              </button>
-            )}
           </div>
         </div>
       ) : state === "needs-action" ? (
@@ -796,11 +844,15 @@ export function RideDetailLayout({
         </div>
       ) : null}
 
-      <MissedSwipePrompt
-        open={promptOpen}
-        onOpenChange={setPromptOpen}
-        onAnswer={handleMemberAboard}
-      />
+      {detection && (
+        <MissedSwipePrompt
+          anchor={detection.anchor}
+          basis={detection.basis}
+          open={promptOpen}
+          onOpenChange={setPromptOpen}
+          onAnswer={handleAnswer}
+        />
+      )}
       {missedSwipeAsks && (
         <MissedSwipeForm
           /*

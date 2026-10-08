@@ -173,13 +173,13 @@ export const SOLUTIONS: Solution[] = [
      *    case, so the proposal has to carry what happens when it misses.
      */
     proposedFeature:
-      "Ask one question first — is the member still in the car → if yes, offer the drop-off swipe the app is withholding and collect the pick-up after it, so one missed mark stops costing the whole leg → then a form that fills in every end the location trail can place them at, asks where they were only for the ends it cannot, and says which is which",
+      "The app notices the missed mark itself — the driver has left the pick-up with no pick-up recorded → it asks one question, is the member still in the car → if yes, it offers the drop-off swipe it was withholding and collects the pick-up after it, so one missed mark stops costing the whole leg → then a form that fills in every end the location trail can place them at, asks where they were only for the ends it cannot, and says which is which",
     klass: "form",
     buildState: "in-prototype",
     entry: {
       route: "/my-rides/1049800381",
       label:
-        "The ride detail, on a leg swiped to start and never picked up. Tap 'I already made this swipe' → say the member is in the car → the button becomes DROP OFF MEMBER, which production would not offer → swipe it and the pick-up form opens with the arrival time already filled from the trail. Rides 1049800382 (both ends confirmed — nothing to reconstruct) and 1049800383 (drop-off unconfirmable — it asks where instead) are the other two states.",
+        "Open the ride and the app raises it on its own — the trail puts the driver at the pick-up and then gone, with no pick-up recorded. Answer 'they're in the car now' → the button becomes DROP OFF MEMBER, which production would not offer → swipe it and the pick-up form opens with the arrival time already filled from the trail. Ride 1049800382 is the same notice on a ride that is already over (both ends confirmed — nothing to reconstruct); 1049800383 is the weaker claim, 'it looks like you have driven on', because the trail never got within a quarter-mile of the drop-off.",
     },
   },
   {

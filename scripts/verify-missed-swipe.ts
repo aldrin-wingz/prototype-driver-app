@@ -17,7 +17,9 @@
 import { readFileSync } from "node:fs";
 import {
   anchorMatched,
-  canFileMissedSwipe,
+  departedAnchor,
+  detectMissedSwipe,
+  DEPARTURE_MARGIN_MILES,
   canSubmitUnedited,
   getMissingAnchors,
   getUnrecordedSwipes,
@@ -194,17 +196,117 @@ check("postponing invents no pick-up time",
 check("a postponed leg is still missing the pick-up",
   getMissingAnchors(postponedLeg).includes("pickup"), "pick-up no longer missing");
 
-const CAN_FILE: Array<[("start" | "pick-up" | "drop-off" | null), boolean]> = [
-  ["start", false], ["pick-up", true], ["drop-off", true], [null, false],
-];
-for (const [next, expected] of CAN_FILE) {
-  check(`canFileMissedSwipe(${next}) === ${expected}`,
-    canFileMissedSwipe(next) === expected, `got ${canFileMissedSwipe(next)}`);
+// ═══════════════════════════════════════════════════════════════════
+section("3b. Detection — the app notices, the driver no longer has to");
+
+/** A leg built from a trail, for exercising the departure rule directly. */
+function legWithTrail(
+  trail: Array<[number, number]>,
+  progress: Partial<{ startedAt: string | null; pickedUpAt: string | null; droppedOffAt: string | null }> = {}
+): TripLeg {
+  const base = firstLeg(SEEDS.postpone);
+  return {
+    ...base,
+    progress: {
+      startedAt: "9:00 AM",
+      pickedUpAt: null,
+      droppedOffAt: null,
+      ...progress,
+    },
+    locationRecords: trail.map(([age, miles]) => ({
+      ageMinutes: age,
+      distanceMiles: miles,
+      at: "9:00 AM",
+    })),
+  };
 }
-check("the entry-point table is complete", CAN_FILE.length === 4, `${CAN_FILE.length}`);
-check("the entry point is offered on some states and refused on others",
-  CAN_FILE.filter(([, e]) => e).length === 2 && CAN_FILE.filter(([, e]) => !e).length === 2,
-  "the gate is constant");
+
+/** [name, trail as (ageMinutes, miles from pick-up), expected kind, expected basis] */
+const DEPARTURE_TABLE: Array<[string, Array<[number, number]>, string, string | null]> = [
+  ["sitting at the pick-up", [[20, 0.1], [10, 0.08], [1, 0.05]], "still_there", null],
+  ["wandered, then came back", [[20, 0.05], [10, 3.0], [1, 0.1]], "still_there", null],
+  ["was there, then drove off", [[20, 0.05], [10, 2.0], [1, 8.0]], "left", "confirmed"],
+  // ⛔ The case the whole margin exists for. A driver DRIVING TO a pick-up is
+  // never at it, and without the recede test every en-route leg in the app
+  // would raise a notice.
+  ["still driving to it", [[20, 12.0], [10, 6.0], [1, 2.0]], "never_there", null],
+  ["approached and receded", [[20, 12.0], [10, 1.5], [1, 5.0]], "left", "inferred"],
+  ["receded, but inside the margin", [[20, 12.0], [10, 1.5], [1, 2.0]], "never_there", null],
+  ["never anywhere near", [[20, 30.0], [10, 30.0], [1, 30.0]], "never_there", null],
+  ["no trail at all", [], "never_there", null],
+];
+for (const [name, trail, kind, basis] of DEPARTURE_TABLE) {
+  const actual = departedAnchor(legWithTrail(trail), "pickup");
+  const actualBasis = actual.kind === "left" ? actual.basis : null;
+  check(`departure: ${name} → ${kind}${basis ? `/${basis}` : ""}`,
+    actual.kind === kind && actualBasis === basis,
+    `got ${actual.kind}${actualBasis ? `/${actualBasis}` : ""}`);
+}
+check("the departure table is complete",
+  DEPARTURE_TABLE.length === 8, `${DEPARTURE_TABLE.length} rows`);
+check("all three departure kinds occur",
+  new Set(DEPARTURE_TABLE.map(([, , k]) => k)).size === 3,
+  `${[...new Set(DEPARTURE_TABLE.map(([, , k]) => k))].join(", ")}`);
+check("both bases occur",
+  new Set(DEPARTURE_TABLE.map(([, , , b]) => b).filter(Boolean)).size === 2,
+  "only one basis is reachable");
+check("the margin is the declared 1 mile",
+  DEPARTURE_MARGIN_MILES === 1, `${DEPARTURE_MARGIN_MILES}`);
+// ⛔ The margin must DECIDE: the same approach at either side of it.
+check("the margin changes the answer on its own",
+  departedAnchor(legWithTrail([[20, 12], [10, 1.5], [1, 2.0]]), "pickup").kind !==
+    departedAnchor(legWithTrail([[20, 12], [10, 1.5], [1, 5.0]]), "pickup").kind,
+  "the recede test is inert");
+
+/** ⛔ A leg that has not started has no mark to have missed. */
+check("a leg with no en-route mark is never detected",
+  detectMissedSwipe(legWithTrail([[20, 0.05], [1, 8.0]], { startedAt: null })) === null,
+  "a notice was raised on a leg that had not begun");
+check("...while the same trail on a started leg IS detected",
+  detectMissedSwipe(legWithTrail([[20, 0.05], [1, 8.0]])) !== null,
+  "the started control does not detect, so the check above proves nothing");
+
+/** ⛔ Marks fill left to right: never ask about the drop-off first. */
+const bothMissing = detectMissedSwipe(legWithTrail([[20, 0.05], [1, 8.0]]));
+check("a leg missing both marks is asked about the PICK-UP",
+  bothMissing?.anchor === "pickup", `${bothMissing?.anchor}`);
+
+/**
+ * ⛔⛔ **The false-positive sweep, over EVERY in-progress ride.**
+ *
+ * The notice opens itself now, so a wrong one is not a dead link — it is a modal
+ * on a ride that has nothing to do with this case. Two of these rides are the
+ * Rider No-Show demos, and one of them (`1049800377`) is deliberately 0.6 miles
+ * from a hospital pick-up with the pick-up unrecorded: the exact shape a careless
+ * "is the driver at the pick-up?" rule would fire on.
+ */
+const EXPECTED_DETECTION: Record<string, string> = {
+  "1049800371": "none",            // not started — no mark to have missed
+  "1049800373": "none",            // at the pick-up right now (no-show demo)
+  "1049800377": "none",            // 0.6 mi out and never nearer (no-show demo)
+  "1049800376": "none",            // no trail
+  "1049800379": "none",            // every mark recorded
+  "1049800381": "pickup/confirmed",
+  "1049800382": "pickup/confirmed",
+  "1049800383": "dropoff/inferred",
+};
+let swept = 0;
+for (const trip of mockInProgressTrips) {
+  const leg = trip.legs.find((l) => l.progress);
+  const found = leg ? detectMissedSwipe(leg) : null;
+  const actual = found ? `${found.anchor}/${found.basis}` : "none";
+  const expected = EXPECTED_DETECTION[trip.id];
+  swept += 1;
+  check(`detection on ${trip.id} → ${expected ?? "UNDECLARED"}`,
+    actual === expected, `got ${actual}`);
+}
+check("every in-progress ride was swept",
+  swept === Object.keys(EXPECTED_DETECTION).length && swept === mockInProgressTrips.length,
+  `${swept} ridden of ${mockInProgressTrips.length} seeded, ${Object.keys(EXPECTED_DETECTION).length} declared`);
+/** The sweep must contain both answers, or it only proves one of them. */
+const fires = Object.values(EXPECTED_DETECTION).filter((v) => v !== "none").length;
+check("the sweep covers rides that DO and DO NOT detect",
+  fires === 3 && fires < swept, `${fires} fire, ${swept - fires} stay quiet`);
 
 // ═══════════════════════════════════════════════════════════════════
 section("4. Evidence — what the location trail can and cannot say");
@@ -590,12 +692,43 @@ section("10. Wiring — with positive controls on every read");
 const LAYOUT = readFileSync("components/driver/ride-detail-layout.tsx", "utf8");
 const FORM = readFileSync("components/support/missed-swipe-form.tsx", "utf8");
 check("the ride detail source was actually read", LAYOUT.length > 2000, `${LAYOUT.length} chars`);
+
+/**
+ * The source with comments stripped.
+ *
+ * ⚠️ Needed because this file's own rules are written out in prose beside the
+ * code that follows them, so a grep for a thing that must be ABSENT matches the
+ * comment explaining why it is absent. `verify-base`'s FORBIDDEN list has the
+ * same bug in the other direction — it is a raw `includes()` over whole files,
+ * so a banned string in a comment fails the build.
+ */
+const CODE = LAYOUT.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+check("stripping comments left the code behind",
+  CODE.length > LAYOUT.length * 0.4 && CODE.length < LAYOUT.length,
+  `${CODE.length} of ${LAYOUT.length} chars`);
 check("the form source was actually read", FORM.length > 1000, `${FORM.length} chars`);
 
 check("the ride detail offers the swipe through the rule",
   LAYOUT.includes("offeredSwipe("), "offeredSwipe is not called");
-check("the entry point is gated by the rule",
-  LAYOUT.includes("canFileMissedSwipe("), "canFileMissedSwipe is not called");
+check("the app raises the notice itself",
+  LAYOUT.includes("detectMissedSwipe("), "detectMissedSwipe is not called");
+/**
+ * ⛔⛔ The whole point of this change: the driver is no longer asked to
+ * remember that they forgot. If the old link ever comes back, it comes back
+ * beside a notice that already says the same thing.
+ */
+check("...and the driver-initiated link is gone",
+  !/I already made this swipe/.test(CODE),
+  "the manual claim link is still rendered");
+check("a request on the ride suppresses the notice",
+  LAYOUT.includes("findAnyForTrip(submittedForms, trip.id)"),
+  "a ride already with Support would still be asked");
+check("the notice is raised once per mark",
+  LAYOUT.includes("hasSeenDetection(") && LAYOUT.includes("markDetectionSeen("),
+  "no seen-tracking — the prompt reopens on every visit");
+check("a no-show answer is handed to the no-show flow",
+  LAYOUT.includes('router.push(`/my-rides/${trip.id}/no-show`)'),
+  "a member who never came out would be filed as a missed swipe");
 check("session swipes are laid over the seed",
   LAYOUT.includes("applySessionSwipes("), "applySessionSwipes is not called");
 check("the postponed drop-off records a mark",

@@ -119,6 +119,16 @@ interface RideFlowValue {
   isPickupPostponed: (legId: string) => boolean;
   postponePickup: (legId: string) => void;
   clearPostponedPickup: (legId: string) => void;
+  /**
+   * Whether the app has already raised its missed-swipe notice for this mark.
+   *
+   * ⚠️ The notice OPENS ITSELF, so without this it reopens on every visit to the
+   * ride and becomes a modal the driver cannot get past. Seen once, it stays on
+   * the screen as a banner instead — which is the difference between the app
+   * telling you something and the app nagging you.
+   */
+  hasSeenDetection: (legId: string, anchor: string) => boolean;
+  markDetectionSeen: (legId: string, anchor: string) => void;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -149,6 +159,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   // React is told to look again.
   const [swipeRevision, setSwipeRevision] = useState(0);
   const [postponed, setPostponed] = useState<string[]>([]);
+  const [seenDetections, setSeenDetections] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -199,8 +210,16 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         ),
       clearPostponedPickup: (legId) =>
         setPostponed((previous) => previous.filter((id) => id !== legId)),
+      hasSeenDetection: (legId, anchor) =>
+        seenDetections.includes(`${legId}:${anchor}`),
+      markDetectionSeen: (legId, anchor) =>
+        setSeenDetections((previous) =>
+          previous.includes(`${legId}:${anchor}`)
+            ? previous
+            : [...previous, `${legId}:${anchor}`]
+        ),
     }),
-    [records, swipeRevision, postponed]
+    [records, swipeRevision, postponed, seenDetections]
   );
 
   return (
