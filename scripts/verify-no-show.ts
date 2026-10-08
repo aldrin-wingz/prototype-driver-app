@@ -19,8 +19,10 @@ import {
   postPickupAvailableAt,
   postPickupRefusalCopy,
   postPickupThresholdMinutes,
+  noShowFormFor,
   resolveNoShow,
   treatmentFor,
+  waivesPresenceWait,
   walkLocationRecords,
   type NoShowDemoRow,
 } from "../lib/driver-data/no-show-rules";
@@ -205,75 +207,176 @@ if (anyTrip) {
   }
 }
 
-// ── The no-show type is a LABEL, not a branch ───────────────────────────────
+// ── The no-show type IS a branch — the captured contract ───────────────────
+/**
+ * ⛔ **This section replaces its own opposite, and the replacement is forced by
+ * evidence.** Until 2026-10-09 it asserted that the type was a label and never a
+ * branch: nine checks that grepped four source files for `=== "Cancel At Door"`
+ * and asserted `resolveNoShow.length === 2`.
+ *
+ * ⚠️ **Eight of those nine did not fire** when the branch was deliberately and
+ * completely restored. They were written to catch a literal comparison, and the
+ * branch came back as a keyed record lookup — invisible to every one of them.
+ * Only the per-type-constant name check tripped, and only by accident of naming.
+ * A shape check guards the shape it imagined, not the behaviour it was named
+ * for. Everything below asserts BEHAVIOUR, and counts its denominator.
+ */
 check("all three production types are offered", NO_SHOW_TYPES.length === 3,
   NO_SHOW_TYPES.join("/"));
 check("Cancel At Door is one of them",
   NO_SHOW_TYPES.some((t) => /cancel at door/i.test(t)), NO_SHOW_TYPES.join("/"));
 
 /**
- * ⚠️ The invariant that matters, and it needs a source scan to be falsifiable.
- *
- * "All three types behave the same" is true by CONSTRUCTION right now —
- * `resolveNoShow` does not take the type and the form builder does not either —
- * so asserting it against the running code proves nothing and would keep passing
- * the day somebody adds the branch back. What can fail is the SHAPE: a
- * comparison against a type string anywhere in the rules or the form, and an
- * extra parameter on the resolver.
+ * The contract, read off `CAP-232`/`CAP-233`/`CAP-234` and DECLARED here as
+ * literals. Never derived from `NO_SHOW_TYPE_FORMS` — an expectation computed
+ * from the thing it checks cannot fail.
  */
-const RULES_SRC = readFileSync("lib/driver-data/no-show-rules.ts", "utf8");
-const SCREEN_SRC = readFileSync("components/driver/member-no-show-screen.tsx", "utf8");
-const FORM_SRC = readFileSync("components/support/rider-no-show-form.tsx", "utf8");
-const REGISTRY_SRC = readFileSync("lib/support-data/case-registry.ts", "utf8");
+const EXPECTED_FORMS: Record<string, {
+  extra: string | null; helper: boolean; signature: string; waives: boolean;
+}> = {
+  "Member Not Home":  { extra: null,         helper: false, signature: "Driver Signature", waives: false },
+  "Cancel At Door":   { extra: "Spoke with", helper: false, signature: "Member Signature", waives: true  },
+  "Member Not Ready": { extra: null,         helper: true,  signature: "Driver Signature", waives: false },
+};
+check("the expectation covers every offered type",
+  Object.keys(EXPECTED_FORMS).length === NO_SHOW_TYPES.length &&
+    NO_SHOW_TYPES.every((t) => t in EXPECTED_FORMS),
+  `${Object.keys(EXPECTED_FORMS).length} expected vs ${NO_SHOW_TYPES.length} offered`);
 
-// Positive control: the scan can find the list it is looking for values from.
-check("the scan reads the real rules file", RULES_SRC.includes("NO_SHOW_TYPES"));
-
-for (const [name, src] of [
-  ["rules", RULES_SRC],
-  ["no-show screen", SCREEN_SRC],
-  ["form wrapper", FORM_SRC],
-  ["case registry", REGISTRY_SRC],
-] as const) {
-  // Strip comments first — these files legitimately DISCUSS Cancel At Door at
-  // length, explaining that it is not branched on. Scanning raw text would trip
-  // on the very notes that document the rule.
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
-  for (const type of NO_SHOW_TYPES) {
-    /**
-     * ⚠️ Looks for a COMPARISON, not a mention. The first version of this check
-     * searched for the bare literal and failed on the rules file — which is where
-     * `NO_SHOW_TYPES` is DECLARED. A declaration is not a branch, and a check
-     * that cannot tell them apart can only be satisfied by deleting the list.
-     */
-    const compared = new RegExp(
-      `(?:===|!==|==(?!=)|!=(?!=)|case)\\s*"${type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`
-    );
-    check(`${name} never compares against "${type}"`, !compared.test(code),
-      `literal comparison in ${name}`);
-  }
-  // A named constant is the other way one comes back.
-  check(`${name} declares no per-type constant`,
-    !/NO_SHOW_TYPE_[A-Z_]+/.test(code), name);
+for (const type of NO_SHOW_TYPES) {
+  const want = EXPECTED_FORMS[type];
+  const got = noShowFormFor(type);
+  check(`${type} — extra field matches the capture`,
+    (got.extraField?.label ?? null) === want.extra,
+    `${got.extraField?.label ?? "none"} vs ${want.extra ?? "none"}`);
+  check(`${type} — helper line matches the capture`,
+    Boolean(got.helper) === want.helper, got.helper ?? "none");
+  check(`${type} — signature label matches the capture`,
+    got.signatureLabel === want.signature, got.signatureLabel);
+  check(`${type} — waiver matches the proposal`,
+    waivesPresenceWait(type) === want.waives, `${waivesPresenceWait(type)}`);
 }
 
-// ⚠️ Arity 2, not 3: `Function.length` counts only the parameters BEFORE the
-// first defaulted one, and `elapsedMinutes = 0` is defaulted. Getting this wrong
-// is how a shape check passes for the wrong reason — here it failed loudly, but
-// an off-by-one in the permissive direction would not have.
-check("resolveNoShow takes no no-show type", resolveNoShow.length === 2,
-  `arity ${resolveNoShow.length}`);
+/**
+ * ⚠️ The per-type checks above all pass if the record says the SAME thing three
+ * times and the expectation agrees. These counts are what make it a branch: each
+ * trait must belong to exactly one of the three.
+ */
+const withExtra = NO_SHOW_TYPES.filter((t) => noShowFormFor(t).extraField);
+const withHelper = NO_SHOW_TYPES.filter((t) => noShowFormFor(t).helper);
+const memberSigned = NO_SHOW_TYPES.filter(
+  (t) => noShowFormFor(t).signatureLabel === "Member Signature");
+const waiving = NO_SHOW_TYPES.filter((t) => waivesPresenceWait(t));
+check("exactly one type adds a field", withExtra.length === 1,
+  `${withExtra.length} of ${NO_SHOW_TYPES.length}: ${withExtra.join(",") || "none"}`);
+check("exactly one type carries a helper line", withHelper.length === 1,
+  `${withHelper.length} of ${NO_SHOW_TYPES.length}: ${withHelper.join(",") || "none"}`);
+check("exactly one type takes the MEMBER's signature", memberSigned.length === 1,
+  `${memberSigned.length} of ${NO_SHOW_TYPES.length}: ${memberSigned.join(",") || "none"}`);
+check("exactly one type waives the presence wait", waiving.length === 1,
+  `${waiving.length} of ${NO_SHOW_TYPES.length}: ${waiving.join(",") || "none"}`);
+check("and the one that waives is the one that asks who they spoke with",
+  waiving.length === 1 && waiving[0] === withExtra[0], `${waiving[0]} vs ${withExtra[0]}`);
 
-// And the form is the same four questions whichever type is carried in.
+// `CAP-229`: before any type is picked, the pad already reads "Driver Signature".
+check("the pre-selection default is the captured empty state",
+  noShowFormFor("").signatureLabel === "Driver Signature" &&
+    noShowFormFor("").extraField === null && noShowFormFor("").helper === null,
+  noShowFormFor("").signatureLabel);
+// ⚠️ The waiver must not be reachable by an unknown string.
+check("an unrecognised type waives nothing", !waivesPresenceWait("Cancelled At Door"));
+check("and neither does an empty one", !waivesPresenceWait(""));
+
+// ── The waiver: what it DOES ───────────────────────────────────────────────
+if (timerRide) {
+  const leg = activeLeg(timerRide)!;
+  // Positive control: this ride is a timer, which is the whole premise.
+  check("3.1 with no type chosen is still a timer",
+    resolveNoShow(timerRide, leg, 0, null).kind === "timer",
+    resolveNoShow(timerRide, leg, 0, null).kind);
+
+  const byType = NO_SHOW_TYPES.map(
+    (t) => ({ t, out: resolveNoShow(timerRide, leg, 0, t) }));
+  const files = byType.filter((r) => r.out.kind === "files");
+  check("exactly one type gets past the ten-minute wait here",
+    files.length === 1,
+    byType.map((r) => `${r.t}: ${r.out.kind}`).join(" | "));
+  check("and it is Cancel At Door",
+    files.length === 1 && files[0].t === "Cancel At Door", files[0]?.t ?? "none");
+
+  const cad = resolveNoShow(timerRide, leg, 0, "Cancel At Door");
+  check("the waived filing is FLAGGED as waived",
+    cad.kind === "files" && cad.presenceWaitWaived,
+    cad.kind === "files" ? `${cad.presenceWaitWaived}` : cad.kind);
+  /**
+   * ⚠️ It must report what the app actually SAW, not the ten minutes it never
+   * observed — otherwise the submit copy claims evidence that does not exist.
+   */
+  check("it reports the observed time, which is short of the wait",
+    cad.kind === "files" && cad.qualifyingMinutes > 0 &&
+      cad.qualifyingMinutes < NO_SHOW_WAIT_MINUTES,
+    cad.kind === "files" ? `${cad.qualifyingMinutes}` : cad.kind);
+}
+
+// ── The waiver: what it must NOT do ────────────────────────────────────────
+/**
+ * ⚠️ These four are the reason the waiver is safe to ship. It waives the
+ * DURATION of the wait and nothing else; a Cancel At Door is not a skeleton key.
+ */
+if (formRide) {
+  const leg = activeLeg(formRide)!;
+  const cad = resolveNoShow(formRide, leg, 0, "Cancel At Door");
+  check("a driver who has LEFT still cannot file a Cancel At Door",
+    cad.kind === "form", cad.kind);
+  check("and is told the real reason", cad.kind === "form" && cad.gap === "not_at_pickup",
+    cad.kind === "form" ? cad.gap : cad.kind);
+}
+if (timerRide) {
+  const leg = activeLeg(timerRide)!;
+  const noFix = resolveNoShow(timerRide, { ...leg, locationRecords: [] }, 0, "Cancel At Door");
+  check("a phone with no location still cannot file a Cancel At Door",
+    noFix.kind === "form" && noFix.gap === "no_location_data",
+    noFix.kind === "form" ? noFix.gap : noFix.kind);
+
+  // The pick-up-time gate is a DIFFERENT rung and the waiver does not reach it.
+  const indiana = { ...timerRide, client: "WellTrans", market: "IN" as const, noShowDemo: undefined };
+  const notDueYet = { ...leg, minutesSinceScheduledPickup: 0 };
+  const gated = resolveNoShow(indiana, notDueYet, 0, "Cancel At Door");
+  check("a Cancel At Door on a ride that is not due yet is still refused",
+    gated.kind === "timer" && gated.reason === "post-pickup",
+    gated.kind === "timer" ? gated.reason : gated.kind);
+}
+
+/**
+ * The SUPPORT form stays type-agnostic, and that is not a contradiction.
+ *
+ * ⚠️ Two different artifacts. The production SCREEN branches on the type; the
+ * support form is the escape hatch offered after a refusal, and it asks the same
+ * "what happened" questions whatever the driver had selected. The 2026-09-07
+ * decision conflated the two, which is part of how it went wrong.
+ */
 const perType = NO_SHOW_TYPES.map((type) => {
   const built = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
   return { type, ids: built.fields.map((f) => f.id).join(",") };
 });
-check("every type builds the same field set",
+check("the support form has fields to compare", perType.every((p) => p.ids.length > 0),
+  perType.map((p) => p.ids.length).join(","));
+check("every type builds the same SUPPORT form field set",
   new Set(perType.map((p) => p.ids)).size === 1,
   perType.map((p) => `${p.type}: ${p.ids}`).join(" | "));
+
+// The screen renders from the contract rather than from its own literals.
+const SCREEN = readFileSync("components/driver/member-no-show-screen.tsx", "utf8");
+const FORM_SRC = readFileSync("components/support/rider-no-show-form.tsx", "utf8");
+// Positive controls: a source scan that read an empty string would pass silently.
+check("the screen source was read", SCREEN.length > 0, `${SCREEN.length} chars`);
+check("the form source was read", FORM_SRC.length > 0, `${FORM_SRC.length} chars`);
+check("the screen reads the signature label from the contract",
+  SCREEN.includes("typeForm.signatureLabel"), "not found");
+check("the screen does not hardcode a signature heading",
+  !/>\s*(Driver|Member) Signature\s*</.test(SCREEN), "hardcoded heading");
+check("the screen passes the type to the guardrail",
+  /resolveNoShow\(trip, activeLeg, elapsed, noShowType\)/.test(SCREEN), "not wired");
 
 // ── The form asks four questions and no attachment ─────────────────────────
 const form = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });

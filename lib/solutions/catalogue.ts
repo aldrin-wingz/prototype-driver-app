@@ -117,24 +117,37 @@ export const SOLUTIONS: Solution[] = [
         {
           route: "/my-rides/1049800373/more",
           label:
-            "The other branch — the driver IS at the pick-up but short of ten minutes, so the refusal carries a live countdown and deliberately offers NO form. A form here would be a way to skip the wait.",
+            "The other branch — the driver IS at the pick-up but short of ten minutes, so the refusal carries a live countdown and deliberately offers NO form. A form here would be a way to skip the wait. (Selecting Cancel At Door on this same ride is slice 02, and files instead.)",
         },
       ],
     },
   },
   {
-    id: "cancel-at-door-signature",
+    id: "cancel-at-door",
     order: 2,
     subjectArea: "Member / Rider No-Show",
     calls: 882,
     problem: "Driver must still wait 10 min even after selecting Cancel at Door",
     useCase:
-      "Driver selects Cancel at Door → signs the member's refusal and names who they spoke with → app enforces the 10-minute wait anyway → driver calls Support",
+      "Driver selects Cancel at Door → app asks who refused the ride and takes the member's signature → enforces the 10-minute wait anyway → driver waits at a door they have already been turned away from → driver calls Support",
+    /**
+     * ⚠️ Reworded twice on 2026-10-09, both times by evidence rather than by
+     * preference. First: production already captures a member signature, so this
+     * was never "add a signature". Then `CAP-232`–`CAP-234`: the signature
+     * carries no `*` in ANY of the three types, so it is optional and cannot be
+     * the thing a guardrail hangs on. `Spoke with` is the required one, and it is
+     * the one the warehouse can audit — `ride_observation.spoke_with`, ~99%
+     * populated for Cancel At Door, against no signature column anywhere.
+     */
     proposedFeature:
-      "Let the member signature the app ALREADY captures on Cancel at Door skip the 10-minute wait — the proof exists, it is just discarded",
+      "Cancel at Door ALREADY requires the driver to name who refused the ride — let that skip the 10-minute wait. It waives the duration only: a driver who is not at the pick-up still cannot file.",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides/1049800373/more",
+      label:
+        "More Options → Member No-Show. The same ride slice 01 uses to show the countdown: the driver is at the pick-up but short of ten minutes. Pick Member Not Home and it counts down; pick Cancel At Door and the form grows a required Spoke with, relabels the pad Member Signature, and files.",
+    },
   },
   {
     id: "missed-swipe",

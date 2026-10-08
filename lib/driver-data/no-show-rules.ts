@@ -28,8 +28,10 @@ import {
  * their own if the driver stays put, one never will, and one needs a different
  * action entirely. `resolveNoShow` splits them:
  *
- * ⚠️ The no-show TYPE is not consulted anywhere in this ladder. It is a label
- * Support reads, not a branch the app takes.
+ * ⚠️ The no-show TYPE enters this ladder at exactly one rung: `Cancel At Door`
+ * waives the ten-minute `timer`, because production already makes that driver
+ * name who refused them at the door. It waives nothing else — not the presence
+ * requirement, not the pick-up-time gate. See `NO_SHOW_TYPE_FORMS`.
  *
  *   files         every condition met — submit, as production does
  *   timer         will clear by waiting — countdown, and NO form
@@ -241,7 +243,13 @@ export type NoShowFormGap = "not_at_pickup" | "no_location_data";
 export type NoShowTimerReason = "presence" | "post-pickup";
 
 export type NoShowOutcome =
-  | { kind: "files"; qualifyingMinutes: number }
+  /**
+   * `presenceWaitWaived` is how a caller tells the two ways of getting here
+   * apart: ten unbroken minutes at the pick-up, or a Cancel At Door that was
+   * short of them. The copy differs, so the flag has to travel with the outcome
+   * rather than be re-derived from the type at each call site.
+   */
+  | { kind: "files"; qualifyingMinutes: number; presenceWaitWaived: boolean }
   | { kind: "timer"; reason: NoShowTimerReason; minutesRemaining: number }
   | { kind: "form"; gap: NoShowFormGap; detail: string }
   | { kind: "confirm-first" }
@@ -257,12 +265,26 @@ export type NoShowOutcome =
 export function resolveNoShow(
   trip: Trip,
   leg: TripLeg | undefined,
-  elapsedMinutes = 0
+  elapsedMinutes = 0,
+  /**
+   * ⚠️ Defaults to `null`, which means "no type chosen yet" and takes the
+   * unwaived path. Callers that know the type MUST pass it — the Member No-Show
+   * screen does, at Submit, which is the only moment both the type and the
+   * location walk exist.
+   */
+  noShowType: string | null = null
 ): NoShowOutcome {
   if (isAwaitingMemberConfirmation(trip)) return { kind: "confirm-first" };
   if (!leg || !isInSwipeWindow(leg)) return { kind: "dead-end" };
 
   const walk = walkLocationRecords(leg.locationRecords ?? [], elapsedMinutes);
+
+  /**
+   * Set only on the waived path, and only ever to a near-run age — so a filing
+   * that skipped the wait still reports how long the app DID see the driver
+   * there, rather than claiming ten minutes it never observed.
+   */
+  let waivedQualifyingMinutes: number | null = null;
 
   if (!walk.ok) {
     // No usable position at all — or a fix so far out it cannot be one.
@@ -284,26 +306,40 @@ export function resolveNoShow(
     // A near-run means the newest records are inside the radius, so staying put
     // will clear this on its own — a form here would skip the wait.
     if (walk.nearRunOldestAge !== null) {
+      /**
+       * ⚠️ **The one place the type changes the outcome.** The near-run is what
+       * proves the driver is AT the pick-up; the only thing missing is duration,
+       * and duration is exactly what a member refusing at the door makes moot.
+       *
+       * Note where this sits: after the no-location and bogus-fix branches, and
+       * before the not-at-pick-up branch — so a Cancel At Door driver who is not
+       * actually there still falls through to the form, as they must.
+       */
+      if (waivesPresenceWait(noShowType)) {
+        waivedQualifyingMinutes = walk.nearRunOldestAge;
+      } else {
+        return {
+          kind: "timer",
+          reason: "presence",
+          minutesRemaining: Math.max(
+            0,
+            NO_SHOW_WAIT_MINUTES - walk.nearRunOldestAge
+          ),
+        };
+      }
+    } else {
+      // Latest record is outside the radius: they have left, or never arrived,
+      // or the pickup is bigger than the radius. Waiting cannot fix any of
+      // those — and neither can a no-show type.
       return {
-        kind: "timer",
-        reason: "presence",
-        minutesRemaining: Math.max(
-          0,
-          NO_SHOW_WAIT_MINUTES - walk.nearRunOldestAge
-        ),
+        kind: "form",
+        gap: "not_at_pickup",
+        detail:
+          walk.reason === "blocked_far"
+            ? `We last had you ${walk.blockedDistanceMiles.toFixed(1)} miles from the pick-up, outside the ${NO_SHOW_RADIUS_MILES}-mile range.`
+            : "We couldn't place you at the pick-up, so we can't confirm the wait ourselves.",
       };
     }
-
-    // Latest record is outside the radius: they have left, or never arrived, or
-    // the pickup is bigger than the radius. Waiting cannot fix any of those.
-    return {
-      kind: "form",
-      gap: "not_at_pickup",
-      detail:
-        walk.reason === "blocked_far"
-          ? `We last had you ${walk.blockedDistanceMiles.toFixed(1)} miles from the pick-up, outside the ${NO_SHOW_RADIUS_MILES}-mile range.`
-          : "We couldn't place you at the pick-up, so we can't confirm the wait ourselves.",
-    };
   }
 
   const threshold = postPickupThresholdMinutes(trip);
@@ -318,7 +354,20 @@ export function resolveNoShow(
     }
   }
 
-  return { kind: "files", qualifyingMinutes: walk.qualifyingMinutes };
+  // ⚠️ Reached on BOTH paths, which is the point: the pick-up-time gate is not
+  // waived by any type. A Cancel At Door on a ride that is not due yet is still
+  // a timer, exactly as it is for the other two.
+  return walk.ok
+    ? {
+        kind: "files",
+        qualifyingMinutes: walk.qualifyingMinutes,
+        presenceWaitWaived: false,
+      }
+    : {
+        kind: "files",
+        qualifyingMinutes: waivedQualifyingMinutes ?? 0,
+        presenceWaitWaived: true,
+      };
 }
 
 /**
@@ -617,22 +666,113 @@ export const NO_SHOW_STAGE_REFUSAL =
 
 /**
  * The `No-Show Type:` options — all three, exactly as production's picker shows
- * them.
- *
- * ⚠️ **The type is a LABEL, not a branch, and that is the finalised decision.**
- * An earlier version of this prototype gave `Cancel At Door` its own guardrail
- * and its own question set: it skipped the ten-minute wait and asked who told the
- * driver instead. It no longer does. All three types take the same path, serve
- * the same wait, and produce the same form — the value tells Support what the
- * driver believes happened, and nothing in the app reads it to decide anything.
- *
- * ⚠️ Which is why `resolveNoShow` does not take the type as a parameter at all.
- * Keeping the argument "just in case" would leave a seam for one branch to creep
- * back in and be the only one anybody tested. `verify-no-show.ts` asserts the
- * outcome is identical across all three.
+ * them. The picker is a native action sheet: three rows then Cancel (`CAP-230`).
  */
-export const NO_SHOW_TYPES: readonly string[] = [
+export const NO_SHOW_TYPES = [
   "Member Not Home",
   "Cancel At Door",
   "Member Not Ready",
 ] as const;
+
+export type NoShowType = (typeof NO_SHOW_TYPES)[number];
+
+/**
+ * What the form looks like for a given type.
+ *
+ * ⛔ **This reverses the finalised 2026-09-07 decision, and the reversal is
+ * forced by evidence.** That decision recorded that the no-show type "is a
+ * LABEL, not a branch", that all three types "produce the same form", and that
+ * nothing in the app reads the value to decide anything. The 2026-10-09
+ * production shoot (`CAP-232`/`CAP-233`/`CAP-234`, all three selections from one
+ * session 34 seconds apart) disproves every clause: the type changes the field
+ * set, the helper copy, and whose signature is being taken.
+ *
+ * `CAP-233` is the control that makes it attributable — same build, same
+ * session, Member Not Home, reading "Driver Signature" with no `Spoke with`
+ * field. Without it the Apr-2026 captures and the Oct-2026 one differed by two
+ * variables at once and proved nothing.
+ *
+ * ⚠️ **`*` is production's required marker, and no signature label carries
+ * one.** Only `Spoke with` does. The signature is optional in all three states;
+ * the name is required, and only on Cancel At Door. That matches the warehouse:
+ * `bronze.ride_observation.spoke_with` is ~99% populated for Cancel At Door and
+ * carries a `"nothing"` sentinel elsewhere, and no signature column exists
+ * anywhere in bronze, silver or gold.
+ */
+export interface NoShowTypeForm {
+  /** An extra field this type adds, or `null`. Production marks it required with `*`. */
+  extraField: { id: string; label: string } | null;
+  /** A line of guidance under the type select, or `null`. */
+  helper: string | null;
+  /** Whose signature the pad is taking. */
+  signatureLabel: string;
+  /**
+   * Whether this type's OWN required evidence stands in for the ten-minute
+   * presence wait — and which field is that evidence.
+   *
+   * ⚠️ **This is the proposal; everything else in this record is replication.**
+   * Declared per type rather than derived from `extraField`, because "has an
+   * extra field" and "has waited long enough" are unrelated facts that happen to
+   * coincide on exactly one row today. Deriving one from the other would extend
+   * the bypass silently the first time another type gained a field.
+   *
+   * ⚠️ It waives the DURATION, never the PRESENCE. A driver whose latest fix is
+   * outside the radius still cannot file — they cannot have been spoken to at
+   * the door from somewhere else — and the pick-up-time gate is untouched.
+   */
+  presenceWaitWaivedBy: string | null;
+}
+
+export const NO_SHOW_TYPE_FORMS: Record<NoShowType, NoShowTypeForm> = {
+  "Member Not Home": {
+    extraField: null,
+    helper: null,
+    signatureLabel: "Driver Signature",
+    presenceWaitWaivedBy: null,
+  },
+  "Cancel At Door": {
+    extraField: { id: "spokeWith", label: "Spoke with" },
+    helper: null,
+    signatureLabel: "Member Signature",
+    // The driver is at the door being refused in person, and production already
+    // makes them name who refused. That name is the proof the wait was for.
+    presenceWaitWaivedBy: "spokeWith",
+  },
+  "Member Not Ready": {
+    extraField: null,
+    /**
+     * ⚠️ Verbatim from `CAP-234`, and note what it anchors to: the **Start
+     * Time**, not the driver's arrival. `canNoshow` walks location records
+     * instead. Whether the two agree is UNVERIFIED — this is driver-facing
+     * guidance copy, not evidence of the server rule.
+     */
+    helper: "Wait 10 minutes from the Start Time before signing and leaving",
+    signatureLabel: "Driver Signature",
+    presenceWaitWaivedBy: null,
+  },
+};
+
+/** The form contract for a type, or the empty one before a type is picked. */
+export function noShowFormFor(type: string): NoShowTypeForm {
+  return (
+    NO_SHOW_TYPE_FORMS[type as NoShowType] ?? {
+      extraField: null,
+      helper: null,
+      // ⚠️ The pre-selection default, captured in `CAP-229`: before any type is
+      // chosen the pad already reads "Driver Signature".
+      signatureLabel: "Driver Signature",
+      presenceWaitWaivedBy: null,
+    }
+  );
+}
+
+/**
+ * ⭐ Production's own copy already argues for this.
+ *
+ * It tells the Member Not Ready driver to wait ten minutes and tells the Cancel
+ * At Door driver nothing — then `canNoshow` enforces the wait on both at Submit.
+ * The app implies the wait does not apply here, and then applies it.
+ */
+export function waivesPresenceWait(type: string | null | undefined): boolean {
+  return Boolean(type && noShowFormFor(type).presenceWaitWaivedBy);
+}

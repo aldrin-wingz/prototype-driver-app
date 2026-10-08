@@ -26,6 +26,7 @@ import { RiderNoShowForm } from "@/components/support/rider-no-show-form";
 import {
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_TYPES,
+  noShowFormFor,
   resolveNoShow,
   treatmentFor,
   type NoShowOutcome,
@@ -44,9 +45,15 @@ import { DRIVER_TEAL } from "@/constants/driver-app-colors";
  * Member No-Show — the production screen, replicated.
  *
  * A pushed page rather than a sheet, because that is what production is: back
- * chevron, centred title, `No-Show Type:` select, a tall `Driver Signature`
- * canvas, a centred blue Clear, and a full-width teal Submit pinned to the
- * bottom.
+ * chevron, centred title, `No-Show Type:` select, a tall signature canvas, a
+ * centred blue Clear, and a full-width teal Submit pinned to the bottom.
+ *
+ * ⛔ **The body below the select is per-type**, replicated from `CAP-232`–
+ * `CAP-234`: Cancel At Door inserts a required `Spoke with` and relabels the pad
+ * "Member Signature"; Member Not Ready adds a wait notice; Member Not Home adds
+ * nothing. The shape lives in `NO_SHOW_TYPE_FORMS` rather than in this JSX, so
+ * one rule drives the render, the validation and the guardrail instead of three
+ * that can disagree.
  *
  * **The guardrail fires at Submit, not on entry**, which is also production's
  * order. That means a driver about to be refused has already picked a type and
@@ -70,6 +77,7 @@ export function MemberNoShowScreen({
   const { toast } = useToast();
 
   const [noShowType, setNoShowType] = useState("");
+  const [extraValue, setExtraValue] = useState("");
   const [signed, setSigned] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [refusal, setRefusal] = useState<NoShowOutcome | null>(null);
@@ -88,12 +96,17 @@ export function MemberNoShowScreen({
    * no-show will succeed — the countdown belongs where the refusal is.
    */
   const treatment = treatmentFor(trip);
-  // ⚠️ The outcome no longer depends on the no-show type. It used to — `Cancel At
-  // Door` bypassed the wait — and dropping that type dropped the dependency, so
-  // the guardrail is now a pure function of the trip, the leg and the clock.
-  const outcomeNow = resolveNoShow(trip, activeLeg, 0);
+  /** The captured form contract for whatever is selected right now. */
+  const typeForm = noShowFormFor(noShowType);
+  /**
+   * ⚠️ The outcome depends on the no-show type again, which is what Phase 2
+   * restores. A Cancel At Door at the pick-up but short of ten minutes resolves
+   * to `files`, not `timer` — so selecting it here also stops the clock below,
+   * and that is correct: there is no longer a wait to count down.
+   */
+  const outcomeNow = resolveNoShow(trip, activeLeg, 0, noShowType);
   const elapsed = useNoShowClock(outcomeNow.kind === "timer");
-  const outcome = resolveNoShow(trip, activeLeg, elapsed);
+  const outcome = resolveNoShow(trip, activeLeg, elapsed, noShowType);
 
   function handleSubmit() {
     // Light validation first, and deliberately NOT the refusal dialog — an
@@ -107,10 +120,26 @@ export function MemberNoShowScreen({
       });
       return;
     }
+    // ⚠️ The only field production marks required with `*`, and it exists on
+    // exactly one type. Checked before the signature because that is the order
+    // it is rendered in.
+    if (typeForm.extraField && !extraValue.trim()) {
+      toast({
+        title: "Member No-Show",
+        description: `${typeForm.extraField.label} is required for ${noShowType}.`,
+      });
+      return;
+    }
     if (!signed) {
       toast({
         title: "Member No-Show",
-        description: "Add your signature before submitting.",
+        // ⚠️ Whose signature it is changes with the type, so the prompt has to
+        // as well — telling a driver to "add your signature" under a pad
+        // labelled "Member Signature" asks for the wrong person's.
+        description:
+          typeForm.signatureLabel === "Member Signature"
+            ? "Have the member sign before submitting."
+            : "Add your signature before submitting.",
       });
       return;
     }
@@ -127,7 +156,12 @@ export function MemberNoShowScreen({
     // happened.
     toast({
       title: "Member No-Show submitted",
-      description: `We had you at the pick-up for ${Math.floor(outcome.qualifyingMinutes)} minutes. Not wired further in the prototype — this is the production action.`,
+      // ⚠️ Two ways to reach `files` now, and they must not claim the same
+      // thing. The waived path never observed ten minutes and does not pretend
+      // to — it says what it DID see, and what stood in for the rest.
+      description: outcome.presenceWaitWaived
+        ? `${noShowType} — ${extraValue.trim()} refused at the door, so the 10-minute wait does not apply. We had you at the pick-up for ${Math.floor(outcome.qualifyingMinutes)} minutes. Not wired further in the prototype.`
+        : `We had you at the pick-up for ${Math.floor(outcome.qualifyingMinutes)} minutes. Not wired further in the prototype — this is the production action.`,
     });
     router.push(backHref);
   }
@@ -179,8 +213,35 @@ export function MemberNoShowScreen({
           </SelectContent>
         </Select>
 
+        {/* ⚠️ Plain weight and no control — this is guidance, not a field.
+            `CAP-234` places it between the select and the signature heading. */}
+        {typeForm.helper && (
+          <p className="mt-6 text-base text-gray-700">{typeForm.helper}</p>
+        )}
+
+        {/* Cancel At Door only. A free-text input, NOT a picker: production
+            stores 3,601 distinct values in `ride_observation.spoke_with`, which
+            no canned list produces. An earlier version of this prototype used a
+            select labelled "Who did you talk to?" and was wrong on both counts. */}
+        {typeForm.extraField && (
+          <>
+            <h2 className="mb-2 mt-7 text-xl font-bold text-gray-900">
+              <label htmlFor={typeForm.extraField.id}>
+                {typeForm.extraField.label} *
+              </label>
+            </h2>
+            <input
+              id={typeForm.extraField.id}
+              type="text"
+              value={extraValue}
+              onChange={(event) => setExtraValue(event.target.value)}
+              className="h-16 w-full rounded-lg border border-gray-300 px-4 text-lg text-gray-900 outline-none focus:border-gray-400"
+            />
+          </>
+        )}
+
         <h2 className="mb-2 mt-7 text-xl font-bold text-gray-900">
-          Driver Signature
+          {typeForm.signatureLabel}
         </h2>
         {/* Full-bleed and tall, per the capture — the pad's own hint-and-Clear
             row is suppressed so Clear can be the centred blue link below. */}
@@ -203,10 +264,12 @@ export function MemberNoShowScreen({
       {/* Pinned, and always tappable — production lets you submit and then tells
           you no, which is the behaviour being replicated.
 
-          ⚠️ No countdown here any more. Every refusal now fires on the More
-          Options tile, before the driver picks a type or signs, so a driver who
-          reaches this screen is one whose no-show will succeed. The Submit-time
-          refusal below survives only as a backstop for direct-URL entry. */}
+          ⚠️ No countdown on the button, and no refusal before this point. The
+          More Options tile enforces guardrail 1 (the ride's STATUS) and nothing
+          else, because the production lookback runs only on Submit — until then
+          the app has done no location check at all. So every location refusal
+          fires here, and that is also what makes Phase 2 possible: Submit is the
+          only moment at which both the no-show type and the walk exist. */}
       <div className="sticky bottom-0 border-t border-gray-200 bg-white px-4 py-4">
         <button
           type="button"

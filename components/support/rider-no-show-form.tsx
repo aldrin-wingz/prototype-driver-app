@@ -63,7 +63,9 @@ function buildCallout(
   leg: TripLeg | undefined,
   noShowType: string
 ): SupportCallout | undefined {
-  const outcome = resolveNoShow(trip, leg, 0);
+  // ⚠️ The type travels here too, so this form cannot disagree with the screen
+  // that opened it about whether the ride was fileable.
+  const outcome = resolveNoShow(trip, leg, 0, noShowType);
 
   // Only the form outcomes reach this sheet, and only they have
   // something to explain. Anything else means the sheet was opened by a path
