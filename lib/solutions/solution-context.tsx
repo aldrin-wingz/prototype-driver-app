@@ -1,0 +1,112 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { findSolution, type Solution } from "./catalogue";
+
+/**
+ * Which proposed feature the prototype is currently focused on.
+ *
+ * ⚠️ The focus is held in React state and MIRRORED into the URL — not held in
+ * the URL alone. That was the first design and it broke on the first walk: the
+ * app's own navigation (a tile pushing `/my-rides/[id]/no-show`) carries no
+ * query string, so the briefing vanished the moment you started demonstrating
+ * the flow it describes. Making the app preserve the param everywhere would
+ * mean editing mirrored screens to suit the selector, which the base contract
+ * forbids.
+ *
+ * So: the URL SEEDS the focus and is kept truthful afterwards, and state keeps
+ * it alive across in-app navigation. The mirror is written with
+ * `history.replaceState` rather than a Next navigation, because a navigation
+ * here would remount the screen under the person using it.
+ *
+ * ⚠️ `useSearchParams` makes this a dynamic client boundary, so the provider
+ * MUST sit inside a Suspense boundary. `next dev` never prerenders, so a
+ * missing one is invisible until `next build`.
+ */
+export const SOLUTION_PARAM = "solution";
+
+interface SolutionValue {
+  /** `undefined` when nothing is focused — the app runs as the plain mirror. */
+  active: Solution | undefined;
+  /** Focus a solution and navigate to its entry point, if it has one. */
+  focus: (solution: Solution) => void;
+  clear: () => void;
+  pickerOpen: boolean;
+  setPickerOpen: (open: boolean) => void;
+}
+
+const SolutionContext = createContext<SolutionValue | null>(null);
+
+function writeParam(id: string | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set(SOLUTION_PARAM, id);
+  else url.searchParams.delete(SOLUTION_PARAM);
+  window.history.replaceState(null, "", url);
+}
+
+export function SolutionProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const paramId = searchParams.get(SOLUTION_PARAM);
+
+  // Adopt a focus named in the URL: an entry point, a shared link, or a hand
+  // edit. Only ever widens — a missing param means "the app navigated", not
+  // "the focus was dropped".
+  useEffect(() => {
+    if (paramId && paramId !== activeId) setActiveId(paramId);
+  }, [paramId, activeId]);
+
+  // Put it back after the app's own navigation drops it, so the URL always
+  // says which solution produced what is on screen.
+  useEffect(() => {
+    if (activeId && paramId !== activeId) writeParam(activeId);
+  }, [activeId, paramId, pathname]);
+
+  const active = findSolution(activeId);
+
+  const focus = useCallback(
+    (solution: Solution) => {
+      setActiveId(solution.id);
+      // An entry point moves the app to where the solution is demonstrable. A
+      // solution with none still focuses — the briefing is the whole point for
+      // the rows there is nothing to build for.
+      if (solution.entry) {
+        router.push(`${solution.entry.route}?${SOLUTION_PARAM}=${solution.id}`);
+      } else {
+        writeParam(solution.id);
+      }
+    },
+    [router],
+  );
+
+  const clear = useCallback(() => {
+    setActiveId(null);
+    writeParam(null);
+  }, []);
+
+  const value = useMemo<SolutionValue>(
+    () => ({ active, focus, clear, pickerOpen, setPickerOpen }),
+    [active, focus, clear, pickerOpen],
+  );
+
+  return <SolutionContext.Provider value={value}>{children}</SolutionContext.Provider>;
+}
+
+export function useSolution(): SolutionValue {
+  const ctx = useContext(SolutionContext);
+  if (!ctx) throw new Error("useSolution must be used inside a SolutionProvider");
+  return ctx;
+}

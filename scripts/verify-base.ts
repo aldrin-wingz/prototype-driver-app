@@ -127,6 +127,8 @@ const REQUIRED = [
   "lib/driver-data/no-show-rules.ts",
   "hooks/use-no-show-clock.ts",
   "app/my-rides/[id]/no-show",
+  "lib/solutions",
+  "components/solutions-dev",
 ];
 const missingNs = REQUIRED.filter((p) => !existsSync(join(ROOT, p)));
 check(

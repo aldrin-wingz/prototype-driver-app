@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
@@ -6,6 +7,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
 import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup";
 import { RideFlowProvider } from "@/lib/support-data/ride-flow-context";
+import { SolutionProvider } from "@/lib/solutions/solution-context";
+import { SolutionStrip } from "@/components/solutions-dev/solution-strip";
+import { SolutionPickerSheet } from "@/components/solutions-dev/solution-picker-sheet";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -45,7 +49,17 @@ export default function RootLayout({
         >
           <IncentiveEarnedProvider>
             <RideFlowProvider>
-              {children}
+              {/* ⚠️ `SolutionProvider` reads `useSearchParams`, which makes it a
+                  dynamic client boundary. Without this Suspense every route
+                  fails to prerender — and `next dev` never prerenders, so only
+                  `next build` would ever tell us. */}
+              <Suspense fallback={null}>
+                <SolutionProvider>
+                  <SolutionStrip />
+                  {children}
+                  <SolutionPickerSheet />
+                </SolutionProvider>
+              </Suspense>
               <IncentiveEarnedPopup />
             </RideFlowProvider>
           </IncentiveEarnedProvider>
