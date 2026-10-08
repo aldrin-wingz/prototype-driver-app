@@ -776,3 +776,70 @@ export function noShowFormFor(type: string): NoShowTypeForm {
 export function waivesPresenceWait(type: string | null | undefined): boolean {
   return Boolean(type && noShowFormFor(type).presenceWaitWaivedBy);
 }
+
+// ── Who the driver spoke to at the door ────────────────────────────────────
+
+/**
+ * ⛔ **This field is a PROPOSAL, not replication.** Production asks `Spoke with`
+ * as free text and gets a NAME. A name tells Support who was there and nothing
+ * about whether that person could speak for the member — which is the fact the
+ * waiver below actually turns on.
+ *
+ * ⚠️ These options are **derived from `bronze.ride_observation.spoke_with`,
+ * aggregated**, never invented and never copied. Only values frequent enough to
+ * be canned options reach this file: every label below is backed by a role word
+ * appearing 21+ times across Cancel At Door filings, so **no person's name is
+ * reproduced here**. The raw column is PII and must stay aggregated.
+ */
+export const SPOKE_WITH_MEMBER = "member";
+export const SPOKE_WITH_CONTACT = "point-of-contact";
+export const SPOKE_WITH_NOBODY = "no-one";
+
+export const SPOKE_WITH_OPTIONS = [
+  { value: SPOKE_WITH_MEMBER, label: "The member themselves" },
+  { value: SPOKE_WITH_CONTACT, label: "Someone else at the door" },
+  /**
+   * ⛔⛔ **The option the two-option design did not have, and the reason it
+   * needs one.**
+   *
+   * ~9.1% of Cancel At Door filings record no person at all — `nothing` (1,198)
+   * and `no one` (26) — and another 2.9% name Wingz, Support or the client,
+   * which is a phone call and not somebody at the door. Without an honest way to
+   * say "nobody came out", a required picker makes every one of those drivers
+   * claim a conversation that did not happen — and that claim is exactly what
+   * would be skipping the ten-minute wait.
+   *
+   * ⚠️ A Cancel At Door with nobody at the door IS a Member Not Home. This
+   * answer earns no waiver; see `answerEarnsWaiver`.
+   */
+  { value: SPOKE_WITH_NOBODY, label: "No one came to the door" },
+] as const;
+
+/**
+ * What that person was to the member.
+ *
+ * ⚠️ Counts are Cancel At Door filings whose `spoke_with` matched the role word,
+ * all time. Declared beside each option so the list can be audited against the
+ * warehouse rather than taken on trust.
+ */
+export const CONTACT_RELATION_OPTIONS = [
+  { value: "parent", label: "Parent" },                      // mother 238 + mom 163 + father 24 = 425
+  { value: "child", label: "Son or daughter" },              // daughter 91 + son 52 = 143
+  { value: "spouse", label: "Spouse or partner" },           // wife 51 + husband 48 = 99
+  { value: "carer", label: "Caregiver or nurse" },           // nurse 74 + caregiver 60 = 134
+  { value: "other-family", label: "Other family member" },   // family member 34 + sister 29 = 63
+  { value: "other", label: "Someone else" },                 // roommate 21, and the long tail
+] as const;
+
+/**
+ * Whether the driver's answer actually earns the waiver.
+ *
+ * ⚠️ **Two rules, deliberately separate.** `waivesPresenceWait` asks whether the
+ * TYPE may skip the wait, and so decides which form opens. This asks whether the
+ * ANSWER supports it, and so decides the outcome. Collapsing them into one would
+ * mean the route and the verdict could never disagree — and the whole point of
+ * asking is that they sometimes must.
+ */
+export function answerEarnsWaiver(spokeWithWho: string | null | undefined): boolean {
+  return spokeWithWho === SPOKE_WITH_MEMBER || spokeWithWho === SPOKE_WITH_CONTACT;
+}

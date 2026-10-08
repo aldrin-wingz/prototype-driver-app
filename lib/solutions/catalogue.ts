@@ -140,13 +140,13 @@ export const SOLUTIONS: Solution[] = [
      * populated for Cancel At Door, against no signature column anywhere.
      */
     proposedFeature:
-      "Cancel at Door ALREADY requires the driver to name who refused the ride — let that skip the 10-minute wait. It waives the duration only: a driver who is not at the pick-up still cannot file.",
+      "Let Cancel at Door skip the 10-minute wait, in exchange for two questions it asks instead → who came to the door (the member, someone else, or no one) → and what that person is to the member → nobody at the door earns no skip, because that is a Member Not Home",
     klass: "form",
     buildState: "in-prototype",
     entry: {
       route: "/my-rides/1049800373/more",
       label:
-        "More Options → Member No-Show. The same ride slice 01 uses to show the countdown: the driver is at the pick-up but short of ten minutes. Pick Member Not Home and it counts down; pick Cancel At Door and the form grows a required Spoke with, relabels the pad Member Signature, and files.",
+        "More Options → Member No-Show. The same ride slice 01 uses for the countdown: the driver is at the pick-up but short of ten minutes. Pick Member Not Home and it counts down. Pick Cancel At Door and two questions open instead — answer 'the member' and it files, answer 'no one came to the door' and the countdown comes back.",
     },
   },
   {

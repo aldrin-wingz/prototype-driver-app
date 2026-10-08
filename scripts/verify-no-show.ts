@@ -19,8 +19,14 @@ import {
   postPickupAvailableAt,
   postPickupRefusalCopy,
   postPickupThresholdMinutes,
+  answerEarnsWaiver,
+  CONTACT_RELATION_OPTIONS,
   noShowFormFor,
   resolveNoShow,
+  SPOKE_WITH_CONTACT,
+  SPOKE_WITH_MEMBER,
+  SPOKE_WITH_NOBODY,
+  SPOKE_WITH_OPTIONS,
   treatmentFor,
   waivesPresenceWait,
   walkLocationRecords,
@@ -28,7 +34,7 @@ import {
 } from "../lib/driver-data/no-show-rules";
 import { mockInProgressTrips } from "../lib/driver-data/mock-trips";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
-import { ISSUE_RIDER_NO_SHOW } from "../lib/support-data/issue-types";
+import { ISSUE_CANCEL_AT_DOOR, ISSUE_RIDER_NO_SHOW } from "../lib/support-data/issue-types";
 import { canSubmitCase } from "../lib/support/field-rules";
 import {
   findAnyForTrip,
@@ -377,6 +383,21 @@ check("the screen does not hardcode a signature heading",
   !/>\s*(Driver|Member) Signature\s*</.test(SCREEN), "hardcoded heading");
 check("the screen passes the type to the guardrail",
   /resolveNoShow\(trip, activeLeg, elapsed, noShowType\)/.test(SCREEN), "not wired");
+// ⚠️ The waiver paths must END in the questions, not in a filing or a dialog.
+check("Submit opens the Cancel at Door form on the waiver paths",
+  /usingWaiver[\s\S]{0,200}setCancelAtDoorOpen\(true\)/.test(SCREEN), "not wired");
+/**
+ * ⚠️ Added because a mutation got through: hardcoding `atPickup={false}` left
+ * every check green while asking a driver standing at the door to reconstruct
+ * times they never needed. The variant is a DECISION and needs its own check.
+ */
+check("the form variant is computed, not hardcoded",
+  /atPickup=\{cancelAtDoorAtPickup\}/.test(SCREEN), "variant hardcoded");
+check("and it is computed from whether the app placed the driver there",
+  /setCancelAtDoorAtPickup\(outcome\.kind === "files"\)/.test(SCREEN), "not derived");
+check("⛔ a refused waiver re-resolves WITHOUT the type",
+  /waiver-refused[\s\S]{0,400}resolveNoShow\(trip, activeLeg, elapsed, null\)/.test(SCREEN),
+  "would show the waived outcome back to a driver who just lost the waiver");
 
 // ── The form asks four questions and no attachment ─────────────────────────
 const form = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
@@ -413,6 +434,107 @@ check("the form can be submitted", canSubmitCase(standalone.fields, filled));
 const { waitedWhere: _omit, ...missing } = filled;
 check("the form is blocked when a required answer is missing",
   !canSubmitCase(standalone.fields, missing));
+
+// ── Cancel at Door — the two questions the waiver rests on ─────────────────
+/**
+ * ⛔⛔ The waiver is a CLAIM that a member came out and refused. These checks
+ * hold the line that the claim is actually asked for, and that answering it
+ * honestly can take the waiver away again.
+ */
+check("three ways to answer who was at the door", SPOKE_WITH_OPTIONS.length === 3,
+  SPOKE_WITH_OPTIONS.map((o) => o.value).join(","));
+check("one of them is nobody", SPOKE_WITH_OPTIONS.some((o) => o.value === SPOKE_WITH_NOBODY),
+  SPOKE_WITH_OPTIONS.map((o) => o.value).join(","));
+
+const earning = SPOKE_WITH_OPTIONS.filter((o) => answerEarnsWaiver(o.value));
+check("exactly two of the three answers earn the waiver", earning.length === 2,
+  `${earning.length} of ${SPOKE_WITH_OPTIONS.length}: ${earning.map((o) => o.value).join(",")}`);
+check("the member earns it", answerEarnsWaiver(SPOKE_WITH_MEMBER));
+check("a point of contact earns it", answerEarnsWaiver(SPOKE_WITH_CONTACT));
+check("⛔ nobody at the door earns NOTHING", !answerEarnsWaiver(SPOKE_WITH_NOBODY));
+check("an unanswered question earns nothing", !answerEarnsWaiver(""));
+check("and an unknown answer earns nothing", !answerEarnsWaiver("the dispatcher"));
+
+/**
+ * ⚠️ The two rules must be able to DISAGREE, or asking is theatre. The type
+ * routes the driver to the questions; the answer decides the outcome.
+ */
+check("the route and the verdict are independent rules",
+  waivesPresenceWait("Cancel At Door") && !answerEarnsWaiver(SPOKE_WITH_NOBODY));
+
+check("the relation options are a real list", CONTACT_RELATION_OPTIONS.length >= 4,
+  `${CONTACT_RELATION_OPTIONS.length}`);
+check("no relation option is a person's name",
+  CONTACT_RELATION_OPTIONS.every((o) => /^[A-Z][a-z]+( or [a-z]+| [a-z]+)*$/.test(o.label)),
+  CONTACT_RELATION_OPTIONS.map((o) => o.label).join(" | "));
+
+// ── The two variants ask different things ─────────────────────────────────
+const cadAtPickup = buildSupportFormCase({
+  includeIssues: [ISSUE_CANCEL_AT_DOOR],
+  askWaitTimes: false,
+});
+const cadAway = buildSupportFormCase({
+  includeIssues: [ISSUE_CANCEL_AT_DOOR],
+  askWaitTimes: true,
+});
+const atPickupIds = cadAtPickup.fields.map((f) => f.id);
+const awayIds = cadAway.fields.map((f) => f.id);
+
+check("the at-pick-up variant has fields", atPickupIds.length > 0, `${atPickupIds.length}`);
+check("both variants ask who was at the door",
+  atPickupIds.includes("spokeWithWho") && awayIds.includes("spokeWithWho"),
+  `${atPickupIds.join(",")} || ${awayIds.join(",")}`);
+check("⚠️ a driver standing at the door is NOT asked to reconstruct times",
+  !atPickupIds.includes("waitedFrom") && !atPickupIds.includes("leftAt"),
+  atPickupIds.join(","));
+check("a driver who has left IS asked when they arrived and left",
+  awayIds.includes("waitedFrom") && awayIds.includes("leftAt"),
+  awayIds.join(","));
+// ⚠️ The pair must genuinely differ, or `askWaitTimes` is doing nothing.
+check("the two variants are different forms",
+  atPickupIds.join(",") !== awayIds.join(","),
+  `${atPickupIds.length} vs ${awayIds.length} fields`);
+
+// Rider No-Show keeps its own shape — the new block must not leak into it.
+const plainNoShow = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
+const plainIds = plainNoShow.fields.map((f) => f.id);
+check("Rider No-Show still asks its four questions",
+  ["waitedFrom", "leftAt", "waitedWhere", "knocked"].every((id) => plainIds.includes(id)),
+  plainIds.join(","));
+check("and the Cancel at Door block did not leak into it",
+  !plainIds.includes("spokeWithWho") || plainNoShow.fields
+    .find((f) => f.id === "spokeWithWho")?.showIf?.equals.includes(ISSUE_RIDER_NO_SHOW) === false,
+  plainIds.join(","));
+
+const relationField = cadAtPickup.fields.find((f) => f.id === "spokeWithRelation");
+check("the relation question exists", Boolean(relationField));
+check("and is asked only for a point of contact",
+  relationField?.showIf?.field === "spokeWithWho" &&
+    relationField?.showIf?.equals.join(",") === SPOKE_WITH_CONTACT,
+  `${relationField?.showIf?.field}=${relationField?.showIf?.equals.join(",")}`);
+
+// ── The submit gate is reachable on both variants ─────────────────────────
+// ⚠️ An unreachable gate is worse than a missing field: the form looks complete
+// and the Submit button never lights.
+const CAD_BASE = { issue: ISSUE_CANCEL_AT_DOOR, noShowType: "Cancel At Door", legId: "1049800373" };
+check("the at-pick-up form submits with the member",
+  canSubmitCase(cadAtPickup.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_MEMBER }));
+check("⚠️ a point of contact cannot submit without saying who they are",
+  !canSubmitCase(cadAtPickup.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_CONTACT }));
+check("and can once they do",
+  canSubmitCase(cadAtPickup.fields, {
+    ...CAD_BASE, spokeWithWho: SPOKE_WITH_CONTACT, spokeWithRelation: CONTACT_RELATION_OPTIONS[0].value,
+  }));
+check("nobody-at-the-door is a submittable answer, not a dead end",
+  canSubmitCase(cadAtPickup.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_NOBODY }));
+check("the form is blocked with the question unanswered",
+  !canSubmitCase(cadAtPickup.fields, CAD_BASE));
+check("the away form needs its times too",
+  !canSubmitCase(cadAway.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_MEMBER }));
+check("and submits once they are given",
+  canSubmitCase(cadAway.fields, {
+    ...CAD_BASE, spokeWithWho: SPOKE_WITH_MEMBER, waitedFrom: "10:31", leftAt: "10:56",
+  }));
 
 // ── A submitted no-show shows the driver NOTHING afterwards ──────────────
 /**

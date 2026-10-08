@@ -43,6 +43,7 @@ export interface SupportIssueType {
 const NOT_YET_SUFFIX = " — ⚠️ not in prototype yet";
 
 export const ISSUE_RIDER_NO_SHOW = "rider-no-show";
+export const ISSUE_CANCEL_AT_DOOR = "cancel-at-door";
 
 /**
  * The support issues a driver can file.
@@ -68,6 +69,17 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Entered from the Member No-Show tile in More Options — that tile IS this case. Only offered on a leg that is en-route, and only asks anything when the app cannot confirm the wait itself.",
+  },
+  {
+    value: ISSUE_CANCEL_AT_DOOR,
+    label: "Cancel at Door",
+    description:
+      "For a member who came to the door and refused the ride. Tell us who turned you away, so Support can see the wait was over before it started.",
+    // Same reasoning as Rider No-Show: reached from the Member No-Show screen
+    // with the type already chosen, so there is no dropdown to be visible in.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Opens automatically after Submit on the Member No-Show screen when the type is Cancel At Door and the ten-minute wait has not been served. It is the evidence the waiver rests on, so it exists only on the paths that use the waiver.",
   },
 ];
 

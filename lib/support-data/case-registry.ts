@@ -1,5 +1,14 @@
-import { getIssueOptions, ISSUE_RIDER_NO_SHOW } from "./issue-types";
-import { NO_SHOW_TYPES } from "@/lib/driver-data/no-show-rules";
+import {
+  getIssueOptions,
+  ISSUE_CANCEL_AT_DOOR,
+  ISSUE_RIDER_NO_SHOW,
+} from "./issue-types";
+import {
+  CONTACT_RELATION_OPTIONS,
+  NO_SHOW_TYPES,
+  SPOKE_WITH_CONTACT,
+  SPOKE_WITH_OPTIONS,
+} from "@/lib/driver-data/no-show-rules";
 import type { SupportCaseDefinition } from "@/types/support";
 
 /**
@@ -10,6 +19,19 @@ import type { SupportCaseDefinition } from "@/types/support";
  * `ONLY_*` and its own block, with nothing to unpick here first.
  */
 const ONLY_RIDER_NO_SHOW = { field: "issue", equals: [ISSUE_RIDER_NO_SHOW] };
+const ONLY_CANCEL_AT_DOOR = { field: "issue", equals: [ISSUE_CANCEL_AT_DOOR] };
+
+/**
+ * Fields both no-show cases ask, so they are declared once.
+ *
+ * ⚠️ `equals` is an array for exactly this: a field belongs to a SET of issues.
+ * Two copies of `legId` under different gates would be two fields that could
+ * drift apart while looking identical in the rendered form.
+ */
+const EITHER_NO_SHOW_CASE = {
+  field: "issue",
+  equals: [ISSUE_RIDER_NO_SHOW, ISSUE_CANCEL_AT_DOOR],
+};
 
 const SUPPORT_FORM_CASE_ID = "support-form";
 
@@ -53,6 +75,7 @@ export function buildSupportFormCase({
   includeIssues,
   askNoShowType = false,
   askSignature = false,
+  askWaitTimes = true,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -76,6 +99,15 @@ export function buildSupportFormCase({
   askNoShowType?: boolean;
   /** Ask for the signature here, because no screen collected one. */
   askSignature?: boolean;
+  /**
+   * Ask when the driver arrived and when they left.
+   *
+   * ⚠️ Always true for Rider No-Show — the whole case is about a wait. For
+   * Cancel at Door it is true ONLY when the app could not place the driver at
+   * the pick-up: a driver standing there right now has nothing to reconstruct,
+   * and asking anyway is the interrogation this form exists to avoid.
+   */
+  askWaitTimes?: boolean;
 } = {}): SupportCaseDefinition {
   return {
     id: SUPPORT_FORM_CASE_ID,
@@ -118,7 +150,7 @@ export function buildSupportFormCase({
             required: true,
             // The same values as the screen's picker, from the one list.
             options: NO_SHOW_TYPES.map((value) => ({ value, label: value })),
-            showIf: ONLY_RIDER_NO_SHOW,
+            showIf: EITHER_NO_SHOW_CASE,
           }
         : {
             id: "noShowType",
@@ -130,7 +162,7 @@ export function buildSupportFormCase({
             // was claimed.
             lockWhenPrefilled: true,
             lockedBadge: "From the no-show screen",
-            showIf: ONLY_RIDER_NO_SHOW,
+            showIf: EITHER_NO_SHOW_CASE,
           },
       {
         id: "legId",
@@ -138,7 +170,7 @@ export function buildSupportFormCase({
         label: "Which trip?",
         placeholder: "Search your rides by leg ID, rider or date",
         required: true,
-        showIf: ONLY_RIDER_NO_SHOW,
+        showIf: EITHER_NO_SHOW_CASE,
         prefillFrom: "legId",
         // A no-show is only actionable on a trip that is under way.
         legScope: "in-progress",
@@ -148,30 +180,34 @@ export function buildSupportFormCase({
         lockWhenPrefilled: true,
         lockedBadge: "From this ride",
       },
-      {
-        id: "waitedFrom",
-        type: "time",
-        label: "What time did you arrive?",
-        shortLabel: "time you arrived",
-        helpText: "When you got to the pick-up.",
-        required: true,
-        prefillFrom: "waitArrivedAt",
-        // ⚠️ NO `lockWhenPrefilled` — the inverse of a recorded swipe mark. What
-        // prefills here is the evidence we have just judged insufficient, so
-        // locking it would stop the driver correcting the one thing we are
-        // unsure about.
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
-      {
-        id: "leftAt",
-        type: "time",
-        label: "What time did you leave?",
-        shortLabel: "time you left",
-        helpText: "When you gave up and drove off.",
-        required: true,
-        prefillFrom: "waitLeftAt",
-        showIf: ONLY_RIDER_NO_SHOW,
-      },
+      ...(askWaitTimes
+        ? ([
+            {
+              id: "waitedFrom",
+              type: "time",
+              label: "What time did you arrive?",
+              shortLabel: "time you arrived",
+              helpText: "When you got to the pick-up.",
+              required: true,
+              prefillFrom: "waitArrivedAt",
+              // ⚠️ NO `lockWhenPrefilled` — the inverse of a recorded swipe mark. What
+              // prefills here is the evidence we have just judged insufficient, so
+              // locking it would stop the driver correcting the one thing we are
+              // unsure about.
+              showIf: EITHER_NO_SHOW_CASE,
+            },
+            {
+              id: "leftAt",
+              type: "time",
+              label: "What time did you leave?",
+              shortLabel: "time you left",
+              helpText: "When you gave up and drove off.",
+              required: true,
+              prefillFrom: "waitLeftAt",
+              showIf: EITHER_NO_SHOW_CASE,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
       {
         id: "waitedWhere",
         type: "text",
@@ -196,6 +232,45 @@ export function buildSupportFormCase({
           { value: "no", label: "No" },
         ],
         showIf: ONLY_RIDER_NO_SHOW,
+      },
+
+      // ---- Cancel at Door ------------------------------------------------
+      // ⚠️ Two questions, and they are the entire evidence the waived wait rests
+      // on. Production asks `Spoke with` as free text and gets a NAME; a name
+      // says who was there and nothing about whether they could speak for the
+      // member. These ask the two things that actually matter, as categories —
+      // which is also why nothing identifying reaches the request.
+      {
+        id: "spokeWithWho",
+        type: "select",
+        label: "Who did you talk to?",
+        placeholder: "Select:",
+        required: true,
+        options: [...SPOKE_WITH_OPTIONS],
+        /**
+         * ⚠️ Deliberately says nothing about WHO, because one of the three
+         * answers is "no one". An earlier version read "You named them on the
+         * previous screen…", which contradicts itself the moment a driver picks
+         * the option this field exists to offer.
+         */
+        helpText: "Not their name — you gave that on the previous screen.",
+        showIf: ONLY_CANCEL_AT_DOOR,
+      },
+      {
+        id: "spokeWithRelation",
+        type: "select",
+        label: "What are they to the member?",
+        placeholder: "Select:",
+        required: true,
+        options: [...CONTACT_RELATION_OPTIONS],
+        /**
+         * ⚠️ Gated on the ANSWER, not on the issue, because `showIf` carries one
+         * condition and this field needs the narrower of the two. It is safe
+         * only because `spokeWithWho` is itself gated on this issue, so it can
+         * hold a value on no other case. If a second case ever asks
+         * `spokeWithWho`, this needs a compound condition rather than a comment.
+         */
+        showIf: { field: "spokeWithWho", equals: [SPOKE_WITH_CONTACT] },
       },
 
       // ⚠️ The signature is conditional, and where it lives is a real decision.

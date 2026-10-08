@@ -23,12 +23,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RiderNoShowForm } from "@/components/support/rider-no-show-form";
+import { CancelAtDoorForm } from "@/components/support/cancel-at-door-form";
 import {
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_TYPES,
   noShowFormFor,
   resolveNoShow,
   treatmentFor,
+  waivesPresenceWait,
   type NoShowOutcome,
 } from "@/lib/driver-data/no-show-rules";
 import { refusalCopyFor } from "@/components/driver/more-options-screen";
@@ -82,6 +84,9 @@ export function MemberNoShowScreen({
   const [resetKey, setResetKey] = useState(0);
   const [refusal, setRefusal] = useState<NoShowOutcome | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [cancelAtDoorOpen, setCancelAtDoorOpen] = useState(false);
+  /** Whether the app can place the driver at the pick-up — picks the variant. */
+  const [cancelAtDoorAtPickup, setCancelAtDoorAtPickup] = useState(false);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =
@@ -144,6 +149,36 @@ export function MemberNoShowScreen({
       return;
     }
     if (!activeLeg) return;
+
+    /**
+     * ⛔ **Cancel at Door does not end here — it ends in the form below.**
+     *
+     * The waiver is a claim that the member came out and refused, and nothing
+     * has yet asked whether that is what happened. So on every path the waiver
+     * touches, Submit opens the two questions instead of resolving:
+     *
+     *   at the pick-up, short of ten minutes → `files` with the waiver set
+     *   not at the pick-up, or no fix at all → `form`
+     *
+     * ⚠️ It deliberately bypasses `treatment.offerForm`, which exists to stop a
+     * form appearing on a timer — "a form here would be a way to skip the wait".
+     * That rule still holds for the other two types. It does not apply here
+     * because THIS form is what decides whether the wait is skipped, and it
+     * refuses the waiver when the answer does not support it.
+     *
+     * ⚠️ A ride that has genuinely served the ten minutes is NOT included: the
+     * outcome carries no waiver, so there is nothing to justify and production's
+     * plain filing stands.
+     */
+    const usingWaiver =
+      waivesPresenceWait(noShowType) &&
+      ((outcome.kind === "files" && outcome.presenceWaitWaived) ||
+        outcome.kind === "form");
+    if (usingWaiver) {
+      setCancelAtDoorAtPickup(outcome.kind === "files");
+      setCancelAtDoorOpen(true);
+      return;
+    }
 
     if (outcome.kind !== "files") {
       setRefusal(outcome);
@@ -343,6 +378,34 @@ export function MemberNoShowScreen({
           type remounts the subtree so the initialiser re-runs with the real
           value. Caught in the browser; the field looked present and correct in
           the diff. */}
+      {/* ⚠️ Re-keyed on the variant as well as the type: the sheet seeds its
+          values in a `useState` initialiser that runs once at mount, and the two
+          variants have different field sets. Without the variant in the key, a
+          driver who hit the away form first would carry its time fields into the
+          at-pick-up one. */}
+      <CancelAtDoorForm
+        key={`cad-${noShowType}-${cancelAtDoorAtPickup}`}
+        trip={trip}
+        leg={activeLeg}
+        noShowType={noShowType}
+        atPickup={cancelAtDoorAtPickup}
+        open={cancelAtDoorOpen}
+        onOpenChange={setCancelAtDoorOpen}
+        onResolved={(resolution) => {
+          if (resolution === "waiver-refused") {
+            /**
+             * ⛔ Resolve WITHOUT the type, deliberately. The waived outcome is
+             * `files`, and showing that would be the opposite of what just
+             * happened — the driver needs the countdown they would have had if
+             * they had never claimed a refusal at the door.
+             */
+            setRefusal(resolveNoShow(trip, activeLeg, elapsed, null));
+            return;
+          }
+          router.push(backHref);
+        }}
+      />
+
       <RiderNoShowForm
         key={noShowType}
         trip={trip}
