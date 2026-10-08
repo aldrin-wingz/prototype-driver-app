@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { getIssueLabel } from "./issue-types";
+import { findPendingForTrip } from "@/lib/support/request-visibility";
 
 /**
  * One support request the driver has submitted.
@@ -22,6 +23,21 @@ export interface SupportFormRecord {
   values: Record<string, string>;
   /** Fixed label rather than a real clock, so screenshots stay stable. */
   updatedAt: string;
+  /**
+   * Whether the app can learn what happened to this request.
+   *
+   * ⚠️ This is the difference between "we submitted something" and "we can tell
+   * the driver where it got to", and the two are NOT the same. A request filed
+   * to Zendesk leaves the app entirely: there is no status to read back, so
+   * showing a Pending state would be the app claiming knowledge it does not
+   * have. A request that reaches the Support Forms portal can be tracked.
+   *
+   * Rider No-Show is `false` — the PRD removed its Pending state on 2026-09-08
+   * when the destination became Zendesk. Missed Swipe still specifies Pending
+   * as its resolution path, so this is deliberately per-case and not a global
+   * removal.
+   */
+  appTracksStatus: boolean;
 }
 
 /** What a caller supplies; the store fills in the id, label and timestamp. */
@@ -31,6 +47,12 @@ export interface SupportFormInput {
   tripId?: string;
   legId?: string;
   values: Record<string, string>;
+  /**
+   * Required, with no default on purpose. Every case has to make this call
+   * deliberately; a default would let the next one inherit an answer nobody
+   * decided. See `SupportFormRecord.appTracksStatus`.
+   */
+  appTracksStatus: boolean;
 }
 
 /** A support request the driver has submitted and is waiting on. */
@@ -43,10 +65,22 @@ export interface PendingSupportRequest {
 }
 
 interface RideFlowValue {
-  /** Every request the driver has submitted, newest first. */
-  pendingForms: SupportFormRecord[];
+  /**
+   * EVERY request the driver has submitted, newest first — tracked or not.
+   *
+   * Untracked ones stay here deliberately. The driver did submit them, and the
+   * requests tray will have to list them as exactly that: sent, with no status
+   * the app can offer. Dropping them would hide the problem the tray exists for.
+   */
+  submittedForms: SupportFormRecord[];
   submitForm: (input: SupportFormInput) => string;
-  /** The pending request for a ride, if it has one — drives the ride surfaces. */
+  /**
+   * The pending request for a ride — drives the ride's Pending surfaces.
+   *
+   * ⚠️ Returns only requests the app can actually TRACK. A submitted but
+   * untracked request is not pending as far as the driver's screen is
+   * concerned, because the app has nothing true to say about it.
+   */
   getPendingRequest: (tripId: string) => PendingSupportRequest | undefined;
 }
 
@@ -70,7 +104,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<RideFlowValue>(
     () => ({
-      pendingForms: records,
+      submittedForms: records,
       submitForm: (input) => {
         const id = `form-${nextId.current++}`;
         setRecords((previous) => [
@@ -83,13 +117,16 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
             legId: input.legId,
             values: input.values,
             updatedAt: "Just now",
+            appTracksStatus: input.appTracksStatus,
           },
           ...previous,
         ]);
         return id;
       },
       getPendingRequest: (tripId) => {
-        const match = records.find((record) => record.tripId === tripId);
+        // The rule lives in `lib/support/request-visibility.ts` so a check can
+        // reach it and the three reading surfaces cannot drift apart.
+        const match = findPendingForTrip(records, tripId);
         if (!match) return undefined;
         return {
           tripId,

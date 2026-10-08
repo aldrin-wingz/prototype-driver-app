@@ -46,6 +46,15 @@ export interface SolutionEntry {
   route: string;
   /** What the driver does from there. */
   label: string;
+  /**
+   * Other states of the SAME slice worth showing.
+   *
+   * ⚠️ A slice is not always one screen. Rider No-Show has two branches of a
+   * single check — the driver is at the pick-up, or they are not — and showing
+   * only one of them demonstrates half the case. Alternates keep the catalogue
+   * at one row per spreadsheet row while making both reachable.
+   */
+  alternates?: Array<{ route: string; label: string }>;
 }
 
 export interface Solution {
@@ -102,7 +111,15 @@ export const SOLUTIONS: Solution[] = [
     buildState: "in-prototype",
     entry: {
       route: "/my-rides/1049800377/more",
-      label: "More Options → Member No-Show. The driver is 0.6 mi out at a hospital campus, so waiting can never clear it and the form is offered.",
+      label:
+        "More Options → Member No-Show. The driver is 0.6 mi out at a hospital campus, so waiting can never place them at the pick-up and the form is offered.",
+      alternates: [
+        {
+          route: "/my-rides/1049800373/more",
+          label:
+            "The other branch — the driver IS at the pick-up but short of ten minutes, so the refusal carries a live countdown and deliberately offers NO form. A form here would be a way to skip the wait.",
+        },
+      ],
     },
   },
   {

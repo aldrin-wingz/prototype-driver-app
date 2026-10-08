@@ -122,10 +122,15 @@ export function RiderNoShowForm({
           issue: ISSUE_RIDER_NO_SHOW,
           ...resolveTripContext(supportCase, values),
           values,
+          // ⚠️ Zendesk is the destination, so there is no status to read back.
+          // The ride deliberately shows nothing afterwards — see the PRD's
+          // superseded section, and `SupportFormRecord.appTracksStatus`.
+          appTracksStatus: false,
         });
         toast({
           title: supportCase.successMessage ?? "Sent to Support",
-          description: "This ride has moved to Pending while Support reviews it.",
+          description:
+            "Support has your report. The app will not show its progress — they will contact you if they need more.",
         });
         onSubmitted?.();
       }}

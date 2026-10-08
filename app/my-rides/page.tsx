@@ -29,7 +29,7 @@ export default function MyRidesPage() {
   // reachable in one tap. The real app's default tab is a product decision nobody
   // has made — revert to "needs-action" before treating this as production.
   const [activeTab, setActiveTab] = useState<TabValue>("in-progress");
-  const { pendingForms } = useRideFlow();
+  const { submittedForms } = useRideFlow();
 
   // Only a form that NAMES a trip moves a ride here. A general or payment
   // question lives in the Forms menu instead — it isn't about a ride, so putting
@@ -37,8 +37,13 @@ export default function MyRidesPage() {
   //
   // A ride waiting on Support MOVES to Pending — it does not appear in both
   // places. Otherwise the driver cannot tell which rides still need them.
+  //
+  // ⚠️ And only a request the app can TRACK. A Rider No-Show goes to Zendesk,
+  // so the app never learns its state — moving that ride to Pending would be
+  // the app inventing a status. It stays in its own tab, unchanged.
   const pendingIds = new Set(
-    pendingForms
+    submittedForms
+      .filter((record) => record.appTracksStatus)
       .map((record) => record.tripId)
       .filter((tripId): tripId is string => Boolean(tripId))
   );

@@ -262,8 +262,13 @@ export function MoreOptionsScreen({
   const router = useRouter();
   const { toast } = useToast();
 
-  const { getPendingRequest } = useRideFlow();
-  const pending = getPendingRequest(trip.id);
+  //
+  // ⚠️ Reads `submittedForms`, NOT `getPendingRequest`. This guard is about
+  // whether the driver already filed — which the app does know — not about what
+  // Support did with it, which for a no-show it never learns. Using the pending
+  // lookup here would let the same claim be filed twice over.
+  const { submittedForms } = useRideFlow();
+  const pending = submittedForms.some((record) => record.tripId === trip.id);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =

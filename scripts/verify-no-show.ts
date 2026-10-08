@@ -28,6 +28,11 @@ import { mockInProgressTrips } from "../lib/driver-data/mock-trips";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
 import { ISSUE_RIDER_NO_SHOW } from "../lib/support-data/issue-types";
 import { canSubmitCase } from "../lib/support/field-rules";
+import {
+  findAnyForTrip,
+  findPendingForTrip,
+  showsPendingState,
+} from "../lib/support/request-visibility";
 
 let passed = 0;
 const failures: string[] = [];
@@ -305,6 +310,61 @@ check("the form can be submitted", canSubmitCase(standalone.fields, filled));
 const { waitedWhere: _omit, ...missing } = filled;
 check("the form is blocked when a required answer is missing",
   !canSubmitCase(standalone.fields, missing));
+
+// ── A submitted no-show shows the driver NOTHING afterwards ──────────────
+/**
+ * ⚠️ The PRD removed Rider No-Show's Pending state on 2026-09-08, when the
+ * destination became Zendesk. The prototype had built the banner, the
+ * PENDING SUPPORT REVIEW pill and the My Rides → Pending tab, and all three are
+ * recorded as superseded — "never write it as spec".
+ *
+ * The invariant is awkward to state and worth stating anyway: the app keeps the
+ * record, because the driver DID submit and the requests tray will need it,
+ * while showing no status for it. Both halves are asserted — deleting the
+ * record would also empty the pending lookup and would sail through a check
+ * that only looked for absence.
+ */
+const NO_SHOW_REQUEST = { tripId: "1049800377", appTracksStatus: false };
+const TRACKED_REQUEST = { tripId: "1049800377", appTracksStatus: true };
+
+check("a no-show request shows no pending state", !showsPendingState(NO_SHOW_REQUEST));
+check(
+  "a no-show request is still RECORDED, not dropped",
+  findAnyForTrip([NO_SHOW_REQUEST], "1049800377") !== undefined
+);
+check(
+  "the ride surfaces see nothing for it",
+  findPendingForTrip([NO_SHOW_REQUEST], "1049800377") === undefined
+);
+/** The negative control: the rule must still be able to return something. */
+check(
+  "a tracked request DOES surface, so the rule is not dead",
+  findPendingForTrip([TRACKED_REQUEST], "1049800377") !== undefined
+);
+/** Mixed store — the untracked one must be SKIPPED, not merely sorted last. */
+check(
+  "an untracked request is skipped rather than ordered last",
+  findPendingForTrip(
+    [NO_SHOW_REQUEST, { tripId: "other", appTracksStatus: true }],
+    "1049800377"
+  ) === undefined
+);
+
+/**
+ * ⚠️ The checks above prove the RULE is right. This one proves the no-show form
+ * actually uses it — without which flipping one literal in the form would
+ * restore the superseded Pending state with every check still green.
+ */
+check(
+  "the no-show form declares itself untracked",
+  /appTracksStatus:\s*false/.test(FORM_SRC),
+  "expected `appTracksStatus: false` in rider-no-show-form.tsx"
+);
+check(
+  "and never claims to be tracked",
+  !/appTracksStatus:\s*true/.test(FORM_SRC),
+  "rider-no-show-form.tsx sets appTracksStatus true — that restores Pending"
+);
 
 console.log(
   failures.length === 0

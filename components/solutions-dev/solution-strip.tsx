@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, CornerDownRight, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   CLASS_LABEL,
@@ -45,6 +46,7 @@ function Column({ heading, children }: { heading: string; children: React.ReactN
 
 export function SolutionStrip() {
   const { active, clear, setPickerOpen } = useSolution();
+  const router = useRouter();
   /**
    * ⚠️ Collapsible because of narrow viewports, not as decoration. Side by
    * side needs ~640px; below that the three columns stack and the briefing
@@ -138,9 +140,25 @@ export function SolutionStrip() {
               </p>
             )}
             {active.entry && (
-              <p className={cn("mt-1 px-2 text-[11px] leading-snug text-[#7D9A92]", !briefingOpen && "hidden")}>
-                {active.entry.label}
-              </p>
+              <div className={cn("mt-1 px-2", !briefingOpen && "hidden")}>
+                <p className="text-[11px] leading-snug text-[#7D9A92]">
+                  {active.entry.label}
+                </p>
+                {/* A slice can have more than one state worth seeing. Rider
+                    No-Show has two branches of one check, and showing only the
+                    form branch demonstrates half the case. */}
+                {active.entry.alternates?.map((alternate) => (
+                  <button
+                    key={alternate.route}
+                    type="button"
+                    onClick={() => router.push(`${alternate.route}?solution=${active.id}`)}
+                    className="mt-1 flex w-full items-start gap-1.5 rounded text-left text-[11px] leading-snug text-[#7D9A92] hover:text-[#E6EFEC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4FD1AE]"
+                  >
+                    <CornerDownRight className="mt-0.5 h-3 w-3 shrink-0 text-[#4FD1AE]" />
+                    <span>{alternate.label}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </>
         ) : (

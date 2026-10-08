@@ -233,24 +233,54 @@ const allTripIds = new Set(
 );
 
 let routesChecked = 0;
-for (const s of built) {
-  const route = s.entry!.route;
+let alternatesChecked = 0;
+
+function checkEntry(id: string, what: string, route: string, label: string) {
   routesChecked++;
-  check(`${s.id}: route resolves to a page`, route, routeExists(route));
+  check(`${id}: ${what} resolves to a page`, route, routeExists(route));
 
   // Any ride-scoped entry must name a ride the seed actually has, or the demo
   // lands on a 404 that looks like a broken feature.
   const rideId = /^\/my-rides\/([^/]+)/.exec(route)?.[1];
   if (rideId) {
     check(
-      `${s.id}: entry ride is seeded`,
+      `${id}: ${what} ride is seeded`,
       `${rideId} ${allTripIds.has(rideId) ? "found" : "MISSING"} among ${allTripIds.size} trips`,
       allTripIds.has(rideId),
     );
   }
-  check(`${s.id}: entry says what to do`, `${s.entry!.label.length} chars`, s.entry!.label.length > 20);
+  check(`${id}: ${what} says what to do`, `${label.length} chars`, label.length > 20);
 }
-check("entry routes were actually checked", `${routesChecked} of ${built.length}`, routesChecked === built.length);
+
+for (const s of built) {
+  checkEntry(s.id, "entry", s.entry!.route, s.entry!.label);
+
+  for (const alternate of s.entry!.alternates ?? []) {
+    alternatesChecked++;
+    checkEntry(s.id, "alternate", alternate.route, alternate.label);
+    /**
+     * An alternate pointing at the same screen as the primary is decorative —
+     * it would look like a second branch and demonstrate the first one twice.
+     */
+    check(
+      `${s.id}: alternate is a DIFFERENT state`,
+      `${alternate.route} vs ${s.entry!.route}`,
+      alternate.route !== s.entry!.route,
+    );
+  }
+}
+check("entry routes were actually checked", `${routesChecked} checked across ${built.length} built row(s)`, routesChecked >= built.length);
+/**
+ * ⚠️ Declared, not derived. Rider No-Show is two branches of one check — the
+ * driver is at the pick-up or they are not — and a selector that reached only
+ * one of them would demonstrate half the case while looking complete.
+ */
+const EXPECTED_ALTERNATES = 1;
+check(
+  "the multi-branch slice still exposes both branches",
+  `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
+  alternatesChecked === EXPECTED_ALTERNATES,
+);
 
 // ---------------------------------------------------------------------------
 console.log("\n4. Locked vocabulary");
