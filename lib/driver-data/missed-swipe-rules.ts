@@ -253,20 +253,6 @@ export function asksMemberAboard(leg: TripLeg): boolean {
 }
 
 /**
- * Whether the trail alone could fill every answer the form needs.
- *
- * This is the claim the slice is really making — "if everything is there all
- * they need to do is click submit" — so it is a named rule with its own check
- * rather than something the form works out while rendering.
- */
-export function canSubmitUnedited(
-  leg: TripLeg,
-  asks: SwipeAnchor[]
-): boolean {
-  return asks.every((anchor) => anchorMatched(matchAnchor(leg, anchor)));
-}
-
-/**
  * The swipe to offer, once a postponed pick-up is taken into account.
  *
  * ⛔⛔ **This is the unblock, and it is the whole slice in one function.**

@@ -713,6 +713,27 @@ check("confirmed answers are written back as marks",
   "the form files a correction its own leg never sees");
 check("the MEMBER signature outcome is recorded on submit",
   FORM.includes("markMemberSignatureMissing(leg.id)"), "the outcome is never recorded");
+/**
+ * ⛔ No context callout on this form, by decision (2026-10-09).
+ *
+ * It carried three variants explaining what the trail could and could not
+ * confirm — and said at block level what the fields already say at field level:
+ * each time input's own help text names whether it was placed from the trail or
+ * left for the driver, and each odometer says outright that no reading exists.
+ * The callout restated all of it in a tinted box above the form.
+ *
+ * Asserted rather than merely absent, so re-adding one is a decision somebody
+ * makes rather than a drift nobody notices. The other two cases keep theirs.
+ */
+check("the Missed Swipe form renders no callout",
+  !/callout=/.test(FORM), "a callout is being passed again");
+check("...while the field-level explanations survive",
+  caseFor(["dropoff"], RIDE_2).fields.filter((f) => f.helpText).length >= 3,
+  "the per-field copy went with it");
+check("...and the other cases keep theirs",
+  readFileSync("components/support/cancel-at-door-form.tsx", "utf8").includes("callout="),
+  "the removal leaked into Cancel at Door");
+
 check("Missed Swipe is the case that keeps Pending",
   FORM.includes("appTracksStatus: true"), "appTracksStatus is not true");
 check("the no-show form still is not",

@@ -9,7 +9,6 @@ import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   anchorMatched,
-  canSubmitUnedited,
   leavesMemberSignatureMissing,
   MARK_FOR_ANCHOR,
   matchAnchor,
@@ -17,7 +16,6 @@ import {
 } from "@/lib/driver-data/missed-swipe-rules";
 import { fromTimeInputValue } from "@/lib/support/prefill";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
-import type { SupportCallout } from "@/types/support";
 
 /**
  * Build the Missed Swipe case for one leg.
@@ -45,57 +43,6 @@ export function buildMissedSwipe(
   };
 
   return { supportCase, initialValues };
-}
-
-/**
- * Say what the app could and could not confirm, before asking anything.
- *
- * ⛔⛔ **The three states are not interchangeable and must not share copy.** The
- * app having a trail that puts the driver at the address, having a trail that
- * never came near it, and having no trail at all look identical from inside the
- * form — same empty boxes — and mean completely different things to the person
- * reading the filing. Saying which one it is costs a sentence and is the only
- * honest way to present a prefill the driver is being asked to stand behind.
- *
- * ⚠️ Measured. On 107 legs a driver started and never swiped again, the
- * background trail placed them within a quarter-mile of the pick-up on 53.3% and
- * of the drop-off on 33.6% — against a control of 135 normally-swiped legs at
- * 89.6% and 92.6%. So the fully-prefilled case is real but it is NOT the usual
- * one, and a form built as though it were would mislead most of the drivers
- * who open it.
- */
-function buildCallout(
-  leg: TripLeg | undefined,
-  asks: SwipeAnchor[]
-): SupportCallout {
-  if (leg && canSubmitUnedited(leg, asks)) {
-    return {
-      tone: "info",
-      title: "We filled this in from your location history",
-      detail:
-        "Check the times match what happened, add a reason, and send. Change anything that looks wrong.",
-    };
-  }
-
-  const noTrace =
-    leg !== undefined &&
-    asks.every((anchor) => matchAnchor(leg, anchor).kind === "no_trace");
-
-  if (noTrace) {
-    return {
-      tone: "warning",
-      title: "Your phone recorded no location for this trip",
-      detail:
-        "There is nothing for us to check this against, so every answer here is yours. Support reads it as your account of the trip.",
-    };
-  }
-
-  return {
-    tone: "warning",
-    title: "We could only confirm part of this trip",
-    detail:
-      "Anything we could place you at is filled in. The rest is blank because we genuinely do not know it — not because we are checking your answer.",
-  };
 }
 
 /**
@@ -135,7 +82,6 @@ export function MissedSwipeForm({
   return (
     <SupportFormSheet
       supportCase={supportCase}
-      callout={buildCallout(leg, asks)}
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}
