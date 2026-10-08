@@ -24,16 +24,16 @@ import type { SwipeMark } from "./missed-swipe-rules";
  */
 const overlay = new Map<string, Partial<LegSwipeProgress>>();
 /**
- * Legs whose rider signature was never taken.
+ * Legs whose MEMBER signature was never taken.
  *
- * ⛔⛔ **Not a pending question — a permanent fact.** The signature is captured
- * by the drop-off swipe, with the member present. Once they have gone there is
- * no later moment at which it can be collected, so a leg that reaches the end
- * without one is COMPLETE and short a signature, which is a state the app
- * already models (Ride History filters on it). The missed-swipe form records
- * that outcome; it never asks for the signature it cannot have.
+ * ⛔⛔ **Not a pending question — a permanent fact, and only one of the two.**
+ * `CAP-098` shows production taking a Driver AND a Member signature at Stage 05.
+ * The driver is present whenever the correction is filed, so theirs is collected
+ * in the form; the member has gone, so theirs is lost for good. A leg that ends
+ * this way is COMPLETE and short the member's signature — a state the app
+ * already models, since Ride History filters on it.
  */
-const signatureMissing = new Set<string>();
+const memberSignatureMissing = new Set<string>();
 let version = 0;
 
 /** Bumped on every write, so a provider can hang state off it. */
@@ -73,23 +73,23 @@ export function recordSessionSwipe(
 /** Drop every recorded swipe. Exists so a check can assert a clean start. */
 export function resetSessionSwipes(): void {
   overlay.clear();
-  signatureMissing.clear();
+  memberSignatureMissing.clear();
   version += 1;
 }
 
-/** Record that this leg finished without a rider signature. */
-export function markSignatureMissing(legId: string): void {
-  signatureMissing.add(legId);
+/** Record that this leg finished without the member's signature. */
+export function markMemberSignatureMissing(legId: string): void {
+  memberSignatureMissing.add(legId);
   version += 1;
 }
 
-export function isSignatureMissing(legId: string): boolean {
-  return signatureMissing.has(legId);
+export function isMemberSignatureMissing(legId: string): boolean {
+  return memberSignatureMissing.has(legId);
 }
 
-/** Does any leg of this trip lack its signature? Drives the ride card's pill. */
-export function tripSignatureMissing(trip: Trip): boolean {
-  return trip.legs.some((leg) => signatureMissing.has(leg.id));
+/** Does any leg of this trip lack it? Drives the ride card's pill. */
+export function tripMemberSignatureMissing(trip: Trip): boolean {
+  return trip.legs.some((leg) => memberSignatureMissing.has(leg.id));
 }
 
 /** How many legs carry an overlay — the denominator for any check about it. */

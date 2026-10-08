@@ -18,7 +18,7 @@ import {
   getMissingAnchors,
   getUnrecordedSwipes,
   insideGeofence,
-  leavesSignatureMissing,
+  leavesMemberSignatureMissing,
   MARK_FOR_ANCHOR,
   MISSED_SWIPE_RADIUS_MILES,
   matchAnchor,
@@ -44,8 +44,8 @@ import { canSubmitCase, isFieldVisible } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
-  isSignatureMissing,
-  markSignatureMissing,
+  isMemberSignatureMissing,
+  markMemberSignatureMissing,
   recordSessionSwipe,
   resetSessionSwipes,
   sessionSwipeCount,
@@ -98,7 +98,9 @@ const SCENARIOS: Array<{
   asks: SwipeAnchor[];
   editable: string[];
   readOnly: string[];
-  signatureMissing: boolean;
+  memberSignatureMissing: boolean;
+  /** The form collects the driver's own signature, which IS recoverable. */
+  asksDriverSignature: boolean;
 }> = [
   {
     name: "1a · pick-up only",
@@ -106,7 +108,8 @@ const SCENARIOS: Array<{
     asks: ["pickup"],
     editable: ["pickupTime", "pickupOdometer"],
     readOnly: ["enRouteTime", "dropOffTime", "dropoffOdometer"],
-    signatureMissing: false,
+    memberSignatureMissing: false,
+    asksDriverSignature: false,
   },
   {
     name: "1b · both ends",
@@ -114,7 +117,8 @@ const SCENARIOS: Array<{
     asks: ["pickup", "dropoff"],
     editable: ["pickupTime", "pickupOdometer", "dropOffTime", "dropoffOdometer"],
     readOnly: ["enRouteTime"],
-    signatureMissing: true,
+    memberSignatureMissing: true,
+    asksDriverSignature: true,
   },
   {
     name: "2 · drop-off only",
@@ -122,7 +126,8 @@ const SCENARIOS: Array<{
     asks: ["dropoff"],
     editable: ["dropOffTime", "dropoffOdometer"],
     readOnly: ["enRouteTime", "pickupTime", "pickupOdometer"],
-    signatureMissing: true,
+    memberSignatureMissing: true,
+    asksDriverSignature: true,
   },
 ];
 
@@ -307,15 +312,41 @@ check("the member question changes the route",
     describe(routeMissedSwipe({ missing: ["pickup"], memberAboard: false })),
   "asking is theatre");
 
-// ⛔⛔ The signature outcome, per scenario.
+/**
+ * ⛔⛔ The signature outcome, per scenario — and it is TWO signatures.
+ *
+ * `CAP-098` shows production's Stage 05 taking a Driver AND a Member signature.
+ * The member's cannot be recovered once they have left; the driver's always can,
+ * because they are the one filing. An earlier version read the screen as one
+ * "member signature" pad and recorded BOTH as lost.
+ */
 for (const scenario of SCENARIOS) {
-  check(`${scenario.name}: signature missing = ${scenario.signatureMissing}`,
-    leavesSignatureMissing(scenario.asks) === scenario.signatureMissing,
-    `got ${leavesSignatureMissing(scenario.asks)}`);
+  check(`${scenario.name}: member signature missing = ${scenario.memberSignatureMissing}`,
+    leavesMemberSignatureMissing(scenario.asks) === scenario.memberSignatureMissing,
+    `got ${leavesMemberSignatureMissing(scenario.asks)}`);
+
+  const hasDriverField = caseFor(scenario.asks, scenario.rideId).fields.some(
+    (f) => f.id === "driverSignature"
+  );
+  check(`${scenario.name}: driver signature asked = ${scenario.asksDriverSignature}`,
+    hasDriverField === scenario.asksDriverSignature, `got ${hasDriverField}`);
 }
-check("the signature outcome differs across the three",
-  SCENARIOS.filter((s) => s.signatureMissing).length === 2,
-  `${SCENARIOS.filter((s) => s.signatureMissing).length} of ${SCENARIOS.length}`);
+check("the member-signature outcome differs across the three",
+  SCENARIOS.filter((s) => s.memberSignatureMissing).length === 2,
+  `${SCENARIOS.filter((s) => s.memberSignatureMissing).length} of ${SCENARIOS.length}`);
+/** ⛔ The two must track each other: a lost member signature is exactly when the
+ *  driver's is worth collecting. If they ever diverge, one of them is wrong. */
+check("a lost member signature always asks for the driver's",
+  SCENARIOS.every((s) => s.memberSignatureMissing === s.asksDriverSignature),
+  "the two halves of Stage 05 disagree");
+
+/** ⛔ It must be LAST — the driver signs for what is above it. */
+for (const scenario of SCENARIOS.filter((s) => s.asksDriverSignature)) {
+  const fields = caseFor(scenario.asks, scenario.rideId).fields;
+  check(`${scenario.name}: the driver signature is the last field`,
+    fields[fields.length - 1]?.id === "driverSignature",
+    `last is ${fields[fields.length - 1]?.id}`);
+}
 
 // The unblock: it moves the BUTTON, never the record.
 const OFFERED: Array<[("start" | "pick-up" | "drop-off" | null), boolean, string | null]> = [
@@ -493,7 +524,7 @@ section("6. The confirmed answers become marks, and the outcome sticks");
 resetSessionSwipes();
 check("the overlay starts empty", sessionSwipeCount() === 0, `${sessionSwipeCount()}`);
 check("...and nothing starts signature-missing",
-  !isSignatureMissing(leg1.id), "a leg started flagged");
+  !isMemberSignatureMissing(leg1.id), "a leg started flagged");
 
 check('a time input converts back to a clock face',
   fromTimeInputValue("11:20") === "11:20 AM" &&
@@ -526,12 +557,12 @@ check("1a: the leg-options registry sees it too",
     "11:20 AM",
   "the second reader of the seed is stale");
 
-markSignatureMissing(leg1.id);
-check("the signature outcome is recorded", isSignatureMissing(leg1.id), "not flagged");
+markMemberSignatureMissing(leg1.id);
+check("the signature outcome is recorded", isMemberSignatureMissing(leg1.id), "not flagged");
 check("...and does not leak to the other leg",
-  !isSignatureMissing(leg2.id), "the flag leaked across legs");
+  !isMemberSignatureMissing(leg2.id), "the flag leaked across legs");
 resetSessionSwipes();
-check("resetting clears both", sessionSwipeCount() === 0 && !isSignatureMissing(leg1.id), "");
+check("resetting clears both", sessionSwipeCount() === 0 && !isMemberSignatureMissing(leg1.id), "");
 
 // A swipe made NOW is stamped from the leg's own trail, not the device clock.
 for (const id of [RIDE_1, RIDE_2]) {
@@ -549,7 +580,7 @@ section("7. Negative controls — the other cases are untouched");
 const noShowCase = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
 const MISSED_ONLY = [
   "enRouteTime", "pickupTime", "pickupOdometer", "dropOffTime", "dropoffOdometer",
-  "pickupWhere", "dropoffWhere", "attachment",
+  "pickupWhere", "dropoffWhere", "attachment", "driverSignature",
 ];
 const leaked = MISSED_ONLY.filter((id) => noShowCase.fields.some((f) => f.id === id));
 check("no Missed Swipe field reaches a no-show build",
@@ -572,6 +603,20 @@ check("every Missed Swipe field is gated on the issue",
 check("...and there were some to check",
   caseFor(["pickup", "dropoff"], RIDE_1).fields.filter((f) => MISSED_ONLY.includes(f.id)).length >= 5,
   "");
+/**
+ * ⛔ Two signature fields now exist on one form runtime — the no-show's
+ * `signature` and Missed Swipe's `driverSignature`. Different ids on purpose: a
+ * shared one would make a no-show attestation and a drop-off attestation the
+ * same stored value under two different pieces of copy.
+ */
+check("the two cases' signature fields are distinct",
+  noShowCase.fields.some((f) => f.type === "signature" && f.id !== "driverSignature") ||
+    !noShowCase.fields.some((f) => f.type === "signature"),
+  "a no-show build carries the driver-signature id");
+check("Missed Swipe's signature is its own id",
+  caseFor(["dropoff"], RIDE_2).fields.some((f) => f.id === "driverSignature"),
+  "the driver signature is missing from a drop-off build");
+
 check("the anchor→mark map is the production sequence",
   MARK_FOR_ANCHOR.pickup === "pickedUpAt" && MARK_FOR_ANCHOR.dropoff === "droppedOffAt", "");
 
@@ -580,10 +625,12 @@ section("8. Wiring — greps run on code, not on the comments about it");
 
 const LAYOUT = readFileSync("components/driver/ride-detail-layout.tsx", "utf8");
 const FORM = readFileSync("components/support/missed-swipe-form.tsx", "utf8");
-const SHEET = readFileSync("components/driver/drop-off-swipe-sheet.tsx", "utf8");
+const ODO = readFileSync("components/driver/odometer-reading-dialog.tsx", "utf8");
+const SIG = readFileSync("components/driver/ride-signature-screen.tsx", "utf8");
 check("the ride detail source was read", LAYOUT.length > 2000, `${LAYOUT.length} chars`);
 check("the form source was read", FORM.length > 1000, `${FORM.length} chars`);
-check("the drop-off sheet source was read", SHEET.length > 1000, `${SHEET.length} chars`);
+check("the odometer source was read", ODO.length > 1000, `${ODO.length} chars`);
+check("the signature source was read", SIG.length > 1000, `${SIG.length} chars`);
 
 /** Comments stripped: a grep for an ABSENT string otherwise matches its own rationale. */
 const CODE = LAYOUT.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -599,8 +646,26 @@ check("nothing raises the flow on mount",
   "a prompt still opens itself when the ride is opened");
 check("the manual claim link is gone",
   !/I already made this swipe/.test(CODE), "the link is still rendered");
-check("the drop-off steps are a real sheet",
-  CODE.includes("<DropOffSwipeSheet"), "no drop-off sheet is mounted");
+/**
+ * ⛔⛔ Stage 04 → 05, replicated rather than invented.
+ *
+ * The first version was one drawer combining an odometer field and a single
+ * "member signature" pad. `CAP-095` and `CAP-098` show two separate surfaces: a
+ * native odometer alert, then a full-screen two-signature capture. The library
+ * held both the whole time, indexed as `CAP-094`–`CAP-099`.
+ */
+check("the odometer popup is mounted",
+  CODE.includes("<OdometerReadingDialog"), "no odometer popup");
+check("the Ride Signature screen is mounted",
+  CODE.includes("<RideSignatureScreen"), "no signature screen");
+check("the invented combined sheet is gone",
+  !/DropOffSwipeSheet/.test(CODE), "the drawer is still mounted");
+check("the odometer comes BEFORE the signature",
+  CODE.indexOf("setOdometerOpen(true)") < CODE.indexOf("setSignatureOpen(true)"),
+  "Stage 05 runs before Stage 04 Step 2");
+check("the mark lands only once the signature is submitted",
+  /handleSignatureSubmit[\s\S]{0,400}recordSwipe\(leg, "droppedOffAt"/.test(CODE),
+  "the drop-off is recorded before Stage 05 completes");
 /**
  * ⛔⛔ The sheet takes the MEMBER's signature, so it belongs only on the path
  * where the member is still in the car. Ride 2's member is long gone: sending
@@ -608,20 +673,37 @@ check("the drop-off steps are a real sheet",
  * someone who is not there, when the honest outcome is that it is missing for
  * good. The postponed branch is the ONLY one that opens it.
  */
-check("only the postponed path opens the signature sheet",
-  /pickupPostponed && nextSwipe === "drop-off"[\s\S]{0,120}setDropOffOpen\(true\)/.test(CODE),
-  "the sheet is not gated on the postponed path");
+check("only the postponed path opens the drop-off steps",
+  /pickupPostponed && nextSwipe === "drop-off"[\s\S]{0,120}setOdometerOpen\(true\)/.test(CODE),
+  "the steps are not gated on the postponed path");
 check("...and an unpostponed drop-off goes straight to the form",
   /nextSwipe === "drop-off" && swipeNeedsConfirming[\s\S]{0,400}fileMissedSwipe\(activeLeg, null\)/.test(CODE),
   "ride 2 is sent to the signature sheet");
-check("the sheet is opened from exactly one place",
-  (CODE.match(/setDropOffOpen\(true\)/g) ?? []).length === 1,
-  `${(CODE.match(/setDropOffOpen\(true\)/g) ?? []).length} call sites`);
-check("the drop-off sheet takes an odometer AND a signature",
-  SHEET.includes("SignaturePad") && SHEET.includes('type="number"'),
-  "the normal drop-off capture is incomplete");
-check("the drop-off records both",
-  CODE.includes('recordSwipe(leg, "droppedOffAt", odometerReading)'),
+check("the drop-off steps are opened from exactly one place",
+  (CODE.match(/setOdometerOpen\(true\)/g) ?? []).length === 1,
+  `${(CODE.match(/setOdometerOpen\(true\)/g) ?? []).length} call sites`);
+/** Element-level, straight off the captures. */
+check("the odometer popup carries production's own copy",
+  ODO.includes("Odometer Reading") &&
+    ODO.includes("Please input your odometer reading:") &&
+    ODO.includes("Cancel") && ODO.includes("Submit"),
+  "the popup does not match CAP-095");
+/**
+ * ⚠️ Asserted as PANEL LABELS, not as bare strings. The first version grepped
+ * for "Member Signature" anywhere in the file — which still matched the
+ * explanatory copy in the member-absent branch, so renaming the panel to
+ * "Rider Signature" left the check green. `CAP-098` says Driver / Member.
+ */
+check("the signature screen takes BOTH panels, labelled as captured",
+  SIG.includes('label="Driver Signature"') &&
+    SIG.includes('label="Member Signature"') &&
+    SIG.includes("Ride Signature"),
+  "CAP-098 shows two panels under one Ride Signature header");
+check("each panel owns its own Clear",
+  (SIG.match(/onClear/g) ?? []).length >= 2 && SIG.includes("showFooter={false}"),
+  "the pad's built-in footer is standing in for the captured Clear links");
+check("the drop-off records the reading with the mark",
+  CODE.includes('recordSwipe(leg, "droppedOffAt", dropOffReading'),
   "the reading is not stored with the mark");
 check("the question set is routed, never hardcoded",
   CODE.includes("routeMissedSwipe({") && !/setMissedSwipeAsks\(\s*\[\s*"pickup"/.test(CODE),
@@ -629,8 +711,8 @@ check("the question set is routed, never hardcoded",
 check("confirmed answers are written back as marks",
   FORM.includes("recordSwipe(") && FORM.includes("MARK_FOR_ANCHOR[anchor]"),
   "the form files a correction its own leg never sees");
-check("the signature outcome is recorded on submit",
-  FORM.includes("markSignatureMissing(leg.id)"), "the outcome is never recorded");
+check("the MEMBER signature outcome is recorded on submit",
+  FORM.includes("markMemberSignatureMissing(leg.id)"), "the outcome is never recorded");
 check("Missed Swipe is the case that keeps Pending",
   FORM.includes("appTracksStatus: true"), "appTracksStatus is not true");
 check("the no-show form still is not",

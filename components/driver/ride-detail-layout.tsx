@@ -38,13 +38,13 @@ import {
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   getMissingAnchors,
-  leavesSignatureMissing,
   offeredSwipe,
   routeMissedSwipe,
   swipeNeedsConfirming,
   type SwipeAnchor,
 } from "@/lib/driver-data/missed-swipe-rules";
-import { DropOffSwipeSheet } from "./drop-off-swipe-sheet";
+import { OdometerReadingDialog } from "./odometer-reading-dialog";
+import { RideSignatureScreen } from "./ride-signature-screen";
 import {
   MissedSwipePrompt,
   type MissedSwipeAnswer,
@@ -302,7 +302,14 @@ export function RideDetailLayout({
   const pendingRequest = getPendingRequest(trip.id);
 
   const [promptOpen, setPromptOpen] = useState(false);
-  const [dropOffOpen, setDropOffOpen] = useState(false);
+  /**
+   * Stage 04 → 05, as `CAP-095` / `CAP-098` have them: the swipe opens the
+   * odometer popup, Submit advances to the full-screen Ride Signature, and only
+   * then is the mark recorded. Two pieces of state because they are two screens.
+   */
+  const [odometerOpen, setOdometerOpen] = useState(false);
+  const [signatureOpen, setSignatureOpen] = useState(false);
+  const [dropOffReading, setDropOffReading] = useState<number | null>(null);
   const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
     null
   );
@@ -344,7 +351,7 @@ export function RideDetailLayout({
     if (!activeLeg) return;
 
     if (pickupPostponed && nextSwipe === "drop-off") {
-      setDropOffOpen(true);
+      setOdometerOpen(true);
       return;
     }
 
@@ -412,28 +419,33 @@ export function RideDetailLayout({
     setTimeout(() => fileMissedSwipe(activeLeg, false), 0);
   }
 
+  /** Stage 04 Step 2 → Stage 05. The reading is held until both panels sign. */
+  function handleOdometerSubmit(reading: number) {
+    setDropOffReading(reading);
+    setOdometerOpen(false);
+    setSignatureOpen(true);
+  }
+
   /**
-   * The drop-off steps came back with a reading and a signature.
+   * Stage 05 submitted — the leg is dropped off properly.
    *
    * ⚠️ The mark AND the odometer are recorded here, which is what makes the
    * drop-off end read-only in the form that follows: it is not a reconstruction,
-   * it is a swipe that just happened properly.
+   * it is a swipe that just happened, with both signatures taken.
    */
-  function handleDropOffComplete(odometerReading: number) {
-    setDropOffOpen(false);
+  function handleSignatureSubmit() {
+    setSignatureOpen(false);
     if (!activeLeg) return;
     const leg = activeLeg;
-    recordSwipe(leg, "droppedOffAt", odometerReading);
-    const wasPostponed = pickupPostponed;
+    recordSwipe(leg, "droppedOffAt", dropOffReading ?? undefined);
     clearPostponedPickup(leg.id);
+    setDropOffReading(null);
     setTimeout(() => {
-      // 1a leaves only the pick-up to confirm; ride 2 leaves only the drop-off.
+      // 1a: the drop-off is now a fact, so only the pick-up is left to confirm.
       const remaining = getMissingAnchors(leg).filter(
         (anchor) => anchor !== "dropoff"
       );
-      setMissedSwipeAsks(
-        wasPostponed && remaining.length > 0 ? remaining : ["dropoff"]
-      );
+      if (remaining.length > 0) setMissedSwipeAsks(remaining);
     }, 0);
   }
 
@@ -825,10 +837,23 @@ export function RideDetailLayout({
         onOpenChange={setPromptOpen}
         onAnswer={handleAnswer}
       />
-      <DropOffSwipeSheet
-        open={dropOffOpen}
-        onOpenChange={setDropOffOpen}
-        onConfirm={handleDropOffComplete}
+      <OdometerReadingDialog
+        anchor="dropoff"
+        open={odometerOpen}
+        onOpenChange={setOdometerOpen}
+        onSubmit={handleOdometerSubmit}
+      />
+      <RideSignatureScreen
+        open={signatureOpen}
+        /*
+          ⚠️ Always true here. This screen is only ever reached from the
+          postponed drop-off, which exists precisely because the member IS in
+          the car — see `handleSwipeTap`. The prop is explicit so the opposite
+          case cannot be reached by accident.
+        */
+        memberPresent
+        onCancel={() => setSignatureOpen(false)}
+        onSubmit={handleSignatureSubmit}
       />
       {missedSwipeAsks && (
         <MissedSwipeForm

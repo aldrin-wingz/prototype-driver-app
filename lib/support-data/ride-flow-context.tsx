@@ -7,9 +7,9 @@ import { swipeClockFor, type SwipeMark } from "@/lib/driver-data/missed-swipe-ru
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import {
   applySessionSwipes as applyOverlay,
-  markSignatureMissing as markMissing,
+  markMemberSignatureMissing as markMissing,
   recordSessionSwipe,
-  tripSignatureMissing,
+  tripMemberSignatureMissing,
 } from "@/lib/driver-data/session-swipes";
 
 /**
@@ -141,9 +141,9 @@ interface RideFlowValue {
    * the screen as a banner instead — which is the difference between the app
    * telling you something and the app nagging you.
    */
-  /** Record that a leg ended with no rider signature, and read it back. */
-  markSignatureMissing: (legId: string) => void;
-  isTripSignatureMissing: (trip: Trip) => boolean;
+  /** Record that a leg ended with no MEMBER signature, and read it back. */
+  markMemberSignatureMissing: (legId: string) => void;
+  isTripMemberSignatureMissing: (trip: Trip) => boolean;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -229,11 +229,11 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         ),
       clearPostponedPickup: (legId) =>
         setPostponed((previous) => previous.filter((id) => id !== legId)),
-      markSignatureMissing: (legId) => {
+      markMemberSignatureMissing: (legId) => {
         markMissing(legId);
         setSwipeRevision((previous) => previous + 1);
       },
-      isTripSignatureMissing: (trip) => tripSignatureMissing(trip),
+      isTripMemberSignatureMissing: (trip) => tripMemberSignatureMissing(trip),
     }),
     [records, swipeRevision, postponed]
   );

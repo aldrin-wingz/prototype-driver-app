@@ -491,6 +491,31 @@ export function buildSupportFormCase({
               helpText: "Add a photo or screenshot if it helps explain.",
               showIf: ONLY_MISSED_SWIPE,
             },
+            /**
+             * ⛔⛔ The DRIVER's signature, and only when the drop-off is being
+             * reconstructed.
+             *
+             * `CAP-098` shows Stage 05 taking two signatures. The member's is
+             * gone once they have left the car; the driver's is not — they are
+             * sitting here filing this. Recording both as lost, as an earlier
+             * version did, threw away a signature that was there for the taking.
+             *
+             * LAST in the set, always: the driver attests to the answers above,
+             * so a field after it would be signed for before it was written.
+             */
+            ...(asksDropoff
+              ? [
+                  {
+                    id: "driverSignature",
+                    type: "signature",
+                    label: "Driver Signature",
+                    helpText:
+                      "The member's signature can no longer be taken, so yours is what attests to this leg.",
+                    required: true,
+                    showIf: ONLY_MISSED_SWIPE,
+                  },
+                ]
+              : []),
           ] as SupportCaseDefinition["fields"])
         : []),
 

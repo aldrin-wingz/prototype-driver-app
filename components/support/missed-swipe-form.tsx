@@ -10,7 +10,7 @@ import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   anchorMatched,
   canSubmitUnedited,
-  leavesSignatureMissing,
+  leavesMemberSignatureMissing,
   MARK_FOR_ANCHOR,
   matchAnchor,
   type SwipeAnchor,
@@ -123,7 +123,7 @@ export function MissedSwipeForm({
   onSubmitted?: () => void;
 }) {
   const { toast } = useToast();
-  const { submitForm, recordSwipe, markSignatureMissing } = useRideFlow();
+  const { submitForm, recordSwipe, markMemberSignatureMissing } = useRideFlow();
   const { supportCase, initialValues } = buildMissedSwipe(trip, leg, asks);
 
   /** Which form fields hold each anchor's answers. */
@@ -163,8 +163,9 @@ export function MissedSwipeForm({
             );
           }
           // The drop-off was reconstructed rather than swiped with the member
-          // present, so the signature it would have taken was never taken.
-          if (leavesSignatureMissing(asks)) markSignatureMissing(leg.id);
+          // present, so the MEMBER's half of Stage 05 was never taken. The
+          // driver's half is the `driverSignature` field above.
+          if (leavesMemberSignatureMissing(asks)) markMemberSignatureMissing(leg.id);
         }
 
         submitForm({
@@ -176,8 +177,8 @@ export function MissedSwipeForm({
         });
         toast({
           title: "Sent to Support",
-          description: leavesSignatureMissing(asks)
-            ? "The leg is complete. It stays pending while Support confirms it, and the rider signature is recorded as missing."
+          description: leavesMemberSignatureMissing(asks)
+            ? "The leg is complete. It stays pending while Support confirms it, and the member's signature is recorded as missing."
             : "The leg is complete. It stays pending while Support confirms the pick-up.",
         });
         onSubmitted?.();

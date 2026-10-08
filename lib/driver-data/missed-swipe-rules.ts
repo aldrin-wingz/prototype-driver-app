@@ -230,18 +230,20 @@ export function routeMissedSwipe({
 }
 
 /**
- * Does this path leave the rider signature untaken?
+ * Does this path leave the MEMBER's signature untaken?
  *
- * ⛔⛔ **A signature is not a question a form can ask.** It is captured by the
- * drop-off swipe, with the member present — so once they are gone it is not
- * missing pending an answer, it is missing permanently. Every path whose
- * drop-off was never swiped live ends as "completed · signature missing", which
- * is the existing state the app already has a filter for.
+ * ⛔⛔ **Only the member's.** `CAP-098` shows production's Ride Signature screen
+ * taking TWO — `Driver Signature` and `Member Signature`, one green Submit — and
+ * that distinction is the whole rule. The driver is present whenever this form
+ * is filled, so their signature can always be collected; the member has gone, so
+ * theirs cannot be collected ever. An earlier version read the capture as one
+ * "member signature" pad and therefore recorded BOTH as lost, which threw away a
+ * signature that was there for the taking.
  *
- * Only 1a escapes it: there the member is still in the car and the drop-off is
- * swiped exactly as it would have been.
+ * Only 1a escapes it entirely: there the member is still in the car and the
+ * drop-off runs the real Stage 04→05 steps, so both panels are signed.
  */
-export function leavesSignatureMissing(asks: SwipeAnchor[]): boolean {
+export function leavesMemberSignatureMissing(asks: SwipeAnchor[]): boolean {
   return asks.includes("dropoff");
 }
 
