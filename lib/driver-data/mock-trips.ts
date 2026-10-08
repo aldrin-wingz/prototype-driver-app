@@ -257,6 +257,44 @@ export interface Trip {
    * proposal. See `NoShowDemoRow`. Absent means today's behaviour.
    */
   noShowDemo?: NoShowDemoRow;
+  /**
+   * ⚠️ **DEMO SCAFFOLDING.** Which solution scenario this ride IS.
+   *
+   * The prototype carries 26 proposed features and one app, so by slice three
+   * the ride list had become a pile of lookalike cards with production pills on
+   * them and no way to tell which one demonstrated what. A scenario ride says so
+   * on its own card, and the selector can show only the rides belonging to the
+   * solution in focus.
+   *
+   * Absent means a plain mirror ride — one of the base's own state demos, kept
+   * faithful and filtered OUT while a solution is focused.
+   */
+  scenario?: TripScenario;
+  /**
+   * Pills a SCREEN adds at render time, e.g. "Waiting on Support".
+   *
+   * ⚠️ Separate from `pills` because those are seed decoration and a scenario
+   * ride replaces them, while this is live status and must survive that swap.
+   * Collapsing the two hid the Pending tab's own marker the moment the ride
+   * happened to be a scenario ride — which is every ride that can reach it.
+   */
+  statusPills?: TripPill[];
+}
+
+/**
+ * A ride that exists to demonstrate one or more catalogue solutions.
+ *
+ * ⚠️ `solutions` holds catalogue ids, and `verify-solutions` resolves every one
+ * of them — a typo here would silently filter a ride out of its own demo rather
+ * than failing, which is the quietest possible way to break a walkthrough.
+ */
+export interface TripScenario {
+  /** Short, stable handle shown first on the pill, e.g. "03a". */
+  code: string;
+  /** What this ride is the case OF, in a few words. */
+  label: string;
+  /** Catalogue solution ids this ride demonstrates. */
+  solutions: string[];
 }
 
 export interface TripPill {
@@ -1242,7 +1280,15 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "3.1",
-    pills: [{ label: "3.1 · No 10 consec min · refusal carries a countdown", variant: "warning" }],
+    // ⚠️ No production pills on a scenario ride, on purpose. The card renders
+    // the scenario identifier instead, and inventing a "Wait For Call" beside it
+    // would be seed data nothing reads and nobody checked.
+    pills: [],
+    scenario: {
+      code: "02a",
+      label: "At the pick-up, under 10 min",
+      solutions: ["cancel-at-door", "rider-no-show"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1300,9 +1346,12 @@ export const mockInProgressTrips: Trip[] = [
     ],
     status: "in-progress",
     noShowDemo: "4.1",
-    pills: [
-      { label: "4.1 · Not at pickup · revised copy + 4-question form", variant: "warning" },
-    ],
+    pills: [],
+    scenario: {
+      code: "01a",
+      label: "Away from the pick-up",
+      solutions: ["rider-no-show"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1457,7 +1506,12 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Wheelchair", variant: "attention" }],
+    pills: [],
+    scenario: {
+      code: "03a",
+      label: "Missed pick-up, member still aboard",
+      solutions: ["missed-swipe"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1512,7 +1566,12 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Single Legs Allowed", variant: "success" }],
+    pills: [],
+    scenario: {
+      code: "03b",
+      label: "Missed both, trail confirms each end",
+      solutions: ["missed-swipe"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },
@@ -1567,7 +1626,12 @@ export const mockInProgressTrips: Trip[] = [
       },
     ],
     status: "in-progress",
-    pills: [{ label: "Wait For Call", variant: "attention" }],
+    pills: [],
+    scenario: {
+      code: "03c",
+      label: "Missed drop-off, trail can't place it",
+      solutions: ["missed-swipe"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
   },

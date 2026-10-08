@@ -13,6 +13,8 @@ import {
   type Trip,
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import { useSolution } from "@/lib/solutions/solution-context";
+import { ridesForSolution } from "@/lib/solutions/scenario-rides";
 
 type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
 
@@ -30,6 +32,23 @@ export default function MyRidesPage() {
   // has made — revert to "needs-action" before treating this as production.
   const [activeTab, setActiveTab] = useState<TabValue>("in-progress");
   const { submittedForms } = useRideFlow();
+  const { active } = useSolution();
+
+  /**
+   * While a solution is focused, this list holds ONLY the rides that
+   * demonstrate it.
+   *
+   * ⚠️ By slice three the prototype carried 26 proposed features through one
+   * ride list, and the cards had become indistinguishable — same client names,
+   * production pills, no way to tell which ride was the point. Narrowing to the
+   * solution in focus is what makes the selector a demo tool rather than a
+   * reading pane.
+   *
+   * ⚠️ Nothing is hidden when nothing is focused. The app then runs as the plain
+   * mirror, which is the state every screen in it was replicated in.
+   */
+  const focused = (trips: Trip[]) =>
+    ridesForSolution(trips, active?.id ?? null);
 
   // Only a form that NAMES a trip moves a ride here. A general or payment
   // question lives in the Forms menu instead — it isn't about a ride, so putting
@@ -48,7 +67,7 @@ export default function MyRidesPage() {
       .filter((tripId): tripId is string => Boolean(tripId))
   );
   const withoutPending = (trips: Trip[]) =>
-    trips.filter((trip) => !pendingIds.has(trip.id));
+    focused(trips).filter((trip) => !pendingIds.has(trip.id));
 
   const allRides = [
     ...mockInProgressTrips,
@@ -57,13 +76,15 @@ export default function MyRidesPage() {
   ];
   // Carry the pending status onto the card itself. Ride Details spells it out,
   // but a card in the Pending tab that looks like any other card is a miss.
-  const pendingTrips = allRides
+  const pendingTrips = focused(allRides)
     .filter((trip) => pendingIds.has(trip.id))
     .map((trip) => ({
       ...trip,
-      pills: [
+      // ⚠️ `statusPills`, not `pills`. A scenario ride replaces its seeded pills
+      // with its identifier, and this marker has to outlive that swap — which is
+      // every ride that can reach this tab.
+      statusPills: [
         { label: "Waiting on Support", variant: "attention" as const },
-        ...trip.pills,
       ],
     }));
 
@@ -142,7 +163,9 @@ export default function MyRidesPage() {
             <p className="text-gray-500">
               {activeTab === "pending"
                 ? "No rides waiting on Support."
-                : "No rides in this category"}
+                : active
+                  ? `No rides in this tab for solution ${String(active.order).padStart(2, "0")} — ${active.subjectArea}.`
+                  : "No rides in this category"}
             </p>
           </div>
         ) : (

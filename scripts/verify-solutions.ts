@@ -29,6 +29,12 @@ import {
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
+  isScenarioFor,
+  pillsFor,
+  ridesForSolution,
+  scenarioRides,
+} from "../lib/solutions/scenario-rides";
+import {
   mockRequestTrips,
   mockNeedsActionTrips,
   mockUpcomingTrips,
@@ -367,6 +373,171 @@ check(
   "steps genuinely outnumber lines",
   `${stepCount} steps vs ${lineCount} lines`,
   stepCount > lineCount * 1.5,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n6. Scenario rides — every built row has one, and says which");
+
+const builtRows = SOLUTIONS.filter((s) => s.buildState === "in-prototype");
+
+const ALL_SEEDED = [
+  ...mockInProgressTrips,
+  ...mockNeedsActionTrips,
+  ...mockUpcomingTrips,
+  ...mockCompletedTrips,
+  ...mockRequestTrips,
+];
+const tagged = scenarioRides(ALL_SEEDED);
+
+/** Declared, never counted off the seed — a derived total cannot fail. */
+const EXPECTED_SCENARIO_RIDES = 5;
+check(
+  "the seed carries the declared number of scenario rides",
+  `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
+  tagged.length === EXPECTED_SCENARIO_RIDES,
+);
+
+const codes = tagged.map((trip) => trip.scenario!.code);
+check(
+  "every scenario code is unique",
+  `${new Set(codes).size} distinct of ${codes.length} — ${codes.join(", ")}`,
+  new Set(codes).size === codes.length,
+);
+check(
+  "every scenario carries a label",
+  `${tagged.filter((t) => t.scenario!.label.trim()).length} of ${tagged.length}`,
+  tagged.every((trip) => trip.scenario!.label.trim().length > 0),
+);
+
+/**
+ * ⛔ A solution id that does not resolve would filter a ride out of its own
+ * demo silently — the ride simply never appears, and nothing says why.
+ */
+const danglingIds = tagged.flatMap((trip) =>
+  trip.scenario!.solutions.filter((id) => !SOLUTIONS.some((s) => s.id === id)),
+);
+const claimedIds = tagged.flatMap((trip) => trip.scenario!.solutions);
+check(
+  "every scenario names real catalogue rows",
+  `${danglingIds.length} dangling of ${claimedIds.length} claim(s)`,
+  danglingIds.length === 0,
+);
+
+/** Every row that claims to be built must be demonstrable from the ride list. */
+const unbacked = builtRows.filter(
+  (solution) => !tagged.some((trip) => isScenarioFor(trip, solution.id)),
+);
+check(
+  "every in-prototype row has at least one scenario ride",
+  `${unbacked.length} unbacked of ${builtRows.length} built row(s)`,
+  unbacked.length === 0,
+);
+check(
+  "...and there were built rows to check",
+  `${builtRows.length} built`,
+  builtRows.length >= 3,
+);
+
+/** The entry route's own ride has to be one of them, or the link lands nowhere. */
+let entryMismatches = 0;
+let entryChecked = 0;
+for (const solution of builtRows) {
+  // ⚠️ `entry.alternates`, NOT `solution.alternates`. The first version read the
+  // wrong level, found `undefined`, and quietly checked 3 routes instead of 4 —
+  // a passing check with a denominator one short of the truth. The count below
+  // is declared so that cannot recur silently.
+  const routes = [
+    solution.entry?.route,
+    ...(solution.entry?.alternates ?? []).map((a) => a.route),
+  ];
+  for (const route of routes) {
+    if (!route) continue;
+    const id = route.split("/")[2];
+    const trip = ALL_SEEDED.find((t) => t.id === id);
+    entryChecked += 1;
+    if (!trip || !isScenarioFor(trip, solution.id)) entryMismatches += 1;
+  }
+}
+check(
+  "every entry route lands on a ride tagged for that row",
+  `${entryMismatches} mismatch(es) of ${entryChecked} route(s)`,
+  entryMismatches === 0,
+);
+/** Declared, because a route silently skipped is a check that stops checking. */
+const EXPECTED_ENTRY_ROUTES = 4;
+check(
+  "...and every declared route was reached",
+  `${entryChecked} checked (expected ${EXPECTED_ENTRY_ROUTES})`,
+  entryChecked === EXPECTED_ENTRY_ROUTES,
+);
+
+console.log("\n7. The scenario pill replaces, and status survives");
+
+const scenarioRide = tagged[0];
+const plainRide = ALL_SEEDED.find((t) => !t.scenario && t.pills.length > 0);
+check(
+  "a scenario ride shows exactly one pill — its identifier",
+  `${pillsFor(scenarioRide).length} pill(s): ${pillsFor(scenarioRide).map((p) => p.label).join(" | ")}`,
+  pillsFor(scenarioRide).length === 1 &&
+    pillsFor(scenarioRide)[0].label.startsWith(scenarioRide.scenario!.code),
+);
+check(
+  "a plain ride keeps its production pills",
+  plainRide
+    ? `${pillsFor(plainRide).length} of ${plainRide.pills.length}`
+    : "no plain ride with pills in the seed",
+  Boolean(plainRide) && pillsFor(plainRide!).length === plainRide!.pills.length,
+);
+/** ⛔ The Pending marker must outlive the swap, or the tab stops saying anything. */
+check(
+  "a render-time status pill survives on a scenario ride",
+  pillsFor({ ...scenarioRide, statusPills: [{ label: "Waiting on Support", variant: "attention" }] })
+    .map((p) => p.label)
+    .join(" | "),
+  pillsFor({
+    ...scenarioRide,
+    statusPills: [{ label: "Waiting on Support", variant: "attention" }],
+  })[0].label === "Waiting on Support",
+);
+
+console.log("\n8. Focusing a solution narrows the ride list");
+
+const inProgress = mockInProgressTrips;
+check(
+  "no focus hides nothing",
+  `${ridesForSolution(inProgress, null).length} of ${inProgress.length}`,
+  ridesForSolution(inProgress, null).length === inProgress.length,
+);
+/** Declared per row, so adding a scenario ride has to be a deliberate edit. */
+const EXPECTED_IN_PROGRESS: Record<string, number> = {
+  "rider-no-show": 2,
+  "cancel-at-door": 1,
+  "missed-swipe": 3,
+};
+for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
+  const shown = ridesForSolution(inProgress, id);
+  check(
+    `focusing ${id} shows ${expected} In Progress ride(s)`,
+    `${shown.length} of ${inProgress.length} — ${shown.map((t) => t.scenario?.code).join(", ")}`,
+    shown.length === expected,
+  );
+}
+check(
+  "every built row's ride count was declared",
+  `${Object.keys(EXPECTED_IN_PROGRESS).length} declared of ${builtRows.length} built`,
+  Object.keys(EXPECTED_IN_PROGRESS).length === builtRows.length,
+);
+/** The filter must actually REMOVE something, or it is decorative. */
+check(
+  "focusing genuinely narrows the list",
+  `${ridesForSolution(inProgress, "missed-swipe").length} of ${inProgress.length}`,
+  ridesForSolution(inProgress, "missed-swipe").length < inProgress.length,
+);
+/** A row with no scenario ride shows an empty list rather than everything. */
+check(
+  "focusing an unbuilt row shows no rides, not all of them",
+  `${ridesForSolution(inProgress, "tag-number-invalid").length} of ${inProgress.length}`,
+  ridesForSolution(inProgress, "tag-number-invalid").length === 0,
 );
 
 // ---------------------------------------------------------------------------

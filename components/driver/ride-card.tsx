@@ -4,6 +4,7 @@ import { Expand, Users, Phone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Trip, TripLeg, TripPill, TimeAnchorType } from "@/lib/driver-data/mock-trips";
+import { pillsFor } from "@/lib/solutions/scenario-rides";
 import { ProgramContributionIndicator } from "./program-contribution-indicator";
 import { RevenueDisplay } from "./revenue-display";
 
@@ -165,7 +166,7 @@ export function RideCard({
 
       {/* Pills row — locked variant: pill-named-bottom */}
       <div className="flex flex-wrap gap-2">
-        {trip.pills.map((pill, index) => (
+        {pillsFor(trip).map((pill, index) => (
           <span
             key={index}
             className={cn(
