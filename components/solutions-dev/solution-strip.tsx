@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, CornerDownRight, X } from "lucide-react";
+import { ChevronDown, ChevronsUpDown, CornerDownRight, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -62,6 +62,7 @@ export function SolutionStrip() {
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
+            aria-label="Choose a solution to focus"
             className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-[#1B2C28] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4FD1AE]"
           >
             <span className="shrink-0 rounded bg-[#1B2C28] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#4FD1AE]">
@@ -75,9 +76,21 @@ export function SolutionStrip() {
                 ? `${active.calls.toLocaleString()} calls · ${formatShare(active)}`
                 : `${SOLUTIONS.length} proposed features`}
             </span>
-            {!active && (
-              <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-[#7D9A92]" />
-            )}
+            {/*
+              ⛔⛔ Always an affordance, in BOTH states.
+              Previously the chevron rendered only when nothing was focused —
+              so on a deep link, which is the commonest way anyone arrives, the
+              picker became a full-width invisible button sitting directly above
+              the app, with the only visible chevron next to it belonging to a
+              different control (the briefing collapse). Two near-miss taps on
+              the ride below opened the picker and then selected a row from it,
+              navigating out of the demo.
+
+              A switcher glyph rather than a second ChevronDown, so the two
+              adjacent controls cannot be mistaken for each other: this one
+              changes the selection, that one folds the briefing.
+            */}
+            <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 text-[#7D9A92]" />
           </button>
 
           {active && (

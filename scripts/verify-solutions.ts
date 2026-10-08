@@ -16,7 +16,7 @@
  * Run: bun run verify:solutions
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -376,6 +376,39 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+console.log("\n5b. The strip's controls are distinguishable");
+
+const STRIP = readFileSync(join(ROOT, "components/solutions-dev/solution-strip.tsx"), "utf8");
+check(
+  "the strip source was read",
+  `${STRIP.length} chars`,
+  STRIP.length > 2000,
+);
+/**
+ * ⛔⛔ The picker trigger is a full-width button sitting directly above the app.
+ * Its affordance used to render only when NOTHING was focused — so on a deep
+ * link, the commonest way anyone arrives, it was invisible, and the one visible
+ * chevron beside it belonged to the briefing collapse. Two near-miss taps meant
+ * for the ride opened the picker and then selected a row out of the demo.
+ */
+const hasSwitcher = STRIP.includes("<ChevronsUpDown");
+const gatedOnActive = /\{!active && \(\s*<Chevron/.test(STRIP);
+check(
+  "the picker trigger carries an affordance in BOTH states",
+  `switcher=${hasSwitcher}, gated-on-no-focus=${gatedOnActive}`,
+  hasSwitcher && !gatedOnActive,
+);
+check(
+  "...and it is not the same glyph as the briefing collapse",
+  "switcher vs chevron",
+  STRIP.includes("<ChevronsUpDown") && STRIP.includes("<ChevronDown"),
+);
+check(
+  "the trigger is labelled for screen readers",
+  "aria-label on the picker button",
+  STRIP.includes('aria-label="Choose a solution to focus"'),
+);
+
 console.log("\n6. Scenario rides — every built row has one, and says which");
 
 const builtRows = SOLUTIONS.filter((s) => s.buildState === "in-prototype");
