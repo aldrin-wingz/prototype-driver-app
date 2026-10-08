@@ -23,6 +23,17 @@ import type { SwipeMark } from "./missed-swipe-rules";
  * a mutable module cannot trigger a render by itself.
  */
 const overlay = new Map<string, Partial<LegSwipeProgress>>();
+/**
+ * Legs whose rider signature was never taken.
+ *
+ * ⛔⛔ **Not a pending question — a permanent fact.** The signature is captured
+ * by the drop-off swipe, with the member present. Once they have gone there is
+ * no later moment at which it can be collected, so a leg that reaches the end
+ * without one is COMPLETE and short a signature, which is a state the app
+ * already models (Ride History filters on it). The missed-swipe form records
+ * that outcome; it never asks for the signature it cannot have.
+ */
+const signatureMissing = new Set<string>();
 let version = 0;
 
 /** Bumped on every write, so a provider can hang state off it. */
@@ -30,20 +41,55 @@ export function swipeVersion(): number {
   return version;
 }
 
-/** Record a swipe against a leg. `at` is a clock face, e.g. "2:14 PM". */
+/** Which odometer field a mark captures, when it captures one. */
+const ODOMETER_FOR_MARK: Partial<Record<SwipeMark, "pickedUpOdometer" | "droppedOffOdometer">> = {
+  pickedUpAt: "pickedUpOdometer",
+  droppedOffAt: "droppedOffOdometer",
+};
+
+/**
+ * Record a swipe against a leg. `at` is a clock face, e.g. "2:14 PM".
+ *
+ * ⚠️ The odometer travels WITH the mark, because in production it is the same
+ * capture — the swipe takes the reading. Storing them separately would let a
+ * recorded mark exist with no reading beside it, which is exactly the state this
+ * whole case is about.
+ */
 export function recordSessionSwipe(
   legId: string,
   mark: SwipeMark,
-  at: string
+  at: string,
+  odometer?: number
 ): void {
-  overlay.set(legId, { ...overlay.get(legId), [mark]: at });
+  const odometerKey = ODOMETER_FOR_MARK[mark];
+  overlay.set(legId, {
+    ...overlay.get(legId),
+    [mark]: at,
+    ...(odometerKey && odometer !== undefined ? { [odometerKey]: odometer } : {}),
+  });
   version += 1;
 }
 
 /** Drop every recorded swipe. Exists so a check can assert a clean start. */
 export function resetSessionSwipes(): void {
   overlay.clear();
+  signatureMissing.clear();
   version += 1;
+}
+
+/** Record that this leg finished without a rider signature. */
+export function markSignatureMissing(legId: string): void {
+  signatureMissing.add(legId);
+  version += 1;
+}
+
+export function isSignatureMissing(legId: string): boolean {
+  return signatureMissing.has(legId);
+}
+
+/** Does any leg of this trip lack its signature? Drives the ride card's pill. */
+export function tripSignatureMissing(trip: Trip): boolean {
+  return trip.legs.some((leg) => signatureMissing.has(leg.id));
 }
 
 /** How many legs carry an overlay — the denominator for any check about it. */

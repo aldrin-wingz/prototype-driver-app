@@ -51,12 +51,21 @@ const ANY_LEG_CASE = {
 /** The time fields of a Missed Swipe, in the order they must have happened. */
 export const SWIPE_TIME_SEQUENCE = ["enRouteTime", "pickupTime", "dropOffTime"];
 
-/** One end of a missed-swipe leg, and whether the location trail confirmed it. */
+/** One end of a missed-swipe leg the driver has to confirm. */
 export interface MissedSwipeAsk {
   anchor: SwipeAnchor;
-  /** The trail placed the driver at this address. */
+  /** The location trail placed the driver at this address. */
   confirmed: boolean;
 }
+
+/** The time fields of a Missed Swipe, with each odometer beside its own time. */
+export const SWIPE_FIELD_ORDER = [
+  "enRouteTime",
+  "pickupTime",
+  "pickupOdometer",
+  "dropOffTime",
+  "dropoffOdometer",
+];
 
 const SUPPORT_FORM_CASE_ID = "support-form";
 
@@ -315,22 +324,32 @@ export function buildSupportFormCase({
       },
 
       // ---- Missed Swipe --------------------------------------------------
-      // A leg the driver DROVE but could not mark. Every question here is one
-      // the app would have answered itself if the swipe had happened — which is
-      // why each one carries what the location trail could and could not say,
-      // rather than presenting a blank box and letting the driver guess whether
-      // we already knew.
+      //
+      // ⛔⛔ **Every field renders, prefilled with everything the app holds.
+      // Only the ends being CONFIRMED accept input; the rest are read-only.**
+      // One rule, applied per scenario — 1a confirms the pick-up, 1b confirms
+      // both, ride 2 confirms the drop-off. A form that hid the settled fields
+      // would make the driver take the app's word for them; a form that opened
+      // them all would invite edits to marks that are already facts.
+      //
+      // ⚠️ The odometer is the exception the rule has to carry. A time can be
+      // proposed from the location trail; a reading exists only because a swipe
+      // captured it, and on a missed swipe that is exactly what did not happen.
+      // So a confirmable odometer opens BLANK and says why, while a recorded one
+      // prefills and locks like any other fact.
       ...(missedSwipe
         ? ([
             {
               id: "enRouteTime",
               type: "time",
               label: "En-route time",
-              helpText: "When you swiped to start. This is the one mark we have.",
+              helpText: "When you swiped to start. This is the one mark we always have.",
               prefillFrom: "enRouteTime",
               lockWhenPrefilled: true,
               showIf: ONLY_MISSED_SWIPE,
             },
+
+            // ---- the pick-up end ----
             asksPickup
               ? {
                   id: "pickupTime",
@@ -340,10 +359,10 @@ export function buildSupportFormCase({
                   required: true,
                   prefillFrom: "pickupSeenAt",
                   // ⚠️ NOT locked even when it prefills. What fills it is the
-                  // app's own guess off the trail — the time it first saw the
-                  // driver AT the address, which is when they arrived, not when
-                  // the member got in. Locking a guess would make the driver
-                  // file a time they can see is wrong.
+                  // app's guess off the trail — when it first saw the driver AT
+                  // the address, which is when they arrived, not when the member
+                  // got in. Locking a guess makes the driver file a time they
+                  // can see is wrong.
                   helpText: confirmed("pickup")
                     ? "Your location history puts you at the pick-up around this time. Change it if the member got in later."
                     : "We could not place you at the pick-up, so this one is yours to fill in.",
@@ -357,10 +376,30 @@ export function buildSupportFormCase({
                   lockWhenPrefilled: true,
                   showIf: ONLY_MISSED_SWIPE,
                 },
+            asksPickup
+              ? {
+                  id: "pickupOdometer",
+                  type: "number",
+                  label: "Odometer at pick-up",
+                  shortLabel: "pick-up odometer",
+                  required: true,
+                  min: 0,
+                  placeholder: "e.g. 48213",
+                  helpText:
+                    "We have no reading for that moment — the swipe that captures it is the one that was missed.",
+                  showIf: ONLY_MISSED_SWIPE,
+                }
+              : {
+                  id: "pickupOdometer",
+                  type: "number",
+                  label: "Odometer at pick-up",
+                  prefillFrom: "recordedPickupOdometer",
+                  lockWhenPrefilled: true,
+                  showIf: ONLY_MISSED_SWIPE,
+                },
             // Only when the trail could NOT place them there. Asking where the
             // pick-up happened while the app can already see they were at the
-            // pick-up address is exactly the interrogation this case exists to
-            // remove.
+            // pick-up address is the interrogation this case exists to remove.
             ...(asksPickup && !confirmed("pickup")
               ? [
                   {
@@ -376,6 +415,8 @@ export function buildSupportFormCase({
                   },
                 ]
               : []),
+
+            // ---- the drop-off end ----
             asksDropoff
               ? {
                   id: "dropOffTime",
@@ -397,6 +438,27 @@ export function buildSupportFormCase({
                   lockWhenPrefilled: true,
                   showIf: ONLY_MISSED_SWIPE,
                 },
+            asksDropoff
+              ? {
+                  id: "dropoffOdometer",
+                  type: "number",
+                  label: "Odometer at drop-off",
+                  shortLabel: "drop-off odometer",
+                  required: true,
+                  min: 0,
+                  placeholder: "e.g. 48229",
+                  helpText:
+                    "We have no reading for that moment — the swipe that captures it is the one that was missed.",
+                  showIf: ONLY_MISSED_SWIPE,
+                }
+              : {
+                  id: "dropoffOdometer",
+                  type: "number",
+                  label: "Odometer at drop-off",
+                  prefillFrom: "recordedDropoffOdometer",
+                  lockWhenPrefilled: true,
+                  showIf: ONLY_MISSED_SWIPE,
+                },
             ...(asksDropoff && !confirmed("dropoff")
               ? [
                   {
@@ -411,6 +473,7 @@ export function buildSupportFormCase({
                   },
                 ]
               : []),
+
             {
               id: "reason",
               type: "textarea",

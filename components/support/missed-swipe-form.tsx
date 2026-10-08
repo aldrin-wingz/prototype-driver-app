@@ -10,9 +10,12 @@ import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   anchorMatched,
   canSubmitUnedited,
+  leavesSignatureMissing,
+  MARK_FOR_ANCHOR,
   matchAnchor,
   type SwipeAnchor,
 } from "@/lib/driver-data/missed-swipe-rules";
+import { fromTimeInputValue } from "@/lib/support/prefill";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import type { SupportCallout } from "@/types/support";
 
@@ -120,8 +123,14 @@ export function MissedSwipeForm({
   onSubmitted?: () => void;
 }) {
   const { toast } = useToast();
-  const { submitForm } = useRideFlow();
+  const { submitForm, recordSwipe, markSignatureMissing } = useRideFlow();
   const { supportCase, initialValues } = buildMissedSwipe(trip, leg, asks);
+
+  /** Which form fields hold each anchor's answers. */
+  const FIELDS: Record<SwipeAnchor, { time: string; odometer: string }> = {
+    pickup: { time: "pickupTime", odometer: "pickupOdometer" },
+    dropoff: { time: "dropOffTime", odometer: "dropoffOdometer" },
+  };
 
   return (
     <SupportFormSheet
@@ -132,6 +141,32 @@ export function MissedSwipeForm({
       initialValues={initialValues}
       onSubmit={(values) => {
         onOpenChange(false);
+
+        /**
+         * ⛔⛔ **The confirmed answers become the marks.** Without this the leg
+         * stays visibly unswiped after the driver has just told us when each end
+         * happened — the record they filed to correct would still be wrong on
+         * their own screen. Only the CONFIRMED ends are written; a read-only
+         * field is already a mark and writing it back would be a no-op pretending
+         * to be a correction.
+         */
+        if (leg) {
+          for (const anchor of asks) {
+            const time = (values[FIELDS[anchor].time] ?? "").trim();
+            if (!time) continue;
+            const reading = Number(values[FIELDS[anchor].odometer]);
+            recordSwipe(
+              leg,
+              MARK_FOR_ANCHOR[anchor],
+              Number.isFinite(reading) ? reading : undefined,
+              fromTimeInputValue(time)
+            );
+          }
+          // The drop-off was reconstructed rather than swiped with the member
+          // present, so the signature it would have taken was never taken.
+          if (leavesSignatureMissing(asks)) markSignatureMissing(leg.id);
+        }
+
         submitForm({
           caseId: supportCase.id,
           issue: ISSUE_MISSED_SWIPE,
@@ -140,9 +175,10 @@ export function MissedSwipeForm({
           appTracksStatus: true,
         });
         toast({
-          title: supportCase.successMessage ?? "Sent to Support",
-          description:
-            "This ride has moved to Pending while Support corrects the record.",
+          title: "Sent to Support",
+          description: leavesSignatureMissing(asks)
+            ? "The leg is complete. It stays pending while Support confirms it, and the rider signature is recorded as missing."
+            : "The leg is complete. It stays pending while Support confirms the pick-up.",
         });
         onSubmitted?.();
       }}

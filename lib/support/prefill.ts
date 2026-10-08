@@ -36,6 +36,23 @@ function clockFromMinutesAgo(minutesAgo: number | undefined): string {
   return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
 }
 
+/**
+ * Convert the `<input type="time">` value "11:20" back to "11:20 AM".
+ *
+ * ⚠️ The inverse of `toTimeInputValue`, and it exists because a CONFIRMED answer
+ * becomes a swipe mark. The seed stores clock faces, so a value that went into
+ * the form as "11:20" has to come back out in the shape every other mark on the
+ * leg is written in — or the leg ends up with two time formats and the ordering
+ * checks start comparing strings that are not comparable.
+ */
+export function fromTimeInputValue(value: string): string {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return value;
+  const hour = Number(match[1]);
+  const shown = hour % 12 === 0 ? 12 : hour % 12;
+  return `${shown}:${match[2]} ${hour < 12 ? "AM" : "PM"}`;
+}
+
 /** Convert "Thu, Jul 31, 2026" to the `<input type="date">` value "2026-07-31". */
 function toDateInputValue(rideDate: string): string {
   const parsed = new Date(rideDate.replace(/^\w{3},\s*/, ""));
@@ -93,6 +110,10 @@ function resolve(
       return toTimeInputValue(leg?.progress?.pickedUpAt);
     case "recordedDropoffAt":
       return toTimeInputValue(leg?.progress?.droppedOffAt);
+    case "recordedPickupOdometer":
+      return odometer(leg?.progress?.pickedUpOdometer);
+    case "recordedDropoffOdometer":
+      return odometer(leg?.progress?.droppedOffOdometer);
     case "pickupSeenAt":
       return seenAt(leg, "pickup");
     case "dropoffSeenAt":
@@ -110,6 +131,11 @@ function resolve(
  * "you were never there" and "we have no record of you" are different claims and
  * an empty box tells the driver neither.
  */
+/** A captured odometer reading, or "" when the swipe never took one. */
+function odometer(reading: number | null | undefined): string {
+  return reading === null || reading === undefined ? "" : String(reading);
+}
+
 function seenAt(leg: TripLeg | undefined, anchor: SwipeAnchor): string {
   if (!leg) return "";
   const evidence = matchAnchor(leg, anchor);

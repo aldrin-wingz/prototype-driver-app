@@ -37,23 +37,32 @@ import {
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
-  detectMissedSwipe,
   getMissingAnchors,
+  leavesSignatureMissing,
   offeredSwipe,
   routeMissedSwipe,
+  swipeNeedsConfirming,
   type SwipeAnchor,
 } from "@/lib/driver-data/missed-swipe-rules";
+import { DropOffSwipeSheet } from "./drop-off-swipe-sheet";
 import {
   MissedSwipePrompt,
   type MissedSwipeAnswer,
 } from "@/components/support/missed-swipe-prompt";
 import { MissedSwipeForm } from "@/components/support/missed-swipe-form";
-import { findAnyForTrip } from "@/lib/support/request-visibility";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
 /** Driver-facing label + display order for each swipe mark. */
-const SWIPE_ROWS: Array<{ key: keyof LegSwipeProgress; label: string }> = [
+/**
+ * ⚠️ Typed to the TIME marks only. `LegSwipeProgress` also carries odometer
+ * readings now, and `keyof` would sweep them into a row list whose renderer
+ * formats clock faces.
+ */
+const SWIPE_ROWS: Array<{
+  key: "startedAt" | "pickedUpAt" | "droppedOffAt";
+  label: string;
+}> = [
   { key: "startedAt", label: "Started" },
   { key: "pickedUpAt", label: "Picked up" },
   { key: "droppedOffAt", label: "Dropped off" },
@@ -284,8 +293,6 @@ export function RideDetailLayout({
     isPickupPostponed,
     postponePickup,
     clearPostponedPickup,
-    hasSeenDetection,
-    markDetectionSeen,
   } = useRideFlow();
 
   // Any swipe the driver made in this session, laid over the seed. Everything
@@ -295,6 +302,7 @@ export function RideDetailLayout({
   const pendingRequest = getPendingRequest(trip.id);
 
   const [promptOpen, setPromptOpen] = useState(false);
+  const [dropOffOpen, setDropOffOpen] = useState(false);
   const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
     null
   );
@@ -319,34 +327,48 @@ export function RideDetailLayout({
   const cta = nextSwipe ? SWIPE_CTA[nextSwipe] : null;
 
   /**
-   * The swipe CTA toasts, EXCEPT on a leg whose pick-up has been postponed.
+   * The swipe CTA.
    *
-   * ⚠️ Deliberately that narrow. Nothing in the prototype advances a swipe mark,
-   * and making every swipe real would change what Phases 1 and 2 demo — a
-   * no-show ride sits at `started` on purpose. The postponed drop-off is the one
-   * swipe this slice genuinely needs to land, because "ask about the pick-up
-   * after the drop-off" has no "after" without it.
+   * ⛔⛔ **This is where the case starts now.** Tapping a swipe outside its own
+   * geofence is the moment the app and the driver disagree: the driver is saying
+   * it happened, and the app can see it cannot have happened here. Everything
+   * else — the question, the form, the confirmations — hangs off this tap.
+   *
+   * ⚠️ Three paths, and the order matters:
+   * 1. A postponed drop-off runs the real drop-off steps (odometer + signature).
+   * 2. A pick-up swiped from outside the geofence asks 1a-or-1b.
+   * 3. A drop-off swiped from outside the geofence goes STRAIGHT to the drop-off
+   *    steps, with no question — there is only one thing it can mean.
    */
   function handleSwipeTap() {
-    if (pickupPostponed && nextSwipe === "drop-off" && activeLeg) {
-      recordSwipe(activeLeg, "droppedOffAt");
-      clearPostponedPickup(activeLeg.id);
-      /**
-       * Now, and only now, ask about what is STILL missing.
-       *
-       * ⚠️ Derived, not the literal `["pickup"]` it obviously is today. The
-       * seed's state is read back minus the mark just recorded, so if a leg ever
-       * reaches here missing something else, the form asks about that too
-       * instead of quietly dropping it. `getMissingAnchors` cannot see the mark
-       * we just wrote — that is React state landing on the next render — which
-       * is exactly why it is subtracted here rather than re-read.
-       */
-      const remaining = getMissingAnchors(activeLeg).filter(
-        (anchor) => anchor !== "dropoff"
-      );
-      if (remaining.length > 0) setMissedSwipeAsks(remaining);
+    if (!activeLeg) return;
+
+    if (pickupPostponed && nextSwipe === "drop-off") {
+      setDropOffOpen(true);
       return;
     }
+
+    if (nextSwipe === "pick-up" && swipeNeedsConfirming(activeLeg, "pickup")) {
+      setPromptOpen(true);
+      return;
+    }
+
+    /**
+     * ⛔⛔ Straight to the form, NOT to the drop-off sheet.
+     *
+     * The sheet takes the member's signature, and on this path the member is
+     * already gone — that is the entire difference between ride 2 and 1a. A
+     * signature pad here would ask the driver to produce a signature from
+     * someone who is not in the car, and the honest outcome is the opposite:
+     * the leg ends COMPLETE with that signature recorded as missing, for good.
+     */
+    if (nextSwipe === "drop-off" && swipeNeedsConfirming(activeLeg, "dropoff")) {
+      fileMissedSwipe(activeLeg, null);
+      return;
+    }
+
+    // Inside the geofence, or no location to argue with: production's own
+    // action, which this prototype does not stand in for.
     toast({
       title: cta?.name ?? "Swipe",
       description: "Not wired in the prototype — this is the production action.",
@@ -357,77 +379,62 @@ export function RideDetailLayout({
    * Open the form for every end of this leg that is still missing.
    *
    * ⚠️ Routed, never hardcoded. The first version asked only about the drop-off
-   * whenever the button said DROP OFF MEMBER — which is right on an ordinary leg
-   * and WRONG on a postponed one, where the button says drop-off precisely
-   * because the pick-up is still missing. Going through the rule is what stops
-   * the two paths disagreeing.
+   * whenever the button said DROP OFF MEMBER — right on an ordinary leg and
+   * WRONG on a postponed one, where the button says drop-off precisely because
+   * the pick-up is still missing.
    */
-  function fileMissedSwipe(leg: TripLeg) {
+  function fileMissedSwipe(leg: TripLeg, memberAboard: boolean | null) {
     const route = routeMissedSwipe({
       missing: getMissingAnchors(leg),
-      // The driver is telling us a swipe already happened, so the leg is behind
-      // the record rather than live — whatever they said earlier about the
-      // member no longer describes now.
-      memberAboard: false,
+      memberAboard,
     });
     if (route.kind === "form") setMissedSwipeAsks(route.asks);
   }
 
-  /**
-   * The app's own notice that a swipe is owed.
-   *
-   * ⛔⛔ **This is the entry point now — there is no "I already made this swipe"
-   * link any more.** A driver who forgot to swipe is not thinking about
-   * swiping, so asking them to remember to report forgetting is asking for the
-   * thing that already failed. The trail is the app's, so the app raises it.
-   *
-   * Suppressed while a request for this ride already exists — ANY request, not
-   * just a trackable one. A Rider No-Show goes to Zendesk and leaves no pending
-   * state, and a driver who has just filed one must not then be asked whether
-   * they picked the member up.
-   */
-  const detection =
-    activeLeg && !pickupPostponed && !findAnyForTrip(submittedForms, trip.id)
-      ? detectMissedSwipe(activeLeg)
-      : null;
-
-  // Raise it once per mark, then leave the banner. A notice that reopens every
-  // time the ride is opened is a modal the driver cannot get past.
-  useEffect(() => {
-    if (!detection || !activeLeg) return;
-    if (hasSeenDetection(activeLeg.id, detection.anchor)) return;
-    markDetectionSeen(activeLeg.id, detection.anchor);
-    setPromptOpen(true);
-  }, [detection?.anchor, activeLeg?.id]);
-
+  /** 1a or 1b — the one fact only the driver has. */
   function handleAnswer(answer: MissedSwipeAnswer) {
     setPromptOpen(false);
     if (!activeLeg) return;
 
-    if (answer === "not-yet") return;
-
-    if (answer === "no-show") {
-      // ⚠️ Handed to the case that actually fits. A member who never came out
-      // is a no-show, and filing it as a missed swipe would record a ride that
-      // did not happen.
-      router.push(`/my-rides/${trip.id}/no-show`);
-      return;
-    }
-
     if (answer === "member-aboard") {
       postponePickup(activeLeg.id);
       toast({
-        title: "We'll come back to the pick-up",
+        title: "Drop them off as normal",
         description:
-          "Drop the member off as normal — we'll ask about the pick-up straight after.",
+          "We'll ask you to confirm the pick-up once the drop-off is done.",
       });
       return;
     }
 
-    // "ride-over" — every missing end has to be reconstructed. Defer by a tick:
-    // vaul reports the dismissal before the handler that caused it, and opening
-    // the next sheet inside that window leaves the first one's scroll lock on.
-    setTimeout(() => fileMissedSwipe(activeLeg), 0);
+    // Defer by a tick: vaul reports the dismissal before the handler that caused
+    // it, and opening the next sheet inside that window leaves the first one's
+    // scroll lock on.
+    setTimeout(() => fileMissedSwipe(activeLeg, false), 0);
+  }
+
+  /**
+   * The drop-off steps came back with a reading and a signature.
+   *
+   * ⚠️ The mark AND the odometer are recorded here, which is what makes the
+   * drop-off end read-only in the form that follows: it is not a reconstruction,
+   * it is a swipe that just happened properly.
+   */
+  function handleDropOffComplete(odometerReading: number) {
+    setDropOffOpen(false);
+    if (!activeLeg) return;
+    const leg = activeLeg;
+    recordSwipe(leg, "droppedOffAt", odometerReading);
+    const wasPostponed = pickupPostponed;
+    clearPostponedPickup(leg.id);
+    setTimeout(() => {
+      // 1a leaves only the pick-up to confirm; ride 2 leaves only the drop-off.
+      const remaining = getMissingAnchors(leg).filter(
+        (anchor) => anchor !== "dropoff"
+      );
+      setMissedSwipeAsks(
+        wasPostponed && remaining.length > 0 ? remaining : ["dropoff"]
+      );
+    }, 0);
   }
 
   const subtitle =
@@ -475,37 +482,6 @@ export function RideDetailLayout({
         )}
       >
         {banner}
-
-        {/*
-          The standing notice.
-
-          ⚠️ In the SCROLL AREA, beside the existing banner slot — not in the
-          fixed action bar. The first version sat under the swipe CTA inside that
-          bar, which has a fixed height replicated from the capture: the notice
-          was clipped by the viewport edge and its icon sat behind the floating
-          nav button. A bar built to hold one control holds one control.
-
-          ⚠️ It reports what the APP observed, never what the driver claims. The
-          entry point is the app's now, so the copy has to be too.
-        */}
-        {detection && !promptOpen && (
-          <button
-            type="button"
-            onClick={() => setPromptOpen(true)}
-            className="flex w-full items-start gap-2 border-b border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-left"
-          >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#D97706]" />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-sm font-semibold text-[#92400E]">
-                No {detection.anchor === "pickup" ? "pick-up" : "drop-off"}{" "}
-                recorded for this leg
-              </span>
-              <span className="text-xs text-[#92400E]/80">
-                Tell us what happened
-              </span>
-            </span>
-          </button>
-        )}
 
         {/* Map preview */}
         <div className="relative h-64 w-full bg-[#1e3a4c]">
@@ -844,15 +820,16 @@ export function RideDetailLayout({
         </div>
       ) : null}
 
-      {detection && (
-        <MissedSwipePrompt
-          anchor={detection.anchor}
-          basis={detection.basis}
-          open={promptOpen}
-          onOpenChange={setPromptOpen}
-          onAnswer={handleAnswer}
-        />
-      )}
+      <MissedSwipePrompt
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        onAnswer={handleAnswer}
+      />
+      <DropOffSwipeSheet
+        open={dropOffOpen}
+        onOpenChange={setDropOffOpen}
+        onConfirm={handleDropOffComplete}
+      />
       {missedSwipeAsks && (
         <MissedSwipeForm
           /*

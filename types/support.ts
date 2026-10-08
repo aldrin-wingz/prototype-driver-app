@@ -87,7 +87,16 @@ export type SupportPrefillSource =
   /** When the location trail first places the driver at the pick-up. */
   | "pickupSeenAt"
   /** When the location trail first places them at the drop-off. */
-  | "dropoffSeenAt";
+  | "dropoffSeenAt"
+  /**
+   * The odometer readings the swipes captured.
+   *
+   * ⛔ There is deliberately NO trail-derived counterpart to these. A reading is
+   * not observable from location data at all — it exists only because a swipe
+   * took it — so a missing one has no source and opens blank.
+   */
+  | "recordedPickupOdometer"
+  | "recordedDropoffOdometer";
 
 export interface SupportFieldOption {
   value: string;

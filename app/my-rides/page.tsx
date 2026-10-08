@@ -31,7 +31,7 @@ export default function MyRidesPage() {
   // reachable in one tap. The real app's default tab is a product decision nobody
   // has made — revert to "needs-action" before treating this as production.
   const [activeTab, setActiveTab] = useState<TabValue>("in-progress");
-  const { submittedForms } = useRideFlow();
+  const { submittedForms, isTripSignatureMissing } = useRideFlow();
   const { active } = useSolution();
 
   /**
@@ -83,8 +83,21 @@ export default function MyRidesPage() {
       // ⚠️ `statusPills`, not `pills`. A scenario ride replaces its seeded pills
       // with its identifier, and this marker has to outlive that swap — which is
       // every ride that can reach this tab.
+      /**
+       * ⚠️ Two different outstanding things, said separately.
+       *
+       * A missed swipe leaves the leg COMPLETE — every mark is now recorded —
+       * and still pending, because Support has to confirm the times the driver
+       * reconstructed. Where the drop-off was reconstructed rather than swiped
+       * with the member present, the rider signature is additionally gone for
+       * good. One pill saying "Waiting on Support" would hide the half that is
+       * never coming back.
+       */
       statusPills: [
         { label: "Waiting on Support", variant: "attention" as const },
+        ...(isTripSignatureMissing(trip)
+          ? [{ label: "Signature missing", variant: "danger" as const }]
+          : []),
       ],
     }));
 

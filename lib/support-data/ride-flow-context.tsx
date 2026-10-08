@@ -7,7 +7,9 @@ import { swipeClockFor, type SwipeMark } from "@/lib/driver-data/missed-swipe-ru
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import {
   applySessionSwipes as applyOverlay,
+  markSignatureMissing as markMissing,
   recordSessionSwipe,
+  tripSignatureMissing,
 } from "@/lib/driver-data/session-swipes";
 
 /**
@@ -108,7 +110,19 @@ interface RideFlowValue {
    * leg's own trail — see `swipeClockFor`. A device clock here puts the new mark
    * in a different frame from every mark beside it.
    */
-  recordSwipe: (leg: TripLeg, mark: SwipeMark) => void;
+  recordSwipe: (
+    leg: TripLeg,
+    mark: SwipeMark,
+    odometer?: number,
+    /**
+     * The clock face to stamp, when the DRIVER supplied it.
+     *
+     * ⚠️ Omitted for a swipe made now, which takes the leg's own trail clock.
+     * Passed for a confirmed answer, because the driver's correction is the
+     * whole point — stamping "now" over it would discard it.
+     */
+    at?: string
+  ) => void;
   /**
    * The driver said the member is still in the car, so the pick-up is deferred.
    *
@@ -127,8 +141,9 @@ interface RideFlowValue {
    * the screen as a banner instead — which is the difference between the app
    * telling you something and the app nagging you.
    */
-  hasSeenDetection: (legId: string, anchor: string) => boolean;
-  markDetectionSeen: (legId: string, anchor: string) => void;
+  /** Record that a leg ended with no rider signature, and read it back. */
+  markSignatureMissing: (legId: string) => void;
+  isTripSignatureMissing: (trip: Trip) => boolean;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -159,7 +174,6 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   // React is told to look again.
   const [swipeRevision, setSwipeRevision] = useState(0);
   const [postponed, setPostponed] = useState<string[]>([]);
-  const [seenDetections, setSeenDetections] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -199,8 +213,13 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       },
 
       applySessionSwipes: (trip) => applyOverlay(trip),
-      recordSwipe: (leg, mark) => {
-        recordSessionSwipe(leg.id, mark, swipeClockFor(leg) ?? nowClock());
+      recordSwipe: (leg, mark, odometer, at) => {
+        recordSessionSwipe(
+          leg.id,
+          mark,
+          at ?? swipeClockFor(leg) ?? nowClock(),
+          odometer
+        );
         setSwipeRevision((previous) => previous + 1);
       },
       isPickupPostponed: (legId) => postponed.includes(legId),
@@ -210,16 +229,13 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         ),
       clearPostponedPickup: (legId) =>
         setPostponed((previous) => previous.filter((id) => id !== legId)),
-      hasSeenDetection: (legId, anchor) =>
-        seenDetections.includes(`${legId}:${anchor}`),
-      markDetectionSeen: (legId, anchor) =>
-        setSeenDetections((previous) =>
-          previous.includes(`${legId}:${anchor}`)
-            ? previous
-            : [...previous, `${legId}:${anchor}`]
-        ),
+      markSignatureMissing: (legId) => {
+        markMissing(legId);
+        setSwipeRevision((previous) => previous + 1);
+      },
+      isTripSignatureMissing: (trip) => tripSignatureMissing(trip),
     }),
-    [records, swipeRevision, postponed, seenDetections]
+    [records, swipeRevision, postponed]
   );
 
   return (

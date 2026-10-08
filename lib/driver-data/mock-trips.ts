@@ -47,6 +47,21 @@ export interface LegSwipeProgress {
   pickedUpAt: string | null;
   /** Swiped "drop off member" — completes the leg. */
   droppedOffAt: string | null;
+  /**
+   * Odometer readings captured BY the pick-up and drop-off swipes.
+   *
+   * ⚠️ Optional so the twenty-odd rides seeded before this slice stay valid —
+   * absent means the reading was never captured, which is the honest state for a
+   * ride nobody asked the question of.
+   *
+   * ⛔⛔ **An odometer is the one answer no amount of location data can
+   * reconstruct.** A time can be proposed from the trail — the app saw where the
+   * driver was and when. A reading exists only because a swipe captured it, and
+   * on a missed swipe that is precisely what did not happen. So a missing
+   * odometer opens BLANK and says so; it is never guessed at.
+   */
+  pickedUpOdometer?: number | null;
+  droppedOffOdometer?: number | null;
 }
 
 /**
@@ -1483,6 +1498,9 @@ export const mockInProgressTrips: Trip[] = [
           startedAt: "11:08 AM",
           pickedUpAt: null,
           droppedOffAt: null,
+          // Never captured, because the swipes that capture them never happened.
+          pickedUpOdometer: null,
+          droppedOffOdometer: null,
         },
         // The trail puts the driver at the pick-up and then on the move. Once
         // the drop-off is swiped, the postponed pick-up form opens with this
@@ -1509,7 +1527,7 @@ export const mockInProgressTrips: Trip[] = [
     pills: [],
     scenario: {
       code: "03a",
-      label: "Missed pick-up, member still aboard",
+      label: "Missed pick-up — member aboard, or gone",
       solutions: ["missed-swipe"],
     },
     incentiveTypes: [],
@@ -1537,14 +1555,20 @@ export const mockInProgressTrips: Trip[] = [
         county: "Cobb County",
         revenue: 27.45,
         revenueNote: "Accepted by you",
+        // ⚠️ The pick-up was swiped PROPERLY — mark and odometer both captured.
+        // That is what makes this a different case from ride 03a rather than a
+        // second copy of it: there is exactly one unknown end, and the rider
+        // signature that the drop-off swipe would have taken was never taken.
         progress: {
           startedAt: "9:02 AM",
-          pickedUpAt: null,
+          pickedUpAt: "9:15 AM",
+          pickedUpOdometer: 48213,
           droppedOffAt: null,
+          droppedOffOdometer: null,
         },
-        // ⭐ The "all they need to do is click submit" ride: the trail sits
-        // inside the radius at BOTH ends, so both times prefill and neither
-        // "where were you" field is asked at all.
+        // The trail reaches the drop-off and then moves on, so the drop-off TIME
+        // can be proposed — and the odometer still cannot, which is the pairing
+        // this ride exists to show.
         locationRecords: [
           { ageMinutes: 96, distanceMiles: 4.4, dropoffDistanceMiles: 9.8, at: "9:04 AM" },
           { ageMinutes: 88, distanceMiles: 0.21, dropoffDistanceMiles: 5.9, at: "9:12 AM" },
@@ -1569,67 +1593,7 @@ export const mockInProgressTrips: Trip[] = [
     pills: [],
     scenario: {
       code: "03b",
-      label: "Missed both, trail confirms each end",
-      solutions: ["missed-swipe"],
-    },
-    incentiveTypes: [],
-    clientEnrolledInIncentives: true,
-  },
-
-  // --- the drop-off alone is missing, and the trail cannot place it ---------
-  {
-    id: "1049800383",
-    date: "Thu, Jul 31, 2026",
-    rider: "Beatrix Ngoma",
-    client: "Alivi",
-    passengerCount: 1,
-    distance: "15.7 mi",
-    totalRevenue: 48.90,
-    notes: "Drop-off is the rear entrance by the pharmacy",
-    legs: [
-      {
-        id: "1049800383",
-        legCode: "A",
-        type: "est-pickup",
-        label: "Est Pick-up Time",
-        time: "1:30 PM",
-        address: "9 Juniper Ct, Lithia Springs, GA 30122",
-        county: "Douglas County",
-        revenue: 48.90,
-        revenueNote: "Accepted by you",
-        progress: {
-          startedAt: "1:18 PM",
-          pickedUpAt: "1:41 PM",
-          droppedOffAt: null,
-        },
-        // ⛔ The common case, and the one a demo must not skip: the trail exists
-        // and is good at the pick-up, but never comes within a quarter-mile of
-        // the drop-off. Measured at 66.4% of real missed-swipe legs. The form
-        // leaves the time blank and asks where they dropped the member instead
-        // of pretending to a match.
-        locationRecords: [
-          { ageMinutes: 74, distanceMiles: 0.11, dropoffDistanceMiles: 14.2, at: "1:30 PM" },
-          { ageMinutes: 70, distanceMiles: 0.04, dropoffDistanceMiles: 14.1, at: "1:34 PM" },
-          { ageMinutes: 52, distanceMiles: 6.8, dropoffDistanceMiles: 7.4, at: "1:52 PM" },
-          { ageMinutes: 38, distanceMiles: 12.9, dropoffDistanceMiles: 1.8, at: "2:06 PM" },
-          { ageMinutes: 20, distanceMiles: 16.4, dropoffDistanceMiles: 4.9, at: "2:24 PM" },
-        ],
-      },
-      {
-        id: "1049800383-appt",
-        type: "appointment",
-        label: "Appointment Time",
-        time: "2:15 PM",
-        address: "1200 Thornton Rd, Lithia Springs, GA 30122",
-        county: "Douglas County",
-        revenue: 0,
-      },
-    ],
-    status: "in-progress",
-    pills: [],
-    scenario: {
-      code: "03c",
-      label: "Missed drop-off, trail can't place it",
+      label: "Missed drop-off — signature never taken",
       solutions: ["missed-swipe"],
     },
     incentiveTypes: [],

@@ -173,13 +173,13 @@ export const SOLUTIONS: Solution[] = [
      *    case, so the proposal has to carry what happens when it misses.
      */
     proposedFeature:
-      "The app notices the missed mark itself — the driver has left the pick-up with no pick-up recorded → it asks one question, is the member still in the car → if yes, it offers the drop-off swipe it was withholding and collects the pick-up after it, so one missed mark stops costing the whole leg → then a form that fills in every end the location trail can place them at, asks where they were only for the ends it cannot, and says which is which",
+      "The swipe itself is the trigger — tap PICK UP MEMBER from outside the pick-up geofence and the app asks the one thing only the driver knows, is the member still in the car → if yes, take the drop-off properly, odometer and signature and all, then confirm the pick-up alone → if not, confirm both ends → a drop-off missed the same way leaves the rider signature gone for good, so the leg ends COMPLETE and pending rather than simply late → every field is prefilled with what the app holds and only the ends being confirmed can be edited",
     klass: "form",
     buildState: "in-prototype",
     entry: {
       route: "/my-rides/1049800381",
       label:
-        "Open the ride and the app raises it on its own — the trail puts the driver at the pick-up and then gone, with no pick-up recorded. Answer 'they're in the car now' → the button becomes DROP OFF MEMBER, which production would not offer → swipe it and the pick-up form opens with the arrival time already filled from the trail. Ride 1049800382 is the same notice on a ride that is already over (both ends confirmed — nothing to reconstruct); 1049800383 is the weaker claim, 'it looks like you have driven on', because the trail never got within a quarter-mile of the drop-off.",
+        "Tap PICK UP MEMBER. The driver is a mile past the pick-up, so the app asks whether the member is still in the car. Answer YES (1a) → the button becomes DROP OFF MEMBER, which production would not offer → the drop-off takes its odometer and the member's signature as normal → then a form confirming the PICK-UP alone. Answer NO (1b) → one form confirming BOTH ends, and the rider signature is gone for good. Ride 1049800382 is the other case: the pick-up was swiped properly and only the drop-off was missed, so only the drop-off is confirmable.",
     },
   },
   {

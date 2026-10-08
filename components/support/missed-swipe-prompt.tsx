@@ -2,8 +2,7 @@
 
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { PersonStanding, FileText, UserX, Clock } from "lucide-react";
-import type { SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
+import { PersonStanding, FileText } from "lucide-react";
 
 /**
  * What the driver says happened, when the app notices a swipe is owed.
@@ -21,14 +20,10 @@ import type { SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
  * anything at all.
  */
 export type MissedSwipeAnswer =
-  /** The member is in the car; the leg is still live. */
+  /** 1a — the member is in the car; the leg is still live. */
   | "member-aboard"
-  /** The leg is over and the mark is simply missing. */
-  | "ride-over"
-  /** The member never came out — this is a no-show, not a missed swipe. */
-  | "no-show"
-  /** The app is early or wrong. Dismiss without claiming anything. */
-  | "not-yet";
+  /** 1b — the leg is over and nothing was swiped live. */
+  | "ride-over";
 
 interface Choice {
   answer: MissedSwipeAnswer;
@@ -38,85 +33,48 @@ interface Choice {
   tone: "primary" | "plain";
 }
 
+/**
+ * ⛔⛔ **Two answers, and that is only safe because the SWIPE is the trigger.**
+ *
+ * An earlier version raised this by itself when the ride was opened, which meant
+ * it also caught a driver who had waited and left because nobody came out — so
+ * it needed a third "the member never came out" answer and a dismiss, or it
+ * would make that driver claim a ride that never happened.
+ *
+ * Tapping PICK UP MEMBER *is* the driver saying they have the member. A no-show
+ * driver never taps it. The trigger does the work the extra options were doing,
+ * and the question is back to the two states that can actually follow.
+ */
 const PICKUP_CHOICES: Choice[] = [
   {
     answer: "member-aboard",
     icon: PersonStanding,
     title: "Yes — they're in the car now",
-    detail: "Carry on and drop them off. We'll sort the pick-up out afterwards.",
+    detail:
+      "Carry on and drop them off as normal. We'll confirm the pick-up after that.",
     tone: "primary",
   },
   {
     answer: "ride-over",
     icon: FileText,
     title: "Yes — and the ride is already over",
-    detail: "We'll ask about both ends and fill in whatever we can.",
-    tone: "plain",
-  },
-  {
-    answer: "no-show",
-    icon: UserX,
-    title: "No — the member never came out",
-    detail: "That's a no-show, not a missed swipe. We'll take you there instead.",
-    tone: "plain",
-  },
-  {
-    answer: "not-yet",
-    icon: Clock,
-    title: "Not yet — I'm still on my way",
-    detail: "We'll stop asking. The notice stays on the ride if you need it.",
+    detail:
+      "We'll ask you to confirm both ends, and fill in whatever we can.",
     tone: "plain",
   },
 ];
-
-const DROPOFF_CHOICES: Choice[] = [
-  {
-    answer: "ride-over",
-    icon: FileText,
-    title: "Yes — I dropped them off",
-    detail: "We'll ask when and where, and fill in whatever we can.",
-    tone: "primary",
-  },
-  {
-    answer: "not-yet",
-    icon: Clock,
-    title: "Not yet — I'm still driving",
-    detail: "We'll stop asking. The notice stays on the ride if you need it.",
-    tone: "plain",
-  },
-];
-
-/**
- * ⚠️ The claim is worded to its evidence. "We can see you were there" is only
- * true on a CONFIRMED departure — a fix inside the radius followed by one
- * outside it. On an inferred one the trail only approached and receded, and
- * saying more than that would be the app overstating what it has.
- */
-function headline(anchor: SwipeAnchor, basis: "confirmed" | "inferred"): string {
-  const end = anchor === "pickup" ? "pick-up" : "drop-off";
-  return basis === "confirmed"
-    ? `We can see you were at the ${end} and have moved on`
-    : `It looks like you've driven on from the ${end}`;
-}
 
 export function MissedSwipePrompt({
-  anchor,
-  basis,
   open,
   onOpenChange,
   onAnswer,
 }: {
-  anchor: SwipeAnchor;
-  basis: "confirmed" | "inferred";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAnswer: (answer: MissedSwipeAnswer) => void;
 }) {
-  const choices = anchor === "pickup" ? PICKUP_CHOICES : DROPOFF_CHOICES;
-  const question =
-    anchor === "pickup"
-      ? "Did you pick the member up?"
-      : "Did you drop the member off?";
+  const choices = PICKUP_CHOICES;
+  const question = "Is the member still with you?";
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -126,8 +84,8 @@ export function MissedSwipePrompt({
             {question}
           </DrawerTitle>
           <p className="mt-2 text-sm text-gray-600">
-            {headline(anchor, basis)}, with no{" "}
-            {anchor === "pickup" ? "pick-up" : "drop-off"} recorded for this leg.
+            You&apos;re not at the pick-up any more, so we can&apos;t record this
+            swipe where it happened.
           </p>
 
           <div className="mt-6 flex flex-col gap-3">

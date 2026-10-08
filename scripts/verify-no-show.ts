@@ -101,7 +101,7 @@ for (const trip of asIs) {
  * comparison-matrix row they do not demonstrate would be worse than exempting
  * them.
  */
-const OTHER_SLICE_RIDES = new Set(["1049800381", "1049800382", "1049800383"]);
+const OTHER_SLICE_RIDES = new Set(["1049800381", "1049800382"]);
 
 let refusing = 0;
 let exempted = 0;
@@ -123,8 +123,8 @@ check("some ride actually refuses", refusing > 0, `${refusing}`);
 // The exemption must stay a narrow carve-out, not a hole. If a Missed Swipe ride
 // stops refusing — or one is deleted — this says so rather than quietly
 // shrinking the population the check above runs on.
-check("every exempt ride is still exercised", exempted === 2,
-  `${exempted} of ${OTHER_SLICE_RIDES.size} exempt ids refuse (1049800383 is past pick-up, so no-show never applies)`);
+check("every exempt ride is still exercised", exempted === 1,
+  `${exempted} of ${OTHER_SLICE_RIDES.size} exempt ids refuse (1049800382 is past pick-up, so no-show never applies)`);
 
 // ── The two stories, one ride each ──────────────────────────────
 // These replace the matrix checks. They assert the branch each ride demonstrates,

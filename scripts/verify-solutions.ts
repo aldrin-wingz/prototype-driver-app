@@ -390,7 +390,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 5;
+const EXPECTED_SCENARIO_RIDES = 4;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -512,7 +512,10 @@ check(
 const EXPECTED_IN_PROGRESS: Record<string, number> = {
   "rider-no-show": 2,
   "cancel-at-door": 1,
-  "missed-swipe": 3,
+  // ⚠️ Two, not three. The third ride demonstrated a drop-off the trail could
+  // not place — which 1b and ride 2 now cover between them, so it was removed
+  // rather than left as a fourth card saying nothing new.
+  "missed-swipe": 2,
 };
 for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
   const shown = ridesForSolution(inProgress, id);

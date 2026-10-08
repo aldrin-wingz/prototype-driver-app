@@ -215,17 +215,34 @@ export function routeMissedSwipe({
   if (missing.length === 0) return { kind: "nothing-missing" };
 
   if (missing.includes("pickup")) {
-    // The member is in the car: the leg is still live, so the drop-off swipe is
-    // still the right next action and the pick-up can be reconstructed after it.
+    // 1a — the member is in the car, so the leg is still live. The drop-off is
+    // still the right next action and gets swiped properly, odometer and
+    // signature and all; only the pick-up is left to reconstruct.
     if (memberAboard === true) return { kind: "postpone" };
-    // Not aboard, or not yet asked — the leg is over and both ends need filing.
-    // ⚠️ `asks` is both anchors even when the drop-off mark happens to exist,
-    // because a leg whose pick-up was never recorded cannot have a trustworthy
-    // drop-off: production would not have offered that swipe.
+    // 1b — the member is gone. Nothing was swiped live, so both ends are
+    // unknown and the rider signature was never taken.
     return { kind: "form", asks: ["pickup", "dropoff"] };
   }
 
+  // Ride 2 — the pick-up was swiped properly and only the drop-off is missing,
+  // so the pick-up time and odometer are facts and stay read-only.
   return { kind: "form", asks: ["dropoff"] };
+}
+
+/**
+ * Does this path leave the rider signature untaken?
+ *
+ * ⛔⛔ **A signature is not a question a form can ask.** It is captured by the
+ * drop-off swipe, with the member present — so once they are gone it is not
+ * missing pending an answer, it is missing permanently. Every path whose
+ * drop-off was never swiped live ends as "completed · signature missing", which
+ * is the existing state the app already has a filter for.
+ *
+ * Only 1a escapes it: there the member is still in the car and the drop-off is
+ * swiped exactly as it would have been.
+ */
+export function leavesSignatureMissing(asks: SwipeAnchor[]): boolean {
+  return asks.includes("dropoff");
 }
 
 /** Does this leg need the "is the member still with you?" question? */
@@ -271,132 +288,47 @@ export function offeredSwipe(
 }
 
 /**
- * How far past its closest approach the trail has to recede before the app will
- * say the driver has moved on WITHOUT ever having been inside the radius.
+ * Is the driver inside the geofence for this end of the leg, right now?
  *
- * ⚠️ This margin is the entire difference between "been and gone" and "still on
- * the way". A driver driving TO a pick-up gets steadily closer, so their latest
- * fix IS their closest one and no margin is cleared. A driver who got near and
- * then drove off recedes past it. Without the margin, every en-route leg in the
- * app would raise a missed-swipe notice.
- */
-export const DEPARTURE_MARGIN_MILES = 1;
-
-/**
- * Whether the driver has left one end of the leg.
+ * ⛔⛔ **This is the trigger, and the SWIPE is what fires it.** An earlier
+ * version had the app raise the question when the RIDE WAS OPENED, off a
+ * "been and gone" reading of the trail. That was wrong twice over: it
+ * interrupted a driver who had asked for nothing, and it needed elaborate
+ * machinery — a recede margin, a departure basis — purely to avoid firing on
+ * every leg merely en route to a pick-up.
  *
- * ⛔ `basis` is not decoration. **confirmed** means a fix actually landed inside
- * the radius and a later one did not — the app saw them there and saw them go.
- * **inferred** means the trail never got inside the radius but approached and
- * then receded, which is a weaker claim and has to be WORDED as one. Measured on
- * real missed-swipe legs, the trail confirms the pick-up on 53.3% and the
- * drop-off on 33.6%, so the inferred case is not an edge — it is most of the
- * drop-offs.
- */
-export type AnchorDeparture =
-  | {
-      kind: "left";
-      basis: "confirmed" | "inferred";
-      closestMiles: number;
-      /** Age of the fix the departure is read from. */
-      lastSeenAgoMinutes: number;
-    }
-  /** The newest fix is inside the radius — they are there right now. */
-  | { kind: "still_there"; closestMiles: number }
-  /** Never got near, still approaching, or no trail to read. */
-  | { kind: "never_there"; closestMiles: number | null };
-
-/**
- * Read a departure off the trail.
+ * Tapping PICK UP MEMBER is the driver saying they have the member. If they are
+ * not at the pick-up when they say it, the swipe cannot be recorded where it
+ * happened — and that, not a background guess, is the moment to ask. All that
+ * machinery went with it.
  *
- * ⚠️ Order matters and is explicit: inside-now beats been-and-gone beats
- * approached-and-receded. A driver sitting at the pick-up must never be told
- * they have left it, however far they wandered earlier in the leg.
+ * `null` when no fix can speak to this anchor: the app cannot say someone is
+ * outside a fence it cannot see.
  */
-export function departedAnchor(
+export function insideGeofence(
   leg: TripLeg,
   anchor: SwipeAnchor
-): AnchorDeparture {
-  // Oldest first, so "later than" is just "further along the array".
-  const fixes = measurableFixes(leg, anchor).sort((a, b) => b.age - a.age);
-  if (fixes.length === 0) return { kind: "never_there", closestMiles: null };
-
-  const closestMiles = Math.min(...fixes.map((fix) => fix.miles));
-  const latest = fixes[fixes.length - 1];
-
-  if (latest.miles <= MISSED_SWIPE_RADIUS_MILES) {
-    return { kind: "still_there", closestMiles };
-  }
-
-  const near = fixes.filter((fix) => fix.miles <= MISSED_SWIPE_RADIUS_MILES);
-  if (near.length > 0) {
-    return {
-      kind: "left",
-      basis: "confirmed",
-      closestMiles,
-      // The LAST fix inside the radius — when they were last seen there.
-      lastSeenAgoMinutes: near[near.length - 1].age,
-    };
-  }
-
-  const closestIndex = fixes.findIndex((fix) => fix.miles === closestMiles);
-  const receded = latest.miles > closestMiles + DEPARTURE_MARGIN_MILES;
-  if (closestIndex < fixes.length - 1 && receded) {
-    return {
-      kind: "left",
-      basis: "inferred",
-      closestMiles,
-      lastSeenAgoMinutes: fixes[closestIndex].age,
-    };
-  }
-
-  return { kind: "never_there", closestMiles };
-}
-
-export interface MissedSwipeDetection {
-  anchor: SwipeAnchor;
-  basis: "confirmed" | "inferred";
-  closestMiles: number;
-  lastSeenAgoMinutes: number;
+): boolean | null {
+  const fixes = measurableFixes(leg, anchor);
+  if (fixes.length === 0) return null;
+  const latest = fixes.reduce((newest, fix) =>
+    fix.age < newest.age ? fix : newest
+  );
+  return latest.miles <= MISSED_SWIPE_RADIUS_MILES;
 }
 
 /**
- * The app's own notice that a swipe is owed — the entry point for this case.
+ * Should this swipe open the missed-swipe flow instead of simply recording?
  *
- * ⛔⛔ **This replaces a driver-initiated "I already made this swipe" link, and
- * the difference is the whole point.** A driver who forgot to swipe is by
- * definition not thinking about swiping; asking them to remember to report
- * forgetting is asking for the thing that already failed. The app has the trail,
- * so the app raises it.
- *
- * ⚠️ Three guards, each load-bearing:
- * - **The leg must have started.** A leg with no en-route mark has no swipe to
- *   have missed, and a notice there would invite a filing about a trip that
- *   never happened.
- * - **Only the FIRST missing mark.** Marks fill left to right, so a leg missing
- *   both is missing the pick-up — asking about the drop-off first would ask the
- *   driver to describe the end of a leg whose beginning is unrecorded.
- * - **A departure is required, not just distance.** "Not at the pick-up" is the
- *   normal state of every leg en route to one.
+ * ⚠️ `false` when the app has no fix at all. With no location there is nothing
+ * to contradict the driver, and interrogating them anyway would be the app
+ * asserting a suspicion it cannot support.
  */
-export function detectMissedSwipe(leg: TripLeg): MissedSwipeDetection | null {
-  if (!leg.progress?.startedAt) return null;
-
-  for (const anchor of getMissingAnchors(leg)) {
-    const departure = departedAnchor(leg, anchor);
-    if (departure.kind === "left") {
-      return {
-        anchor,
-        basis: departure.basis,
-        closestMiles: departure.closestMiles,
-        lastSeenAgoMinutes: departure.lastSeenAgoMinutes,
-      };
-    }
-    // Marks fill left to right: if the first missing one has not been departed,
-    // nothing after it can be the subject either.
-    return null;
-  }
-  return null;
+export function swipeNeedsConfirming(
+  leg: TripLeg,
+  anchor: SwipeAnchor
+): boolean {
+  return insideGeofence(leg, anchor) === false;
 }
 
 /**
