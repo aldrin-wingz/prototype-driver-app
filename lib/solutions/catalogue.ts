@@ -191,11 +191,41 @@ export const SOLUTIONS: Solution[] = [
       "Driver wants to push through with the trip but cannot reach the member",
     useCase:
       "Ex 1 — Number is invalid → Support calls to confirm it is invalid → Support calls the broker for a new number",
+    /**
+     * ⛔⛔ **Reworded 2026-10-09, and the change is about WHO decides.**
+     *
+     * The spreadsheet reads "driver tags the number invalid from the app". That
+     * names the wrong actor. Whether a number is invalid is a judgement made
+     * across every trip that number appears on — an agent-side CS Tool feature,
+     * and one this driver-app-only prototype is not the place for. A driver has
+     * one failed call and cannot see the rest.
+     *
+     * What the driver CAN report honestly is which number they tried and what
+     * happened when they dialled, and "the number was disconnected or not in
+     * service" is the answer an agent reads as a candidate invalid number. So
+     * the driver-app half of this row is a report, not a tag — the agent-side
+     * half stays out of scope and is named as such rather than quietly claimed.
+     */
     proposedFeature:
-      "Driver tags the number invalid from the app so Support skips the verification call",
-    klass: "surface",
-    buildState: "not-yet",
-    entry: null,
+      "Driver reports a specific number as unreachable, with what happened and photo proof of the attempt, so Support has the evidence before it calls — ⚠️ Not in prototype yet: deciding a number is INVALID across its trips is an agent-side CS Tool feature, outside this driver-app prototype",
+    // Was "surface". Both this row and row 05 open the same form from two
+    // different places, so the distinction between them stopped meaning
+    // anything the moment they became one build.
+    klass: "form",
+    buildState: "in-prototype",
+    sharedBuildWith: "cannot-reach-member",
+    entry: {
+      route: "/my-rides/1049800391",
+      label:
+        "Tap I REACHED OUT TO CONFIRM. The STANDARD Reach Rider modal opens with its three production options — note that option 3, 'No, try again later', closes and changes nothing, which is the whole problem. Pick the fourth option to report which number you tried and what happened.",
+      alternates: [
+        {
+          route: "/my-rides/1049800392",
+          label:
+            "The SAME-DAY variant, on a will-call ride. Option 3 here reads 'No, but I will go to the pickup as scheduled' and ADVANCES the trip — today a driver who cannot reach the member drives out unconfirmed instead of telling anyone. This ride also carries only TWO member numbers, so the form offers two.",
+        },
+      ],
+    },
   },
   {
     id: "cannot-reach-member",
@@ -209,8 +239,16 @@ export const SOLUTIONS: Solution[] = [
     proposedFeature:
       "“Cannot reach member” in-app form where the driver adds what they tried; filed asynchronously instead of being held on the line",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    sharedBuildWith: "tag-number-invalid",
+    entry: {
+      route: "/my-rides/1049800391/more",
+      // ⚠️ The second door onto the same form. Row 04 reaches it from the
+      // confirmation modal, which only exists while a trip is unconfirmed; this
+      // one is in More Options, which is reachable at any stage.
+      label:
+        "More Options → the eighth tile. Same form as row 04, reached without going through the confirmation modal — both entry points call one builder, so the two paths cannot drift into asking different questions.",
+    },
   },
   {
     id: "ai-assistant",

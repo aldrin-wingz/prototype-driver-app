@@ -33,3 +33,17 @@ export const DRIVER_DROPOFF = "#E06078";
 
 /** Hairline divider between grid cells on the More Options screen. */
 export const DRIVER_DIVIDER = "#F0F0F0";
+
+/**
+ * Spring green of the Reach Rider modal's `Next` button and its selected-option
+ * border.
+ *
+ * ⚠️ Sampled from `Stage 01 - Member Confirmation - Reach Rider modal
+ * (same-day).webp` in the Flow Reference shoot, NOT from
+ * `references/screenshots/canonical/` like the constants above. Different
+ * shoot, different device, so treat it as close rather than matched.
+ */
+export const DRIVER_SPRING = "#00E8A8";
+
+/** The same button before an option is picked — the disabled state. */
+export const DRIVER_SPRING_MUTED = "#A6E3CD";

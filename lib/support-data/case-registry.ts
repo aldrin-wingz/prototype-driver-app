@@ -1,9 +1,14 @@
 import {
   getIssueOptions,
   ISSUE_CANCEL_AT_DOOR,
+  ISSUE_CANNOT_REACH_MEMBER,
   ISSUE_MISSED_SWIPE,
   ISSUE_RIDER_NO_SHOW,
 } from "./issue-types";
+import {
+  REACH_OUTCOME_OTHER,
+  REACH_OUTCOMES,
+} from "@/lib/driver-data/reach-attempt";
 import type { SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
 import {
   CONTACT_RELATION_OPTIONS,
@@ -11,7 +16,10 @@ import {
   SPOKE_WITH_CONTACT,
   SPOKE_WITH_OPTIONS,
 } from "@/lib/driver-data/no-show-rules";
-import type { SupportCaseDefinition } from "@/types/support";
+import type {
+  SupportCaseDefinition,
+  SupportFieldOption,
+} from "@/types/support";
 
 /**
  * Which issue owns a field.
@@ -35,6 +43,10 @@ const EITHER_NO_SHOW_CASE = {
   equals: [ISSUE_RIDER_NO_SHOW, ISSUE_CANCEL_AT_DOOR],
 };
 const ONLY_MISSED_SWIPE = { field: "issue", equals: [ISSUE_MISSED_SWIPE] };
+const ONLY_CANNOT_REACH = {
+  field: "issue",
+  equals: [ISSUE_CANNOT_REACH_MEMBER],
+};
 
 /**
  * Every case that is filed against one leg.
@@ -45,7 +57,12 @@ const ONLY_MISSED_SWIPE = { field: "issue", equals: [ISSUE_MISSED_SWIPE] };
  */
 const ANY_LEG_CASE = {
   field: "issue",
-  equals: [ISSUE_RIDER_NO_SHOW, ISSUE_CANCEL_AT_DOOR, ISSUE_MISSED_SWIPE],
+  equals: [
+    ISSUE_RIDER_NO_SHOW,
+    ISSUE_CANCEL_AT_DOOR,
+    ISSUE_MISSED_SWIPE,
+    ISSUE_CANNOT_REACH_MEMBER,
+  ],
 };
 
 /** The time fields of a Missed Swipe, in the order they must have happened. */
@@ -111,6 +128,7 @@ export function buildSupportFormCase({
   askSignature = false,
   askWaitTimes = true,
   missedSwipe,
+  cannotReach,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -153,6 +171,16 @@ export function buildSupportFormCase({
    * form ask where someone was while telling them it knows.
    */
   missedSwipe?: MissedSwipeAsk[];
+  /**
+   * The member-facing numbers THIS trip carries, for "which number did you try?".
+   *
+   * ⚠️ Passed in rather than derived here, because the options are a property of
+   * the trip and this builder has no trip. ⛔ An empty array is a real case, not
+   * a caller mistake — the stage map records the numbers as client-provided, so
+   * a trip can carry none. The block below renders a notice instead of an
+   * unanswerable required select when that happens.
+   */
+  cannotReach?: { contactOptions: SupportFieldOption[] };
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -170,8 +198,24 @@ export function buildSupportFormCase({
     submitLabel: "Submit",
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: missedSwipe ? "Missed swipe" : "Member no-show",
-    timeSequence: missedSwipe ? SWIPE_TIME_SEQUENCE : WAIT_TIME_SEQUENCE,
+    zendeskEquivalent: cannotReach
+      ? "Unable to reach member"
+      : missedSwipe
+        ? "Missed swipe"
+        : "Member no-show",
+    /**
+     * ⚠️ `undefined` for Can't Reach, not a fallback.
+     *
+     * This case asks no times at all, so naming a sequence here would hand
+     * `getTimeOrderWarnings` two field ids that never render — a check that
+     * passes because it has nothing to look at, which is indistinguishable from
+     * a check that passed because the times were in order.
+     */
+    timeSequence: cannotReach
+      ? undefined
+      : missedSwipe
+        ? SWIPE_TIME_SEQUENCE
+        : WAIT_TIME_SEQUENCE,
     fields: [
       {
         id: "issue",
@@ -222,8 +266,19 @@ export function buildSupportFormCase({
         required: true,
         showIf: ANY_LEG_CASE,
         prefillFrom: "legId",
-        // A no-show is only actionable on a trip that is under way.
-        legScope: "in-progress",
+        /**
+         * ⛔⛔ **The scope has to match the case, and `"in-progress"` means one
+         * specific seed array — `mockInProgressTrips` — not "a live trip".**
+         *
+         * A no-show or a missed swipe is only actionable on a trip that is under
+         * way, so those keep the narrow scope. Can't Reach Member is filed on a
+         * trip that has not been CONFIRMED yet, which lives in Needs Action and
+         * is not in that array at all. Left narrow, the picker could not resolve
+         * the leg the form had just prefilled and rendered its empty search box
+         * instead — a required field showing a placeholder, on a form the driver
+         * cannot correct because the field is meant to be locked.
+         */
+        legScope: cannotReach ? "all" : "in-progress",
         // Locked because the form is only ever opened from a ride, and a no-show
         // is about a specific pick-up the driver physically attended. Leaving it
         // open would let a driver standing at trip A file against trip B.
@@ -516,6 +571,99 @@ export function buildSupportFormCase({
                   },
                 ]
               : []),
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Can't Reach Member --------------------------------------------
+      //
+      // Catalogue rows 04 and 05, which are ONE build reached from two places:
+      // a fourth option in the Reach Rider modal, and a tile in More Options.
+      // Both call this builder, so the two paths cannot drift into asking
+      // different questions — the lesson Missed Swipe's two entry points taught.
+      //
+      // ⛔⛔ Row 04 was written as "driver tags the number invalid from the app".
+      // That is the wrong actor and the form does NOT do it. Whether a number is
+      // invalid is an agent-side judgement made across every trip it appears on;
+      // a driver has one failed call and cannot see that. What they can report
+      // truthfully is which number they tried and what happened when they did —
+      // and "disconnected or not in service" is the answer an agent reads as a
+      // candidate invalid number, sourced from someone who actually observed it.
+      ...(cannotReach
+        ? ([
+            cannotReach.contactOptions.length > 0
+              ? {
+                  id: "contactNumber",
+                  type: "select",
+                  label: "Which number did you try?",
+                  shortLabel: "number you tried",
+                  placeholder: "Select:",
+                  required: true,
+                  // ⚠️ The trip's own numbers, never a fixed list of three.
+                  // Offering a number that was never on the driver's screen
+                  // sends Support chasing a call nobody made.
+                  options: cannotReach.contactOptions,
+                  helpText:
+                    "Only the member's numbers are listed. Calling Wingz Support is not an attempt to reach them, so it is not an option here.",
+                  showIf: ONLY_CANNOT_REACH,
+                }
+              : {
+                  id: "contactNumber",
+                  type: "notice",
+                  label: "Which number did you try?",
+                  helpText:
+                    "This trip carries no member phone number at all — which is itself the problem. Tell us what you tried below and Support will chase the client for a number.",
+                  showIf: ONLY_CANNOT_REACH,
+                },
+            {
+              id: "reachOutcome",
+              type: "select",
+              label: "What happened when you called?",
+              shortLabel: "what happened",
+              placeholder: "Select:",
+              required: true,
+              options: [...REACH_OUTCOMES],
+              showIf: ONLY_CANNOT_REACH,
+            },
+            {
+              id: "reachOutcomeOther",
+              type: "text",
+              label: "What happened?",
+              placeholder: "In a few words",
+              required: true,
+              /**
+               * ⚠️ Gated on the ANSWER, not the issue, because `showIf` carries
+               * one condition and this needs the narrower of the two. Safe only
+               * because `reachOutcome` is itself gated on this issue and so can
+               * hold a value on no other case. A second case asking
+               * `reachOutcome` would need a compound condition here, not a
+               * comment.
+               */
+              showIf: { field: "reachOutcome", equals: [REACH_OUTCOME_OTHER] },
+            },
+            {
+              id: "reachNotes",
+              type: "textarea",
+              label: "Anything else Support should know? (optional)",
+              placeholder:
+                "e.g. the menu asked for an extension I do not have, or the facility desk said to call back after 2pm",
+              maxLength: 500,
+              showIf: ONLY_CANNOT_REACH,
+            },
+            {
+              id: "contactProof",
+              type: "file",
+              label: "Photo of your call log",
+              /**
+               * ⚠️ `requiredNotEnforced` — the project's existing pattern for a
+               * file nobody walking a demo has to hand. The asterisk shows the
+               * real requirement; the prototype does not block on it.
+               */
+              required: true,
+              requiredNotEnforced: true,
+              helpText:
+                "A screenshot of your phone's call log showing the attempt. ⚠️ Not in prototype yet — the real form would require this, and you can submit without it here.",
+              showIf: ONLY_CANNOT_REACH,
+            },
           ] as SupportCaseDefinition["fields"])
         : []),
 

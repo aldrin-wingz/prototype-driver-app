@@ -45,6 +45,7 @@ const NOT_YET_SUFFIX = " — ⚠️ not in prototype yet";
 export const ISSUE_RIDER_NO_SHOW = "rider-no-show";
 export const ISSUE_CANCEL_AT_DOOR = "cancel-at-door";
 export const ISSUE_MISSED_SWIPE = "missed-swipe";
+export const ISSUE_CANNOT_REACH_MEMBER = "cannot-reach-member";
 
 /**
  * The support issues a driver can file.
@@ -94,6 +95,18 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Entered from the Missed Swipe tile in More Options, on a leg with an unrecorded mark. A missed PICK-UP asks whether the member is still in the car before it asks anything else — if they are, no form opens at all until the drop-off is swiped.",
+  },
+  {
+    value: ISSUE_CANNOT_REACH_MEMBER,
+    label: "Can't Reach Member",
+    description:
+      "For a member you have not been able to get hold of. Tell us which number you tried and what happened, and we will take it from there.",
+    // Hidden like the rest: both entry points — the confirmation modal and the
+    // More Options tile — open this form with the issue already chosen, so
+    // there is no dropdown left to be visible in.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Two entry points, one form. Offered as a fourth option in the Reach Rider modal (both the standard and the same-day variant) and as a tile in More Options. ⛔ Filing changes nothing about the trip — it stays unconfirmed, exactly as 'No, try again later' leaves it today.",
   },
 ];
 

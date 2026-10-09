@@ -50,6 +50,7 @@ import {
   type MissedSwipeAnswer,
 } from "@/components/support/missed-swipe-prompt";
 import { MissedSwipeForm } from "@/components/support/missed-swipe-form";
+import { ReachRiderModal } from "./reach-rider-modal";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
@@ -104,10 +105,14 @@ const SWIPE_CTA: Record<
  *   started        → "Active Ride"     (s-01b)
  *   picked up      → "Ride"            (s-01c)
  */
-function getInProgressSubtitle(stage: LegSwipeStage): string {
+function getInProgressSubtitle(stage: LegSwipeStage, sameDay = false): string {
   switch (stage) {
     case "not-started":
-      return "Accepted Ride";
+      // Per the stage map: a same-day / will-call trip reads "Will-Call Ride"
+      // here, as `Stage 01 - Member Confirmation - Reach Rider modal
+      // (same-day).webp` shows. Only on the unstarted phase — once the trip is
+      // under way it is an Active Ride like any other.
+      return sameDay ? "Will-Call Ride" : "Accepted Ride";
     case "started":
       return "Active Ride";
     case "picked-up":
@@ -279,7 +284,7 @@ function LegCard({
  */
 export function RideDetailLayout({
   trip: seededTrip,
-  state,
+  state: seededState,
   backHref,
   banner,
 }: RideDetailLayoutProps) {
@@ -293,6 +298,8 @@ export function RideDetailLayout({
     isPickupPostponed,
     postponePickup,
     clearPostponedPickup,
+    isTripConfirmed,
+    confirmTrip,
   } = useRideFlow();
 
   // Any swipe the driver made in this session, laid over the seed. Everything
@@ -301,7 +308,27 @@ export function RideDetailLayout({
   const trip = applySessionSwipes(seededTrip);
   const pendingRequest = getPendingRequest(trip.id);
 
+  /**
+   * ⛔⛔ **Confirming the trip is what moves Ride Details off `needs-action`.**
+   *
+   * The page computes the seeded phase from `trip.status`, which cannot know
+   * about a confirmation the driver made thirty seconds ago — there is no
+   * backend to write it to. So the one transition production's Stage 01 exists
+   * to perform is applied here, over the seed, exactly like `applySessionSwipes`
+   * applies a swipe. Without it the modal's first option would tick a box and
+   * leave the driver on the same screen.
+   *
+   * Only ever `needs-action` → `in-progress`. No other phase is touched, so a
+   * completed or sent-back ride cannot be dragged backwards by this.
+   */
+  const state =
+    seededState === "needs-action" && isTripConfirmed(trip.id)
+      ? "in-progress"
+      : seededState;
+
   const [promptOpen, setPromptOpen] = useState(false);
+  /** Stage 01 Step 2 — the Reach Rider modal behind the orange CTA. */
+  const [reachOpen, setReachOpen] = useState(false);
   /**
    * Stage 04 → 05, as `CAP-095` / `CAP-098` have them: the swipe opens the
    * odometer popup, Submit advances to the full-screen Ride Signature, and only
@@ -453,10 +480,16 @@ export function RideDetailLayout({
     state === "before-taken"
       ? "Will-Call Ride"
       : state === "in-progress"
-        ? getInProgressSubtitle(activeStage)
+        ? getInProgressSubtitle(activeStage, trip.sameDay)
         : state === "completed"
           ? "Completed Ride"
-          : "Accepted Ride";
+          // The unconfirmed phase. Same rule as the unstarted in-progress one
+          // above and spelled out rather than shared, because this branch is
+          // reached from a different state and silently kept saying "Accepted
+          // Ride" on a will-call trip when only the other was patched.
+          : trip.sameDay
+            ? "Will-Call Ride"
+            : "Accepted Ride";
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -805,16 +838,12 @@ export function RideDetailLayout({
             ) : (
               <button
                 type="button"
-                // A production action v1 does not cover. Saying so beats a dead
-                // tap that reads as a bug — the same treatment the More Options
-                // tiles give every unwired action.
-                onClick={() =>
-                  toast({
-                    title: "I Reached Out to Confirm",
-                    description:
-                      "Not wired in the prototype — this is the production action.",
-                  })
-                }
+                // Stage 01 Step 2. This used to raise a "not wired" toast,
+                // which meant the app could enter the unconfirmed phase and had
+                // no way out of it — and the proposal in rows 04/05 is a FOURTH
+                // option on a modal that has to exist before a fourth makes
+                // sense.
+                onClick={() => setReachOpen(true)}
                 className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
@@ -871,6 +900,19 @@ export function RideDetailLayout({
           onOpenChange={(next) => {
             if (!next) setMissedSwipeAsks(null);
           }}
+        />
+      )}
+
+      {/* Stage 01 Step 2 — only on the unconfirmed phase, which is the only
+          phase whose CTA opens it. Mounted here rather than inside the footer
+          so the sheet is not clipped by the fixed action bar. */}
+      {seededState === "needs-action" && (
+        <ReachRiderModal
+          trip={trip}
+          leg={activeLeg}
+          open={reachOpen}
+          onOpenChange={setReachOpen}
+          onConfirmed={() => confirmTrip(trip.id)}
         />
       )}
     </div>

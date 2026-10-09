@@ -35,6 +35,17 @@ import {
   scenarioRides,
 } from "../lib/solutions/scenario-rides";
 import {
+  CANNOT_REACH_LEAVES_TRIP_UNCONFIRMED,
+  CONTACT_CHANNELS,
+  contactOptionsFor,
+  MAX_OUTCOME_LABEL_CHARS,
+  REACH_OUTCOMES,
+} from "../lib/driver-data/reach-attempt";
+import { reachOptionsFor } from "../components/driver/reach-rider-modal";
+import { buildSupportFormCase } from "../lib/support-data/case-registry";
+import { ISSUE_CANNOT_REACH_MEMBER } from "../lib/support-data/issue-types";
+import { getLegOptions } from "../lib/support-data/leg-options";
+import {
   mockRequestTrips,
   mockNeedsActionTrips,
   mockUpcomingTrips,
@@ -277,11 +288,15 @@ for (const s of built) {
 }
 check("entry routes were actually checked", `${routesChecked} checked across ${built.length} built row(s)`, routesChecked >= built.length);
 /**
- * ⚠️ Declared, not derived. Rider No-Show is two branches of one check — the
- * driver is at the pick-up or they are not — and a selector that reached only
- * one of them would demonstrate half the case while looking complete.
+ * ⚠️ Declared, not derived. TWO slices have two branches each and a selector
+ * that reached only one branch would demonstrate half the case while looking
+ * complete:
+ *   - Rider No-Show — the driver is at the pick-up, or they are not.
+ *   - Can't Reach Member (row 04) — the STANDARD confirmation modal, whose third
+ *     option changes nothing, and the SAME-DAY one, whose third option advances
+ *     the trip. Those are different alternatives for the proposal to beat.
  */
-const EXPECTED_ALTERNATES = 1;
+const EXPECTED_ALTERNATES = 2;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -423,7 +438,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 4;
+const EXPECTED_SCENARIO_RIDES = 6;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -497,7 +512,7 @@ check(
   entryMismatches === 0,
 );
 /** Declared, because a route silently skipped is a check that stops checking. */
-const EXPECTED_ENTRY_ROUTES = 4;
+const EXPECTED_ENTRY_ROUTES = 7;
 check(
   "...and every declared route was reached",
   `${entryChecked} checked (expected ${EXPECTED_ENTRY_ROUTES})`,
@@ -550,6 +565,20 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // rather than left as a fourth card saying nothing new.
   "missed-swipe": 2,
 };
+/**
+ * ⚠️ A SECOND tab, declared separately rather than folded into the map above
+ * with zeros.
+ *
+ * Can't Reach Member demos a trip that has not been confirmed yet, which lives
+ * in Needs Action — it never appears in In Progress at all. Writing it as
+ * `"cannot-reach-member": 0` in the map above would have satisfied the
+ * completeness check below while saying the row has no rides, which is the exact
+ * shape of a check that stops checking.
+ */
+const EXPECTED_NEEDS_ACTION: Record<string, number> = {
+  "tag-number-invalid": 2,
+  "cannot-reach-member": 2,
+};
 for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
   const shown = ridesForSolution(inProgress, id);
   check(
@@ -558,10 +587,33 @@ for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
     shown.length === expected,
   );
 }
+for (const [id, expected] of Object.entries(EXPECTED_NEEDS_ACTION)) {
+  const shown = ridesForSolution(mockNeedsActionTrips, id);
+  check(
+    `focusing ${id} shows ${expected} Needs Action ride(s)`,
+    `${shown.length} of ${mockNeedsActionTrips.length} — ${shown.map((t) => t.scenario?.code).join(", ")}`,
+    shown.length === expected,
+  );
+}
+const declaredRows = new Set([
+  ...Object.keys(EXPECTED_IN_PROGRESS),
+  ...Object.keys(EXPECTED_NEEDS_ACTION),
+]);
 check(
-  "every built row's ride count was declared",
-  `${Object.keys(EXPECTED_IN_PROGRESS).length} declared of ${builtRows.length} built`,
-  Object.keys(EXPECTED_IN_PROGRESS).length === builtRows.length,
+  "every built row's ride count was declared, in one tab or the other",
+  `${declaredRows.size} declared of ${builtRows.length} built`,
+  declaredRows.size === builtRows.length &&
+    builtRows.every((row) => declaredRows.has(row.id)),
+);
+/**
+ * ⛔ The Needs Action tab must still hold the base's own unconfirmed ride.
+ * Both new scenario rides landed there, and a filter that swept the plain mirror
+ * ride out of its own tab would be this slice quietly deleting a base demo.
+ */
+check(
+  "the base's plain unconfirmed ride survives in Needs Action",
+  `${mockNeedsActionTrips.filter((t) => !t.scenario).length} plain of ${mockNeedsActionTrips.length}`,
+  mockNeedsActionTrips.filter((t) => !t.scenario).length === 1,
 );
 /** The filter must actually REMOVE something, or it is decorative. */
 check(
@@ -570,10 +622,375 @@ check(
   ridesForSolution(inProgress, "missed-swipe").length < inProgress.length,
 );
 /** A row with no scenario ride shows an empty list rather than everything. */
+/**
+ * ⚠️ Was `tag-number-invalid`, which is now BUILT. An example row that quietly
+ * became buildable would have gone on passing while testing nothing — it has to
+ * name a row with genuinely no scenario ride, and the assertion below says so.
+ */
+const UNBUILT_EXAMPLE = "ai-assistant";
+check(
+  "the unbuilt example really is unbuilt",
+  `${UNBUILT_EXAMPLE} buildState=${SOLUTIONS.find((s) => s.id === UNBUILT_EXAMPLE)?.buildState}`,
+  SOLUTIONS.find((s) => s.id === UNBUILT_EXAMPLE)?.buildState === "not-yet",
+);
 check(
   "focusing an unbuilt row shows no rides, not all of them",
-  `${ridesForSolution(inProgress, "tag-number-invalid").length} of ${inProgress.length}`,
-  ridesForSolution(inProgress, "tag-number-invalid").length === 0,
+  `${ridesForSolution(inProgress, UNBUILT_EXAMPLE).length} of ${inProgress.length}`,
+  ridesForSolution(inProgress, UNBUILT_EXAMPLE).length === 0,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n9. Can't Reach Member — rows 04 and 05, one build, two doors");
+// ---------------------------------------------------------------------------
+
+const REACH_SOURCES = {
+  modal: readFileSync(join(ROOT, "components/driver/reach-rider-modal.tsx"), "utf8"),
+  more: readFileSync(join(ROOT, "components/driver/more-options-screen.tsx"), "utf8"),
+  form: readFileSync(join(ROOT, "components/support/cannot-reach-member-form.tsx"), "utf8"),
+};
+for (const [name, src] of Object.entries(REACH_SOURCES)) {
+  check(`the ${name} source was read`, `${src.length} chars`, src.length > 1500);
+}
+
+/**
+ * ⛔⛔ **Neither entry point may assemble its own case.**
+ *
+ * Rows 04 and 05 are one build reached from two places, and the only thing
+ * keeping them one form is that both go through `CannotReachMemberForm`. An
+ * entry point that called `buildSupportFormCase` directly would render a form
+ * that looked identical and could then drift a field at a time — which is
+ * exactly what Missed Swipe's two entry points taught. Checked on the source
+ * because there is no runtime moment at which the two can be compared.
+ */
+for (const [name, src] of [["modal", REACH_SOURCES.modal], ["more", REACH_SOURCES.more]] as const) {
+  check(
+    `the ${name} entry goes through the shared form`,
+    "<CannotReachMemberForm",
+    src.includes("<CannotReachMemberForm"),
+  );
+  check(
+    `...and the ${name} entry builds no case of its own`,
+    `buildSupportFormCase occurrences: ${(src.match(/buildSupportFormCase/g) ?? []).length}`,
+    !src.includes("buildSupportFormCase"),
+  );
+}
+
+/**
+ * The trip is deliberately left alone. `appTracksStatus: false` is what keeps a
+ * Pending pill off a request whose outcome never comes back to the app.
+ */
+check(
+  "filing tracks no status, because there is none to track",
+  "appTracksStatus: false",
+  REACH_SOURCES.form.includes("appTracksStatus: false"),
+);
+check(
+  "...and the decision is named in lib, not left implicit in the form",
+  `CANNOT_REACH_LEAVES_TRIP_UNCONFIRMED=${CANNOT_REACH_LEAVES_TRIP_UNCONFIRMED}`,
+  CANNOT_REACH_LEAVES_TRIP_UNCONFIRMED === true,
+);
+/**
+ * ⛔ The modal must not confirm the trip on this option. `confirmTrip` is the
+ * one call that moves Ride Details out of the unconfirmed phase, and it belongs
+ * to options 1 and the same-day 3 only — a fourth option that reported a failure
+ * to reach someone and then marked the trip confirmed would be the opposite of
+ * what it says.
+ */
+const cannotReachAdvances = /case "cannot-reach":[\s\S]{0,240}onConfirmed\(\)/.test(
+  REACH_SOURCES.modal,
+);
+check(
+  "the proposed option does NOT confirm the trip",
+  `onConfirmed() inside the cannot-reach branch: ${cannotReachAdvances}`,
+  !cannotReachAdvances,
+);
+
+// ---- both modal variants carry the option ------------------------------
+/** Declared: three production options plus one proposal, in both variants. */
+const EXPECTED_REACH_OPTIONS = 4;
+const standard = reachOptionsFor(false);
+const sameDay = reachOptionsFor(true);
+for (const [name, list] of [["standard", standard], ["same-day", sameDay]] as const) {
+  check(
+    `the ${name} modal offers ${EXPECTED_REACH_OPTIONS} options`,
+    `${list.length} — ${list.map((o) => o.value).join(", ")}`,
+    list.length === EXPECTED_REACH_OPTIONS,
+  );
+  check(
+    `...and the ${name} modal carries the proposed option`,
+    `${list.filter((o) => o.proposed).length} proposed of ${list.length}`,
+    list.filter((o) => o.proposed).length === 1 &&
+      list[list.length - 1].value === "cannot-reach",
+  );
+}
+/**
+ * ⛔ The variants must genuinely differ. If the same-day third option ever
+ * matched the standard one, both demos would show the same alternative and the
+ * second scenario ride would be making an argument it no longer makes.
+ */
+check(
+  "the two variants' third option really differs",
+  `"${standard[2].label}" vs "${sameDay[2].label}"`,
+  standard[2].label !== sameDay[2].label && Boolean(sameDay[2].note) && !standard[2].note,
+);
+check(
+  "the same-day note is production's own wording",
+  `${sameDay[2].note?.slice(0, 32)}…`,
+  (sameDay[2].note ?? "").includes("you can still start the trip on the pickup day"),
+);
+
+// ---- the numbers offered are the trip's own ----------------------------
+/**
+ * ⚠️ Declared per ride. The stage map records the numbers as client-provided and
+ * varying per trip, and `04b` exists to prove the form offers TWO when the trip
+ * carries two. A single expected count would have let a hardcoded list of three
+ * pass.
+ */
+const EXPECTED_CONTACTS: Record<string, number> = {
+  "1049800391": 3,
+  "1049800392": 2,
+};
+const reachRides = ALL_SEEDED.filter((t) => isScenarioFor(t, "cannot-reach-member"));
+check(
+  "every declared contact count names a scenario ride",
+  `${Object.keys(EXPECTED_CONTACTS).length} declared of ${reachRides.length} scenario ride(s)`,
+  Object.keys(EXPECTED_CONTACTS).length === reachRides.length &&
+    reachRides.every((t) => t.id in EXPECTED_CONTACTS),
+);
+for (const [id, expected] of Object.entries(EXPECTED_CONTACTS)) {
+  const ride = ALL_SEEDED.find((t) => t.id === id);
+  const options = ride ? contactOptionsFor(ride) : [];
+  check(
+    `${id} offers ${expected} member number(s)`,
+    `${options.length} — ${options.map((o) => o.value).join(", ")}`,
+    options.length === expected,
+  );
+  check(
+    `...and ${id}'s labels carry the number itself, not just its name`,
+    options.map((o) => o.label).join(" | ") || "(none)",
+    options.length > 0 && options.every((o) => /\d{3}\) 555-01\d{2}/.test(o.label)),
+  );
+}
+/**
+ * ⛔⛔ `Wingz Support` is the fourth entry in production's Phone Options popup
+ * and must never be offered as proof of trying to reach the MEMBER. Checked
+ * across every seeded ride, not just the two scenarios, so a later seed cannot
+ * reintroduce it quietly.
+ */
+let contactOptionsScanned = 0;
+const supportOffered: string[] = [];
+for (const ride of ALL_SEEDED) {
+  for (const option of contactOptionsFor(ride)) {
+    contactOptionsScanned++;
+    if (/support|wingz/i.test(option.label)) supportOffered.push(`${ride.id}: ${option.label}`);
+  }
+}
+check(
+  "calling Wingz Support is never offered as a member contact",
+  supportOffered.length
+    ? supportOffered.join("; ")
+    : `0 hits across ${contactOptionsScanned} option(s) on ${ALL_SEEDED.length} ride(s)`,
+  supportOffered.length === 0 && contactOptionsScanned > 0,
+);
+check(
+  "the channel list itself is the three member-facing numbers",
+  `${CONTACT_CHANNELS.length} — ${CONTACT_CHANNELS.map((c) => c.label).join(", ")}`,
+  CONTACT_CHANNELS.length === 3,
+);
+
+// ---- the form the two doors share --------------------------------------
+/**
+ * Built here from the same two lib functions the wrapper uses. The grep above is
+ * what ties this case to the one the app renders; this is what checks its shape.
+ */
+const reachRide = ALL_SEEDED.find((t) => t.id === "1049800391")!;
+const reachCase = buildSupportFormCase({
+  includeIssues: [ISSUE_CANNOT_REACH_MEMBER],
+  cannotReach: { contactOptions: contactOptionsFor(reachRide) },
+});
+const reachFieldIds = reachCase.fields.map((f) => f.id);
+/** Declared, in render order. */
+const EXPECTED_REACH_FIELDS = [
+  "contactNumber",
+  "reachOutcome",
+  "reachOutcomeOther",
+  "reachNotes",
+  "contactProof",
+];
+const missingFields = EXPECTED_REACH_FIELDS.filter((id) => !reachFieldIds.includes(id));
+check(
+  "the form asks every declared field",
+  missingFields.length
+    ? `missing: ${missingFields.join(", ")}`
+    : `${EXPECTED_REACH_FIELDS.length} of ${EXPECTED_REACH_FIELDS.length} present, among ${reachFieldIds.length} total`,
+  missingFields.length === 0,
+);
+const inOrder = EXPECTED_REACH_FIELDS.map((id) => reachFieldIds.indexOf(id));
+check(
+  "...in the declared order",
+  inOrder.join(" < "),
+  inOrder.every((pos, i) => i === 0 || pos > inOrder[i - 1]),
+);
+const numberField = reachCase.fields.find((f) => f.id === "contactNumber")!;
+check(
+  "the number question offers the trip's own numbers",
+  `type=${numberField.type}, ${numberField.options?.length ?? 0} option(s)`,
+  numberField.type === "select" && numberField.options?.length === 3,
+);
+const outcomeField = reachCase.fields.find((f) => f.id === "reachOutcome")!;
+/** Declared: a driver cannot be made to pick between two answers. */
+const EXPECTED_OUTCOMES = 6;
+check(
+  "the outcome question offers every declared answer",
+  `${outcomeField.options?.length ?? 0} of ${EXPECTED_OUTCOMES} — ${(outcomeField.options ?? []).map((o) => o.value).join(", ")}`,
+  outcomeField.options?.length === EXPECTED_OUTCOMES &&
+    REACH_OUTCOMES.length === EXPECTED_OUTCOMES,
+);
+/**
+ * ⛔ No answer may be longer than the select can draw. The shared primitive does
+ * not wrap its items, so an over-long label is cut at the panel edge silently —
+ * found by walking the app, not by any gate, which is why there is a gate now.
+ */
+const longLabels = REACH_OUTCOMES.filter(
+  (o) => o.label.length > MAX_OUTCOME_LABEL_CHARS,
+);
+check(
+  "every answer fits the select without clipping",
+  longLabels.length
+    ? longLabels.map((o) => `${o.label} (${o.label.length})`).join("; ")
+    : `longest is ${Math.max(...REACH_OUTCOMES.map((o) => o.label.length))} of ${MAX_OUTCOME_LABEL_CHARS} max, across ${REACH_OUTCOMES.length} answers`,
+  longLabels.length === 0,
+);
+
+/**
+ * ⛔ The one answer catalogue row 04 is about. Without it the form collects
+ * "I could not reach them" and an agent still has to call the number to find out
+ * it is dead — which is the call row 04 exists to remove.
+ */
+check(
+  "a disconnected number is one of the answers",
+  (outcomeField.options ?? []).map((o) => o.value).join(", "),
+  (outcomeField.options ?? []).some((o) => o.value === "disconnected"),
+);
+/**
+ * ⛔⛔ **The prefilled leg must exist in the picker's OWN scope.**
+ *
+ * `legScope: "in-progress"` does not mean "a live trip" — it means one seed
+ * array, `mockInProgressTrips`. Can't Reach Member is filed on a trip that is
+ * merely UNCONFIRMED, which lives in Needs Action. With the narrow scope the
+ * form prefilled a leg the picker could not resolve and rendered its empty
+ * search box instead: a required, supposedly-locked field showing a placeholder.
+ * Typecheck, every other gate and the build all passed with that on screen.
+ *
+ * Checked for every case that carries a leg picker, so the next one cannot
+ * repeat it.
+ */
+const legField = reachCase.fields.find((f) => f.id === "legId")!;
+const legChoices = getLegOptions(legField.legScope ?? "all");
+check(
+  "the leg picker's scope can see the ride the form opens on",
+  `scope=${legField.legScope} · ${legChoices.length} leg(s) offered · looking for ${reachRide.legs[0].id}`,
+  legChoices.some((option) => option.legId === reachRide.legs[0].id),
+);
+check(
+  "...and for the other variant's ride too",
+  `looking for 1049800392 among ${legChoices.length}`,
+  legChoices.some((option) => option.legId === "1049800392"),
+);
+/**
+ * The locked treatment is the point: the form is only ever opened FROM a ride,
+ * so letting the driver repoint it at another one would let them file against a
+ * trip they are not on.
+ */
+check(
+  "the leg stays locked once it resolves",
+  `lockWhenPrefilled=${legField.lockWhenPrefilled} badge="${legField.lockedBadge}"`,
+  legField.lockWhenPrefilled === true,
+);
+/** And the narrow scope must still be narrow for the cases that need it. */
+const noShowCase = buildSupportFormCase({ includeIssues: [ISSUE_CANNOT_REACH_MEMBER] });
+const noShowLegField = noShowCase.fields.find((f) => f.id === "legId")!;
+check(
+  "widening the scope did NOT widen it for every other case",
+  `cannotReach=${legField.legScope} vs default=${noShowLegField.legScope}`,
+  noShowLegField.legScope === "in-progress" && legField.legScope === "all",
+);
+
+const proofField = reachCase.fields.find((f) => f.id === "contactProof")!;
+check(
+  "the photo proof keeps its asterisk without blocking the demo",
+  `required=${proofField.required} requiredNotEnforced=${proofField.requiredNotEnforced}`,
+  proofField.required === true && proofField.requiredNotEnforced === true,
+);
+check(
+  "the case names no time sequence, because it asks no times",
+  `timeSequence=${reachCase.timeSequence ?? "undefined"}`,
+  reachCase.timeSequence === undefined,
+);
+/**
+ * ⛔ A trip with no member number at all is a real case — and an empty required
+ * select is a dead end no driver can submit past. The block has to degrade to a
+ * notice instead.
+ */
+const noNumberCase = buildSupportFormCase({
+  includeIssues: [ISSUE_CANNOT_REACH_MEMBER],
+  cannotReach: { contactOptions: [] },
+});
+const noNumberField = noNumberCase.fields.find((f) => f.id === "contactNumber")!;
+check(
+  "a trip with no member number degrades to a notice, not an empty required select",
+  `type=${noNumberField.type} required=${noNumberField.required ?? false}`,
+  noNumberField.type === "notice" && !noNumberField.required,
+);
+/** And the block must be absent entirely when the case is not this one. */
+const otherCase = buildSupportFormCase({ includeIssues: [ISSUE_CANNOT_REACH_MEMBER] });
+check(
+  "the block is absent when no contact options are passed",
+  `${otherCase.fields.filter((f) => EXPECTED_REACH_FIELDS.includes(f.id)).length} of ${EXPECTED_REACH_FIELDS.length} leaked`,
+  otherCase.fields.every((f) => !EXPECTED_REACH_FIELDS.includes(f.id)),
+);
+
+// ---- the More Options grid ---------------------------------------------
+/**
+ * ⚠️ The grid gained a tile, which Phase 3 explicitly refused to do. Declared
+ * here so it stays a decision: seven production tiles, in capture order, plus
+ * exactly one proposal.
+ */
+const EXPECTED_PRODUCTION_TILES = 7;
+const productionTileIds = [
+  "map-pickup",
+  "map-dropoff",
+  "call",
+  "email-support",
+  "calendar",
+  "no-show",
+  "send-back",
+];
+const tileBlock = REACH_SOURCES.more.slice(
+  REACH_SOURCES.more.indexOf("const PRODUCTION_TILES"),
+  REACH_SOURCES.more.indexOf("const CANNOT_REACH_TILE"),
+);
+const foundTiles = productionTileIds.filter((id) => tileBlock.includes(`id: "${id}"`));
+check(
+  "all seven production tiles survive, in the production list",
+  `${foundTiles.length} of ${EXPECTED_PRODUCTION_TILES}`,
+  foundTiles.length === EXPECTED_PRODUCTION_TILES,
+);
+check(
+  "...and exactly one tile was added, outside that list",
+  `cannot-reach in production list: ${tileBlock.includes('id: "cannot-reach"')}`,
+  !tileBlock.includes('id: "cannot-reach"') &&
+    REACH_SOURCES.more.includes('id: "cannot-reach"'),
+);
+/**
+ * ⛔ Send Back Trip stays LAST and stays full-width. It is the destructive
+ * action; a proposal that pushed it out of the position the capture gives it
+ * would be this slice rearranging production to make room for itself.
+ */
+check(
+  "Send Back Trip is still last and still full-width",
+  "CANNOT_REACH_TILE inserted above send-back",
+  /\[CANNOT_REACH_TILE, \{ \.\.\.tile, fullWidth: true \}\]/.test(REACH_SOURCES.more),
 );
 
 // ---------------------------------------------------------------------------

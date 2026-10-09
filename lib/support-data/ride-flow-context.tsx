@@ -144,6 +144,23 @@ interface RideFlowValue {
   /** Record that a leg ended with no MEMBER signature, and read it back. */
   markMemberSignatureMissing: (legId: string) => void;
   isTripMemberSignatureMissing: (trip: Trip) => boolean;
+
+  // ---- Member Confirmation (Stage 01) ----------------------------------
+  /**
+   * Whether the driver has confirmed this trip with the member.
+   *
+   * ⚠️ Session state, not a seed field. The confirmation gate is what separates
+   * Ride Details' `needs-action` phase from `in-progress`, and before this the
+   * orange `I REACHED OUT TO CONFIRM` button was a toast saying it was not wired
+   * — so the app could reach `needs-action` and never leave it. Held per trip
+   * because the gate is per trip, and resets on reload like every other
+   * in-session fact here.
+   *
+   * ⛔ Filing "I can't reach the member" does NOT set this. That form reports a
+   * failure to reach someone; confirming says the opposite.
+   */
+  isTripConfirmed: (tripId: string) => boolean;
+  confirmTrip: (tripId: string) => void;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -174,6 +191,8 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   // React is told to look again.
   const [swipeRevision, setSwipeRevision] = useState(0);
   const [postponed, setPostponed] = useState<string[]>([]);
+  // Trip ids the driver confirmed with the member this session.
+  const [confirmed, setConfirmed] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -234,8 +253,14 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         setSwipeRevision((previous) => previous + 1);
       },
       isTripMemberSignatureMissing: (trip) => tripMemberSignatureMissing(trip),
+
+      isTripConfirmed: (tripId) => confirmed.includes(tripId),
+      confirmTrip: (tripId) =>
+        setConfirmed((previous) =>
+          previous.includes(tripId) ? previous : [...previous, tripId]
+        ),
     }),
-    [records, swipeRevision, postponed]
+    [records, swipeRevision, postponed, confirmed]
   );
 
   return (

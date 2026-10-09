@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   CornerUpRight,
+  PhoneOff,
   Phone,
   Mail,
   Calendar,
@@ -42,6 +43,8 @@ import {
   type NoShowOutcome,
   type NoShowTreatment,
 } from "@/lib/driver-data/no-show-rules";
+import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-form";
+import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -143,6 +146,33 @@ const PRODUCTION_TILES: OptionTile[] = [
     color: DRIVER_GOLD,
   },
 ];
+
+/**
+ * Catalogue row 05 — the eighth tile, and the one production does not have.
+ *
+ * ⚠️ **This edits a capture-locked grid, deliberately.** The seven above are
+ * replicated from the `DAB-2026-10-01` shoot and Phase 3 refused to add a Missed
+ * Swipe tile here for exactly that reason, using a link under the swipe CTA
+ * instead. This one is a tile because the slice's own specification puts it in
+ * More Options — recorded as a decision, not a drift, so the next slice has to
+ * make the call again rather than inherit it.
+ *
+ * ⚠️ Full-width, like `Send Back Trip`. That keeps every production tile in the
+ * column and variant the capture shows it in: the alternative, pairing this one
+ * with Send Back Trip into a fourth row of two, would take Send Back Trip's
+ * full-width treatment away to make room for a proposal.
+ */
+const CANNOT_REACH_TILE: OptionTile = {
+  id: "cannot-reach",
+  label: CANNOT_REACH_LABEL,
+  icon: PhoneOff,
+  // `filled`, the variant the capture reserves for consequential actions. This
+  // files a support request; the plain glyphs beside it open the dialer and the
+  // mail app.
+  variant: "filled",
+  color: DRIVER_NAVY,
+  fullWidth: true,
+};
 
 /**
  * The refusal wording, per treatment.
@@ -275,6 +305,7 @@ export function MoreOptionsScreen({
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
   const [stageRefused, setStageRefused] = useState(false);
+  const [cannotReachOpen, setCannotReachOpen] = useState(false);
 
   /**
    * ⚠️ Nothing about guardrail 2 is known here.
@@ -290,11 +321,18 @@ export function MoreOptionsScreen({
    */
 
   /**
-   * ⚠️ The grid never changes shape. All seven production tiles, always, with
-   * `Send Back Trip` full-width as the odd one — exactly as captured.
+   * All seven production tiles, in capture order and capture treatment, plus
+   * the one proposed tile.
+   *
+   * ⚠️ The proposal is inserted ABOVE `Send Back Trip` rather than appended, so
+   * the destructive action stays last — where the capture has it, and where a
+   * driver's thumb expects it. Every production tile keeps its column and its
+   * variant; the only change to the captured grid is one extra row.
    */
-  const gridTiles: OptionTile[] = PRODUCTION_TILES.map((tile) =>
-    tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
+  const gridTiles: OptionTile[] = PRODUCTION_TILES.flatMap((tile) =>
+    tile.id === "send-back"
+      ? [CANNOT_REACH_TILE, { ...tile, fullWidth: true }]
+      : [tile]
   );
 
   function handleProductionTile(id: string) {
@@ -308,6 +346,14 @@ export function MoreOptionsScreen({
   }
 
   function handleGridTile(id: string) {
+    if (id === "cannot-reach") {
+      // ⚠️ No guard. Unlike Member No-Show there is no stage rule and no
+      // one-per-ride limit: a driver who tried the rider's phone at nine and the
+      // facility desk at ten has made two different attempts on two different
+      // numbers, and Support wants both.
+      setCannotReachOpen(true);
+      return;
+    }
     if (id === "no-show") {
       // Guardrail 1 only — the ride's status, which needs no location check.
       if (!activeLeg || !canFileNoShow(trip, activeLeg)) {
@@ -388,6 +434,16 @@ export function MoreOptionsScreen({
         ))}
       </div>
 
+      <CannotReachMemberForm
+        trip={trip}
+        leg={activeLeg}
+        open={cannotReachOpen}
+        onOpenChange={setCannotReachOpen}
+        // ⛔ Deliberately does NOT navigate back to the ride. The trip is
+        // unchanged, so there is nothing new on it to see — returning the driver
+        // to a screen that looks exactly as they left it would read as the
+        // submit having failed.
+      />
     </div>
   );
 }

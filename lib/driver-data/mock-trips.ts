@@ -223,6 +223,20 @@ export function getLegStatusLabel(leg: TripLeg): string {
   }
 }
 
+/**
+ * The numbers production's Phone Options popup offers for a trip.
+ *
+ * Keyed rather than a list because each one means something different to
+ * Support: the rider's own phone, the number at the pick-up (often a facility
+ * desk) and the number at the drop-off. "I could not reach them" is a different
+ * claim about each.
+ */
+export interface TripContacts {
+  riderPhone?: string;
+  pickupPhone?: string;
+  dropoffPhone?: string;
+}
+
 export interface Trip {
   id: string;
   date: string;
@@ -285,6 +299,32 @@ export interface Trip {
    * faithful and filtered OUT while a solution is focused.
    */
   scenario?: TripScenario;
+  /**
+   * The member-facing numbers this trip carries, as production's Phone Options
+   * popup lists them.
+   *
+   * ⚠️ **Optional per key, deliberately.** The stage map records the numbers as
+   * client-provided and varying per trip, so a leg may carry one, two or three.
+   * Anything that offers these has to offer what the trip ACTUALLY has — a fixed
+   * list of three would invite a driver to report an attempt on a number that
+   * was never on their screen.
+   *
+   * ⛔ `Wingz Support` is in the production popup and is NOT here. It is calling
+   * us, not the member, so it can never be evidence of trying to reach them.
+   *
+   * ⚠️ Every value is in the 555-01xx range reserved for fiction. These are
+   * seeds; no real number belongs in this repo.
+   */
+  contacts?: TripContacts;
+  /**
+   * Whether this is a same-day / Will-Call trip.
+   *
+   * ⚠️ Seeded rather than derived from `date`. The prototype has no clock — a
+   * derived version would flip to "same-day" on exactly one real-world day and
+   * read as a bug on every other. What it selects is the Reach Rider modal's
+   * SAME-DAY variant, whose third option advances the trip instead of closing.
+   */
+  sameDay?: boolean;
   /**
    * Pills a SCREEN adds at render time, e.g. "Waiting on Support".
    *
@@ -1150,6 +1190,131 @@ export const mockNeedsActionTrips: Trip[] = [
       // status list is [ACCEPTED, CHECKED, EN_ROUTE] and an unconfirmed trip may well
       // sit at ACCEPTED, in which case the server would allow the no-show.
     ],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 04a — can't reach the member, STANDARD confirmation modal =====
+  //
+  // Catalogue rows 04 and 05, which are one build reached from two places. This
+  // ride is an advance trip, so `I REACHED OUT TO CONFIRM` opens the STANDARD
+  // Reach Rider modal — the variant whose third option closes and changes
+  // nothing, which is the behaviour the proposal exists to improve on.
+  //
+  // Three member numbers, which is the most a trip carries.
+  {
+    id: "1049800391",
+    date: "Thu, Jul 31, 2026",
+    rider: "TERRENCE HALLOWAY",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "6.4 mi",
+    totalRevenue: 38.75,
+    notes: "Dialysis center — ask for the transport desk",
+    contacts: {
+      riderPhone: "(470) 555-0132",
+      pickupPhone: "(470) 555-0118",
+      dropoffPhone: "(678) 555-0176",
+    },
+    legs: [
+      {
+        id: "1049800391",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "8:30 AM",
+        address: "2140 Sylvan Rd SW, Atlanta, GA 30310",
+        county: "Fulton County",
+        revenue: 38.75,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800391-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:15 AM",
+        address: "1550 Peachtree St NE, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "04a",
+      label: "Can't reach — standard confirmation",
+      solutions: ["tag-number-invalid", "cannot-reach-member"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 04b — can't reach the member, SAME-DAY confirmation modal =====
+  //
+  // ⚠️ The second variant, and it is NOT cosmetic. Here the third option reads
+  // "No, but I will go to the pickup as scheduled" and ADVANCES the trip — a
+  // driver who cannot reach the member today can already drive out unconfirmed.
+  // That is the alternative the proposed option is competing with, so a demo
+  // that only showed the standard modal would be arguing against the weaker case.
+  //
+  // ⛔ TWO numbers, not three. The stage map records them as client-provided and
+  // varying per trip, and this is the ride that proves the form offers what the
+  // trip actually has rather than a fixed list.
+  {
+    id: "1049800392",
+    date: "Thu, Jul 31, 2026",
+    rider: "ROSALIND VEGA",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "4.1 mi",
+    totalRevenue: 29.40,
+    notes: "Will-call return — rider calls when discharged",
+    sameDay: true,
+    contacts: {
+      riderPhone: "(404) 555-0109",
+      pickupPhone: "(404) 555-0155",
+    },
+    legs: [
+      {
+        id: "1049800392",
+        legCode: "B",
+        type: "wait-for-call",
+        label: "Wait For Call",
+        time: "Will-Call",
+        address: "550 Peachtree St NE, Atlanta, GA 30308",
+        county: "Fulton County",
+        revenue: 29.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800392-b",
+        type: "scheduled",
+        label: "Scheduled Drop-off",
+        time: "2:40 PM",
+        address: "1823 Glenwood Ave SE, Atlanta, GA 30316",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "04b",
+      label: "Can't reach — same-day risk path",
+      solutions: ["tag-number-invalid", "cannot-reach-member"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
