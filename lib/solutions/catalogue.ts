@@ -57,6 +57,22 @@ export interface SolutionEntry {
   alternates?: Array<{ route: string; label: string }>;
 }
 
+/**
+ * Where the app lands when a focused solution has nowhere of its own to go.
+ *
+ * ⛔ 21 of the 26 rows have no entry point, and `focus()` used to just rewrite
+ * the query string for those — leaving whoever switched standing on the
+ * PREVIOUS solution's ride detail screen, reading a briefing about something
+ * else, with that ride filtered out of its own list. Switching has to move the
+ * app somewhere every solution means the same thing, and the ride list is it:
+ * focused, it is either the solution's scenario rides or an empty tab that says
+ * so by name.
+ *
+ * Declared here rather than written inline so `scripts/verify-solutions.ts` can
+ * assert the route resolves to a real page.
+ */
+export const SOLUTION_HOME = "/my-rides";
+
 export interface Solution {
   id: string;
   /** 1-26, call-volume order — the order the phases are built in. */
@@ -416,6 +432,12 @@ export const SOLUTIONS: Solution[] = [
       "Requests tray — one list of every in-app request the driver has submitted and its current state",
     klass: "surface",
     buildState: "not-yet",
+    // ⚠️ Added 2026-10-09. Row 18 has always pointed here; this never pointed
+    // back, so the relationship existed in one direction only. Invisible while
+    // the picker's label was hardcoded — it printed "17" regardless of which
+    // row you opened, which is the right answer for row 18 and the reason
+    // nobody noticed row 17 was silent.
+    sharedBuildWith: "requests-tray-modifications",
     entry: null,
   },
   {

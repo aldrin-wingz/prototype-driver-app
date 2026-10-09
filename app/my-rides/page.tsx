@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
@@ -14,7 +14,10 @@ import {
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { useSolution } from "@/lib/solutions/solution-context";
-import { ridesForSolution } from "@/lib/solutions/scenario-rides";
+import {
+  firstTabWithRides,
+  ridesForSolution,
+} from "@/lib/solutions/scenario-rides";
 
 type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
 
@@ -134,6 +137,28 @@ export default function MyRidesPage() {
         return [];
     }
   };
+
+  /**
+   * ⚠️ **The landing tab follows the solution in focus.**
+   *
+   * Keyed on `active?.id` so it fires when the focus CHANGES, not on every
+   * render — a tab the person chose by hand has to survive until they switch
+   * solutions, or the page would drag them back every time a count moved.
+   *
+   * ⛔ Without this, focusing Can't Reach Member landed on In Progress reading
+   * "No rides in this tab", while its two rides sat in Needs Action one tap
+   * away. The empty tab said the solution had no demo; it has two.
+   *
+   * Only while something is focused. Unfocused, the app is the plain mirror and
+   * In Progress is its own default — see the `useState` above.
+   */
+  useEffect(() => {
+    if (!active) return;
+    setActiveTab(firstTabWithRides(tabs));
+    // `tabs` is rebuilt every render, so depending on it would re-run this
+    // constantly and pin the tab. The focused solution is what should move it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
 
   const currentTrips = getTripsForTab(activeTab);
   

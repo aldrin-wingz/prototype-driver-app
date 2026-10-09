@@ -61,3 +61,25 @@ export function ridesForSolution(
 export function scenarioRides(trips: Trip[]): Trip[] {
   return trips.filter((trip) => trip.scenario);
 }
+
+/**
+ * The My Rides tab to open on, for the solution in focus.
+ *
+ * ⚠️ **A rule, not a default.** My Rides opens on In Progress, which is right
+ * for the plain mirror and wrong for a focused solution whose rides are
+ * somewhere else: Can't Reach Member demos an UNCONFIRMED trip, so its two rides
+ * live in Needs Action and focusing it landed on an In Progress tab reading "No
+ * rides in this tab" — which says the solution has no demo when it has two.
+ *
+ * Takes the counts the page has already computed rather than recomputing them,
+ * so the tab chosen and the number printed on it cannot disagree.
+ *
+ * Falls back to the FIRST tab when every count is zero — an unbuilt row has no
+ * rides anywhere, and there is no better tab to pick. Returning the first keeps
+ * the plain-mirror default intact.
+ */
+export function firstTabWithRides<T extends string>(
+  tabs: ReadonlyArray<{ value: T; count: number }>
+): T {
+  return (tabs.find((tab) => tab.count > 0) ?? tabs[0]).value;
+}

@@ -7,6 +7,7 @@ import {
   CLASS_LABEL,
   COVERED_CALLS,
   SOLUTIONS,
+  findSolution,
   buildStateLabel,
   formatShare,
   subjectAreaGroups,
@@ -28,6 +29,10 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
   const { active } = useSolution();
   const isActive = active?.id === solution.id;
   const unbuildable = solution.klass === "no-app-surface";
+  // Resolved from the row it names, never written as a literal. `undefined`
+  // when the id does not resolve, so a dangling reference prints nothing rather
+  // than a wrong number — and `verify-solutions` already fails on one.
+  const sharedWith = findSolution(solution.sharedBuildWith ?? null);
 
   return (
     <button
@@ -75,8 +80,16 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
           <span className="text-[10px] font-medium text-gray-500">
             {buildStateLabel(solution.buildState)}
           </span>
-          {solution.sharedBuildWith && (
-            <span className="text-[10px] text-gray-400">· same build as 17</span>
+          {/* ⛔⛔ This number was HARDCODED to 17. It was written when rows 17
+              and 18 were the only shared pair, so it read correctly by
+              accident — and when rows 04 and 05 became a shared build it told
+              you row 05 shared one with the requests tray. A fact about one row
+              written as a literal in another row's JSX is a fact nothing can
+              check; it now comes off the row it names. */}
+          {sharedWith && (
+            <span className="text-[10px] text-gray-400">
+              · same build as {String(sharedWith.order).padStart(2, "0")}
+            </span>
           )}
         </span>
       </span>

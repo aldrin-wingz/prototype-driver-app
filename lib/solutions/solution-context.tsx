@@ -6,11 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { findSolution, type Solution } from "./catalogue";
+import { findSolution, SOLUTION_HOME, type Solution } from "./catalogue";
 
 /**
  * Which proposed feature the prototype is currently focused on.
@@ -62,16 +63,60 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
 
   const paramId = searchParams.get(SOLUTION_PARAM);
 
+  /**
+   * ⛔⛔ **The path a `focus()` navigation is heading for, while it is in
+   * flight — and the reason BOTH effects below stand down while it is set.**
+   *
+   * `router.push` is async, so for a render or two after a switch the URL still
+   * describes the old solution on the old screen. Left alone, the two effects
+   * each undo the switch in their own way: the adopt effect reads the stale
+   * param and restores the old focus, and the mirror effect calls
+   * `history.replaceState` on the page it is still on, overwriting the pending
+   * push. Between them the app either stayed put or arrived wearing the wrong
+   * id — reported as "the prototype struggles to switch, especially on a ride
+   * page". Nothing throws and the briefing updates either way, which is exactly
+   * why it survived a walk.
+   */
+  const pendingFocus = useRef<string | null>(null);
+
   // Adopt a focus named in the URL: an entry point, a shared link, or a hand
   // edit. Only ever widens — a missing param means "the app navigated", not
   // "the focus was dropped".
   useEffect(() => {
+    /**
+     * ⛔⛔ **Not while we are mid-switch.** `router.push` is async, so for a
+     * render or two after `focus()` the URL still names the PREVIOUS solution —
+     * and this effect, reading it, would set the focus straight back. The app
+     * then arrived at the new solution's entry screen still wearing the old
+     * solution's id and briefing. Half-switched is worse than not switching: it
+     * looks like it worked.
+     */
+    if (pendingFocus.current) return;
     if (paramId && paramId !== activeId) setActiveId(paramId);
   }, [paramId, activeId]);
 
+  /**
+   * ⛔⛔ **The path a `focus()` navigation is heading for, while it is in
+   * flight.**
+   *
+   * `router.push` is async. The mirror effect below renders first, sees the
+   * param it wants is not in the URL yet, and calls `history.replaceState` on
+   * the page it is STILL on — which overwrites the pending push. The app then
+   * sat on the old screen wearing the new solution's id, which is the
+   * "switching does nothing" the prototype was reported for. Nothing errors and
+   * the briefing updates, so it reads as a sluggish app rather than a bug.
+   */
   // Put it back after the app's own navigation drops it, so the URL always
   // says which solution produced what is on screen.
   useEffect(() => {
+    // ⛔ Never while a focus navigation is still travelling — see above.
+    if (pendingFocus.current) {
+      // Settled once we have ARRIVED, or once the URL already agrees with us —
+      // the second clause matters when the target is the page we are on, where
+      // the pathname never changes and waiting on it would wedge both effects.
+      if (pathname !== pendingFocus.current && paramId !== activeId) return;
+      pendingFocus.current = null;
+    }
     if (activeId && paramId !== activeId) writeParam(activeId);
   }, [activeId, paramId, pathname]);
 
@@ -80,14 +125,21 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   const focus = useCallback(
     (solution: Solution) => {
       setActiveId(solution.id);
-      // An entry point moves the app to where the solution is demonstrable. A
-      // solution with none still focuses — the briefing is the whole point for
-      // the rows there is nothing to build for.
-      if (solution.entry) {
-        router.push(`${solution.entry.route}?${SOLUTION_PARAM}=${solution.id}`);
-      } else {
-        writeParam(solution.id);
-      }
+      /**
+       * ⛔ **Switching ALWAYS moves the app.** An entry point goes to where the
+       * solution is demonstrable; a row without one goes to `SOLUTION_HOME`.
+       *
+       * The second half used to just rewrite the query string, which looked
+       * harmless and was not: switching while on a ride detail screen left you
+       * on the PREVIOUS solution's ride, reading the new solution's briefing,
+       * with that ride filtered out of its own list. Deep screens are where a
+       * demo actually happens, so that was the common case, not the edge.
+       */
+      const target = solution.entry?.route ?? SOLUTION_HOME;
+      // Claimed BEFORE the push, so the mirror effect's very first render after
+      // `setActiveId` already knows to stay out of the way.
+      pendingFocus.current = target.split("?")[0];
+      router.push(`${target}?${SOLUTION_PARAM}=${solution.id}`);
     },
     [router],
   );

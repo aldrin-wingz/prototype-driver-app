@@ -23,12 +23,15 @@ import { fileURLToPath } from "node:url";
 import {
   CATEGORIZED_CALLS,
   COVERED_CALLS,
+  findSolution,
+  SOLUTION_HOME,
   SOLUTIONS,
   subjectAreaGroups,
   type SolutionClass,
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
+  firstTabWithRides,
   isScenarioFor,
   pillsFor,
   ridesForSolution,
@@ -991,6 +994,198 @@ check(
   "Send Back Trip is still last and still full-width",
   "CANNOT_REACH_TILE inserted above send-back",
   /\[CANNOT_REACH_TILE, \{ \.\.\.tile, fullWidth: true \}\]/.test(REACH_SOURCES.more),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n10. Switching solutions always lands somewhere that means something");
+// ---------------------------------------------------------------------------
+
+check(
+  "the fallback landing route resolves to a real page",
+  SOLUTION_HOME,
+  routeExists(SOLUTION_HOME),
+);
+/**
+ * ⛔⛔ **`focus()` must navigate on BOTH paths.**
+ *
+ * 21 of 26 rows have no entry point. That branch used to only rewrite the query
+ * string, so switching while on a ride detail screen left you standing on the
+ * PREVIOUS solution's ride, reading the new solution's briefing, with that ride
+ * filtered out of its own list. Nothing errored and the briefing updated, which
+ * is exactly why it survived a walk — the broken state looks like a working one.
+ */
+const CONTEXT_SRC = readFileSync(join(ROOT, "lib/solutions/solution-context.tsx"), "utf8");
+check(
+  "the solution context source was read",
+  `${CONTEXT_SRC.length} chars`,
+  CONTEXT_SRC.length > 1500,
+);
+const focusBody = CONTEXT_SRC.slice(
+  CONTEXT_SRC.indexOf("const focus = useCallback"),
+  CONTEXT_SRC.indexOf("const clear = useCallback"),
+);
+check(
+  "focus() pushes a route rather than only rewriting the query string",
+  `router.push occurrences in focus(): ${(focusBody.match(/router\.push/g) ?? []).length}`,
+  (focusBody.match(/router\.push/g) ?? []).length === 1 &&
+    focusBody.includes("SOLUTION_HOME"),
+);
+check(
+  "...and focus() no longer has a branch that skips navigation",
+  `writeParam inside focus(): ${focusBody.includes("writeParam")}`,
+  !focusBody.includes("writeParam"),
+);
+/**
+ * ⛔⛔ **BOTH effects must stand down while a switch is in flight.**
+ *
+ * `router.push` is async, so for a render or two the URL still describes the
+ * old solution on the old screen. Each effect undoes the switch its own way —
+ * the adopt effect reads the stale param and restores the old focus; the mirror
+ * effect `replaceState`s over the pending push. Guarding only one leaves the
+ * other: with just the mirror guarded, the app DID navigate to the new
+ * solution's entry screen and arrived still wearing the old solution's id.
+ * Half-switched looks like it worked, which is why this needs a check and not a
+ * memory.
+ */
+const adoptGuarded = /if \(pendingFocus\.current\) return;/.test(CONTEXT_SRC);
+const mirrorGuarded = /if \(pendingFocus\.current\) \{/.test(CONTEXT_SRC);
+const focusClaims = focusBody.includes("pendingFocus.current =");
+check(
+  "the adopt effect stands down mid-switch",
+  `guard present: ${adoptGuarded}`,
+  adoptGuarded,
+);
+check(
+  "the mirror effect stands down mid-switch",
+  `guard present: ${mirrorGuarded}`,
+  mirrorGuarded,
+);
+check(
+  "...and focus() claims the pending path before it pushes",
+  `claim inside focus(): ${focusClaims}`,
+  focusClaims &&
+    focusBody.indexOf("pendingFocus.current =") < focusBody.indexOf("router.push"),
+);
+
+/** The rows that actually exercise the fallback — there must be some. */
+const unbuilt = SOLUTIONS.filter((s) => !s.entry);
+check(
+  "the fallback is reached by most of the catalogue, not a corner case",
+  `${unbuilt.length} of ${SOLUTIONS.length} rows have no entry point`,
+  unbuilt.length > 0,
+);
+
+/**
+ * ⛔⛔ **The "same build as NN" label was HARDCODED to 17.**
+ *
+ * Written when rows 17 and 18 were the only shared pair, so it printed the
+ * right number by accident for a year. The moment rows 04 and 05 became a
+ * shared build, the picker told you row 05 shared one with the requests tray.
+ * A fact about one row, written as a literal in another row's JSX, is a fact
+ * nothing can check — see the project's own rule about correctness rules in
+ * JSX. It now resolves through `findSolution`, and this asserts no row's order
+ * is written as a literal there.
+ */
+const PICKER_SRC = readFileSync(
+  join(ROOT, "components/solutions-dev/solution-picker-sheet.tsx"),
+  "utf8",
+);
+check(
+  "the picker source was read",
+  `${PICKER_SRC.length} chars`,
+  PICKER_SRC.length > 2000,
+);
+check(
+  "the shared-build label is resolved from data, not written as a literal",
+  "findSolution(solution.sharedBuildWith)",
+  PICKER_SRC.includes("findSolution(solution.sharedBuildWith") &&
+    !/same build as \d/.test(PICKER_SRC),
+);
+/**
+ * And the pairs must be symmetric, or one row names a partner that does not
+ * name it back and the label contradicts itself depending which row you open.
+ */
+const asymmetric = SOLUTIONS.filter(
+  (row) =>
+    row.sharedBuildWith &&
+    findSolution(row.sharedBuildWith)?.sharedBuildWith !== row.id,
+);
+check(
+  "every shared build names a partner that names it back",
+  asymmetric.length
+    ? asymmetric.map((r) => `${r.id} → ${r.sharedBuildWith}`).join("; ")
+    : `${shared.length} shared row(s), all symmetric`,
+  asymmetric.length === 0 && shared.length > 0,
+);
+/** Declared, because a pair silently dropping out would pass everything above. */
+const EXPECTED_SHARED_ROWS = 4;
+check(
+  "the declared number of rows share a build",
+  `${shared.length} of ${EXPECTED_SHARED_ROWS} — ${shared.map((r) => r.order).join(", ")}`,
+  shared.length === EXPECTED_SHARED_ROWS,
+);
+
+/**
+ * The landing TAB has to follow the focus too, or the fallback lands on an empty
+ * In Progress tab for a solution whose rides are in Needs Action — which reads
+ * as "this solution has no demo" when it has two.
+ */
+const TAB_ORDER = ["in-progress", "needs-action", "upcoming", "pending"] as const;
+function tabCountsFor(solutionId: string | null) {
+  return [
+    { value: TAB_ORDER[0], count: ridesForSolution(mockInProgressTrips, solutionId).length },
+    { value: TAB_ORDER[1], count: ridesForSolution(mockNeedsActionTrips, solutionId).length },
+    { value: TAB_ORDER[2], count: ridesForSolution(mockUpcomingTrips, solutionId).length },
+    { value: TAB_ORDER[3], count: 0 },
+  ];
+}
+/** Declared per built row — the tab each one's demo actually lives in. */
+const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
+  "rider-no-show": "in-progress",
+  "cancel-at-door": "in-progress",
+  "missed-swipe": "in-progress",
+  "tag-number-invalid": "needs-action",
+  "cannot-reach-member": "needs-action",
+};
+check(
+  "every built row declares the tab it lands on",
+  `${Object.keys(EXPECTED_LANDING_TAB).length} declared of ${built.length} built`,
+  Object.keys(EXPECTED_LANDING_TAB).length === built.length &&
+    built.every((row) => row.id in EXPECTED_LANDING_TAB),
+);
+for (const [id, expected] of Object.entries(EXPECTED_LANDING_TAB)) {
+  const counts = tabCountsFor(id);
+  const landed = firstTabWithRides(counts);
+  check(
+    `focusing ${id} lands on the ${expected} tab`,
+    `${landed} — counts ${counts.map((t) => `${t.value}:${t.count}`).join(" ")}`,
+    landed === expected,
+  );
+}
+/**
+ * ⛔ The rule must genuinely MOVE the tab for someone, or it is decorative. If
+ * every built row landed on the first tab, the whole thing could be deleted and
+ * every check above would still pass.
+ */
+const moved = Object.entries(EXPECTED_LANDING_TAB).filter(
+  ([, tab]) => tab !== TAB_ORDER[0],
+);
+check(
+  "the rule moves the tab for at least one row",
+  `${moved.length} of ${Object.keys(EXPECTED_LANDING_TAB).length} land off the first tab — ${moved.map(([id]) => id).join(", ")}`,
+  moved.length > 0,
+);
+/** An unbuilt row has rides nowhere, and must land on the mirror's own default. */
+check(
+  "an unbuilt row falls back to the first tab rather than picking at random",
+  `${firstTabWithRides(tabCountsFor(UNBUILT_EXAMPLE))} for ${UNBUILT_EXAMPLE}`,
+  firstTabWithRides(tabCountsFor(UNBUILT_EXAMPLE)) === TAB_ORDER[0],
+);
+/** Unfocused, nothing changes — the app is the plain mirror. */
+check(
+  "with nothing focused the first tab still wins",
+  `${firstTabWithRides(tabCountsFor(null))} with counts ${tabCountsFor(null).map((t) => t.count).join("/")}`,
+  firstTabWithRides(tabCountsFor(null)) === TAB_ORDER[0],
 );
 
 // ---------------------------------------------------------------------------
