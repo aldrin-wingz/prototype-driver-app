@@ -111,7 +111,33 @@ import {
   sendBackSteps,
   type SendBackStep,
 } from "../lib/driver-data/send-back-reasons";
-import { ISSUE_SEND_BACK_REASON } from "../lib/support-data/issue-types";
+import {
+  ISSUE_RIDER_DECLINED,
+  ISSUE_SEND_BACK_REASON,
+} from "../lib/support-data/issue-types";
+import {
+  ARTIFACT_CHANNELS,
+  CANCELLATION_REQUESTED_DETAIL,
+  CANCELLATION_REQUESTED_PILL,
+  CANCELLATION_REQUESTED_TITLE,
+  CANCELLATION_TRACKED_BY_APP,
+  DECLINE_CHANNELS,
+  DECLINED_BODY,
+  DECLINED_BODY_2021,
+  DECLINED_BODY_2026,
+  DECLINED_CONTINUE,
+  DECLINED_LEGS_FIELD,
+  DECLINED_TITLE,
+  DECLINED_WALK_BACK,
+  declineLegDefault,
+  declineLegOptions,
+  parseLegSelection,
+  SECOND_HAND_CHANNELS,
+  SHEET_SWAP_MS,
+  toggleLegSelection,
+  tripIdsForLegs,
+} from "../lib/driver-data/rider-declined";
+import { buildRiderDeclined } from "../components/support/rider-declined-form";
 import { getMemberOptions, MEMBER_WINDOW_DAYS } from "../lib/support-data/member-options";
 import { areRequiredFieldsFilled, isFieldVisible } from "../lib/support/field-rules";
 import { solutionHref } from "../lib/solutions/solution-context";
@@ -384,7 +410,7 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * below went back to 6 rather than being left at 7 with a row quietly failing
  * to supply its alternate.
  */
-const EXPECTED_ALTERNATES = 6;
+const EXPECTED_ALTERNATES = 7;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -526,7 +552,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 13;
+const EXPECTED_SCENARIO_RIDES = 15;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -650,7 +676,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 12;
+const EXPECTED_RIDE_ROUTES = 14;
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
 const EXPECTED_SURFACE_ROUTES = 3;
 check(
@@ -734,6 +760,11 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
 const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   "tag-number-invalid": 2,
   "cannot-reach-member": 2,
+  // ⭐ TWO, and they are one round trip rather than two scenarios. `16a` is the
+  // outbound and `16b` the return, sharing a `tripGroup` — which is the case:
+  // production's own decline template removes several leg ids at once, so a
+  // single seeded ride could not have shown the checklist doing anything.
+  "rider-initiated-cancellation": 2,
 };
 for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
   const shown = ridesForSolution(inProgress, id);
@@ -1476,6 +1507,9 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   "auto-assign-request": "in-progress",
   "request-feed-member-filter": "in-progress",
   "send-back-reason-form": "in-progress",
+  // Row 16 is reached during member confirmation, which is the unconfirmed
+  // phase — so both its rides are Needs Action, like rows 04 and 05.
+  "rider-initiated-cancellation": "needs-action",
 };
 /**
  * ⚠️ Row 15 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
@@ -3633,6 +3667,463 @@ check(
   "no internal marker reaches driver-facing copy",
   `${markerLeaks.length} leak(s) of ${DRIVER_FACING.length} string(s)`,
   markerLeaks.length === 0,
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n14. Rider declined the trip — catalogue row 16");
+// ---------------------------------------------------------------------------
+
+const D_SOURCES = {
+  rules: readFileSync(join(ROOT, "lib/driver-data/rider-declined.ts"), "utf8"),
+  modal: readFileSync(join(ROOT, "components/driver/reach-rider-modal.tsx"), "utf8"),
+  form: readFileSync(join(ROOT, "components/support/rider-declined-form.tsx"), "utf8"),
+  detail: readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8"),
+};
+for (const [name, src] of Object.entries(D_SOURCES)) {
+  check(`the declined ${name} source was read`, `${src.length} chars`, src.length > 1200);
+}
+
+/* --- 14a. The catalogue row ---------------------------------------------- */
+
+const ROW_16 = SOLUTIONS.find((s) => s.id === "rider-initiated-cancellation")!;
+check(
+  "row 16 is in the prototype, entered from a needs-action ride",
+  `${ROW_16.buildState} · ${ROW_16.entry?.route} · ${(ROW_16.entry?.alternates ?? []).length} alternate(s)`,
+  ROW_16.buildState === "in-prototype" &&
+    ROW_16.entry?.route === "/my-rides/1049800398" &&
+    (ROW_16.entry?.alternates ?? []).length === 1,
+);
+
+/* --- 14b. Both modal variants carry the declined option ------------------ */
+
+/**
+ * ⚠️ The Phase 5 lesson, applied to a second option on the same modal: the
+ * standard and same-day variants are built per variant rather than patched, so
+ * an option present on one and absent on the other is a one-line mistake that
+ * nothing else would catch.
+ */
+for (const sameDay of [false, true]) {
+  const options = reachOptionsFor(sameDay);
+  check(
+    `the ${sameDay ? "same-day" : "standard"} modal offers "Rider declined the trip"`,
+    `${options.filter((o) => o.value === "declined").length} of ${options.length} option(s)`,
+    options.filter((o) => o.value === "declined").length === 1,
+  );
+}
+
+/* --- 14c. The sheet is CAP-224, not CAP-090 ------------------------------ */
+
+/**
+ * ⛔⛔ The prototype replicated `CAP-090` — an iOS capture of a 2021 ride with
+ * one button, `Call Support`. The current build (`CAP-224` / `s-04b`) is a
+ * bottom sheet with TWO buttons, the second a walk-back. Both bodies stay
+ * DECLARED in the rules module as a record of what changed; only one may be
+ * rendered, which is why this reads the component through `codeOnly`.
+ */
+const modalCode = codeOnly(D_SOURCES.modal);
+check(
+  "the declined sheet renders the 2026 copy",
+  "DECLINED_TITLE + DECLINED_BODY",
+  /\{DECLINED_TITLE\}/.test(modalCode) && /\{DECLINED_BODY\}/.test(modalCode),
+);
+check(
+  "...and the 2021 copy is nowhere in the rendered component",
+  `${DECLINED_BODY_2021.slice(0, 24)}…`,
+  !modalCode.includes(DECLINED_BODY_2021) && !modalCode.includes("Call Support"),
+);
+check(
+  "...and both captured bodies stay declared, so the change is recorded",
+  `2021 ${DECLINED_BODY_2021.length} chars · 2026 ${DECLINED_BODY_2026.length} chars`,
+  DECLINED_BODY_2021.length > 0 &&
+    DECLINED_BODY_2026.length > 0 &&
+    D_SOURCES.rules.includes(DECLINED_BODY_2021) &&
+    D_SOURCES.rules.includes(DECLINED_BODY_2026),
+);
+check(
+  "...and it is a sheet, not the AlertDialog it used to be",
+  "Drawer + DrawerContent, no AlertDialog",
+  /<Drawer\b/.test(modalCode) && !/<AlertDialog\b/.test(modalCode),
+);
+/** ⛔ The walk-back files nothing — it must not reach the form. */
+check(
+  "the walk-back returns to the options and opens no form",
+  `${DECLINED_WALK_BACK}`,
+  /\{DECLINED_WALK_BACK\}/.test(modalCode) &&
+    /setChoice\(null\);\s*\n\s*setTimeout\(\(\) => onOpenChange\(true\), SHEET_SWAP_MS\);/.test(
+      modalCode,
+    ),
+);
+check(
+  "Continue is what opens the form",
+  "<RiderDeclinedForm",
+  /setDeclineFormOpen\(true\)/.test(modalCode) &&
+    /<RiderDeclinedForm/.test(modalCode),
+);
+
+/**
+ * ⛔⛔ **Found by walking, and no gate could have seen it.** Rebuilding the
+ * declined popup as a SHEET made it a second vaul drawer, and two drawers
+ * opened in the same frame stack rather than hand over — the reach modal stayed
+ * on screen with the declined sheet peeking out beneath it. Every handover in
+ * this flow is therefore deferred by one named constant, and an immediate
+ * `setTimeout(..., 0)` is the bug, not the fix.
+ */
+const handovers = [...modalCode.matchAll(/setTimeout\(\(\) => [^,]+, ([A-Za-z_0-9]+)\)/g)];
+check(
+  "every sheet handover waits for the close animation",
+  `${handovers.length} handover(s), delays: ${handovers.map((m) => m[1]).join(", ")}`,
+  handovers.length === 4 && handovers.every((m) => m[1] === "SHEET_SWAP_MS"),
+);
+/**
+ * ⛔ Pinned to vaul's own `TRANSITIONS.DURATION`, read out of the installed
+ * package. A delay tuned by eye passes on the machine it was tuned on — 250ms
+ * looked right and the sheets still stacked.
+ */
+const VAUL_DURATION_MS =
+  Number(
+    /DURATION:\s*([0-9.]+)/.exec(
+      readFileSync(join(ROOT, "node_modules/vaul/dist/index.mjs"), "utf8"),
+    )?.[1] ?? "0",
+  ) * 1000;
+check(
+  "...and the delay is vaul's own close duration, not a guess",
+  `${SHEET_SWAP_MS}ms vs vaul ${VAUL_DURATION_MS}ms`,
+  VAUL_DURATION_MS > 0 && SHEET_SWAP_MS >= VAUL_DURATION_MS,
+);
+
+/* --- 14d. The channel table, and why it cannot be one file field --------- */
+
+check(
+  "five channels are declared",
+  `${DECLINE_CHANNELS.length} channel(s)`,
+  DECLINE_CHANNELS.length === 5,
+);
+check(
+  "exactly two can produce an artifact",
+  `${ARTIFACT_CHANNELS.length} of ${DECLINE_CHANNELS.length} — ${ARTIFACT_CHANNELS.join(", ")}`,
+  ARTIFACT_CHANNELS.length === 2 &&
+    ARTIFACT_CHANNELS.includes("text") &&
+    ARTIFACT_CHANNELS.includes("call"),
+);
+check(
+  "exactly two are second-hand",
+  `${SECOND_HAND_CHANNELS.length} of ${DECLINE_CHANNELS.length} — ${SECOND_HAND_CHANNELS.join(", ")}`,
+  SECOND_HAND_CHANNELS.length === 2 &&
+    SECOND_HAND_CHANNELS.includes("caregiver") &&
+    SECOND_HAND_CHANNELS.includes("facility"),
+);
+/**
+ * ⭐ The row that forces the conditional model. `in-person` is first-hand AND
+ * has no artifact — so "ask for a file when it is second-hand" and "ask for a
+ * file when there is an artifact" are NOT the same rule, and a build that
+ * collapsed them would tell a driver at a doorstep to screenshot a face.
+ */
+check(
+  "the two flags are genuinely independent",
+  "in-person: first-hand with no artifact",
+  DECLINE_CHANNELS.some((c) => !c.hasArtifact && !c.secondHand) &&
+    DECLINE_CHANNELS.some((c) => c.hasArtifact && !c.secondHand) &&
+    DECLINE_CHANNELS.some((c) => !c.hasArtifact && c.secondHand),
+);
+
+/**
+ * ⛔ **Found by walking.** Three of the five help strings said "below" about
+ * "Who told you?" and "What did they say?", both of which render ABOVE the
+ * proof box. A help string cannot see the field order — that lives in the case
+ * registry — so naming a position is a claim this table has no way to keep.
+ */
+const positional = DECLINE_CHANNELS.filter((c) =>
+  /\b(above|below)\b/i.test(`${c.proofLabel} ${c.proofHelp}`),
+);
+check(
+  "no proof copy points at where another field sits",
+  `${positional.length} of ${DECLINE_CHANNELS.length} channel(s) name a position`,
+  positional.length === 0,
+);
+
+/* --- 14e. The field set, over every channel ------------------------------ */
+
+const declineRide = mockNeedsActionTrips.find((t) => t.id === "1049800398")!;
+const declineReturn = mockNeedsActionTrips.find((t) => t.id === "1049800399")!;
+const declineCase = buildRiderDeclined(declineRide, declineRide.legs[0]).supportCase;
+
+const proofFields = declineCase.fields.filter((f) =>
+  f.id.startsWith("declineProof-"),
+);
+check(
+  "one proof field per channel, generated from the one table",
+  `${proofFields.length} of ${DECLINE_CHANNELS.length} channel(s)`,
+  proofFields.length === DECLINE_CHANNELS.length &&
+    DECLINE_CHANNELS.every((c) =>
+      proofFields.some((f) => f.id === `declineProof-${c.value}`),
+    ),
+);
+/**
+ * ⚠️ Visibility swept over ALL five channels with a denominator, because a
+ * `showIf` that matches nothing and a `showIf` that matches rarely look
+ * identical from a passing check.
+ */
+let proofVisibilityChecked = 0;
+for (const channel of DECLINE_CHANNELS) {
+  const values = { issue: ISSUE_RIDER_DECLINED, declineChannel: channel.value };
+  const visible = proofFields.filter((f) => isFieldVisible(f, values));
+  proofVisibilityChecked += 1;
+  check(
+    `channel ${channel.value} shows exactly its own proof field`,
+    `${visible.length} visible — ${visible.map((f) => f.id).join(", ")}`,
+    visible.length === 1 && visible[0]!.id === `declineProof-${channel.value}`,
+  );
+  check(
+    `...and its asterisk follows whether an artifact can exist`,
+    `hasArtifact=${channel.hasArtifact} required=${Boolean(visible[0]?.required)}`,
+    Boolean(visible[0]?.required) === channel.hasArtifact,
+  );
+  /** ⚠️ Asked, never blocking — user direction, 2026-10-13. */
+  check(
+    `...and it never blocks Submit`,
+    `requiredNotEnforced=${Boolean(visible[0]?.requiredNotEnforced)}`,
+    !visible[0]?.required || Boolean(visible[0]?.requiredNotEnforced),
+  );
+}
+check(
+  "every declared channel was swept for proof visibility",
+  `${proofVisibilityChecked} of ${DECLINE_CHANNELS.length}`,
+  proofVisibilityChecked === DECLINE_CHANNELS.length,
+);
+
+/** The name is asked for exactly where no artifact can stand in for it. */
+const toldBy = declineCase.fields.find((f) => f.id === "toldBy")!;
+let toldByShown = 0;
+for (const channel of DECLINE_CHANNELS) {
+  const shown = isFieldVisible(toldBy, {
+    issue: ISSUE_RIDER_DECLINED,
+    declineChannel: channel.value,
+  });
+  if (shown) toldByShown += 1;
+  check(
+    `"who told you?" on ${channel.value} follows second-hand`,
+    `secondHand=${channel.secondHand} shown=${shown}`,
+    shown === channel.secondHand,
+  );
+}
+check(
+  "...and it is shown on exactly the two second-hand channels",
+  `${toldByShown} of ${DECLINE_CHANNELS.length}`,
+  toldByShown === SECOND_HAND_CHANNELS.length,
+);
+
+/* --- 14f. The gate actually gates, and actually lets go ------------------ */
+
+/**
+ * ⛔ Two directions, because a check that only ever sees a full form cannot
+ * tell a working gate from an absent one.
+ */
+const filledNoProof: Record<string, string> = {
+  issue: ISSUE_RIDER_DECLINED,
+  [DECLINED_LEGS_FIELD]: declineLegDefault(declineRide),
+  declineChannel: "in-person",
+  toldAt: "10:12",
+  declineSaid: "She said her daughter is taking her and she does not need us.",
+  declineAttestation: "signed",
+};
+check(
+  "a complete form with no attachment can be sent",
+  "channel=in-person, no file",
+  areRequiredFieldsFilled(declineCase.fields, filledNoProof),
+);
+check(
+  "...and so can one on a channel whose proof IS asterisked",
+  "channel=call, no file",
+  areRequiredFieldsFilled(declineCase.fields, {
+    ...filledNoProof,
+    declineChannel: "call",
+  }),
+);
+check(
+  "...but not one with no legs ticked",
+  "declinedLegs empty",
+  !areRequiredFieldsFilled(declineCase.fields, {
+    ...filledNoProof,
+    [DECLINED_LEGS_FIELD]: "",
+  }),
+);
+check(
+  "...and not one that is unsigned",
+  "declineAttestation empty",
+  !areRequiredFieldsFilled(declineCase.fields, {
+    ...filledNoProof,
+    declineAttestation: "",
+  }),
+);
+check(
+  "...and not one where a second-hand channel names nobody",
+  "channel=facility, toldBy empty",
+  !areRequiredFieldsFilled(declineCase.fields, {
+    ...filledNoProof,
+    declineChannel: "facility",
+  }),
+);
+
+/* --- 14g. The legs, and the group they come from ------------------------- */
+
+check(
+  "the scenario rides are one round trip",
+  `${declineRide.tripGroup} === ${declineReturn.tripGroup}`,
+  Boolean(declineRide.tripGroup) &&
+    declineRide.tripGroup === declineReturn.tripGroup,
+);
+check(
+  "the checklist offers both legs, from either end",
+  `${declineLegOptions(declineRide).length} / ${declineLegOptions(declineReturn).length}`,
+  declineLegOptions(declineRide).length === 2 &&
+    declineLegOptions(declineReturn).length === 2,
+);
+check(
+  "...and every leg starts ticked, per the captured template",
+  declineLegDefault(declineRide),
+  parseLegSelection(declineLegDefault(declineRide)).length === 2,
+);
+check(
+  "...and unticking one leaves the other",
+  "toggle leg A off",
+  parseLegSelection(
+    toggleLegSelection(declineLegDefault(declineRide), "1049800398"),
+  ).join(",") === "1049800399",
+);
+/** ⚠️ A ride with no group answers with itself — the honest one-way case. */
+const oneWay = mockNeedsActionTrips.find((t) => !t.tripGroup)!;
+check(
+  "a one-way ride offers exactly itself",
+  `${oneWay.id} → ${declineLegOptions(oneWay).length} leg(s)`,
+  declineLegOptions(oneWay).length === 1,
+);
+check(
+  "the ticked legs resolve back to their rides",
+  "both legs → both trip ids",
+  tripIdsForLegs(declineRide, ["1049800398", "1049800399"]).join(",") ===
+    "1049800398,1049800399" &&
+    tripIdsForLegs(declineRide, ["1049800399"]).join(",") === "1049800399",
+);
+
+/* --- 14h. It is NOT a send-back, and NOT a cancellation ------------------ */
+
+/**
+ * ⛔⛔ The whole argument for row 16 is that a member's decline must not be
+ * recorded as a driver send-back — the send-back is the charged route. A check
+ * should say so in code, not only in prose.
+ */
+const formCode = codeOnly(D_SOURCES.form);
+check(
+  "the declined form never sends a trip back",
+  "no sendBackTrip",
+  !formCode.includes("sendBackTrip") && !modalCode.includes("sendBackTrip"),
+);
+check(
+  "...and files a request the app does not claim to track",
+  "appTracksStatus: false",
+  /appTracksStatus: false/.test(formCode),
+);
+check(
+  "...and the rules module exposes no way to remove a ride",
+  "no sendBack / removeTrip / cancelTrip export",
+  !/export function (sendBack|removeTrip|cancelTrip)/.test(D_SOURCES.rules),
+);
+check(
+  "...and the request state annotates rather than removes",
+  "CANCELLATION_TRACKED_BY_APP === false",
+  CANCELLATION_TRACKED_BY_APP === false,
+);
+
+/* --- 14i. The ride says what happened, and stops contradicting itself ---- */
+
+const detailCode = codeOnly(D_SOURCES.detail);
+/**
+ * ⛔ Bound to the CONDITION that renders it, not merely to the string being
+ * present — a check asserting a banner's words appear cannot see a branch that
+ * is never reached.
+ */
+check(
+  'the red "Confirmation required" banner yields to the cancellation one',
+  "!cancellationRequested in its gate",
+  /state === "needs-action" && !pendingRequest && !cancellationRequested &&/.test(
+    detailCode,
+  ),
+);
+check(
+  "...and the cancellation banner is bound to the same flag",
+  "cancellationRequested && … CANCELLATION_REQUESTED_TITLE",
+  /\{cancellationRequested && \([\s\S]{0,600}\{CANCELLATION_REQUESTED_TITLE\}/.test(
+    detailCode,
+  ),
+);
+check(
+  "...and the confirmation CTA is replaced, not left to be tapped again",
+  "cancellationRequested ? pill : …",
+  /\{cancellationRequested \? \([\s\S]{0,600}\{CANCELLATION_REQUESTED_PILL\}/.test(
+    detailCode,
+  ),
+);
+
+/* --- 14i2. ...and in the smaller fonts too ------------------------------- */
+
+/**
+ * ⛔ **Found by walking, after the banner was already right.** The banner said
+ * the cancellation was with Support while the chip beside the leg details still
+ * said "Not Confirmed", and the My Rides card said nothing at all. One
+ * contradiction fixed in a big font is not the contradiction fixed — a driver
+ * scanning the list is exactly the one who rings back, which is row 17's whole
+ * subject area.
+ */
+check(
+  'the "Not Confirmed" chip yields to the cancellation one',
+  "cancellationRequested ? amber chip : red chip",
+  /\{cancellationRequested \? \([\s\S]{0,260}\{CANCELLATION_REQUESTED_TITLE\}[\s\S]{0,200}: \([\s\S]{0,260}Not Confirmed/.test(
+    detailCode,
+  ),
+);
+const ridesCode = codeOnly(
+  readFileSync(join(ROOT, "app/my-rides/page.tsx"), "utf8"),
+);
+check(
+  "...and the My Rides card carries it as a status pill",
+  "withCancellation(currentTrips)",
+  /isCancellationRequested\(trip\.id\)/.test(ridesCode) &&
+    /statusPills: \[[\s\S]{0,200}CANCELLATION_REQUESTED_TITLE/.test(ridesCode) &&
+    /withCancellation\(currentTrips\)/.test(ridesCode),
+);
+
+/* --- 14j. No internal markers in anything a driver reads ----------------- */
+
+const DECLINE_DRIVER_FACING = [
+  DECLINED_TITLE,
+  DECLINED_BODY,
+  DECLINED_CONTINUE,
+  DECLINED_WALK_BACK,
+  CANCELLATION_REQUESTED_TITLE,
+  CANCELLATION_REQUESTED_DETAIL,
+  CANCELLATION_REQUESTED_PILL,
+  ...DECLINE_CHANNELS.map((c) => c.label),
+];
+const declineLeaks = DECLINE_DRIVER_FACING.filter((text) => /⛔|⭐/.test(text));
+check(
+  "no internal marker reaches row 16's driver-facing copy",
+  `${declineLeaks.length} leak(s) of ${DECLINE_DRIVER_FACING.length} string(s)`,
+  declineLeaks.length === 0,
+);
+/**
+ * ⚠️ The proof help text is the ONE place a ⚠️ is allowed, because it carries
+ * the project's locked flag wording — "⚠️ Not in prototype yet". Asserted
+ * rather than exempted silently.
+ */
+const flagged = DECLINE_CHANNELS.filter((c) =>
+  c.proofHelp.includes("⚠️ Not in prototype yet"),
+);
+check(
+  "the unenforced proof asks carry the locked flag wording",
+  `${flagged.length} of ${ARTIFACT_CHANNELS.length} artifact channel(s)`,
+  flagged.length === ARTIFACT_CHANNELS.length &&
+    flagged.every((c) => c.hasArtifact),
 );
 
 // ---------------------------------------------------------------------------

@@ -326,6 +326,19 @@ export interface Trip {
    */
   sameDay?: boolean;
   /**
+   * The round trip this ride is one leg of.
+   *
+   * ⚠️ EXPLICIT, never inferred from rider name and date. Two members can share
+   * a name and one member can have two unrelated rides in a day; an inferred
+   * group would offer a stranger's leg on a cancellation request. Declared,
+   * never derived.
+   *
+   * Absent means a one-way ride, which is the honest answer for most of the
+   * seed — only catalogue row 16 needs the grouping, because production's own
+   * decline template removes several leg ids at once (`CAP-225`).
+   */
+  tripGroup?: string;
+  /**
    * The standing order this trip belongs to, if any.
    *
    * ⚠️ **An ID, not a boolean**, because that is the shape production has:
@@ -1460,6 +1473,136 @@ export const mockNeedsActionTrips: Trip[] = [
       code: "04b",
       label: "Can't reach — same-day risk path",
       solutions: ["tag-number-invalid", "cannot-reach-member"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 16a / 16b — the member declined, and it is a ROUND TRIP =====
+  //
+  // Catalogue row 16. TWO rides sharing one `tripGroup`, because that is what
+  // the case is about: `CAP-225`'s decline template lists TWO leg ids, and a
+  // member who is not going has usually dropped the return as well. A one-way
+  // seed would have demonstrated a checklist with one box on it.
+  //
+  // ⛔ Both are needs-action and unconfirmed, because the decline is learnt
+  // during member confirmation — that is the entry point the user named.
+  //
+  // ⚠️ The driver's alternative here is the expensive one: sending back a
+  // same-day trip is charged 100% of the time. Verida GA, so the $25 TCI TN
+  // figure is not the one that applies — the point is that a figure applies at
+  // all, and none applies to a member cancellation.
+  {
+    id: "1049800398",
+    date: "Thu, Jul 31, 2026",
+    rider: "ODESSA BRANNIGAN",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "5.2 mi",
+    totalRevenue: 31.80,
+    notes: "Daughter usually answers the home number",
+    tripGroup: "rt-1049800398",
+    contacts: {
+      riderPhone: "(404) 555-0147",
+      pickupPhone: "(404) 555-0163",
+    },
+    legs: [
+      {
+        id: "1049800398",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:05 AM",
+        address: "1480 Donald Lee Hollowell Pkwy NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 31.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800398-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:50 AM",
+        address: "3193 Howell Mill Rd NW, Atlanta, GA 30327",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "16a",
+      label: "Member declined — the outbound leg",
+      solutions: ["rider-initiated-cancellation"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 16b — the return, same member, same day =====
+  //
+  // ⚠️ Seeded as its own ride because that is how this app models legs: a round
+  // trip is two `Trip` objects carrying `legCode` A and B. `tripGroup` is what
+  // ties them — EXPLICIT, never inferred from rider name and date, or a
+  // stranger's leg could end up on a cancellation request.
+  //
+  // ⭐ Filing from HERE is the second state worth demoing: the outbound is
+  // offered too, and unticking it is how a driver says "the family drove her
+  // there, she still needs the ride home".
+  {
+    id: "1049800399",
+    date: "Thu, Jul 31, 2026",
+    rider: "ODESSA BRANNIGAN",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "5.2 mi",
+    totalRevenue: 31.80,
+    notes: "Return leg — same member as the 11:05 AM pick-up",
+    tripGroup: "rt-1049800398",
+    contacts: {
+      riderPhone: "(404) 555-0147",
+      dropoffPhone: "(404) 555-0163",
+    },
+    legs: [
+      {
+        id: "1049800399",
+        legCode: "B",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "2:30 PM",
+        address: "3193 Howell Mill Rd NW, Atlanta, GA 30327",
+        county: "Fulton County",
+        revenue: 31.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800399-b",
+        type: "scheduled",
+        label: "Scheduled Drop-off",
+        time: "3:15 PM",
+        address: "1480 Donald Lee Hollowell Pkwy NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "16b",
+      label: "Member declined — filed from the return",
+      solutions: ["rider-initiated-cancellation"],
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,

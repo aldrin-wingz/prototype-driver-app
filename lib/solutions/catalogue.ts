@@ -474,10 +474,21 @@ export const SOLUTIONS: Solution[] = [
     useCase:
       "Member declines during member confirmation → the driver's own route out is a send-back, which penalises them → so they call Support to cancel it instead",
     proposedFeature:
-      "In-app rider-initiated cancellation form that records the member's cancellation as a cancellation, not as a driver send-back",
+      "In-app rider-initiated cancellation form that records the member's cancellation as a cancellation, not as a driver send-back — filed with proof, from the Rider declined the trip option production already shows",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides/1049800398",
+      label:
+        "Tap I REACHED OUT TO CONFIRM, then option 2, 'Rider declined the trip'. Production's sheet still appears and still says this is not a cancellation — but Continue now opens a form instead of a chat. Both legs of the round trip are ticked, because the captured chat template removes both.",
+      alternates: [
+        {
+          route: "/my-rides/1049800399",
+          label:
+            "The SAME decline filed from the return leg. The outbound is offered too — untick it to say the family drove her there and she still needs the ride home. ⛔ Neither filing cancels anything: the ride stays on the manifest marked 'Cancellation requested', because the client owns the cancellation and row 17's tray is what would tell the driver when it lands.",
+        },
+      ],
+    },
   },
   {
     id: "requests-tray",

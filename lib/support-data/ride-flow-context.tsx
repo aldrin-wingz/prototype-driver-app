@@ -191,6 +191,24 @@ interface RideFlowValue {
   sentBackTrips: string[];
   sendBackTrip: (tripId: string) => void;
   isTripSentBack: (tripId: string) => boolean;
+
+  // ---- Rider Declined (catalogue row 16) -------------------------------
+  /**
+   * Rides the driver has reported as declined by the member this session.
+   *
+   * ⛔⛔ **This is NOT a cancellation and must never become one.** The client
+   * owns the cancellation; production's own popup says so in capitals. So this
+   * list does not remove a ride from My Rides the way `sentBackTrips` does — it
+   * annotates it. A ride here still appears everywhere it did before, carrying
+   * `Cancellation requested` instead of `Confirmation required`.
+   *
+   * ⚠️ Takes SEVERAL ids at once, because one decline covers one round trip —
+   * `CAP-225`'s template lists two leg ids. Calling it once per leg would make
+   * the two halves of one report arrive as two.
+   */
+  cancellationRequests: string[];
+  requestCancellation: (tripIds: string[]) => void;
+  isCancellationRequested: (tripId: string) => boolean;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -227,6 +245,8 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [preferredOptOuts, setPreferredOptOuts] = useState<string[]>([]);
   // Trips sent back this session — removed from My Rides.
   const [sentBack, setSentBack] = useState<string[]>([]);
+  // Trips the member declined — annotated in My Rides, never removed.
+  const [cancelRequested, setCancelRequested] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -306,8 +326,27 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
           previous.includes(tripId) ? previous : [...previous, tripId]
         ),
       isTripSentBack: (tripId) => sentBack.includes(tripId),
+
+      cancellationRequests: cancelRequested,
+      requestCancellation: (tripIds) =>
+        setCancelRequested((previous) => [
+          ...previous,
+          // ⚠️ Filtered, not blindly appended. Refiling the same decline would
+          // otherwise put the same ride in the list twice, and the count is what
+          // a check reads.
+          ...tripIds.filter((id) => !previous.includes(id)),
+        ]),
+      isCancellationRequested: (tripId) => cancelRequested.includes(tripId),
     }),
-    [records, swipeRevision, postponed, confirmed, preferredOptOuts, sentBack]
+    [
+      records,
+      swipeRevision,
+      postponed,
+      confirmed,
+      preferredOptOuts,
+      sentBack,
+      cancelRequested,
+    ]
   );
 
   return (

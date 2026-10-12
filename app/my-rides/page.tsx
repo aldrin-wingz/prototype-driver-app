@@ -14,6 +14,7 @@ import {
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { useSolution } from "@/lib/solutions/solution-context";
+import { CANCELLATION_REQUESTED_TITLE } from "@/lib/driver-data/rider-declined";
 import {
   firstTabWithRides,
   ridesForSolution,
@@ -34,8 +35,12 @@ export default function MyRidesPage() {
   // reachable in one tap. The real app's default tab is a product decision nobody
   // has made — revert to "needs-action" before treating this as production.
   const [activeTab, setActiveTab] = useState<TabValue>("in-progress");
-  const { submittedForms, isTripMemberSignatureMissing, sentBackTrips } =
-    useRideFlow();
+  const {
+    submittedForms,
+    isTripMemberSignatureMissing,
+    sentBackTrips,
+    isCancellationRequested,
+  } = useRideFlow();
   const { active } = useSolution();
 
   /**
@@ -87,6 +92,32 @@ export default function MyRidesPage() {
       (trip) => !pendingIds.has(trip.id) && !sentBackTrips.includes(trip.id)
     );
   const withoutPending = visible;
+
+  /**
+   * Catalogue row 16 — the card has to say it too.
+   *
+   * ⛔ Ride Details spells the cancellation out, but a driver scanning My Rides
+   * sees a ride that still looks like any other unconfirmed one. That is the
+   * state that makes them ring back, which is row 17's whole subject area.
+   *
+   * ⚠️ `statusPills`, not `pills`, for the reason the Pending block below gives:
+   * a scenario ride replaces its seeded pills with its identifier, and this
+   * marker has to outlive that swap.
+   */
+  const withCancellation = (trips: Trip[]) =>
+    trips.map((trip) =>
+      isCancellationRequested(trip.id)
+        ? {
+            ...trip,
+            statusPills: [
+              {
+                label: CANCELLATION_REQUESTED_TITLE,
+                variant: "attention" as const,
+              },
+            ],
+          }
+        : trip
+    );
 
   const allRides = [
     ...mockInProgressTrips,
@@ -223,7 +254,7 @@ export default function MyRidesPage() {
             </p>
           </div>
         ) : (
-          currentTrips.map((trip) => (
+          withCancellation(currentTrips).map((trip) => (
             <RideCard
               key={trip.id}
               trip={trip}

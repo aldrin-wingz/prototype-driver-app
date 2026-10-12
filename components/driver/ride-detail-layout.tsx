@@ -19,6 +19,7 @@ import {
   CornerUpRight,
   ChevronRight,
   Hourglass,
+  CalendarX,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -49,6 +50,11 @@ import { PreferredDriverPrompt } from "@/components/driver/preferred-driver-prom
 import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
+import {
+  CANCELLATION_REQUESTED_DETAIL,
+  CANCELLATION_REQUESTED_PILL,
+  CANCELLATION_REQUESTED_TITLE,
+} from "@/lib/driver-data/rider-declined";
 import { RideSignatureScreen } from "./ride-signature-screen";
 import {
   MissedSwipePrompt,
@@ -305,6 +311,7 @@ export function RideDetailLayout({
     clearPostponedPickup,
     isTripConfirmed,
     confirmTrip,
+    isCancellationRequested,
     preferredDriverOptOuts,
     optOutOfPreferredDriverAsk,
   } = useRideFlow();
@@ -315,6 +322,13 @@ export function RideDetailLayout({
   // stage, the header and the swipe record together.
   const trip = applySessionSwipes(seededTrip);
   const pendingRequest = getPendingRequest(trip.id);
+  /**
+   * The member declined and Support has the report — catalogue row 16.
+   *
+   * ⛔ NOT a cancellation. The ride is still here and still on the manifest;
+   * what changes is that nobody is waiting on the driver any more.
+   */
+  const cancellationRequested = isCancellationRequested(trip.id);
 
   /**
    * ⛔⛔ **Confirming the trip is what moves Ride Details off `needs-action`.**
@@ -594,7 +608,7 @@ export function RideDetailLayout({
           {/* Suppressed once Support has the ride: "please call the rider first"
               and "nothing more is needed from you" cannot both be true, and the
               driver who just filed the form is the one who would read both. */}
-          {state === "needs-action" && !pendingRequest && (
+          {state === "needs-action" && !pendingRequest && !cancellationRequested && (
             <div className="absolute bottom-4 left-4 right-4">
               <div className="rounded-lg bg-[#FEE2E2] border border-[#F87171] px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -610,6 +624,26 @@ export function RideDetailLayout({
             </div>
           )}
         </div>
+
+        {/* ⛔ Replaces production's red "please call the rider first" rather than
+            sitting under it. The driver has just told us the rider is not going;
+            telling them to go and call the rider is the app arguing with itself
+            in two adjacent rectangles. */}
+        {cancellationRequested && (
+          <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
+            <div className="flex items-start gap-3">
+              <CalendarX className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#92400E]">
+                  {CANCELLATION_REQUESTED_TITLE}
+                </p>
+                <p className="mt-0.5 text-sm text-[#92400E]">
+                  {CANCELLATION_REQUESTED_DETAIL}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {pendingRequest && (
           <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
@@ -732,9 +766,19 @@ export function RideDetailLayout({
 
           {state === "needs-action" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
-                Not Confirmed
-              </span>
+              {/* ⛔ The same contradiction as the banner, in a smaller font. A
+                  ride whose cancellation Support is already chasing is not
+                  "Not Confirmed" — nobody is waiting on the driver to confirm
+                  it. Found by walking; the banner alone left this chip red. */}
+              {cancellationRequested ? (
+                <span className="inline-block rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-medium text-[#92400E]">
+                  {CANCELLATION_REQUESTED_TITLE}
+                </span>
+              ) : (
+                <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
+                  Not Confirmed
+                </span>
+              )}
               {hasIncentives &&
                 activeIncentiveTypes.map((incentiveType) => (
                   <ProgramContributionIndicator
@@ -879,7 +923,18 @@ export function RideDetailLayout({
             {/* Same swap the in-progress region makes: once Support holds the
                 ride, re-offering the whole confirmation flow would invite a
                 second request for something already filed. */}
-            {pendingRequest ? (
+            {cancellationRequested ? (
+              /* Where the orange CTA was. ⚠️ Re-offering the confirmation flow
+                 here would invite a second report about the same member saying
+                 the same thing, which is how Support ends up with two tickets
+                 for one conversation. */
+              <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
+                <CalendarX className="h-5 w-5 text-[#92400E]" />
+                <span className="text-sm font-bold uppercase text-[#92400E]">
+                  {CANCELLATION_REQUESTED_PILL}
+                </span>
+              </div>
+            ) : pendingRequest ? (
               <div className="flex h-16 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
                 <Hourglass className="h-5 w-5 text-[#92400E]" />
                 <span className="text-sm font-bold uppercase text-[#92400E]">

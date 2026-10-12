@@ -19,7 +19,78 @@ import {
   findMemberOption,
   searchMemberOptions,
 } from "@/lib/support-data/member-options";
+import {
+  parseLegSelection,
+  toggleLegSelection,
+} from "@/lib/driver-data/rider-declined";
 import type { SupportField } from "@/types/support";
+
+/**
+ * Tick boxes over the legs of one round trip.
+ *
+ * ⚠️ The ticking rule lives in `lib/driver-data/rider-declined.ts`, not here —
+ * joining and splitting the selection in a renderer would put a storage format
+ * in a component, where no check can reach it and the next reader of the value
+ * has to re-derive it.
+ *
+ * ⛔ Every row renders enabled. There is no "you may not untick the last one"
+ * guard, because the field is `required` and an empty selection is already what
+ * keeps Submit disabled — a second rule saying the same thing is a second rule
+ * that can disagree.
+ */
+function LegChecklist({
+  field,
+  value,
+  onChange,
+}: {
+  field: SupportField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selected = parseLegSelection(value);
+  return (
+    <div className="space-y-2">
+      {(field.options ?? []).map((option) => {
+        const isOn = selected.includes(option.value);
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="checkbox"
+            aria-checked={isOn}
+            onClick={() => onChange(toggleLegSelection(value, option.value))}
+            className={cn(
+              "flex w-full items-start gap-3 rounded-xl border px-4 py-3.5 text-left",
+              isOn ? "border-[#10B981] bg-[#ECFDF5]" : "border-gray-200"
+            )}
+          >
+            <span
+              className={cn(
+                "mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border",
+                isOn ? "border-[#10B981] bg-[#10B981]" : "border-gray-300"
+              )}
+            >
+              {isOn && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold text-gray-900">
+                {option.label.split(" · ")[0]}
+              </span>
+              <span className="block text-sm text-gray-600">
+                {option.label.split(" · ").slice(1).join(" · ")}
+              </span>
+              {/* The id, because it is what production's own template lists and
+                  what Support acts on. Small, under the human-readable line. */}
+              <span className="mt-0.5 block text-xs text-gray-400">
+                Leg ID {option.value}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * Searchable picker over the driver's own legs.
@@ -488,6 +559,10 @@ export function SupportFieldRenderer({
           locked={isLocked}
           onChange={onChange}
         />
+      )}
+
+      {field.type === "leg-checklist" && (
+        <LegChecklist field={field} value={value} onChange={onChange} />
       )}
 
       {field.type === "member-picker" && (

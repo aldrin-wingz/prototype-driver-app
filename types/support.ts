@@ -38,6 +38,15 @@ export type SupportFieldType =
   /** Searchable picker over members the driver has driven recently. */
   | "member-picker"
   /**
+   * Tick boxes over the legs of one round trip, several selectable at once.
+   *
+   * ⚠️ The runtime's only MULTI-value scalar: the ticked ids are joined into the
+   * one string this values map holds, so drafts, prefill and the submitted view
+   * all keep working. `leg-repeater` is not this — that one ADDS rows the driver
+   * fills in; this one offers rows that already exist and asks which apply.
+   */
+  | "leg-checklist"
+  /**
    * A repeating row group, e.g. one row per expected leg.
    *
    * Its columns come from `rowFields`. The runtime's only composite type — every

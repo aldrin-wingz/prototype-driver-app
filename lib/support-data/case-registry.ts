@@ -5,8 +5,15 @@ import {
   ISSUE_CANNOT_REACH_MEMBER,
   ISSUE_MISSED_SWIPE,
   ISSUE_RIDER_NO_SHOW,
+  ISSUE_RIDER_DECLINED,
   ISSUE_SEND_BACK_REASON,
 } from "./issue-types";
+import {
+  DECLINE_CHANNELS,
+  DECLINE_CHANNEL_OPTIONS,
+  DECLINED_LEGS_FIELD,
+  SECOND_HAND_CHANNELS,
+} from "@/lib/driver-data/rider-declined";
 import {
   SEND_BACK_REASON_OTHER,
   sendBackReasonOptions,
@@ -66,6 +73,10 @@ const ONLY_SEND_BACK = {
   field: "issue",
   equals: [ISSUE_SEND_BACK_REASON],
 };
+const ONLY_RIDER_DECLINED = {
+  field: "issue",
+  equals: [ISSUE_RIDER_DECLINED],
+};
 
 /**
  * Every case that is filed against one leg.
@@ -90,6 +101,19 @@ const ANY_LEG_CASE = {
     ISSUE_CANNOT_REACH_MEMBER,
   ],
 };
+
+/**
+ * ⛔⛔ **`ISSUE_RIDER_DECLINED` is deliberately absent from `ANY_LEG_CASE` too**,
+ * and for the opposite reason to the auto-assign case. That one has no leg;
+ * this one has SEVERAL, and which of them come off the manifest is the question
+ * the form exists to ask. A locked single-leg picker above a checklist listing
+ * the same leg would be the form answering its own question in the row above it.
+ *
+ * ⚠️ The consequence is explicit: `resolveTripContext` finds no picker on this
+ * case and returns `{}`, so `rider-declined-form.tsx` passes the trip and leg to
+ * `submitForm` itself. That is a deliberate hand-off, not an omission — the
+ * entry point is a ride, so the trip was never in doubt.
+ */
 
 /** The time fields of a Missed Swipe, in the order they must have happened. */
 export const SWIPE_TIME_SEQUENCE = ["enRouteTime", "pickupTime", "dropOffTime"];
@@ -157,6 +181,7 @@ export function buildSupportFormCase({
   cannotReach,
   autoAssign = false,
   sendBack = false,
+  riderDeclined,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -226,6 +251,16 @@ export function buildSupportFormCase({
    * caller to assemble and nothing for them to get wrong.
    */
   sendBack?: boolean;
+  /**
+   * Build the rider-declined case — catalogue row 16.
+   *
+   * ⚠️ Carries the LEGS this report could cover, like `cannotReach` carries the
+   * numbers and for the same reason: they are a property of the trip and this
+   * builder has no trip. ⛔ Never an empty array — `legsInGroup` returns the
+   * ride itself for a one-way trip, so a caller that found nothing has a bug
+   * rather than a case to render.
+   */
+  riderDeclined?: { legOptions: SupportFieldOption[] };
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -249,7 +284,9 @@ export function buildSupportFormCase({
     submitLabel: sendBack ? "Continue" : "Submit",
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: sendBack
+    zendeskEquivalent: riderDeclined
+      ? "Rider declined the trip"
+      : sendBack
       ? "Trip sent back"
       : autoAssign
       ? "Driver assignment request"
@@ -267,7 +304,7 @@ export function buildSupportFormCase({
      * a check that passed because the times were in order.
      */
     timeSequence:
-      cannotReach || autoAssign || sendBack
+      cannotReach || autoAssign || sendBack || riderDeclined
         ? undefined
         : missedSwipe
           ? SWIPE_TIME_SEQUENCE
@@ -719,6 +756,145 @@ export function buildSupportFormCase({
               helpText:
                 "A screenshot of your phone's call log showing the attempt. ⚠️ Not in prototype yet — the real form would require this, and you can submit without it here.",
               showIf: ONLY_CANNOT_REACH,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Rider Declined the Trip ---------------------------------------
+      //
+      // Catalogue row 16 — `Trip / Ride Cancellation`, 509 calls. The member
+      // says they no longer need the ride; production shows a sheet saying this
+      // is NOT a cancellation and sends the driver to Support. This block is
+      // what Support is asked for on that call, collected before it.
+      //
+      // ⛔⛔ **The driver's own alternative is the expensive one, and that is
+      // the whole case.** Sending the trip back is one tap away in More Options
+      // and is CHARGED — $25 on TCI TN at or after 10:00 the day before, and
+      // `calc_same_day` send-backs were charged 100% of the time over fourteen
+      // days. So a member who declines on the morning of the trip costs the
+      // driver money if they use the app and nothing if they ring Support.
+      // Row 16 is the removal of a $25 reason to pick up the phone.
+      ...(riderDeclined
+        ? ([
+            {
+              id: DECLINED_LEGS_FIELD,
+              type: "leg-checklist",
+              label: "Which legs should come off?",
+              shortLabel: "legs to remove",
+              required: true,
+              options: riderDeclined.legOptions,
+              // ⭐ Every leg ticked to start, because production's own template
+              // (`CAP-225`) lists several leg ids at once — a member who is not
+              // going has usually dropped the return too. ⚠️ But not always: a
+              // member whose family drove them to the appointment still needs
+              // the ride home, and unticking is the only way to say so.
+              helpText:
+                "Both legs are selected because a member who cancels usually cancels the return too. Untick one if they still need it.",
+              showIf: ONLY_RIDER_DECLINED,
+            },
+            {
+              id: "declineChannel",
+              type: "select",
+              label: "How did the member tell you?",
+              shortLabel: "how they told you",
+              placeholder: "Select:",
+              required: true,
+              options: DECLINE_CHANNEL_OPTIONS,
+              /**
+               * ⛔⛔ **The load-bearing question on this form.** It decides what
+               * proof can even exist — a doorstep conversation leaves nothing to
+               * screenshot — and it is what tells Support whether they are
+               * acting on the member's own words or a facility's. CASE-07's
+               * finding, kept verbatim in substance.
+               */
+              showIf: ONLY_RIDER_DECLINED,
+            },
+            {
+              id: "toldAt",
+              type: "time",
+              label: "When did they tell you?",
+              shortLabel: "time they told you",
+              required: true,
+              helpText: "Roughly is fine.",
+              showIf: ONLY_RIDER_DECLINED,
+            },
+            {
+              id: "toldBy",
+              type: "text",
+              label: "Who told you?",
+              shortLabel: "who told you",
+              placeholder: "Name, and how they know the member",
+              required: true,
+              /**
+               * ⭐ The Cancel-at-Door precedent, and it is the strongest one
+               * this project has. Production does not ask for a photo of a
+               * refusal — it requires the driver to NAME who refused, and
+               * `bronze.ride_observation.spoke_with` holds 3,601 distinct values
+               * across 6,940 Cancel At Door observations. A name is the proof
+               * when no artifact can exist, because it is checkable and it is
+               * attributable.
+               *
+               * ⚠️ Gated on the ANSWER, not the issue, and only safe because
+               * `declineChannel` is itself gated on this issue and so can hold a
+               * value on no other case. A second case asking `declineChannel`
+               * would need a compound condition here, not a comment.
+               */
+              showIf: { field: "declineChannel", equals: SECOND_HAND_CHANNELS },
+            },
+            {
+              id: "declineSaid",
+              type: "textarea",
+              label: "What did they say?",
+              shortLabel: "what they said",
+              placeholder:
+                "Their words, and whether they still need a ride another day",
+              required: true,
+              maxLength: 500,
+              showIf: ONLY_RIDER_DECLINED,
+            },
+            /**
+             * ⛔⛔ **One proof field per channel, generated from the one table.**
+             *
+             * A single file field cannot be honest here. "Screenshot of your
+             * call log" is the right ask after a call and a nonsense one after a
+             * doorstep conversation, and a required file on the three channels
+             * that cannot produce one would make exactly the declines that ring
+             * Support today unfileable.
+             *
+             * ⚠️ Generated rather than typed out, so the field set and
+             * `DECLINE_CHANNELS` cannot drift — add a channel and its proof
+             * field appears with it. Per user direction (2026-10-13) the ask is
+             * never blocking: `requiredNotEnforced` keeps the asterisk and the
+             * real requirement visible without holding a demo hostage to a
+             * screenshot nobody has.
+             */
+            ...DECLINE_CHANNELS.map((channel) => ({
+              id: `declineProof-${channel.value}`,
+              type: "file" as const,
+              label: channel.proofLabel,
+              required: channel.hasArtifact,
+              requiredNotEnforced: channel.hasArtifact,
+              helpText: channel.proofHelp,
+              showIf: { field: "declineChannel", equals: [channel.value] },
+            })),
+            {
+              id: "declineAttestation",
+              type: "signature",
+              label: "Sign to confirm",
+              /**
+               * ⚠️ Required on EVERY channel, not only the ones with no
+               * artifact. A screenshot shows a message; it does not show that
+               * the message is about this trip, or that the person who sent it
+               * is the member. The signature is the driver standing behind the
+               * claim, and the claim is the same one whichever way it arrived.
+               *
+               * LAST, always — the driver attests to the answers above, so a
+               * field after it would be signed for before it was written.
+               */
+              required: true,
+              helpText:
+                "Sign to confirm the member told you they no longer need this ride.",
+              showIf: ONLY_RIDER_DECLINED,
             },
           ] as SupportCaseDefinition["fields"])
         : []),

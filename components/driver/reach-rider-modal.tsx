@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, FilePlus, X } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-form";
+import { RiderDeclinedForm } from "@/components/support/rider-declined-form";
 import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
+import {
+  DECLINED_BODY,
+  DECLINED_CONTINUE,
+  DECLINED_TITLE,
+  DECLINED_WALK_BACK,
+  SHEET_SWAP_MS,
+} from "@/lib/driver-data/rider-declined";
 import {
   DRIVER_SPRING,
   DRIVER_SPRING_MUTED,
@@ -97,6 +98,7 @@ export function ReachRiderModal({
   const [choice, setChoice] = useState<ReachOutcome | null>(null);
   const [declined, setDeclined] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [declineFormOpen, setDeclineFormOpen] = useState(false);
 
   const sameDay = Boolean(trip.sameDay);
   const options = reachOptionsFor(sameDay);
@@ -107,7 +109,10 @@ export function ReachRiderModal({
     // ⚠️ Cleared on the way out, not on the way in. vaul animates the sheet
     // closed, and resetting before that finishes makes the selected option
     // visibly un-tick while the sheet is still on screen.
-    setTimeout(() => setChoice(null), 250);
+    //
+    // ⭐ The same 250ms as every sheet handover below, and now the same named
+    // constant — it is one fact about vaul, not four coincidences.
+    setTimeout(() => setChoice(null), SHEET_SWAP_MS);
   }
 
   function handleNext() {
@@ -117,10 +122,14 @@ export function ReachRiderModal({
         onConfirmed();
         return;
       case "declined":
-        // ⛔ No trip state change — production's own behaviour. The driver is
-        // told to call Support and the trip stays exactly as it was.
+        // ⛔ No trip state change HERE — production's own behaviour, and it is
+        // still true: the sheet that opens next says in as many words that this
+        // is not a cancellation. What changed in row 16 is where its primary
+        // button goes.
         close();
-        setDeclined(true);
+        // ⚠️ Deferred — see `SHEET_SWAP_MS`. Two vaul drawers opened in one
+        // frame stack instead of handing over.
+        setTimeout(() => setDeclined(true), SHEET_SWAP_MS);
         return;
       case "later":
         close();
@@ -243,24 +252,89 @@ export function ReachRiderModal({
         </DrawerContent>
       </Drawer>
 
-      {/* Rider Declined popup — production copy, verbatim. */}
-      <AlertDialog
+      {/*
+        The Rider Declined sheet.
+
+        ⚠️ **Rebuilt 2026-10-13 against `CAP-224` / `s-04b`.** It was an
+        `AlertDialog` replicating `CAP-090` — an iOS capture of a 2021 ride,
+        offering `Call Support` and nothing else. The current build shows a
+        BOTTOM SHEET with a teal document mark and TWO buttons, the second of
+        which is a walk-back. Replicating the older screen meant the prototype
+        was arguing against a flow production had already changed.
+
+        ⚠️ One departure, and it is named in `rider-declined.ts`: the primary
+        button reads `Continue` rather than `Chat with Support`, because it
+        opens a form. A button naming a chat that opens a form is a small lie
+        about the very next tap.
+      */}
+      <Drawer
         open={declined}
         onOpenChange={(next) => !next && setDeclined(false)}
       >
-        <AlertDialogContent className="max-w-[20rem] rounded-2xl">
-          <AlertDialogTitle className="text-base font-bold text-gray-900">
-            Rider declined the trip
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-base text-gray-900">
-            This is NOT a confirmation for the trip cancellation. Please contact
-            support for further instructions.
-          </AlertDialogDescription>
-          <AlertDialogAction className="bg-transparent text-base font-bold text-[#00B090] shadow-none hover:bg-transparent">
-            Call Support
-          </AlertDialogAction>
-        </AlertDialogContent>
-      </AlertDialog>
+        <DrawerContent className="rounded-t-3xl border-0 px-6 pb-8">
+          <button
+            type="button"
+            onClick={() => setDeclined(false)}
+            aria-label="Close"
+            className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          <div className="flex flex-col items-center pt-10 text-center">
+            <span
+              className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{ backgroundColor: DRIVER_TEAL }}
+            >
+              <FilePlus className="h-8 w-8 text-white" strokeWidth={2} />
+            </span>
+            <DrawerTitle className="mt-6 text-[28px] font-bold leading-tight text-gray-900">
+              {DECLINED_TITLE}
+            </DrawerTitle>
+            <p className="mt-3 text-lg font-semibold leading-snug text-gray-500">
+              {DECLINED_BODY}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeclined(false);
+              // ⚠️ Deferred — the form is a third sheet, and the same handover
+              // applies. See `SHEET_SWAP_MS`.
+              setTimeout(() => setDeclineFormOpen(true), SHEET_SWAP_MS);
+            }}
+            className="mt-8 w-full rounded-full py-4 text-lg font-semibold text-white"
+            style={{ backgroundColor: DRIVER_SPRING }}
+          >
+            {DECLINED_CONTINUE}
+          </button>
+
+          {/* ⛔ Files NOTHING and changes nothing — it returns the driver to the
+              option list. A driver who tapped the wrong option has to be able to
+              leave without having reported that a member said something they
+              did not. Verbatim from the capture. */}
+          <button
+            type="button"
+            onClick={() => {
+              setDeclined(false);
+              setChoice(null);
+              setTimeout(() => onOpenChange(true), SHEET_SWAP_MS);
+            }}
+            className="mt-3 w-full rounded-full border border-gray-300 py-4 text-lg font-semibold text-gray-900"
+          >
+            {DECLINED_WALK_BACK}
+          </button>
+        </DrawerContent>
+      </Drawer>
+
+      <RiderDeclinedForm
+        trip={trip}
+        leg={leg}
+        open={declineFormOpen}
+        onOpenChange={setDeclineFormOpen}
+        onSubmitted={() => setChoice(null)}
+      />
 
       <CannotReachMemberForm
         trip={trip}

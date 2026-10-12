@@ -48,6 +48,7 @@ export const ISSUE_MISSED_SWIPE = "missed-swipe";
 export const ISSUE_CANNOT_REACH_MEMBER = "cannot-reach-member";
 export const ISSUE_AUTO_ASSIGN_REQUEST = "auto-assign-request";
 export const ISSUE_SEND_BACK_REASON = "send-back-reason";
+export const ISSUE_RIDER_DECLINED = "rider-declined";
 
 /**
  * The support issues a driver can file.
@@ -143,6 +144,20 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "A step inside the SEND BACK flow, not a support case the driver chooses. Reasons are production's own CS Tool `DRIVER INITIATED` list, narrowed to the ones a driver can truthfully answer. ⛔ Does NOT bypass any block and does not change the penalty — the Standing Order block and the scoring policy are both out of scope by user direction.",
+  },
+  {
+    value: ISSUE_RIDER_DECLINED,
+    label: "Rider Declined the Trip",
+    // ⚠️ No ⛔ markers in here — a driver reads this line under the form title.
+    // It says what the report is and, just as importantly, what it is not: the
+    // client cancels, we report. Production's own popup makes the same point.
+    description:
+      "For a member who has told you they no longer need the ride. Tell us how they told you and attach what you have — Support takes it to the client, who removes it from your manifest.",
+    // Hidden like the rest: reached by choosing "Rider declined the trip" on the
+    // confirmation modal, which already knows the trip and the issue.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from option 2 of the Reach Rider modal, through the declined sheet production already shows. ⛔ Filing does NOT cancel anything — the client owns the cancellation; the ride stays on the manifest marked 'Cancellation requested'. What it DOES change is the record: a member cancellation rather than a driver send-back, which is what the $25 send-back penalty makes worth a phone call today.",
   },
 ];
 
