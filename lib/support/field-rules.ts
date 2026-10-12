@@ -51,6 +51,37 @@ export function canSubmitCase(
 }
 
 /**
+ * Whether at least one of the named fields differs from what the form opened
+ * with.
+ *
+ * ⛔⛔ **The only submit rule in this file that reads a BASELINE**, and it exists
+ * because one case inverts the usual shape. Every other form asks for values the
+ * app does not have, so "can this be sent" means "is it filled in". Update Trip
+ * Details opens with every answer already filled in — the ride's own times and
+ * addresses — and what it sends is the DIFF. Gated on filledness alone it would
+ * be submittable from the first render, and the request would be to change the
+ * ride to exactly what it already is.
+ *
+ * ⚠️ An empty or absent list means NO diff is required, not "nothing can be
+ * submitted". Every case but one passes `undefined`, and a rule that defaulted
+ * the other way would silently disable every Submit button in the app.
+ *
+ * ⚠️ Compares raw strings, not trimmed ones, for the same reason the time fields
+ * compare `<input type="time">` values: whatever the renderer wrote is what the
+ * driver sees, and normalising here would call a changed field unchanged. The
+ * caller trims when it builds the request, where a stray space is a cosmetic
+ * difference rather than a gate.
+ */
+export function hasRequiredChange(
+  ids: readonly string[] | undefined,
+  values: Record<string, string>,
+  initialValues: Record<string, string>
+): boolean {
+  if (!ids || ids.length === 0) return true;
+  return ids.some((id) => (values[id] ?? "") !== (initialValues[id] ?? ""));
+}
+
+/**
  * ⚠️ **`requireOneOf` was removed with the `Cancel At Door` variant.**
  *
  * It expressed "either the signature or the photo, not both and not neither" —

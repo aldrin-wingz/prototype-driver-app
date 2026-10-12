@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useRef, useState } from "react";
+import type { TripChange } from "@/lib/driver-data/trip-change-request";
 import { getIssueLabel } from "./issue-types";
 import { findPendingForTrip } from "@/lib/support/request-visibility";
 import { swipeClockFor, type SwipeMark } from "@/lib/driver-data/missed-swipe-rules";
@@ -209,6 +210,27 @@ interface RideFlowValue {
   cancellationRequests: string[];
   requestCancellation: (tripIds: string[]) => void;
   isCancellationRequested: (tripId: string) => boolean;
+
+  // ---- Update Trip Details (catalogue row 20) ---------------------------
+  /**
+   * The change the driver has asked Support for, per ride.
+   *
+   * ⛔⛔ **Keyed by ride and holding ONE request, deliberately.** A second,
+   * contradicting request would arrive at Support as two tickets that disagree
+   * about the same ride, and nothing in the app could say which is current. So
+   * the entry points refuse while one stands.
+   *
+   * ⚠️ The cost is real and named in the spec: there is no way to WITHDRAW or
+   * amend from inside the app. That is **catalogue row 17**, the requests tray,
+   * 509 calls, specified nowhere — and this is the fifth build leaning on it.
+   *
+   * ⚠️ Holds the CHANGES, not just a flag, because the ride has to print them:
+   * the trip goes on showing its old times and addresses, so "Change requested"
+   * on its own would read as the submit having done nothing.
+   */
+  tripChangeRequests: Record<string, TripChange[]>;
+  requestTripChange: (tripId: string, changes: TripChange[]) => void;
+  tripChangeRequest: (tripId: string) => TripChange[] | undefined;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -247,6 +269,9 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [sentBack, setSentBack] = useState<string[]>([]);
   // Trips the member declined — annotated in My Rides, never removed.
   const [cancelRequested, setCancelRequested] = useState<string[]>([]);
+  const [tripChanges, setTripChanges] = useState<Record<string, TripChange[]>>(
+    {}
+  );
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -337,6 +362,14 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
           ...tripIds.filter((id) => !previous.includes(id)),
         ]),
       isCancellationRequested: (tripId) => cancelRequested.includes(tripId),
+
+      tripChangeRequests: tripChanges,
+      requestTripChange: (tripId, changes) =>
+        setTripChanges((previous) => ({ ...previous, [tripId]: changes })),
+      // ⚠️ Returns the CHANGES, and `undefined` when there is no request —
+      // distinct from an empty array, which the diff gate makes impossible but
+      // which a caller reading `.length` could not tell apart from "no request".
+      tripChangeRequest: (tripId) => tripChanges[tripId],
     }),
     [
       records,
@@ -346,6 +379,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       preferredOptOuts,
       sentBack,
       cancelRequested,
+      tripChanges,
     ]
   );
 

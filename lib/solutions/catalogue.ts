@@ -550,8 +550,19 @@ export const SOLUTIONS: Solution[] = [
     proposedFeature:
       "In-app form to request a change to a leg's pick-up or drop-off address or time",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides/1049800400",
+      label:
+        "A pencil on each anchor row, and Update Trip Details in More Options. Nothing has started, so both ends are editable and the form is the four fields user direction described — pick-up time, pick-up address, drop-off time, drop-off address — each opening with what the ride already holds. Submit stays disabled until one of them actually differs.",
+      alternates: [
+        {
+          route: "/my-rides/1049800401",
+          label:
+            "The same ride with the pick-up already made. That end is locked to what was recorded and loses its pencil — asking to move a pick-up that happened is a correction, which is row 03's case — so only the drop-off can be asked about.",
+        },
+      ],
+    },
   },
   {
     id: "eta-send-back-explicit",

@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Hourglass,
   CalendarX,
+  PencilLine,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -55,6 +56,15 @@ import {
   CANCELLATION_REQUESTED_PILL,
   CANCELLATION_REQUESTED_TITLE,
 } from "@/lib/driver-data/rider-declined";
+import {
+  canRequestTripChange,
+  changeAnchors,
+  showsTripChangeEntry,
+  TRIP_CHANGE_LABEL,
+  TRIP_CHANGE_REQUESTED_DETAIL,
+  TRIP_CHANGE_REQUESTED_TITLE,
+} from "@/lib/driver-data/trip-change-request";
+import { TripChangeForm } from "@/components/support/trip-change-form";
 import { RideSignatureScreen } from "./ride-signature-screen";
 import {
   MissedSwipePrompt,
@@ -211,11 +221,22 @@ function LegCard({
   isFirst,
   isLast,
   state,
+  onEdit,
 }: {
   leg: TripLeg;
   isFirst: boolean;
   isLast: boolean;
   state: DetailState;
+  /**
+   * Catalogue row 20 — open Update Trip Details for this anchor.
+   *
+   * ⛔ Optional, and the decision of whether to pass it is NOT taken here. Which
+   * anchors can be changed, whether the ride's state admits a request at all and
+   * whether this proposal belongs to the solution in focus are three rules that
+   * live in `trip-change-request.ts`; a `LegCard` that worked any of them out
+   * would be a correctness rule inline in JSX that no check can reach.
+   */
+  onEdit?: () => void;
 }) {
   const anchorStyles = getTimeAnchorStyles(leg.type);
   const showWaitForCall = leg.type === "wait-for-call";
@@ -248,7 +269,23 @@ function LegCard({
 
         {/* Content */}
         <div className="flex-1 pb-4">
-          <p className="text-sm font-medium text-gray-700">{leg.label}</p>
+          {/* ⚠️ The pencil sits on the LABEL row, not the time row. The row
+              below already pins `$31.80 Accepted by you` hard right on an
+              accepted leg, so an icon there would collide with the fare — and
+              the label row is where the user pointed. */}
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-gray-700">{leg.label}</p>
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                aria-label={`${TRIP_CHANGE_LABEL} — ${leg.label}`}
+                className="-mr-1 -mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[#303068] hover:bg-gray-100"
+              >
+                <PencilLine className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <p className={cn("text-xl font-bold", anchorStyles.text)}>{leg.time}</p>
             {showWaitForCall && <Phone className="h-4 w-4 text-amber-500" />}
@@ -312,6 +349,7 @@ export function RideDetailLayout({
     isTripConfirmed,
     confirmTrip,
     isCancellationRequested,
+    tripChangeRequest,
     preferredDriverOptOuts,
     optOutOfPreferredDriverAsk,
   } = useRideFlow();
@@ -331,6 +369,15 @@ export function RideDetailLayout({
   const cancellationRequested = isCancellationRequested(trip.id);
 
   /**
+   * Catalogue row 20 — the change this ride is waiting on, if any.
+   *
+   * ⛔ The ride below still shows its OLD times and addresses, because nothing
+   * about it has changed and nothing will until the client acts. That is exactly
+   * why the request has to be printed: a driver returning to a screen identical
+   * to the one they just filled a form on reads it as the submit having failed.
+   */
+  const changeRequest = tripChangeRequest(trip.id);
+  /**
    * ⛔⛔ **Confirming the trip is what moves Ride Details off `needs-action`.**
    *
    * The page computes the seeded phase from `trip.status`, which cannot know
@@ -348,6 +395,31 @@ export function RideDetailLayout({
       ? "in-progress"
       : seededState;
 
+  /**
+   * Which anchors carry a pencil.
+   *
+   * ⛔⛔ Four rules at once, and every one of them lives in
+   * `trip-change-request.ts`: the ride's state has to admit a request, no
+   * request may already be open, the anchor must not have been swiped past —
+   * and **a proposal belongs to its own build**, which is the rule that escaped
+   * the Reach Rider modal until the user caught it on 2026-10-13.
+   */
+  const changeEntryShown =
+    showsTripChangeEntry(active?.id ?? null) &&
+    canRequestTripChange(trip, state, Boolean(changeRequest));
+  const editableAnchorIds = new Set(
+    changeEntryShown
+      ? changeAnchors(trip)
+          .filter((anchor) => !anchor.passed)
+          .map((anchor) => anchor.index)
+      : []
+  );
+
+  // ⚠️ Reads the EFFECTIVE `state` above, not `seededState`. A driver who just
+  // confirmed a Needs Action ride is on an In Progress one, and both admit a
+  // change request — but a rule reading the seed would be answering about the
+  // screen they were on a moment ago.
+
   const [promptOpen, setPromptOpen] = useState(false);
   /** Stage 01 Step 2 — the Reach Rider modal behind the orange CTA. */
   const [reachOpen, setReachOpen] = useState(false);
@@ -360,6 +432,7 @@ export function RideDetailLayout({
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [preferredOpen, setPreferredOpen] = useState(false);
   const [preferredFormOpen, setPreferredFormOpen] = useState(false);
+  const [tripChangeOpen, setTripChangeOpen] = useState(false);
   const [dropOffReading, setDropOffReading] = useState<number | null>(null);
   const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
     null
@@ -645,6 +718,43 @@ export function RideDetailLayout({
           </div>
         )}
 
+        {/* ⛔ Prints the CHANGES, not just the headline. The timeline underneath
+            is unchanged and will stay unchanged until the client acts, so a
+            banner saying only "Change requested" would leave the driver with no
+            way to check what they actually asked for. Each row is `was → asked
+            for`, which is also the shape the request arrives at Support in. */}
+        {changeRequest && (
+          <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
+            <div className="flex items-start gap-3">
+              <PencilLine className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#92400E]">
+                  {TRIP_CHANGE_REQUESTED_TITLE}
+                </p>
+                <p className="mt-0.5 text-sm text-[#92400E]">
+                  {TRIP_CHANGE_REQUESTED_DETAIL}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {changeRequest.map((change) => (
+                    <li
+                      key={`${change.anchorLabel}-${change.what}`}
+                      className="text-sm text-[#92400E]"
+                    >
+                      <span className="font-medium">
+                        {change.anchorLabel} — {change.what}:
+                      </span>{" "}
+                      <span className="line-through opacity-70">
+                        {change.was}
+                      </span>{" "}
+                      → <span className="font-semibold">{change.asked}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {pendingRequest && (
           <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
             <div className="flex items-start gap-3">
@@ -702,6 +812,11 @@ export function RideDetailLayout({
                 isFirst={index === 0}
                 isLast={index === trip.legs.length - 1}
                 state={state}
+                onEdit={
+                  editableAnchorIds.has(index)
+                    ? () => setTripChangeOpen(true)
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -988,6 +1103,16 @@ export function RideDetailLayout({
         trip={trip}
         open={preferredFormOpen}
         onOpenChange={setPreferredFormOpen}
+      />
+
+      {/* ⛔ No `onSubmitted` navigation — the driver is already on the ride, and
+          the banner appears above them where they are. The More Options entry
+          routes back here for exactly the same reason. */}
+      <TripChangeForm
+        trip={trip}
+        leg={activeLeg}
+        open={tripChangeOpen}
+        onOpenChange={setTripChangeOpen}
       />
 
       <RideSignatureScreen

@@ -11,8 +11,14 @@ import type {
 /** Stand-in for the signed-in driver. Real app would read this from the session. */
 export const DRIVER_EMAIL = "driver@wingz.com";
 
-/** Convert "9:40 AM" to the `<input type="time">` value "09:40". */
-function toTimeInputValue(clock: string | null | undefined): string {
+/**
+ * Convert "9:40 AM" to the `<input type="time">` value "09:40".
+ *
+ * ⚠️ Exported since row 20, which seeds a ride's own scheduled times into a form
+ * directly rather than through a `prefillFrom` source. A second copy of this
+ * conversion would be a second place for an AM/PM to be read wrongly.
+ */
+export function toTimeInputValue(clock: string | null | undefined): string {
   if (!clock) return "";
   const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(clock.trim());
   if (!match) return "";

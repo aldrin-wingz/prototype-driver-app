@@ -7,6 +7,7 @@ import {
   ISSUE_RIDER_NO_SHOW,
   ISSUE_RIDER_DECLINED,
   ISSUE_SEND_BACK_REASON,
+  ISSUE_TRIP_CHANGE_REQUEST,
 } from "./issue-types";
 import {
   DECLINE_CHANNELS,
@@ -27,6 +28,16 @@ import {
   REACH_OUTCOME_OTHER,
   REACH_OUTCOMES,
 } from "@/lib/driver-data/reach-attempt";
+import {
+  CHANGE_NOTES_FIELD,
+  CHANGE_SOURCE_FIELD,
+  CHANGE_SOURCE_OPTIONS,
+  PASSED_ANCHOR_BADGE,
+  changeAddressFieldId,
+  changeTimeFieldId,
+  changeWatchedFields,
+  type ChangeAnchor,
+} from "@/lib/driver-data/trip-change-request";
 import type { SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
 import {
   CONTACT_RELATION_OPTIONS,
@@ -76,6 +87,10 @@ const ONLY_SEND_BACK = {
 const ONLY_RIDER_DECLINED = {
   field: "issue",
   equals: [ISSUE_RIDER_DECLINED],
+};
+const ONLY_TRIP_CHANGE = {
+  field: "issue",
+  equals: [ISSUE_TRIP_CHANGE_REQUEST],
 };
 
 /**
@@ -182,6 +197,7 @@ export function buildSupportFormCase({
   autoAssign = false,
   sendBack = false,
   riderDeclined,
+  tripChange,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -261,6 +277,19 @@ export function buildSupportFormCase({
    * rather than a case to render.
    */
   riderDeclined?: { legOptions: SupportFieldOption[] };
+  /**
+   * Build the Update Trip Details case — catalogue row 20.
+   *
+   * ⚠️ Carries the ride's own ANCHORS, because the field set is generated from
+   * them: two fields per anchor, labelled with the anchor's own wording. A fixed
+   * four-field block would be wrong twice over — it invents a drop-off on the
+   * 26 seeded rides that have only one anchor, and it prints "Drop-off time"
+   * beside a ride that says "Appointment Time".
+   *
+   * ⛔ Never an empty array. Every ride has at least one anchor, so a caller
+   * that found none has a bug rather than a case to render.
+   */
+  tripChange?: { anchors: ChangeAnchor[] };
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -282,9 +311,26 @@ export function buildSupportFormCase({
      * them they had just sent something, on the one case where they have not.
      */
     submitLabel: sendBack ? "Continue" : "Submit",
+    /**
+     * ⛔⛔ **The diff gate, and no other case has one.**
+     *
+     * Every form before this asked for values the app did not have, so Submit
+     * could be gated on required fields being FILLED. This one opens with every
+     * answer already in place — `areRequiredFieldsFilled` would pass it the
+     * instant it rendered, and the driver could send Support a request to change
+     * the ride to exactly what it already is.
+     *
+     * ⚠️ Only the EDITABLE anchors are named. A locked field cannot change, so
+     * listing one would put a field in the gate that can never satisfy it.
+     */
+    requireChangedFrom: tripChange
+      ? changeWatchedFields(tripChange.anchors)
+      : undefined,
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: riderDeclined
+    zendeskEquivalent: tripChange
+      ? "Trip change request"
+      : riderDeclined
       ? "Rider declined the trip"
       : sendBack
       ? "Trip sent back"
@@ -304,7 +350,18 @@ export function buildSupportFormCase({
      * a check that passed because the times were in order.
      */
     timeSequence:
-      cannotReach || autoAssign || sendBack || riderDeclined
+      /**
+       * ⭐ The one case whose sequence is DERIVED, because the fields are.
+       *
+       * A ride's anchors happen in timeline order, so the times the driver is
+       * proposing must too — a drop-off asked for before its own pick-up
+       * describes a ride that cannot happen. ⚠️ Passed anchors are IN the
+       * sequence: a pick-up that already happened at 11:10 is the hardest bound
+       * there is on a drop-off being asked for at 10:30.
+       */
+      tripChange
+        ? tripChange.anchors.map((anchor) => changeTimeFieldId(anchor.index))
+        : cannotReach || autoAssign || sendBack || riderDeclined
         ? undefined
         : missedSwipe
           ? SWIPE_TIME_SEQUENCE
@@ -895,6 +952,92 @@ export function buildSupportFormCase({
               helpText:
                 "Sign to confirm the member told you they no longer need this ride.",
               showIf: ONLY_RIDER_DECLINED,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Update Trip Details -------------------------------------------
+      //
+      // Catalogue row 20 — `Trip / Ride Modification`, 364 calls. The member's
+      // appointment moved, or the address on the manifest is the front entrance
+      // when they need the back one. Today that is a phone call, because there
+      // is nothing in the app that can even state the request.
+      //
+      // ⛔⛔ **Generated from the ride's anchors, two fields per anchor.** Every
+      // other case in this registry is a fixed block gated by `showIf`; this one
+      // cannot be, because how many ends a ride has and what it calls them are
+      // properties of the ride. See `tripChange` on the builder's parameters.
+      //
+      // ⛔⛔ **No `notice` field is used as a section header here**, tempting as
+      // it is. `canSubmitCase` treats a visible notice as an outright block — a
+      // notice stands in for a field set that does not exist — so one used as a
+      // label would make this form permanently unsubmittable, in a way that
+      // looks exactly like the diff gate misfiring.
+      ...(tripChange
+        ? (tripChange.anchors.flatMap((anchor) => [
+            {
+              id: changeTimeFieldId(anchor.index),
+              type: "time",
+              // ⛔ The anchor's OWN label, verbatim. "Drop-off time" beside a
+              // ride printing "Appointment Time" asks the driver to work out
+              // whether those are the same row.
+              label: anchor.label,
+              shortLabel: `${anchor.label.toLowerCase()}`,
+              showIf: ONLY_TRIP_CHANGE,
+              // A passed anchor is shown with what was recorded and cannot be
+              // edited — asking to move a pick-up that already happened is a
+              // correction, which is row 03's case, not this one.
+              lockWhenPrefilled: anchor.passed,
+              lockedBadge: anchor.passed ? PASSED_ANCHOR_BADGE : null,
+            },
+            {
+              id: changeAddressFieldId(anchor.index),
+              type: "text",
+              label: anchor.addressLabel,
+              // ⚠️ Names the anchor it belongs to WITHOUT describing where
+              // either sits on screen. Help text cannot see field order — the
+              // copy lives here and the order lives in this array — so "the
+              // field above" is a claim it is in no position to make.
+              helpText: `The address the ride shows for ${anchor.label}.`,
+              maxLength: 160,
+              showIf: ONLY_TRIP_CHANGE,
+              lockWhenPrefilled: anchor.passed,
+              lockedBadge: anchor.passed ? PASSED_ANCHOR_BADGE : null,
+            },
+          ]) as SupportCaseDefinition["fields"])
+        : []),
+      ...(tripChange
+        ? ([
+            {
+              id: CHANGE_SOURCE_FIELD,
+              type: "select",
+              /**
+               * ⚠️ **Required, and not in the user's four-field list.**
+               *
+               * A driver does not invent a new pick-up address — somebody told
+               * them. Support's first move on a bare "move this to 11:30" is to
+               * find out who said so, and a request that cannot answer that
+               * produces the callback this row exists to remove. One tap is the
+               * whole cost.
+               */
+              label: "Who asked for this change?",
+              shortLabel: "who asked",
+              placeholder: "Select:",
+              required: true,
+              options: [...CHANGE_SOURCE_OPTIONS],
+              showIf: ONLY_TRIP_CHANGE,
+            },
+            {
+              id: CHANGE_NOTES_FIELD,
+              type: "textarea",
+              label: "Anything else Support should know?",
+              shortLabel: "notes",
+              placeholder: "Optional — what they told you, or why the details are wrong",
+              // ⚠️ Optional, following the user's own call on row 16: ask, never
+              // block. The required select already carries the thing Support
+              // cannot proceed without.
+              maxLength: 300,
+              showIf: ONLY_TRIP_CHANGE,
             },
           ] as SupportCaseDefinition["fields"])
         : []),

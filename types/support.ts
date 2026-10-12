@@ -268,6 +268,22 @@ export interface SupportCaseDefinition {
    * check that one, and silently checks nothing on every other case.
    */
   timeSequence?: readonly string[];
+  /**
+   * Field ids, at least one of which must DIFFER from the value the form opened
+   * with before it can be submitted.
+   *
+   * ⛔⛔ For a case whose fields arrive PREFILLED with what the app already has,
+   * so the submission is a diff rather than an answer. `areRequiredFieldsFilled`
+   * cannot express this: a prefilled field is filled from the first render, so a
+   * form built that way is submittable before the driver has touched anything —
+   * and what it would send is a request to change a ride to exactly what it
+   * already is.
+   *
+   * ⚠️ Evaluated against the sheet's own `initialValues`, so the baseline is
+   * whatever the form actually opened with, not a second copy that could drift.
+   * `undefined` means no diff is required, which is every other case.
+   */
+  requireChangedFrom?: readonly string[];
   resolution: SupportResolutionPath;
   /** Confirmation copy shown after a successful submit. */
   successMessage?: string;

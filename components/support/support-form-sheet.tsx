@@ -15,6 +15,7 @@ import {
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
   canSubmitCase,
+  hasRequiredChange,
   emptyValues,
   isFieldVisible,
 } from "@/lib/support/field-rules";
@@ -168,7 +169,17 @@ export function SupportFormSheet({
   // Per `s-02a`, the primary action sits disabled (muted green) until every
   // required field has a value — and stays disabled for an issue whose field set
   // isn't built, since there is nothing to send.
-  const canSubmit = canSubmitCase(supportCase.fields, values);
+  //
+  // ⛔ AND the diff gate, for the one case that opens with every answer already
+  // filled in. `canSubmitCase` cannot see a baseline and must not — it is shared
+  // by every case, and only this one has something to compare against.
+  const canSubmit =
+    canSubmitCase(supportCase.fields, values) &&
+    hasRequiredChange(
+      supportCase.requireChangedFrom,
+      values,
+      initialValues ?? {}
+    );
 
   function setValue(id: string, value: string) {
     setValues((previous) => ({ ...previous, [id]: value }));

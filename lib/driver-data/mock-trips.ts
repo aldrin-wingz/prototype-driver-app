@@ -1607,6 +1607,67 @@ export const mockNeedsActionTrips: Trip[] = [
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
+
+  // ===== 20a — Update Trip Details, the clean case =====
+  //
+  // Catalogue row **20**, `Trip / Ride Modification`, 364 calls. Accepted but not
+  // yet begun, so BOTH anchors are editable — the form opens with four fields,
+  // which is exactly the shape user direction described.
+  //
+  // ⚠️ The member is invented. Every rider name in the captures is a real
+  // member's; the shape is copied, the name is not.
+  {
+    id: "1049800400",
+    date: "Thu, Jul 31, 2026",
+    rider: "TEODORA VANCLEAVE",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "6.8 mi",
+    totalRevenue: 34.40,
+    notes: "Member asked to be collected at the rear entrance, not the main doors",
+    contacts: {
+      riderPhone: "(404) 555-0182",
+      pickupPhone: "(404) 555-0194",
+    },
+    legs: [
+      {
+        id: "1049800400",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "1:20 PM",
+        address: "2201 Glenwood Ave SE, Atlanta, GA 30316",
+        county: "DeKalb County",
+        revenue: 34.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800400-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:15 PM",
+        address: "1821 Clifton Rd NE, Atlanta, GA 30329",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "20a",
+      label: "Both ends still editable — the four-field form",
+      solutions: ["change-pickup-dropoff"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
 ];
 
 // ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
@@ -2291,6 +2352,65 @@ export const mockInProgressTrips: Trip[] = [
       code: "13c",
       label: "Send-back of a STANDING ORDER",
       solutions: ["send-back-reason-form"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 20b — Update Trip Details, with the pick-up already behind them =====
+  //
+  // ⭐ The ONLY demo of the passed-anchor rule. `pickedUpAt` is set, so the
+  // pick-up end has happened: its two fields render locked with what was
+  // recorded, its pencil is not drawn, and only the drop-off can be asked
+  // about. Moving a pick-up that already took place is a correction, which is
+  // catalogue row 03's case and not this one.
+  {
+    id: "1049800401",
+    date: "Thu, Jul 31, 2026",
+    rider: "TEODORA VANCLEAVE",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "6.8 mi",
+    totalRevenue: 34.40,
+    notes: "Member says the clinic moved her to the Peachtree building",
+    contacts: {
+      riderPhone: "(404) 555-0182",
+      pickupPhone: "(404) 555-0194",
+    },
+    legs: [
+      {
+        id: "1049800401",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "1:20 PM",
+        address: "2201 Glenwood Ave SE, Atlanta, GA 30316",
+        county: "DeKalb County",
+        revenue: 34.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "1:04 PM",
+          pickedUpAt: "1:22 PM",
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800401-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:15 PM",
+        address: "1821 Clifton Rd NE, Atlanta, GA 30329",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    scenario: {
+      code: "20b",
+      label: "Pick-up already made — only the drop-off can change",
+      solutions: ["change-pickup-dropoff"],
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,

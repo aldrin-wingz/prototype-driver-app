@@ -1,4 +1,5 @@
 import { hasInProgressLegs } from "./leg-options";
+import { TRIP_CHANGE_LABEL } from "@/lib/driver-data/trip-change-request";
 import type {
   SupportBuildState,
   SupportFieldOption,
@@ -49,6 +50,7 @@ export const ISSUE_CANNOT_REACH_MEMBER = "cannot-reach-member";
 export const ISSUE_AUTO_ASSIGN_REQUEST = "auto-assign-request";
 export const ISSUE_SEND_BACK_REASON = "send-back-reason";
 export const ISSUE_RIDER_DECLINED = "rider-declined";
+export const ISSUE_TRIP_CHANGE_REQUEST = "trip-change-request";
 
 /**
  * The support issues a driver can file.
@@ -158,6 +160,21 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Entered from option 2 of the Reach Rider modal, through the declined sheet production already shows. ⛔ Filing does NOT cancel anything — the client owns the cancellation; the ride stays on the manifest marked 'Cancellation requested'. What it DOES change is the record: a member cancellation rather than a driver send-back, which is what the $25 send-back penalty makes worth a phone call today.",
+  },
+  {
+    value: ISSUE_TRIP_CHANGE_REQUEST,
+    label: TRIP_CHANGE_LABEL,
+    // ⚠️ The description's job here is to say what the driver is NOT doing.
+    // The form opens with every current value filled in and lets them type over
+    // it, which looks exactly like editing the ride — and it is not. Nothing
+    // moves until the client moves it.
+    description:
+      "For a ride whose pick-up or drop-off time or address needs to change. Edit what is wrong and tell us who asked — Support takes it to the client, who updates your manifest.",
+    // Hidden like the rest: both entry points name the issue when they open the
+    // form, so there is no dropdown left to be visible in.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from the Update Trip Details tile in More Options, or the pencil on a ride's own anchor rows. ⛔ Submitting changes NOTHING on the ride — the client owns the manifest. The ride keeps its old times and addresses and gains a 'Change requested' banner saying what was asked for.",
   },
 ];
 

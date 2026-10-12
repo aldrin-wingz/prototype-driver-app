@@ -10,6 +10,7 @@ import {
   Phone,
   Mail,
   Calendar,
+  CalendarClock,
   X,
   Reply,
 } from "lucide-react";
@@ -48,6 +49,13 @@ import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-
 import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
 import { AUTO_ASSIGN_LABEL } from "@/lib/driver-data/member-assignment";
+import {
+  canRequestTripChange,
+  tripChangeRefusal,
+  TRIP_CHANGE_LABEL,
+  TRIP_CHANGE_SOLUTION,
+} from "@/lib/driver-data/trip-change-request";
+import { TripChangeForm } from "@/components/support/trip-change-form";
 import { SendBackReasonForm } from "@/components/support/send-back-reason-form";
 import { SendBackPenaltyDialog } from "@/components/driver/send-back-penalty-dialog";
 import { SendBackConfirmDialog } from "@/components/driver/send-back-confirm-dialog";
@@ -243,6 +251,29 @@ const AUTO_ASSIGN_TILE: OptionTile = {
 };
 
 /**
+ * Catalogue row **20** — ask Support to change a pick-up or drop-off.
+ *
+ * ⚠️ `DRIVER_NAVY` and not rose. Nothing has gone wrong: a member moved their
+ * appointment, or the address on the manifest is the front door when they need
+ * the back one. Rose is the colour this grid reserves for the two tiles that
+ * report a failure, and spending it here would make an administrative ask look
+ * like an incident.
+ *
+ * ⚠️ After `calendar`, which keeps Member No-Show and Send Back Trip ending the
+ * grid side by side — the rule user direction fixed on 2026-10-12 and the reason
+ * `AUTO_ASSIGN_TILE` sits where it does.
+ */
+const TRIP_CHANGE_TILE: OptionTile = {
+  id: "trip-change",
+  label: TRIP_CHANGE_LABEL,
+  icon: CalendarClock,
+  variant: "filled",
+  color: DRIVER_NAVY,
+  solutions: [TRIP_CHANGE_SOLUTION],
+  after: "calendar",
+};
+
+/**
  * The proposed tiles, in catalogue order, newest LAST.
  *
  * ⚠️ Order is the catalogue's, not the order they were built in — a driver
@@ -250,7 +281,11 @@ const AUTO_ASSIGN_TILE: OptionTile = {
  * sequences them, and "whatever we added most recently" is not a sequence
  * anyone can predict.
  */
-const PROPOSED_TILES: OptionTile[] = [CANNOT_REACH_TILE, AUTO_ASSIGN_TILE];
+const PROPOSED_TILES: OptionTile[] = [
+  CANNOT_REACH_TILE,
+  AUTO_ASSIGN_TILE,
+  TRIP_CHANGE_TILE,
+];
 
 /**
  * The grid as rendered, for the solution in focus.
@@ -429,7 +464,8 @@ export function MoreOptionsScreen({
   // whether the driver already filed — which the app does know — not about what
   // Support did with it, which for a no-show it never learns. Using the pending
   // lookup here would let the same claim be filed twice over.
-  const { submittedForms, submitForm, sendBackTrip } = useRideFlow();
+  const { submittedForms, submitForm, sendBackTrip, tripChangeRequest } =
+    useRideFlow();
   const { active } = useSolution();
   const pending = submittedForms.some((record) => record.tripId === trip.id);
 
@@ -440,6 +476,11 @@ export function MoreOptionsScreen({
   const [stageRefused, setStageRefused] = useState(false);
   const [cannotReachOpen, setCannotReachOpen] = useState(false);
   const [autoAssignOpen, setAutoAssignOpen] = useState(false);
+  const [tripChangeOpen, setTripChangeOpen] = useState(false);
+  // ⚠️ Holds the REASON, not a boolean. Three different things can close this
+  // door and they have three different next steps — a shared "you can't do that"
+  // would teach the driver nothing about which one they hit.
+  const [tripChangeRefused, setTripChangeRefused] = useState<string | null>(null);
   const [sendBackConfirmOpen, setSendBackConfirmOpen] = useState(false);
   const [sendBackReasonOpen, setSendBackReasonOpen] = useState(false);
   const [standingOrderOpen, setStandingOrderOpen] = useState(false);
@@ -599,6 +640,21 @@ export function MoreOptionsScreen({
       setAutoAssignOpen(true);
       return;
     }
+    if (id === "trip-change") {
+      /**
+       * ⛔ Scoped to THIS case, not to `pending`. The screen-wide `pending` flag
+       * is true for any form filed against this ride, so reading it here would
+       * refuse a change request because a no-show was filed an hour ago — two
+       * unrelated things the driver would have no way to connect.
+       */
+      const already = Boolean(tripChangeRequest(trip.id));
+      if (!canRequestTripChange(trip, trip.status, already)) {
+        setTripChangeRefused(tripChangeRefusal(trip, trip.status, already));
+        return;
+      }
+      setTripChangeOpen(true);
+      return;
+    }
     if (id === "no-show") {
       // Guardrail 1 only — the ride's status, which needs no location check.
       if (!activeLeg || !canFileNoShow(trip, activeLeg)) {
@@ -655,6 +711,29 @@ export function MoreOptionsScreen({
           <AlertDialogFooter>
             {/* Deliberately the only way out. A member already in the car cannot
                 have failed to show, so there is nothing to collect. */}
+            <AlertDialogAction className="bg-transparent text-base font-bold text-[#00B090] shadow-none hover:bg-transparent">
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ⚠️ Same shape as the Member No-Show stage refusal above, and a separate
+          dialog rather than a shared one: the two carry different copy for
+          different reasons, and one dialog taking whichever string was set last
+          is a dialog that can show the wrong rule. */}
+      <AlertDialog
+        open={tripChangeRefused !== null}
+        onOpenChange={(open) => !open && setTripChangeRefused(null)}
+      >
+        <AlertDialogContent className="max-w-[20rem] rounded-2xl">
+          <AlertDialogTitle className="sr-only">
+            {TRIP_CHANGE_LABEL} unavailable
+          </AlertDialogTitle>
+          <AlertDialogDescription className="py-2 text-base text-gray-900">
+            {tripChangeRefused}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
             <AlertDialogAction className="bg-transparent text-base font-bold text-[#00B090] shadow-none hover:bg-transparent">
               OK
             </AlertDialogAction>
@@ -734,6 +813,19 @@ export function MoreOptionsScreen({
           if (!next) setSendBackValues(null);
         }}
         onConfirm={completeSendBack}
+      />
+
+      <TripChangeForm
+        trip={trip}
+        leg={activeLeg}
+        open={tripChangeOpen}
+        onOpenChange={setTripChangeOpen}
+        // ⭐ Unlike every other form on this screen, this one DOES return the
+        // driver to the ride — because the ride is the subject and it now has
+        // something new on it to read. The `Change requested` banner is the
+        // whole point of filing, and a driver left on the grid would never see
+        // it.
+        onSubmitted={() => router.push(backHref)}
       />
 
       <AutoAssignRequestForm

@@ -31,6 +31,24 @@ import {
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
+  changeAnchors,
+  editableAnchors,
+  tripChanges,
+  tripChangeRefusal,
+  showsTripChangeEntry,
+  CHANGE_NOTES_FIELD,
+  CHANGE_SOURCE_FIELD,
+  CHANGE_SOURCE_OPTIONS,
+  PASSED_ANCHOR_BADGE,
+  TRIP_CHANGE_LABEL,
+  TRIP_CHANGE_REFUSAL,
+  TRIP_CHANGE_REQUESTED_DETAIL,
+  TRIP_CHANGE_REQUESTED_TITLE,
+  TRIP_CHANGE_SUBMIT_TOAST,
+  TRIP_CHANGE_TRACKED_BY_APP,
+} from "../lib/driver-data/trip-change-request";
+import { buildTripChange } from "../components/support/trip-change-form";
+import {
   ACCOUNT_SOLUTION_ID,
   ACCOUNT_ON_FILE,
   CODE_PURPOSE_FOR,
@@ -140,7 +158,14 @@ import {
 } from "../lib/driver-data/rider-declined";
 import { buildRiderDeclined } from "../components/support/rider-declined-form";
 import { getMemberOptions, MEMBER_WINDOW_DAYS } from "../lib/support-data/member-options";
-import { areRequiredFieldsFilled, isFieldVisible } from "../lib/support/field-rules";
+import {
+  areRequiredFieldsFilled,
+  canSubmitCase,
+  hasRequiredChange,
+  isFieldVisible,
+} from "../lib/support/field-rules";
+import { getTimeOrderWarnings } from "../lib/support/time-order";
+import { ISSUE_TRIP_CHANGE_REQUEST } from "../lib/support-data/issue-types";
 import { solutionHref } from "../lib/solutions/solution-context";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
@@ -411,7 +436,7 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * below went back to 6 rather than being left at 7 with a row quietly failing
  * to supply its alternate.
  */
-const EXPECTED_ALTERNATES = 7;
+const EXPECTED_ALTERNATES = 8;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -553,7 +578,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 15;
+const EXPECTED_SCENARIO_RIDES = 17;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -677,7 +702,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 14;
+const EXPECTED_RIDE_ROUTES = 16;
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
 const EXPECTED_SURFACE_ROUTES = 3;
 check(
@@ -747,6 +772,11 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // Three: `13a` short-notice (penalty), `13b` advance (neither warning),
   // `13c` standing order. The second is the negative control for both.
   "send-back-reason-form": 3,
+  // ⭐ ONE, and it is the `20b` ride with the pick-up already made — the only
+  // demo of the passed-anchor rule. Row 20's OTHER ride is in Needs Action, so
+  // this row is declared in BOTH maps: a row with rides in two tabs that named
+  // only one would hide half its demo behind a number that still looked right.
+  "change-pickup-dropoff": 1,
 };
 /**
  * ⚠️ A SECOND tab, declared separately rather than folded into the map above
@@ -766,6 +796,9 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   // production's own decline template removes several leg ids at once, so a
   // single seeded ride could not have shown the checklist doing anything.
   "rider-initiated-cancellation": 2,
+  // ⭐ ONE here, the `20a` ride where nothing has started and both ends are
+  // still editable. See the note beside its In Progress entry above.
+  "change-pickup-dropoff": 1,
 };
 for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
   const shown = ridesForSolution(inProgress, id);
@@ -1271,13 +1304,27 @@ const EXPECTED_GRIDS: Array<{
   fullWidth: string | null;
 }> = [
   {
-    // Nothing focused: no filtering, so both proposals show. Nine tiles — odd.
+    // Nothing focused: no filtering, so every proposal shows. TEN tiles now —
+    // even, so nothing is full-width and `send-back` takes a column. ⚠️ That is
+    // the packing rule working, not a regression: full-width is a function of
+    // the COUNT, and row 20's tile changed the count's parity.
     focus: null,
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
-      "auto-assign", "no-show", "cannot-reach", "send-back",
+      "auto-assign", "trip-change", "no-show", "cannot-reach", "send-back",
     ],
-    fullWidth: "send-back",
+    fullWidth: null,
+  },
+  {
+    // Row 20 focused — its own tile and ⛔ no other proposal, after Add Event To
+    // Calendar so No-Show and Send Back Trip still end the grid side by side.
+    // Eight tiles, four clean rows of two.
+    focus: "change-pickup-dropoff",
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "trip-change", "no-show", "send-back",
+    ],
+    fullWidth: null,
   },
   {
     // Row 09 focused — the user's own worked example, in the order they asked
@@ -1566,6 +1613,21 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   // Row 16 is reached during member confirmation, which is the unconfirmed
   // phase — so both its rides are Needs Action, like rows 04 and 05.
   "rider-initiated-cancellation": "needs-action",
+  /**
+   * ⚠️ **In Progress, which is the ALTERNATE's tab and not the entry's.**
+   *
+   * Row 20 is the first built row with rides in two tabs, and `firstTabWithRides`
+   * walks `TAB_ORDER` — In Progress first. So a reviewer who focuses row 20 and
+   * then opens My Rides meets `20b`, the ride with its pick-up behind it, rather
+   * than `20a`.
+   *
+   * Declared rather than fixed. The selector routes to `entry.route` directly,
+   * so the entry is still what OPENS; this only decides which tab a later tap on
+   * My Rides lands on, and both rides are row 20's. Changing the rule to prefer
+   * the entry's tab would mean teaching `firstTabWithRides` about entries, which
+   * is a bigger claim than this row has earned.
+   */
+  "change-pickup-dropoff": "in-progress",
 };
 /**
  * ⚠️ Row 15 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
@@ -4188,6 +4250,374 @@ check(
   `${flagged.length} of ${ARTIFACT_CHANNELS.length} artifact channel(s)`,
   flagged.length === ARTIFACT_CHANNELS.length &&
     flagged.every((c) => c.hasArtifact),
+);
+
+
+// ===========================================================================
+console.log("\n15. Update Trip Details — catalogue row 20");
+
+const TRIP_CHANGE_ENTRY_RIDE = "1049800400";
+const TRIP_CHANGE_ALT_RIDE = "1049800401";
+const change20a = ALL_SEEDED.find((t) => t.id === TRIP_CHANGE_ENTRY_RIDE)!;
+const change20b = ALL_SEEDED.find((t) => t.id === TRIP_CHANGE_ALT_RIDE)!;
+check(
+  "both scenario rides are seeded",
+  `${[change20a, change20b].filter(Boolean).length} of 2 — ${change20a?.scenario?.code}, ${change20b?.scenario?.code}`,
+  Boolean(change20a) && Boolean(change20b),
+);
+
+// ---- 15a · The anchors, and what the ride has moved past -----------------
+const anchors20a = changeAnchors(change20a);
+const anchors20b = changeAnchors(change20b);
+check(
+  "the clean ride offers BOTH ends",
+  `${anchors20a.length} anchor(s), ${editableAnchors(change20a).length} editable — ${anchors20a.map((a) => `${a.kind}:${a.passed ? "passed" : "open"}`).join(", ")}`,
+  anchors20a.length === 2 && editableAnchors(change20a).length === 2,
+);
+/**
+ * ⭐ The whole reason `20b` exists. Its pick-up has been swiped, so it is
+ * `passed` and drops out of the editable set — asking to move a pick-up that
+ * already happened is a correction, which is catalogue row 03's case.
+ *
+ * ⛔ A check that only ever saw `20a` would pass while `anchorPassed` returned
+ * a constant `false`, which is the exact shape of a check that stops checking.
+ */
+check(
+  "the ride with its pick-up behind it offers ONLY the drop-off",
+  `${anchors20b.length} anchor(s), ${editableAnchors(change20b).length} editable — ${anchors20b.map((a) => `${a.kind}:${a.passed ? "passed" : "open"}`).join(", ")}`,
+  anchors20b.length === 2 &&
+    editableAnchors(change20b).length === 1 &&
+    anchors20b[0].passed &&
+    !anchors20b[1].passed,
+);
+check(
+  "the two rides DISAGREE about the pick-up, so the rule is doing work",
+  `20a pick-up passed=${anchors20a[0].passed}, 20b pick-up passed=${anchors20b[0].passed}`,
+  anchors20a[0].passed !== anchors20b[0].passed,
+);
+/**
+ * ⛔⛔ The anchor's label is the RIDE's own wording, never a fixed "Drop-off
+ * time". The seed calls a destination `Appointment Time` on 24 trips and
+ * `Scheduled Drop-off` on 2, and a form printing a third name beside it would
+ * ask the driver to work out whether those are the same row.
+ */
+check(
+  "each anchor label is the ride's own, verbatim",
+  `${anchors20a.map((a) => a.label).join(" | ")}`,
+  anchors20a.every((a, i) => a.label === change20a.legs[i].label),
+);
+
+// ---- 15b · The case the two entry points build ---------------------------
+const built20a = buildTripChange(change20a, change20a.legs[0]);
+const built20b = buildTripChange(change20b, change20b.legs[0]);
+const ids20a = built20a.supportCase.fields
+  .filter((f) => f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST))
+  .map((f) => f.id);
+const EXPECTED_CHANGE_FIELDS = [
+  "changeTime0",
+  "changeAddress0",
+  "changeTime1",
+  "changeAddress1",
+  CHANGE_SOURCE_FIELD,
+  CHANGE_NOTES_FIELD,
+];
+check(
+  "a two-anchor ride builds the declared six fields, in order",
+  `${ids20a.length}: ${ids20a.join(", ")}`,
+  ids20a.length === EXPECTED_CHANGE_FIELDS.length &&
+    EXPECTED_CHANGE_FIELDS.every((id, i) => ids20a[i] === id),
+);
+/**
+ * ⛔⛔ **No `notice` field on this case.** `canSubmitCase` treats a visible
+ * notice as an outright block, so one used as a section header would make the
+ * form permanently unsubmittable — in a way that looks exactly like the diff
+ * gate misfiring.
+ */
+check(
+  "no notice field — one would block Submit forever",
+  `${built20a.supportCase.fields.filter((f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST)).length} notice(s) of ${ids20a.length}`,
+  built20a.supportCase.fields.every(
+    (f) =>
+      !(f.type === "notice" && f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST)),
+  ),
+);
+/** Who asked is the one thing Support cannot proceed without. */
+const sourceField = built20a.supportCase.fields.find(
+  (f) => f.id === CHANGE_SOURCE_FIELD,
+)!;
+const notesField = built20a.supportCase.fields.find(
+  (f) => f.id === CHANGE_NOTES_FIELD,
+)!;
+check(
+  "who asked is required; the free-text box beside it is not",
+  `source required=${sourceField.required === true} (${sourceField.options?.length} options), notes required=${notesField.required === true}`,
+  sourceField.required === true &&
+    sourceField.options?.length === CHANGE_SOURCE_OPTIONS.length &&
+    notesField.required !== true,
+);
+/**
+ * ⛔⛔ **The RENDERED field's label, not the helper's.**
+ *
+ * The check in 15a above asserts `changeAnchors` carries the ride's own wording
+ * — and a break test proved that is not the same claim: hard-coding
+ * `label: "Drop-off time"` in the case registry left every check green, because
+ * nothing downstream of the helper was being read. A form is what the driver
+ * sees, so the form is what has to be asserted.
+ */
+const timeLabels = built20a.supportCase.fields
+  .filter((f) => f.id.startsWith("changeTime"))
+  .map((f) => f.label);
+check(
+  "each TIME FIELD prints the anchor's own label, verbatim",
+  `${timeLabels.join(" | ")}`,
+  timeLabels.length === anchors20a.length &&
+    timeLabels.every((label, i) => label === anchors20a[i].label),
+);
+check(
+  "...and the two are genuinely different words, so the check can fail",
+  `${new Set(timeLabels).size} distinct of ${timeLabels.length}`,
+  new Set(timeLabels).size === timeLabels.length,
+);
+
+/**
+ * ⛔ The locked badge must not claim the value beside it was RECORDED. A locked
+ * field shows the ride's scheduled 1:20 PM while the swipe that passed it landed
+ * at 1:22 PM — "Already happened" was shipped and caught in the walk.
+ */
+const passedBadges = built20b.supportCase.fields
+  .filter((f) => f.lockWhenPrefilled && f.id.startsWith("change"))
+  .map((f) => f.lockedBadge);
+check(
+  "the locked badge names the END, not a recorded value",
+  `${passedBadges.length} badge(s): ${[...new Set(passedBadges)].join(", ")}`,
+  passedBadges.length === 2 &&
+    passedBadges.every((b) => b === PASSED_ANCHOR_BADGE) &&
+    !/record|happened/i.test(PASSED_ANCHOR_BADGE),
+);
+
+/** Locked on the end that has happened, open on the end that has not. */
+const lock20b = built20b.supportCase.fields
+  .filter((f) => f.id.startsWith("changeTime") || f.id.startsWith("changeAddress"))
+  .map((f) => `${f.id}:${f.lockWhenPrefilled ? "locked" : "open"}`);
+check(
+  "20b locks the pick-up's two fields and leaves the drop-off's open",
+  lock20b.join(", "),
+  lock20b.join(", ") ===
+    "changeTime0:locked, changeAddress0:locked, changeTime1:open, changeAddress1:open",
+);
+
+// ---- 15c · ⛔⛔ The diff gate --------------------------------------------
+/**
+ * The form opens with every answer already filled in, so "can this be sent"
+ * cannot mean "is it filled in". The two checks below are a PAIR and neither is
+ * worth anything alone:
+ *
+ *   · `canSubmitCase` PASSES the untouched form — which is the proof that the
+ *     existing rule would have let an empty request through.
+ *   · `hasRequiredChange` REFUSES it — which is the proof that something else
+ *     is now stopping it.
+ */
+const untouched = { ...built20a.initialValues, [CHANGE_SOURCE_FIELD]: "member" };
+check(
+  "the untouched form passes the ORDINARY submit rule — the gate it needed does not exist",
+  `canSubmitCase=${canSubmitCase(built20a.supportCase.fields, untouched)}`,
+  canSubmitCase(built20a.supportCase.fields, untouched) === true,
+);
+check(
+  "...and the diff gate refuses it anyway",
+  `hasRequiredChange=${hasRequiredChange(built20a.supportCase.requireChangedFrom, untouched, built20a.initialValues)}`,
+  hasRequiredChange(
+    built20a.supportCase.requireChangedFrom,
+    untouched,
+    built20a.initialValues,
+  ) === false,
+);
+const movedTime = { ...untouched, changeTime1: "15:30" };
+check(
+  "...and admits it once one field actually differs",
+  `hasRequiredChange=${hasRequiredChange(built20a.supportCase.requireChangedFrom, movedTime, built20a.initialValues)}`,
+  hasRequiredChange(
+    built20a.supportCase.requireChangedFrom,
+    movedTime,
+    built20a.initialValues,
+  ) === true,
+);
+/**
+ * ⚠️ Every OTHER case must be untouched by this. A rule that defaulted to
+ * "nothing may be submitted" when no list was declared would silently disable
+ * every Submit button in the app.
+ */
+check(
+  "a case with no declared list is unaffected",
+  `hasRequiredChange(undefined)=${hasRequiredChange(undefined, {}, {})}`,
+  hasRequiredChange(undefined, {}, {}) === true,
+);
+check(
+  "⛔ a LOCKED field is not in the gate's list — it could never satisfy it",
+  `20b watches ${built20b.supportCase.requireChangedFrom?.join(", ")}`,
+  (built20b.supportCase.requireChangedFrom ?? []).join(",") ===
+    "changeTime1,changeAddress1",
+);
+
+// ---- 15d · What the request says ----------------------------------------
+const diff = tripChanges(built20a.anchors, built20a.initialValues, {
+  ...built20a.initialValues,
+  changeTime1: "15:30",
+  changeAddress0: "  2201 Glenwood Ave SE, Atlanta, GA 30316  ",
+});
+check(
+  "the request is the DIFF — a retyped-identical address with stray spaces is not a change",
+  `${diff.length} change(s): ${diff.map((c) => `${c.anchorLabel}/${c.what}`).join(", ")}`,
+  diff.length === 1 && diff[0].what === "time",
+);
+check(
+  "...and it carries BOTH values, since the ride goes on showing the old one",
+  `${diff[0]?.was} → ${diff[0]?.asked}`,
+  diff[0]?.was === "14:15" && diff[0]?.asked === "15:30",
+);
+check(
+  "an untouched form produces no changes at all",
+  `${tripChanges(built20a.anchors, built20a.initialValues, built20a.initialValues).length} change(s)`,
+  tripChanges(built20a.anchors, built20a.initialValues, built20a.initialValues)
+    .length === 0,
+);
+
+// ---- 15e · The times still have to be in order --------------------------
+/**
+ * ⭐ The one case whose `timeSequence` is derived, because its fields are. A
+ * drop-off asked for before its own pick-up describes a ride that cannot happen.
+ */
+check(
+  "the time sequence names every anchor, in timeline order",
+  `${built20a.supportCase.timeSequence?.join(", ")}`,
+  (built20a.supportCase.timeSequence ?? []).join(",") ===
+    "changeTime0,changeTime1",
+);
+const backwards = getTimeOrderWarnings(
+  built20a.supportCase.fields,
+  { ...built20a.initialValues, changeTime1: "10:30" },
+  built20a.supportCase.timeSequence ?? [],
+);
+check(
+  "a drop-off asked for before its own pick-up warns",
+  `${Object.keys(backwards).length} warning(s): ${Object.keys(backwards).join(", ")}`,
+  Object.keys(backwards).length === 1 && "changeTime1" in backwards,
+);
+check(
+  "...and the ride as it stands warns about nothing",
+  `${Object.keys(getTimeOrderWarnings(built20a.supportCase.fields, built20a.initialValues, built20a.supportCase.timeSequence ?? [])).length} warning(s)`,
+  Object.keys(
+    getTimeOrderWarnings(
+      built20a.supportCase.fields,
+      built20a.initialValues,
+      built20a.supportCase.timeSequence ?? [],
+    ),
+  ).length === 0,
+);
+
+// ---- 15f · Who can open it ----------------------------------------------
+/**
+ * ⛔ Three doors closed for three different reasons, and each refusal says
+ * which. A `completed` ride is row 03's case; an unaccepted offer is row 21's.
+ */
+const REFUSAL_CASES: Array<[string, string | null]> = [
+  ["needs-action", null],
+  ["in-progress", null],
+  ["before-taken", TRIP_CHANGE_REFUSAL.state],
+  ["completed", TRIP_CHANGE_REFUSAL.state],
+];
+for (const [state, expected] of REFUSAL_CASES) {
+  const actual = tripChangeRefusal(change20a, state, false);
+  check(
+    `a ${state} ride ${expected === null ? "opens the form" : "is refused"}`,
+    actual === null ? "opens" : actual.slice(0, 40) + "…",
+    actual === expected,
+  );
+}
+check(
+  "a ride that already has a request is refused, with its own reason",
+  tripChangeRefusal(change20a, "needs-action", true)?.slice(0, 40) + "…",
+  tripChangeRefusal(change20a, "needs-action", true) ===
+    TRIP_CHANGE_REFUSAL.pending,
+);
+check(
+  "the three refusals are three distinct strings",
+  `${new Set(Object.values(TRIP_CHANGE_REFUSAL)).size} distinct of ${Object.values(TRIP_CHANGE_REFUSAL).length}`,
+  new Set(Object.values(TRIP_CHANGE_REFUSAL)).size ===
+    Object.values(TRIP_CHANGE_REFUSAL).length,
+);
+/**
+ * ⛔⛔ **A proposal belongs to its own build**, and this row has a THIRD surface
+ * carrying that obligation — the pencil on the ride's own anchor rows. The More
+ * Options grid is covered by `EXPECTED_GRIDS`; this is the other one, and it is
+ * the rule the Reach Rider modal escaped until the user caught it on 2026-10-13.
+ */
+const ENTRY_SCOPE: Array<[string | null, boolean]> = [
+  [null, true],
+  ["change-pickup-dropoff", true],
+  ["rider-no-show", false],
+  ["rider-initiated-cancellation", false],
+];
+for (const [focus, expected] of ENTRY_SCOPE) {
+  check(
+    `the ride's pencil ${expected ? "shows" : "is withheld"} with ${focus ?? "nothing"} focused`,
+    `${showsTripChangeEntry(focus)}`,
+    showsTripChangeEntry(focus) === expected,
+  );
+}
+
+// ---- 15g · Driver-facing copy -------------------------------------------
+const TRIP_CHANGE_DRIVER_FACING = [
+  TRIP_CHANGE_LABEL,
+  TRIP_CHANGE_REQUESTED_TITLE,
+  TRIP_CHANGE_REQUESTED_DETAIL,
+  TRIP_CHANGE_SUBMIT_TOAST,
+  ...Object.values(TRIP_CHANGE_REFUSAL),
+  ...CHANGE_SOURCE_OPTIONS.map((o) => o.label),
+  ...built20a.supportCase.fields
+    .filter((f) => f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST))
+    .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
+];
+check(
+  "no internal marker reaches row 20's driver-facing copy",
+  `${TRIP_CHANGE_DRIVER_FACING.filter((t) => /⛔|⭐/.test(t)).length} leak(s) of ${TRIP_CHANGE_DRIVER_FACING.length} string(s)`,
+  TRIP_CHANGE_DRIVER_FACING.every((t) => !/⛔|⭐/.test(t)),
+);
+/**
+ * ⛔ Help text cannot see field ORDER — the copy lives in the registry's field
+ * literals and the order lives in the array around them — so "the field above"
+ * is a claim it is in no position to make. Row 16 shipped three of these.
+ */
+const placed = TRIP_CHANGE_DRIVER_FACING.filter((t) =>
+  /\b(above|below)\b/i.test(t),
+);
+check(
+  "no row 20 copy claims where another field sits",
+  `${placed.length} of ${TRIP_CHANGE_DRIVER_FACING.length} string(s)`,
+  placed.length === 0,
+);
+/**
+ * ⚠️ The help on each address names its own anchor, which is the only thing
+ * tying "Drop-off address" to a row the ride calls "Appointment Time".
+ */
+const addressHelp = built20a.supportCase.fields.filter(
+  (f) => f.id.startsWith("changeAddress") && f.helpText,
+);
+check(
+  "every address field names the anchor it belongs to",
+  `${addressHelp.filter((f, i) => f.helpText!.includes(anchors20a[i].label)).length} of ${anchors20a.length}`,
+  addressHelp.length === anchors20a.length &&
+    addressHelp.every((f, i) => f.helpText!.includes(anchors20a[i].label)),
+);
+/**
+ * ⛔ The app never learns the outcome — the client owns the manifest. Asserted
+ * as a constant so a later slice that starts tracking a status has to change a
+ * declared fact rather than a comment.
+ */
+check(
+  "row 20 does NOT claim to track what happens next",
+  `TRIP_CHANGE_TRACKED_BY_APP=${TRIP_CHANGE_TRACKED_BY_APP}`,
+  TRIP_CHANGE_TRACKED_BY_APP === false,
 );
 
 // ---------------------------------------------------------------------------
