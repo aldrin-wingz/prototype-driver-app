@@ -2455,17 +2455,17 @@ check(
   sendBackSteps(SHORT).indexOf("reason") < sendBackSteps(SHORT).indexOf("penalty"),
 );
 /**
- * ⭐ Production's step 1 is built from the screenshot the user supplied on
+ * ⭐ Production's own popup is built from the screenshot the user supplied on
  * 2026-10-13 — the only place its copy has ever been written down.
  *
- * ⚠️ **Unconditional**: every send-back raises it. Only the penalty warning is
- * conditional, per the copy-update story's AC.
+ * ⚠️ **Unconditional**: every send-back raises it. Only the penalty warning and
+ * the standing-order warning are conditional.
  */
 check(
-  "production's step 1 is built and raised on EVERY send-back",
+  "production's popup is built and raised on EVERY send-back",
   `SEND_BACK_CONFIRM_BUILT=${SEND_BACK_CONFIRM_BUILT}`,
   SEND_BACK_CONFIRM_BUILT === true &&
-    [SHORT, ADVANCE, SO_RIDE].every((t) => sendBackSteps(t)[0] === "confirm"),
+    [SHORT, ADVANCE, SO_RIDE].every((t) => sendBackSteps(t).includes("confirm")),
 );
 
 /**
@@ -2473,22 +2473,27 @@ check(
  * possible and which ones appear turns on two independent properties of the
  * trip. A sequence assembled by three separate `if`s in a component is one
  * nobody can read; this is the table it has to agree with.
+ *
+ * ⛔ **Order set by the user 2026-10-13, and it MOVES A PRODUCTION SCREEN.** In
+ * the real app the "strongly discouraged" popup is step 1 and nothing precedes
+ * it. Here the reason form comes first and that popup comes third. Declared
+ * loudly because a reader who knows production will assume a bug.
  */
 const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = [
   {
     trip: ADVANCE,
     name: "plain advance trip",
-    steps: ["confirm", "reason"],
+    steps: ["reason", "confirm"],
   },
   {
     trip: SHORT,
     name: "short-notice",
-    steps: ["confirm", "reason", "penalty"],
+    steps: ["reason", "confirm", "penalty"],
   },
   {
     trip: SO_RIDE,
     name: "standing order",
-    steps: ["confirm", "reason", "standing-order"],
+    steps: ["reason", "standing-order", "confirm"],
   },
   {
     // ⚠️ Not seeded — asserted. A ride raising BOTH warnings would let a
@@ -2496,7 +2501,7 @@ const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = 
     // and the rule is checked on a trip built here.
     trip: { ...SO_RIDE, sameDay: true },
     name: "standing order AND short-notice",
-    steps: ["confirm", "reason", "standing-order", "penalty"],
+    steps: ["reason", "standing-order", "confirm", "penalty"],
   },
 ];
 for (const row of STEP_MATRIX) {
@@ -2517,21 +2522,35 @@ check(
     STEP_MATRIX.some((r) => !isShortNoticeSendBack(r.trip)),
 );
 /**
- * ⛔⛔ **Standing order BEFORE penalty, always.** A standing order's cost is the
- * ORDER — every future trip, and the account — while the penalty is money.
- * Raising the money warning first would read as an escalation the driver has
- * already tapped past.
+ * ⛔⛔ **The reason is asked FIRST, before any warning.** Asking why after three
+ * warnings would collect an answer from a driver who has been talked at twice
+ * and is tapping through. First is the only point in the sequence where the
+ * answer is theirs rather than a reaction.
  */
-const both = sendBackSteps({ ...SO_RIDE, sameDay: true });
 check(
-  "the standing-order warning comes before the penalty warning",
+  "the reason is the first step on every trip",
+  STEP_MATRIX.map((r) => `${r.name}:${sendBackSteps(r.trip)[0]}`).join(" "),
+  STEP_MATRIX.every((r) => sendBackSteps(r.trip)[0] === "reason"),
+);
+const both = sendBackSteps({ ...SO_RIDE, sameDay: true });
+/**
+ * ⛔⛔ Standing order → production's discouragement → penalty. Escalating: the
+ * consequence specific to THIS trip, the general one, then the money.
+ */
+check(
+  "the warnings escalate — standing order, then production's, then the penalty",
   both.join(" → "),
-  both.indexOf("standing-order") < both.indexOf("penalty"),
+  both.indexOf("standing-order") < both.indexOf("confirm") &&
+    both.indexOf("confirm") < both.indexOf("penalty"),
 );
 check(
-  "...and the reason comes before both of them",
-  both.join(" → "),
-  both.indexOf("reason") < both.indexOf("standing-order"),
+  "...and the penalty warning is always last when it appears",
+  STEP_MATRIX.filter((r) => sendBackSteps(r.trip).includes("penalty"))
+    .map((r) => sendBackSteps(r.trip).join(" → "))
+    .join(" | "),
+  STEP_MATRIX.filter((r) => sendBackSteps(r.trip).includes("penalty")).every(
+    (r) => sendBackSteps(r.trip).at(-1) === "penalty",
+  ),
 );
 
 /**
@@ -2546,14 +2565,14 @@ const CONFIRM_SOURCE = readFileSync(
   "utf8",
 );
 check(
-  "step 1 carries production's own copy, verbatim",
+  "production's popup carries its own copy, verbatim",
   "Trip sendbacks are strongly discouraged…",
   CONFIRM_SOURCE.replace(/\s+/g, " ").includes(
     "Trip sendbacks are strongly discouraged and may result in penalties. Do you want to proceed in sending back the trip?",
   ),
 );
 check(
-  "...and step 1 says No/Yes while step 2 says Cancel/Continue",
+  "...and production's popup says No/Yes while its penalty popup says Cancel/Continue",
   "production disagrees with itself; both reproduced",
   /<AlertDialogCancel[\s\S]{0,300}No\s*<\/AlertDialogCancel>/.test(CONFIRM_SOURCE) &&
     /<AlertDialogAction[\s\S]{0,300}Yes\s*<\/AlertDialogAction>/.test(CONFIRM_SOURCE) &&
@@ -2699,7 +2718,7 @@ const gridHandler = SB_SOURCES.more.slice(
 check(
   "Send Back Trip is intercepted in the grid handler, and returns",
   `branch present: ${gridHandler.includes('if (id === "send-back")')}`,
-  /if \(id === "send-back"\)[\s\S]{0,900}setSendBackConfirmOpen\(true\);[\s\S]{0,60}return;/.test(
+  /if \(id === "send-back"\)[\s\S]{0,900}setSendBackReasonOpen\(true\);[\s\S]{0,60}return;/.test(
     gridHandler,
   ),
 );

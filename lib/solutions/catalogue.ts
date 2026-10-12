@@ -403,17 +403,17 @@ export const SOLUTIONS: Solution[] = [
     entry: {
       route: "/my-rides/1049800394/more",
       label:
-        "Tap Send Back Trip — a PRODUCTION tile, and the first one this prototype replaces rather than adds to. Production's own step 1 asks whether you mean it (No / Yes); the reason step follows, offering CS Tool DRIVER INITIATED reasons narrowed to the ones a driver can truthfully answer. This trip is short-notice, so production's $25 penalty warning ends the sequence. Continue sends it back and the ride leaves My Rides.",
+        "Tap Send Back Trip — a PRODUCTION tile, and the first one this prototype replaces rather than adds to. The reason comes FIRST, offering CS Tool DRIVER INITIATED reasons narrowed to the ones a driver can truthfully answer; then production's own 'strongly discouraged' popup (No / Yes); then, because this trip is short-notice, production's $25 penalty warning. ⚠️ Note the deviation: in the real app that discouragement popup is step 1 and nothing precedes it. Here the warnings escalate after the answer is given. Continue sends it back and the ride leaves My Rides.",
       alternates: [
         {
           route: "/my-rides/1049800395/more",
           label:
-            "An ADVANCE trip. Step 1 and the reason step, then NO warning at all — it goes straight back. Without this branch a reason form seen only on the way to a penalty screen cannot be told apart from part of the penalty screen.",
+            "An ADVANCE trip. Reason, then production's discouragement popup, and NO penalty warning at all. Without this branch a reason form seen only on the way to a penalty screen cannot be told apart from part of the penalty screen.",
         },
         {
           route: "/my-rides/1049800396/more",
           label:
-            "A STANDING ORDER (SO-4471, dialysis Mon/Wed/Fri). After the reason, a warning says so in as many words: sending back one trip can cost the whole standing order, and repeated send-backs risk suspension. ⚠️ Not in prototype yet: this copy is PROPOSED — production says nothing at all here today, which is the problem. ⛔ It warns, it does not block; a hard block is what sends drivers to Support in the first place.",
+            "A STANDING ORDER (SO-4471, dialysis Mon/Wed/Fri). Three screens: reason, then the standing-order warning, then production's own popup. The warning says in as many words what nothing in the app says today: sending back one trip can cost the whole standing order, and repeated send-backs risk suspension. ⚠️ Not in prototype yet: this copy is PROPOSED — production says nothing at all here today, which is the problem. ⛔ It warns, it does not block; a hard block is what sends drivers to Support in the first place.",
         },
       ],
     },

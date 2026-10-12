@@ -487,49 +487,45 @@ export function MoreOptionsScreen({
   }
 
   /**
-   * Step 1 answered "Yes". Open the reason form.
+   * The reason step is done — now the warnings, in escalating order.
    *
-   * ⚠️ Deferred a tick, like every other hand-off in this file: a dialog's
-   * dismissal is reported before the handler that caused it, and opening the
-   * next surface inside that window leaves the first one's scroll lock on.
-   */
-  function handleSendBackConfirmed() {
-    setSendBackConfirmOpen(false);
-    setTimeout(() => setSendBackReasonOpen(true), 0);
-  }
-
-  /**
-   * The reason step is done — now the warnings, in order of what they cost.
-   *
-   * ⛔⛔ **Standing order before penalty.** A standing order's cost is the ORDER
-   * — every future trip, and the account — while the penalty is money. Raising
-   * the money warning first and the severe one second would read as an
-   * escalation the driver has already tapped past.
+   * ⛔⛔ **Order set by the user 2026-10-13, and it moves a PRODUCTION screen.**
+   * The "strongly discouraged" popup is production's step 1 and in the real app
+   * nothing precedes it; here it comes third. The sequence escalates instead:
+   * the consequence specific to this trip, then the general discouragement,
+   * then the money. The rule is `sendBackSteps`; this follows it.
    *
    * ⚠️ The answers are HELD, not filed. Nothing has been sent back yet and the
-   * driver can still cancel at either warning — filing here would have produced
-   * a support record for a send-back that never happened.
+   * driver can still cancel at any of the three warnings — filing here would
+   * have produced a support record for a send-back that never happened.
    */
   function handleReasonCollected(values: Record<string, string>) {
     setSendBackValues(values);
+    // Defer a tick at every hand-off: a sheet or dialog reports its dismissal
+    // before the handler that caused it, and opening the next surface inside
+    // that window leaves the first one's scroll lock on.
     if (isStandingOrder(trip)) {
       setTimeout(() => setStandingOrderOpen(true), 0);
       return;
     }
-    if (isShortNoticeSendBack(trip)) {
-      setTimeout(() => setSendBackPenaltyOpen(true), 0);
-      return;
-    }
-    completeSendBack(values);
+    setTimeout(() => setSendBackConfirmOpen(true), 0);
   }
 
   /**
-   * The standing-order warning was accepted. Production's penalty warning still
-   * follows if this is also short-notice — two different consequences, and
-   * neither stands in for the other.
+   * The standing-order warning was accepted. Production's own discouragement
+   * popup follows — it is raised on every send-back, so there is no branch here.
    */
   function handleStandingOrderAccepted() {
     setStandingOrderOpen(false);
+    setTimeout(() => setSendBackConfirmOpen(true), 0);
+  }
+
+  /**
+   * Production's popup answered "Yes". The penalty warning follows only if this
+   * trip is short-notice; otherwise the send-back completes.
+   */
+  function handleSendBackConfirmed() {
+    setSendBackConfirmOpen(false);
     if (isShortNoticeSendBack(trip)) {
       setTimeout(() => setSendBackPenaltyOpen(true), 0);
       return;
@@ -592,7 +588,7 @@ export function MoreOptionsScreen({
        * thing no artifact in the vault quotes. `sendBackSteps` names it so the
        * gap is visible rather than implied away.
        */
-      setSendBackConfirmOpen(true);
+      setSendBackReasonOpen(true);
       return;
     }
     if (id === "auto-assign") {
@@ -702,7 +698,13 @@ export function MoreOptionsScreen({
 
       <SendBackConfirmDialog
         open={sendBackConfirmOpen}
-        onOpenChange={setSendBackConfirmOpen}
+        onOpenChange={(next) => {
+          setSendBackConfirmOpen(next);
+          // ⛔ "No" abandons the whole send-back, answers included — the same
+          // as Cancel on either warning either side of it. Three gates that
+          // disagreed about what backing out means would be worse than one.
+          if (!next) setSendBackValues(null);
+        }}
         onConfirm={handleSendBackConfirmed}
       />
       <SendBackReasonForm
