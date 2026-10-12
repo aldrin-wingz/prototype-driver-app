@@ -111,18 +111,18 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   },
   {
     value: ISSUE_AUTO_ASSIGN_REQUEST,
-    label: "Ask to Be Their Regular Driver",
+    label: "Member Requested Me as Preferred Driver",
     // ⚠️ No ⛔ in here. That marker is the repo's note-to-ourselves notation and
     // `description` is the one field on this type a DRIVER reads — the form
     // prints it under the title. Say the limit in words instead.
     description:
-      "For a member who wants you next time. Tell us who and why, and Support will ask the client to send you their future trips. Sending this does not assign, hold or claim anything — it asks.",
+      "For a member who has asked you to be their driver. Tell us who asked and when, and Support will take it to the client. Sending this does not assign, hold or claim anything — it asks.",
     // Hidden like the rest: the tile is on a ride, so the member is already
     // known by the time the form opens. A dropdown would make the driver name
     // a member the entry point was standing on.
     visibility: "hidden",
     buildState: "in-prototype",
-    note: "Entered from the 'Ask to be their regular driver' tile in More Options, with the member taken from that ride and locked. ⚠️ Deliberately THIN: `Project - Standing Order Offers` is the long-term home for driver-owned recurring work. This is the support request that absorbs the calls until that exists.",
+    note: "Entered from the 'Member requested me as preferred driver' tile in More Options, or from the prompt after the drop-off signature, with the member taken from that ride and locked. ⚠️ Deliberately THIN: `Project - Standing Order Offers` is the long-term home for driver-owned recurring work. This is the support request that absorbs the calls until that exists.",
   },
 ];
 

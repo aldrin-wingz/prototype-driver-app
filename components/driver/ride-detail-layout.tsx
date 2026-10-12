@@ -38,12 +38,17 @@ import {
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   getMissingAnchors,
+  routeDropOffSwipe,
   offeredSwipe,
   routeMissedSwipe,
   swipeNeedsConfirming,
   type SwipeAnchor,
 } from "@/lib/driver-data/missed-swipe-rules";
 import { OdometerReadingDialog } from "./odometer-reading-dialog";
+import { PreferredDriverPrompt } from "@/components/driver/preferred-driver-prompt";
+import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
+import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
+import { useSolution } from "@/lib/solutions/solution-context";
 import { RideSignatureScreen } from "./ride-signature-screen";
 import {
   MissedSwipePrompt,
@@ -300,7 +305,10 @@ export function RideDetailLayout({
     clearPostponedPickup,
     isTripConfirmed,
     confirmTrip,
+    preferredDriverOptOuts,
+    optOutOfPreferredDriverAsk,
   } = useRideFlow();
+  const { active } = useSolution();
 
   // Any swipe the driver made in this session, laid over the seed. Everything
   // below reads the overlaid trip, so a drop-off recorded a moment ago moves the
@@ -336,6 +344,8 @@ export function RideDetailLayout({
    */
   const [odometerOpen, setOdometerOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  const [preferredOpen, setPreferredOpen] = useState(false);
+  const [preferredFormOpen, setPreferredFormOpen] = useState(false);
   const [dropOffReading, setDropOffReading] = useState<number | null>(null);
   const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
     null
@@ -377,27 +387,30 @@ export function RideDetailLayout({
   function handleSwipeTap() {
     if (!activeLeg) return;
 
-    if (pickupPostponed && nextSwipe === "drop-off") {
-      setOdometerOpen(true);
-      return;
-    }
-
     if (nextSwipe === "pick-up" && swipeNeedsConfirming(activeLeg, "pickup")) {
       setPromptOpen(true);
       return;
     }
 
     /**
-     * ⛔⛔ Straight to the form, NOT to the drop-off sheet.
+     * ⛔⛔ **The routing lives in `routeDropOffSwipe`, not here.**
      *
-     * The sheet takes the member's signature, and on this path the member is
-     * already gone — that is the entire difference between ride 2 and 1a. A
-     * signature pad here would ask the driver to produce a signature from
-     * someone who is not in the car, and the honest outcome is the opposite:
-     * the leg ends COMPLETE with that signature recorded as missing, for good.
+     * Stage 05 takes the MEMBER's signature, so no path may reach it once they
+     * are out of the car — and until 2026-10-12 that was enforced by the shape
+     * of this function (only the postponed branch opened the steps) and
+     * asserted by counting call sites in this file's source. An ordinary
+     * drop-off now runs the steps too, because the signature screen was
+     * otherwise unreachable on every ordinary leg and row 09's end-of-leg
+     * prompt could never fire on its own demo ride. The guarantee is the same;
+     * it is a truth table now rather than a shape, and a check can run it.
      */
-    if (nextSwipe === "drop-off" && swipeNeedsConfirming(activeLeg, "dropoff")) {
-      fileMissedSwipe(activeLeg, null);
+    if (nextSwipe === "drop-off") {
+      const route = routeDropOffSwipe({
+        pickupPostponed,
+        trailChallengesDropOff: swipeNeedsConfirming(activeLeg, "dropoff"),
+      });
+      if (route === "steps") setOdometerOpen(true);
+      else fileMissedSwipe(activeLeg, null);
       return;
     }
 
@@ -472,8 +485,46 @@ export function RideDetailLayout({
       const remaining = getMissingAnchors(leg).filter(
         (anchor) => anchor !== "dropoff"
       );
-      if (remaining.length > 0) setMissedSwipeAsks(remaining);
+      if (remaining.length > 0) {
+        setMissedSwipeAsks(remaining);
+        return;
+      }
+      /**
+       * ⛔ Only once there is nothing left to reconstruct. A driver who still
+       * owes us a pick-up time is mid-correction, and stacking a second,
+       * unrelated question on top of that is how both get dismissed.
+       */
+      if (askPreferred) setPreferredOpen(true);
     }, 0);
+  }
+
+  /**
+   * Whether to ask about a preferred-driver request at the end of this leg.
+   *
+   * ⚠️ The rule itself is in `lib/driver-data/member-assignment.ts` — three
+   * conditions, one of which is that a different solution is not focused. Read
+   * here so the handler above stays a sequence rather than a second copy of it.
+   */
+  const askPreferred = shouldAskPreferredDriver({
+    trip,
+    activeSolutionId: active?.id ?? null,
+    suppressedMembers: preferredDriverOptOuts,
+  });
+
+  function handlePreferredAnswer({
+    requested,
+    optOut,
+  }: {
+    requested: boolean;
+    optOut: boolean;
+  }) {
+    setPreferredOpen(false);
+    // ⛔ Applied on BOTH answers — see the component's note.
+    if (optOut) optOutOfPreferredDriverAsk(trip.rider);
+    if (!requested) return;
+    // Defer a tick: vaul reports the dismissal before the handler that caused
+    // it, and opening the next sheet inside that window leaves the scroll lock on.
+    setTimeout(() => setPreferredFormOpen(true), 0);
   }
 
   const subtitle =
@@ -872,6 +923,18 @@ export function RideDetailLayout({
         onOpenChange={setOdometerOpen}
         onSubmit={handleOdometerSubmit}
       />
+      <PreferredDriverPrompt
+        member={trip.rider}
+        open={preferredOpen}
+        onOpenChange={setPreferredOpen}
+        onAnswer={handlePreferredAnswer}
+      />
+      <AutoAssignRequestForm
+        trip={trip}
+        open={preferredFormOpen}
+        onOpenChange={setPreferredFormOpen}
+      />
+
       <RideSignatureScreen
         open={signatureOpen}
         /*

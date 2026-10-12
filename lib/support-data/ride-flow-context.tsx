@@ -161,6 +161,21 @@ interface RideFlowValue {
    */
   isTripConfirmed: (tripId: string) => boolean;
   confirmTrip: (tripId: string) => void;
+
+  /**
+   * Members who have opted out of the preferred-driver question.
+   *
+   * ⛔⛔ **Keyed by MEMBER, not by trip or leg.** The relationship this asks
+   * about is a standing one — the member rides most weeks — so a per-trip flag
+   * would put the same question about the same person in front of the same
+   * driver every single week. That is how a prompt stops being read.
+   *
+   * ⚠️ Exposed as the raw list rather than a predicate, because the rule that
+   * reads it lives in `lib/driver-data/member-assignment.ts` with the other two
+   * conditions. A predicate here would be a third place the rule could differ.
+   */
+  preferredDriverOptOuts: string[];
+  optOutOfPreferredDriverAsk: (member: string) => void;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -193,6 +208,8 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [postponed, setPostponed] = useState<string[]>([]);
   // Trip ids the driver confirmed with the member this session.
   const [confirmed, setConfirmed] = useState<string[]>([]);
+  // Members who ticked "Don't ask again for this member".
+  const [preferredOptOuts, setPreferredOptOuts] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -259,8 +276,14 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         setConfirmed((previous) =>
           previous.includes(tripId) ? previous : [...previous, tripId]
         ),
+
+      preferredDriverOptOuts: preferredOptOuts,
+      optOutOfPreferredDriverAsk: (member) =>
+        setPreferredOptOuts((previous) =>
+          previous.includes(member) ? previous : [...previous, member]
+        ),
     }),
-    [records, swipeRevision, postponed, confirmed]
+    [records, swipeRevision, postponed, confirmed, preferredOptOuts]
   );
 
   return (

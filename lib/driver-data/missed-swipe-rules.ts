@@ -340,3 +340,43 @@ export function swipeClockFor(leg: TripLeg): string | null {
   );
   return newest.at ?? null;
 }
+
+/**
+ * Where tapping DROP OFF MEMBER goes.
+ *
+ * `"steps"` is the production sequence — odometer (Stage 04 Step 2), then both
+ * signatures (Stage 05). `"missed-swipe-form"` reconstructs a leg whose
+ * drop-off was never marked live.
+ *
+ * ⛔⛔ **The member's signature is the whole reason this is a rule and not an
+ * `if`.** Stage 05 takes a signature FROM THE MEMBER, so it can only run while
+ * they are still in the car. A drop-off the location trail cannot place is a
+ * drop-off that already happened somewhere else — the member is long gone — and
+ * sending that swipe to the signature pad would ask the driver to produce a
+ * signature from someone who is not there. The honest outcome there is that the
+ * member's signature is missing for good, which is what the form records.
+ *
+ * ⚠️ `pickupPostponed` wins over everything, and that is not an oversight: the
+ * driver has just told us in so many words that the member is in the car. It is
+ * the one case where the trail disagreeing with the swipe does not matter,
+ * because a human answered the question the trail was guessing at.
+ *
+ * ⛔ Extracted from `handleSwipeTap` on 2026-10-12, when an ordinary drop-off
+ * started running the steps too. Before that the rule was "only the postponed
+ * path opens them" and a check asserted it by counting call sites in the
+ * source. Counting call sites was always a proxy; what matters is that no path
+ * reaches Stage 05 with the member gone, and that is a truth table.
+ */
+export type DropOffRoute = "steps" | "missed-swipe-form";
+
+export function routeDropOffSwipe({
+  pickupPostponed,
+  trailChallengesDropOff,
+}: {
+  pickupPostponed: boolean;
+  /** `swipeNeedsConfirming(leg, "dropoff")` — the trail cannot place them there. */
+  trailChallengesDropOff: boolean;
+}): DropOffRoute {
+  if (pickupPostponed) return "steps";
+  return trailChallengesDropOff ? "missed-swipe-form" : "steps";
+}

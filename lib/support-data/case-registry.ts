@@ -743,8 +743,8 @@ export function buildSupportFormCase({
             {
               id: "assignmentReason",
               type: "select",
-              label: "Why should their trips come to you?",
-              shortLabel: "your reason",
+              label: "Who asked for you?",
+              shortLabel: "who asked",
               placeholder: "Select:",
               required: true,
               options: [...ASSIGNMENT_REASONS],
@@ -753,7 +753,7 @@ export function buildSupportFormCase({
             {
               id: "assignmentReasonOther",
               type: "text",
-              label: "Tell us why",
+              label: "Who asked?",
               placeholder: "In a few words",
               required: true,
               /**
@@ -774,7 +774,7 @@ export function buildSupportFormCase({
               type: "textarea",
               label: "Anything else Support should know? (optional)",
               placeholder:
-                "e.g. dialysis Tue/Thu mornings, or the family asked for the same driver each week",
+                "e.g. dialysis Tue/Thu mornings, or they asked again this week",
               maxLength: 500,
               showIf: ONLY_AUTO_ASSIGN,
             },

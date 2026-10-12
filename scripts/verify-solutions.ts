@@ -61,7 +61,10 @@ import {
   GROUP_RIDER_PREFIX,
   isGroupRide,
   MAX_REASON_LABEL_CHARS,
+  MAX_TILE_LABEL_CHARS,
   memberFilterOptions,
+  PREFERRED_DRIVER_SOLUTIONS,
+  shouldAskPreferredDriver,
 } from "../lib/driver-data/member-assignment";
 import { buildAutoAssignRequest } from "../components/support/auto-assign-request-form";
 import { getMemberOptions, MEMBER_WINDOW_DAYS } from "../lib/support-data/member-options";
@@ -321,8 +324,11 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *   - Request Feed member filter (row 10) — a member WITH trips posted, and a
  *     member with none. A filter that can only be seen finding something cannot
  *     be told apart from one that ignores its argument.
+ *   - Preferred driver (row 09) — the More Options tile, and the prompt raised
+ *     at the end of the leg. The second is the one the case is really about and
+ *     is on a different screen entirely.
  */
-const EXPECTED_ALTERNATES = 3;
+const EXPECTED_ALTERNATES = 4;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -560,7 +566,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 8;
+const EXPECTED_RIDE_ROUTES = 9;
 const EXPECTED_SURFACE_ROUTES = 2;
 check(
   "...and the two kinds of route were counted as declared",
@@ -1092,17 +1098,19 @@ const EXPECTED_GRIDS: Array<{
     focus: null,
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
-      "no-show", "cannot-reach", "auto-assign", "send-back",
+      "auto-assign", "no-show", "cannot-reach", "send-back",
     ],
     fullWidth: "send-back",
   },
   {
-    // Row 09 focused — the user's own worked example. Eight tiles, four clean
-    // rows of two, and ⛔ NO `cannot-reach`: it belongs to another build.
+    // Row 09 focused — the user's own worked example, in the order they asked
+    // for 2026-10-12: the proposal follows Add Event To Calendar, so Member
+    // No-Show and Send Back Trip end the grid side by side. Eight tiles, four
+    // clean rows of two, and ⛔ NO `cannot-reach`: it belongs to another build.
     focus: "auto-assign-request",
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
-      "no-show", "auto-assign", "send-back",
+      "auto-assign", "no-show", "send-back",
     ],
     fullWidth: null,
   },
@@ -1111,7 +1119,7 @@ const EXPECTED_GRIDS: Array<{
     focus: "request-feed-member-filter",
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
-      "no-show", "auto-assign", "send-back",
+      "auto-assign", "no-show", "send-back",
     ],
     fullWidth: null,
   },
@@ -1890,6 +1898,190 @@ check(
  * strip; `/requests` was found only because row 10 made it an entry route and
  * someone tried to switch solutions from it.
  */
+// ---- the case says the MEMBER asked, not the driver ----------------------
+
+/**
+ * ⛔⛔ **The whole case turns on whose request this is.** User direction
+ * 2026-10-12: *"I just want explicit that the member has agreed and it's not
+ * just the driver asking."* A label saying "ask to be their regular driver"
+ * describes a driver putting themselves forward, and Support would have had to
+ * establish consent before acting on any of it.
+ */
+for (const [what, text] of [
+  ["tile label", AUTO_ASSIGN_LABEL],
+  ["issue label", SUPPORT_ISSUE_TYPES.find((i) => i.value === ISSUE_AUTO_ASSIGN_REQUEST)!.label],
+] as const) {
+  check(
+    `the ${what} says the member requested, not that the driver is asking`,
+    text,
+    /member/i.test(text) && /request/i.test(text) && !/^ask\b/i.test(text),
+  );
+}
+check(
+  `the tile label fits three wrapped lines (<=${MAX_TILE_LABEL_CHARS})`,
+  `${AUTO_ASSIGN_LABEL.length} chars`,
+  AUTO_ASSIGN_LABEL.length <= MAX_TILE_LABEL_CHARS,
+);
+/**
+ * ⛔ And the reason field had to move with it. While the tile said the driver
+ * was asking, "The member asked me directly" was a reasonable option; once the
+ * tile says the member requested them, that option is the PREMISE, and offering
+ * it among five invites a driver to pick another and file a member request
+ * nobody made. The field now asks WHO asked.
+ */
+check(
+  "the reason field asks who asked, not why the driver wants it",
+  ASSIGN_CASE.fields.find((f) => f.id === "assignmentReason")!.label ?? "",
+  /who/i.test(ASSIGN_CASE.fields.find((f) => f.id === "assignmentReason")!.label ?? ""),
+);
+check(
+  "...and every option names a person who could have asked",
+  ASSIGNMENT_REASONS.map((o) => o.label).join(" | "),
+  ASSIGNMENT_REASONS.every((o) =>
+    /member|caregiver|family|facility|care team|someone/i.test(o.label),
+  ),
+);
+/**
+ * ⚠️ A caregiver or the facility speaking for a member is ordinary in NEMT and
+ * is NOT the same claim as the member asking in person. Support weighs them
+ * differently, so the form has to be able to tell them apart.
+ */
+check(
+  "the options distinguish the member themselves from someone speaking for them",
+  `${ASSIGNMENT_REASONS.filter((o) => /^the member/i.test(o.label)).length} direct of ${ASSIGNMENT_REASONS.length}`,
+  ASSIGNMENT_REASONS.some((o) => /^the member/i.test(o.label)) &&
+    ASSIGNMENT_REASONS.some((o) => /caregiver|family|facility|care team/i.test(o.label)),
+);
+
+// ---- the end-of-leg prompt -----------------------------------------------
+
+const PROMPT_SOURCE = readFileSync(
+  join(ROOT, "components/driver/preferred-driver-prompt.tsx"),
+  "utf8",
+);
+const DETAIL_SOURCE = readFileSync(
+  join(ROOT, "components/driver/ride-detail-layout.tsx"),
+  "utf8",
+);
+check("the prompt source was read", `${PROMPT_SOURCE.length} chars`, PROMPT_SOURCE.length > 1200);
+
+/**
+ * ⛔⛔ **It asks; it does not file.** Answering yes opens the same form the tile
+ * opens, with the member locked. A one-tap yes that submitted on its own would
+ * turn a prompt the driver barely read into a claim about what a member wanted.
+ */
+check(
+  "answering yes opens the shared form rather than filing anything",
+  "<AutoAssignRequestForm",
+  DETAIL_SOURCE.includes("<AutoAssignRequestForm") &&
+    !PROMPT_SOURCE.includes("submitForm"),
+);
+check(
+  "...and the prompt builds no case of its own",
+  `buildSupportFormCase occurrences: ${(PROMPT_SOURCE.match(/buildSupportFormCase/g) ?? []).length}`,
+  !PROMPT_SOURCE.includes("buildSupportFormCase"),
+);
+/** It fires after the signature, not before — the member has to be done first. */
+check(
+  "the prompt is raised from the signature handler, after the mark lands",
+  "handleSignatureSubmit -> recordSwipe -> setPreferredOpen",
+  /handleSignatureSubmit[\s\S]{0,900}recordSwipe\(leg, "droppedOffAt"[\s\S]{0,900}setPreferredOpen\(true\)/.test(
+    DETAIL_SOURCE,
+  ),
+);
+/**
+ * ⛔ And only once there is nothing left to reconstruct. A driver who still owes
+ * a pick-up time is mid-correction; stacking an unrelated question on that is
+ * how both get dismissed.
+ */
+check(
+  "...and never while a missed-swipe form is still owed",
+  "remaining.length > 0 returns before the ask",
+  /if \(remaining\.length > 0\) \{[\s\S]{0,160}return;[\s\S]{0,400}setPreferredOpen\(true\)/.test(
+    DETAIL_SOURCE,
+  ),
+);
+
+/**
+ * ⛔⛔ **The opt-out is per MEMBER, and applies on BOTH answers.** A standing
+ * order is a weekly ride, so a per-trip flag would ask the same driver about
+ * the same person every week. And a driver who ticks it then taps Yes has said
+ * "I've told you, stop asking" just as much as one who taps No.
+ */
+check(
+  "the opt-out is applied whichever way the driver answers",
+  "optOut before the requested branch",
+  /if \(optOut\) optOutOfPreferredDriverAsk\(trip\.rider\);[\s\S]{0,120}if \(!requested\) return;/.test(
+    DETAIL_SOURCE,
+  ),
+);
+check(
+  "...and it is keyed by the member, not the trip or the leg",
+  "optOutOfPreferredDriverAsk(trip.rider)",
+  DETAIL_SOURCE.includes("optOutOfPreferredDriverAsk(trip.rider)") &&
+    !/optOutOfPreferredDriverAsk\(trip\.id\)/.test(DETAIL_SOURCE),
+);
+
+/** The three conditions of the rule, as a table. */
+const ASK_TRIP = mockInProgressTrips.find((t) => t.id === "1049800393")!;
+const GROUP_TRIP = mockRequestTrips.find(isGroupRide)!;
+const ASK_CASES: Array<{ name: string; args: Parameters<typeof shouldAskPreferredDriver>[0]; expect: boolean }> = [
+  {
+    name: "row 09 focused, member not opted out",
+    args: { trip: ASK_TRIP, activeSolutionId: "auto-assign-request", suppressedMembers: [] },
+    expect: true,
+  },
+  {
+    name: "row 10 focused — same build, so still asked",
+    args: { trip: ASK_TRIP, activeSolutionId: "request-feed-member-filter", suppressedMembers: [] },
+    expect: true,
+  },
+  {
+    name: "nothing focused — the plain mirror filters nothing",
+    args: { trip: ASK_TRIP, activeSolutionId: null, suppressedMembers: [] },
+    expect: true,
+  },
+  {
+    name: "another prototype focused — a proposal stays in its own build",
+    args: { trip: ASK_TRIP, activeSolutionId: "missed-swipe", suppressedMembers: [] },
+    expect: false,
+  },
+  {
+    name: "the member opted out",
+    args: { trip: ASK_TRIP, activeSolutionId: null, suppressedMembers: [ASK_TRIP.rider] },
+    expect: false,
+  },
+  {
+    name: "a DIFFERENT member opted out — this one is still asked",
+    args: { trip: ASK_TRIP, activeSolutionId: null, suppressedMembers: ["SOMEONE ELSE"] },
+    expect: true,
+  },
+  {
+    name: "a multi-load — no one member to have a preference",
+    args: { trip: GROUP_TRIP, activeSolutionId: null, suppressedMembers: [] },
+    expect: false,
+  },
+];
+for (const c of ASK_CASES) {
+  check(
+    `ask the preferred-driver question — ${c.name}: ${c.expect}`,
+    `got ${shouldAskPreferredDriver(c.args)}`,
+    shouldAskPreferredDriver(c.args) === c.expect,
+  );
+}
+check(
+  "the ask table exercises both outcomes and all three conditions",
+  `${ASK_CASES.filter((c) => c.expect).length} yes / ${ASK_CASES.filter((c) => !c.expect).length} no of ${ASK_CASES.length}`,
+  ASK_CASES.some((c) => c.expect) && ASK_CASES.filter((c) => !c.expect).length >= 3,
+);
+/** The scope list is shared with the tile, not written out twice. */
+check(
+  "the prompt and the tile agree on which build this feature belongs to",
+  PREFERRED_DRIVER_SOLUTIONS.join(", "),
+  PREFERRED_DRIVER_SOLUTIONS.length === PROPOSAL_OWNERS["auto-assign"].length &&
+    PROPOSAL_OWNERS["auto-assign"].every((id) => PREFERRED_DRIVER_SOLUTIONS.includes(id)),
+);
+
 // ---- the two rows are one build ------------------------------------------
 
 const ROW_09 = SOLUTIONS.find((s) => s.id === "auto-assign-request")!;

@@ -83,6 +83,17 @@ interface OptionTile {
    */
   solutions?: string[];
   /**
+   * The production tile this proposal is inserted AFTER — proposals only.
+   *
+   * ⚠️ Per tile, not one global insertion point. The two proposals sit in
+   * different places on purpose: "I can't reach the member" follows Member
+   * No-Show, the other support-case tile it reads alongside; the preferred-
+   * driver tile follows Add Event To Calendar, so that **Member No-Show and
+   * Send Back Trip end the grid side by side** — user direction 2026-10-12.
+   * A single global rule could not produce both.
+   */
+  after?: string;
+  /**
    * Fill the glyph rather than stroking it.
    *
    * The capture shows all three plain glyphs as solid, but lucide is
@@ -195,8 +206,16 @@ const CANNOT_REACH_TILE: OptionTile = {
   // files a support request; the plain glyphs beside it open the dialer and the
   // mail app.
   variant: "filled",
-  color: DRIVER_NAVY,
+  /**
+   * ⚠️ Rose, not navy. User direction 2026-10-12: this tile should read as
+   * urgent. `DRIVER_ROSE_DEEP` is the token Member No-Show already uses for a
+   * filled consequential circle, so the grid gains no new colour — the two
+   * tiles that report something going wrong now look alike, and the navy ones
+   * stay the ordinary actions.
+   */
+  color: DRIVER_ROSE_DEEP,
   solutions: ["tag-number-invalid", "cannot-reach-member"],
+  after: "no-show",
 };
 
 /**
@@ -209,6 +228,8 @@ const AUTO_ASSIGN_TILE: OptionTile = {
   variant: "filled",
   color: DRIVER_NAVY,
   solutions: ["auto-assign-request", "request-feed-member-filter"],
+  // ⚠️ After the calendar, so No-Show and Send Back Trip pair up at the end.
+  after: "calendar",
 };
 
 /**
@@ -255,11 +276,16 @@ export function buildGridTiles(activeSolutionId: string | null): GridTile[] {
       (tile.solutions ?? []).includes(activeSolutionId)
   );
 
-  const packed = PRODUCTION_TILES.flatMap((tile) =>
-    // ⚠️ Inserted ABOVE `Send Back Trip`, never appended, so the destructive
-    // action stays last — where the capture has it and where a thumb expects it.
-    tile.id === "send-back" ? [...proposals, tile] : [tile]
-  );
+  /**
+   * ⚠️ Each proposal lands after the production tile it names, never appended
+   * and never all in one place. `Send Back Trip` has no proposal anchored to it
+   * and so stays LAST, where the capture has it and where a thumb expects a
+   * destructive action to be.
+   */
+  const packed = PRODUCTION_TILES.flatMap((tile) => [
+    tile,
+    ...proposals.filter((proposal) => proposal.after === tile.id),
+  ]);
 
   // ⛔ Derived here and nowhere else. The last tile is full-width only when
   // there is no partner for it; every other tile takes a column.

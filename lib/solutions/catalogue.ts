@@ -323,7 +323,14 @@ export const SOLUTIONS: Solution[] = [
     entry: {
       route: "/my-rides/1049800393/more",
       label:
-        "AMARA OKONKWO is onboard and has asked to be assigned to you. Tap 'Ask to be their regular driver'. The member is locked from this ride and the form prints the two trips you have already driven her in the last 30 days — the one checkable claim the request carries. Submitting changes nothing about any trip, and the toast says so.",
+        "AMARA OKONKWO is onboard and has asked you to be her driver. Tap 'Member requested me as preferred driver'. The member is locked from this ride and the form prints the two trips you have already driven her in the last 30 days — the one checkable claim the request carries. It asks WHO asked, because a caregiver or the facility speaking for a member is a different claim from the member asking in person. Submitting changes nothing about any trip, and the toast says so.",
+      alternates: [
+        {
+          route: "/my-rides/1049800393",
+          label:
+            "The second door, and the better one: tap DROP OFF MEMBER, enter an odometer reading and sign both panels. Once the leg is complete the app asks whether she requested you — which is the moment the driver actually knows, rather than expecting them to remember and go hunting for a tile afterwards. ⛔ Answering yes opens the same form; it files nothing on its own. 'Don't ask again for this member' is per MEMBER, because a standing order is a weekly ride.",
+        },
+      ],
     },
   },
   {

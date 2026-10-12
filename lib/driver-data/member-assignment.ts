@@ -17,8 +17,27 @@ import type { SupportFieldOption } from "@/types/support";
  * absorbs is the phone call that chases it.
  */
 
-/** The More Options tile, and what the form calls itself. */
-export const AUTO_ASSIGN_LABEL = "Ask to be their regular driver";
+/**
+ * The More Options tile, and what the form calls itself.
+ *
+ * ⛔⛔ **"Member requested" — the MEMBER asked, not the driver.** The earlier
+ * wording, "Ask to be their regular driver", described a driver putting
+ * themselves forward, and Support would have had to establish consent before
+ * acting on any of it. User direction 2026-10-12: *"I just want explicit that
+ * the member has agreed and it's not just the driver asking."* The whole case
+ * reads differently as a result — see `PREFERRED_REQUESTERS`, which asks WHO
+ * asked rather than why the driver wants it.
+ */
+export const AUTO_ASSIGN_LABEL = "Member requested me as preferred driver";
+
+/**
+ * ⚠️ The longest label on the More Options grid, by some way — the production
+ * tiles top out at 24 characters ("Map to Drop-off Location"). The label box is
+ * `max-w-[150px]` inside a `min-h-[168px]` tile, which holds three wrapped
+ * lines; this one takes all three. Capped so the next edit cannot quietly push
+ * it to four and overflow the cell.
+ */
+export const MAX_TILE_LABEL_CHARS = 40;
 
 /**
  * ⛔⛔ **Filing this changes nothing about any trip** — not the one it was filed
@@ -43,18 +62,28 @@ export const MAX_REASON_LABEL_CHARS = 34;
 export const ASSIGNMENT_REASON_OTHER = "other";
 
 /**
- * Why the driver thinks they should get this member's future trips.
+ * **Who asked**, and when.
  *
- * ⚠️ These are what Support has to weigh, so they are categories rather than
- * free text: "the member asked" and "I already drive them" are different claims
- * and the second one is checkable against the ride history the request carries.
+ * ⛔⛔ **This replaced a list of the driver's REASONS**, and the swap followed
+ * directly from renaming the case. The old options were "the member asked me
+ * directly", "I already drive them most weeks", "they need help I'm set up
+ * for" — a driver arguing their own case. Once the tile says the member
+ * requested them, "the member asked me directly" is the PREMISE, and a form
+ * offering it as one option among five invites a driver to pick a different one
+ * and file a member request nobody made.
+ *
+ * So the question is now the one piece of evidence Support actually needs: who
+ * made the request. ⚠️ A caregiver, a family member or the facility's care team
+ * speaking for a member is ordinary in NEMT and is not the same claim as the
+ * member asking in person — Support weighs them differently, so the form must
+ * be able to tell them apart.
  */
 export const ASSIGNMENT_REASONS: SupportFieldOption[] = [
-  { value: "member-asked", label: "The member asked me directly" },
-  { value: "already-regular", label: "I already drive them most weeks" },
-  { value: "equipment", label: "They need help I'm set up for" },
-  { value: "standing-appointment", label: "Same appointment every week" },
-  { value: ASSIGNMENT_REASON_OTHER, label: "Something else" },
+  { value: "member-this-ride", label: "The member, on this ride" },
+  { value: "member-earlier", label: "The member, on an earlier ride" },
+  { value: "caregiver", label: "A family member or caregiver" },
+  { value: "facility", label: "The facility or care team" },
+  { value: ASSIGNMENT_REASON_OTHER, label: "Someone else" },
 ];
 
 /**
@@ -102,3 +131,56 @@ export function filterRequestsByMember(trips: Trip[], member: string): Trip[] {
   if (!member) return trips;
   return trips.filter((trip) => !isGroupRide(trip) && trip.rider === member);
 }
+
+
+/**
+ * Whether to ask, at the end of a leg, if this member requested the driver.
+ *
+ * ⛔⛔ **Three conditions, and all three are the point.**
+ *
+ * **The feature is in scope.** A proposal must not surface while a different
+ * solution is focused — the same rule the More Options grid follows. `null`
+ * means the plain mirror, where nothing is filtered.
+ *
+ * **The member has not opted out of being asked.** "Don't ask again for this
+ * member" is per MEMBER, not per trip or per leg: a standing order is a weekly
+ * ride, so a per-trip flag would ask the same driver the same question about
+ * the same person every week — which is the behaviour that makes people stop
+ * reading prompts.
+ *
+ * **There is a member to ask about.** A multi-load has no one member, so there
+ * is no preferred-driver relationship to report.
+ */
+export function shouldAskPreferredDriver({
+  trip,
+  activeSolutionId,
+  suppressedMembers,
+}: {
+  trip: Trip;
+  activeSolutionId: string | null;
+  suppressedMembers: string[];
+}): boolean {
+  if (activeSolutionId !== null && !PREFERRED_DRIVER_SOLUTIONS.includes(activeSolutionId)) {
+    return false;
+  }
+  if (isGroupRide(trip)) return false;
+  return !suppressedMembers.includes(trip.rider);
+}
+
+/**
+ * The catalogue rows this proposal belongs to.
+ *
+ * Both rows, because 09 and 10 are ONE build — the same list the More Options
+ * tile and the scenario rides carry, and declared once here so the three cannot
+ * drift into disagreeing about which prototype this feature is part of.
+ */
+export const PREFERRED_DRIVER_SOLUTIONS = [
+  "auto-assign-request",
+  "request-feed-member-filter",
+];
+
+/** The question the end-of-leg prompt asks. */
+export const PREFERRED_DRIVER_QUESTION = "Did they ask for you next time?";
+
+/** The opt-out beside it. */
+export const PREFERRED_DRIVER_SUPPRESS_LABEL = "Don't ask again for this member";

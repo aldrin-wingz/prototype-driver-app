@@ -27,6 +27,8 @@ import {
   swipeClockFor,
   swipeNeedsConfirming,
   type SwipeAnchor,
+  routeDropOffSwipe,
+  type DropOffRoute,
 } from "../lib/driver-data/missed-swipe-rules";
 import {
   mockInProgressTrips,
@@ -679,15 +681,70 @@ check("the mark lands only once the signature is submitted",
  * someone who is not there, when the honest outcome is that it is missing for
  * good. The postponed branch is the ONLY one that opens it.
  */
-check("only the postponed path opens the drop-off steps",
-  /pickupPostponed && nextSwipe === "drop-off"[\s\S]{0,120}setOdometerOpen\(true\)/.test(CODE),
-  "the steps are not gated on the postponed path");
-check("...and an unpostponed drop-off goes straight to the form",
-  /nextSwipe === "drop-off" && swipeNeedsConfirming[\s\S]{0,400}fileMissedSwipe\(activeLeg, null\)/.test(CODE),
-  "ride 2 is sent to the signature sheet");
-check("the drop-off steps are opened from exactly one place",
-  (CODE.match(/setOdometerOpen\(true\)/g) ?? []).length === 1,
-  `${(CODE.match(/setOdometerOpen\(true\)/g) ?? []).length} call sites`);
+/**
+ * ⛔⛔ **The truth table, not a call-site count.**
+ *
+ * This was three source regexes: the steps are gated on `pickupPostponed`, an
+ * unpostponed drop-off goes to the form, and `setOdometerOpen(true)` appears
+ * exactly once. All three were PROXIES for one guarantee — Stage 05 never runs
+ * with the member out of the car — and the proxy broke on 2026-10-12 when an
+ * ordinary drop-off legitimately started running the steps too. The check
+ * failed while the guarantee held, which is the worst kind of failure: it
+ * argues for weakening the check.
+ *
+ * `routeDropOffSwipe` is the rule now, in lib, and this enumerates every input
+ * it has.
+ */
+const DROPOFF_ROUTES: Array<{
+  pickupPostponed: boolean;
+  trailChallengesDropOff: boolean;
+  expect: DropOffRoute;
+  why: string;
+}> = [
+  {
+    pickupPostponed: true, trailChallengesDropOff: false, expect: "steps",
+    why: "1a — the driver said the member is in the car",
+  },
+  {
+    pickupPostponed: true, trailChallengesDropOff: true, expect: "steps",
+    why: "1a, trail disagreeing — a human already answered what it is guessing at",
+  },
+  {
+    pickupPostponed: false, trailChallengesDropOff: true, expect: "missed-swipe-form",
+    why: "ride 2 — the trail cannot place them, so the member is long gone",
+  },
+  {
+    pickupPostponed: false, trailChallengesDropOff: false, expect: "steps",
+    why: "an ordinary drop-off — production's own sequence",
+  },
+];
+for (const row of DROPOFF_ROUTES) {
+  check(
+    `drop-off routing: postponed=${row.pickupPostponed} challenged=${row.trailChallengesDropOff} -> ${row.expect}`,
+    routeDropOffSwipe(row) === row.expect,
+    `${row.why} — got ${routeDropOffSwipe(row)}`,
+  );
+}
+check("the routing table covers every input, and both outcomes occur",
+  DROPOFF_ROUTES.length === 4 &&
+    DROPOFF_ROUTES.some((r) => r.expect === "steps") &&
+    DROPOFF_ROUTES.some((r) => r.expect === "missed-swipe-form"),
+  `${DROPOFF_ROUTES.length} of 4 combinations`);
+/**
+ * ⛔⛔ **The guarantee itself**, stated once: there is NO input on which the
+ * member's signature is asked for when the trail says they already left and no
+ * human has said otherwise.
+ */
+check("Stage 05 is never reached with the member gone and nobody vouching",
+  !DROPOFF_ROUTES.some(
+    (r) => !r.pickupPostponed && r.trailChallengesDropOff && routeDropOffSwipe(r) === "steps",
+  ),
+  "a path reaches the member's signature pad after they have left");
+/** And the screen still goes through the rule rather than around it. */
+check("the ride detail routes drop-offs through the rule, not an inline branch",
+  CODE.includes("routeDropOffSwipe({") &&
+    !/nextSwipe === "drop-off" && swipeNeedsConfirming/.test(CODE),
+  "the branch is still inline");
 /** Element-level, straight off the captures. */
 check("the odometer popup carries production's own copy",
   ODO.includes("Odometer Reading") &&
