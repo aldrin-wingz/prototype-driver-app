@@ -47,6 +47,7 @@ export const ISSUE_CANCEL_AT_DOOR = "cancel-at-door";
 export const ISSUE_MISSED_SWIPE = "missed-swipe";
 export const ISSUE_CANNOT_REACH_MEMBER = "cannot-reach-member";
 export const ISSUE_AUTO_ASSIGN_REQUEST = "auto-assign-request";
+export const ISSUE_SEND_BACK_REASON = "send-back-reason";
 
 /**
  * The support issues a driver can file.
@@ -123,6 +124,25 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Entered from the 'Member requested me as preferred driver' tile in More Options, or from the prompt after the drop-off signature, with the member taken from that ride and locked. ⚠️ Deliberately THIN: `Project - Standing Order Offers` is the long-term home for driver-owned recurring work. This is the support request that absorbs the calls until that exists.",
+  },
+  {
+    value: ISSUE_SEND_BACK_REASON,
+    /**
+     * ⛔ Present tense, deliberately. "Why You Sent This Trip Back" titled the
+     * sheet in the PAST at the exact moment the rest of the design is careful
+     * to say nothing has happened yet — the button says "Continue", not
+     * "Submit", and the penalty warning after it still asks "are you sure".
+     * A title claiming the trip was already sent contradicts both. Found by
+     * walking; no gate can see a tense.
+     */
+    label: "Sending This Trip Back",
+    description:
+      "Tell us why you cannot take this trip. Support uses this to decide what happens to it next, and nobody has to ring you to ask.",
+    // Hidden like the rest: reached by tapping Send Back Trip, which already
+    // knows the trip and the issue.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "A step inside the SEND BACK flow, not a support case the driver chooses. Reasons are production's own CS Tool `DRIVER INITIATED` list, narrowed to the ones a driver can truthfully answer. ⛔ Does NOT bypass any block and does not change the penalty — the Standing Order block and the scoring policy are both out of scope by user direction.",
   },
 ];
 

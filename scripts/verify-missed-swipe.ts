@@ -258,6 +258,13 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   // at all, so the trail has nothing to challenge the drop-off with, which is
   // the same reason `1049800376` is quiet.
   "1049800393": "none",   // no trail
+  // ⚠️ Row 13's two send-back rides (`13a` short-notice, `13b` advance). Both
+  // accepted and unstarted with no `locationRecords`, so the next swipe is the
+  // START and there is no trail to challenge it with. Declared rather than left
+  // to fall through — an undeclared ride here is one whose swipe behaviour
+  // nobody decided.
+  "1049800394": "none",
+  "1049800395": "none",
   [RIDE_1]: "pickup",
   [RIDE_2]: "dropoff",
 };
@@ -277,7 +284,7 @@ check("every in-progress ride was swept",
   `${swept} ridden, ${Object.keys(EXPECTED_TRIGGER).length} declared`);
 check("the sweep covers rides that DO and DO NOT trigger",
   Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length === 3 &&
-    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 5,
+    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 7,
   `${Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length} fire of ${swept}`);
 
 // ⛔ The two rides that stay quiet AT the pick-up must be quiet for the right

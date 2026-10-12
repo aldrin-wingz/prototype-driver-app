@@ -70,6 +70,20 @@ import {
   shouldAskPreferredDriver,
 } from "../lib/driver-data/member-assignment";
 import { buildAutoAssignRequest } from "../components/support/auto-assign-request-form";
+import { buildSendBackReason } from "../components/support/send-back-reason-form";
+import {
+  CS_TOOL_DRIVER_INITIATED_REASONS,
+  dedupedDriverInitiatedReasons,
+  DRIVER_ANSWERABLE_REASONS,
+  isShortNoticeSendBack,
+  MAX_SEND_BACK_LABEL_CHARS,
+  SEND_BACK_CONFIRM_BUILT,
+  SEND_BACK_PENALTY_USD,
+  SEND_BACK_REASON_OTHER,
+  sendBackReasonOptions,
+  sendBackSteps,
+} from "../lib/driver-data/send-back-reasons";
+import { ISSUE_SEND_BACK_REASON } from "../lib/support-data/issue-types";
 import { getMemberOptions, MEMBER_WINDOW_DAYS } from "../lib/support-data/member-options";
 import { areRequiredFieldsFilled, isFieldVisible } from "../lib/support/field-rules";
 import { solutionHref } from "../lib/solutions/solution-context";
@@ -330,8 +344,12 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *   - Preferred driver (row 09) — the More Options tile, and the prompt raised
  *     at the end of the leg. The second is the one the case is really about and
  *     is on a different screen entirely.
+ *   - Send-back (row 13) — a SHORT-NOTICE trip, which reaches production's
+ *     penalty warning, and an ADVANCE one, which does not. A reason form only
+ *     ever seen on the way to a penalty screen cannot be told apart from part
+ *     of that screen.
  */
-const EXPECTED_ALTERNATES = 4;
+const EXPECTED_ALTERNATES = 5;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -473,7 +491,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 10;
+const EXPECTED_SCENARIO_RIDES = 12;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -569,7 +587,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 9;
+const EXPECTED_RIDE_ROUTES = 11;
 const EXPECTED_SURFACE_ROUTES = 2;
 check(
   "...and the two kinds of route were counted as declared",
@@ -635,6 +653,9 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // would read as built while having nothing of its own to show.
   "auto-assign-request": 1,
   "request-feed-member-filter": 1,
+  // Two, and the second is the negative control: `13a` short-notice (penalty),
+  // `13b` advance (none).
+  "send-back-reason-form": 2,
 };
 /**
  * ⚠️ A SECOND tab, declared separately rather than folded into the map above
@@ -1388,6 +1409,7 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   // which is the whole point of this rule.
   "auto-assign-request": "in-progress",
   "request-feed-member-filter": "in-progress",
+  "send-back-reason-form": "in-progress",
 };
 check(
   "every built row declares the tab it lands on",
@@ -2207,6 +2229,348 @@ check(
   ROW_09.proposedFeature.slice(-90),
   ROW_09.proposedFeature.includes("⚠️ Not in prototype yet") &&
     ROW_09.proposedFeature.includes("Standing Order Offers"),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n12. Send-back — row 13, a reason on every send-back");
+// ---------------------------------------------------------------------------
+
+const SB_SOURCES = {
+  rules: readFileSync(join(ROOT, "lib/driver-data/send-back-reasons.ts"), "utf8"),
+  form: readFileSync(join(ROOT, "components/support/send-back-reason-form.tsx"), "utf8"),
+  penalty: readFileSync(join(ROOT, "components/driver/send-back-penalty-dialog.tsx"), "utf8"),
+  more: readFileSync(join(ROOT, "components/driver/more-options-screen.tsx"), "utf8"),
+  rides: readFileSync(join(ROOT, "app/my-rides/page.tsx"), "utf8"),
+};
+for (const [name, src] of Object.entries(SB_SOURCES)) {
+  check(`the ${name} source was read`, `${src.length} chars`, src.length > 900);
+}
+
+// ---- the reason list is PRODUCTION'S, not invented -----------------------
+
+/**
+ * ⛔⛔ **The single most important check in this section.** The reasons are
+ * production's own CS Tool `DRIVER INITIATED` strings, captured in
+ * `Project - CS Tool React Migration/Phase 1/References/Screenshot Context
+ * Log.md`. Every reason a driver is offered must appear in that array by EXACT
+ * string — not paraphrased, not re-cased, not "close enough".
+ */
+const invented = DRIVER_ANSWERABLE_REASONS.filter(
+  (r) => !CS_TOOL_DRIVER_INITIATED_REASONS.includes(r),
+);
+check(
+  "every offered reason is a verbatim production string",
+  invented.length
+    ? `INVENTED: ${invented.join(", ")}`
+    : `${DRIVER_ANSWERABLE_REASONS.length} of ${CS_TOOL_DRIVER_INITIATED_REASONS.length} captured strings offered`,
+  invented.length === 0,
+);
+check(
+  "...and the captured list is seeded WITH its duplication, as evidence",
+  `${CS_TOOL_DRIVER_INITIATED_REASONS.length} captured, ${dedupedDriverInitiatedReasons().length} distinct`,
+  CS_TOOL_DRIVER_INITIATED_REASONS.length === 22 &&
+    // ⚠️ FOUR `OTHER`s in the DRIVER INITIATED list (entries 3, 9, 10, 11), so
+    // 22 captured collapse to 19 distinct. The project's open question says
+    // "`OTHER` ~6×" — that count is across ALL THREE categories; this list is
+    // one of them. Both literals are declared so the pair cannot drift.
+    CS_TOOL_DRIVER_INITIATED_REASONS.filter((r) => r === "OTHER").length === 4 &&
+    dedupedDriverInitiatedReasons().length === 19,
+);
+/**
+ * ⛔ The narrowing is the point, so it has to be visible. If the allow-list ever
+ * equals the captured list, someone has quietly handed a driver an agent's
+ * vocabulary — `DRIVER NO SHOW`, `vehicle shortage`, `REQUESTED BY VERIDA`.
+ */
+const AGENT_ONLY = [
+  "TRANSFER TO ANOTHER DRIVER", "DRIVER NO SHOW", "DRIVER CANCELLED",
+  "REQUESTED BY VERIDA", "MEDIFAM ER", "RidesCanceledbyTP",
+  "vehicle shortage", "driver shortage", "too many trips",
+  "too much volume with same time period", "wrong level of service assigned",
+  "outside operational hours", "member no longer attends",
+];
+const leakedAgent = AGENT_ONLY.filter((r) => DRIVER_ANSWERABLE_REASONS.includes(r));
+check(
+  "no agent-only reason is offered to a driver",
+  leakedAgent.length
+    ? leakedAgent.join(", ")
+    : `${AGENT_ONLY.length} agent-only string(s) withheld of ${CS_TOOL_DRIVER_INITIATED_REASONS.length} captured`,
+  leakedAgent.length === 0,
+);
+check(
+  "...and the narrowing actually narrows",
+  `${DRIVER_ANSWERABLE_REASONS.length} offered of ${dedupedDriverInitiatedReasons().length} distinct`,
+  DRIVER_ANSWERABLE_REASONS.length < dedupedDriverInitiatedReasons().length,
+);
+/** The driver-facing wording is a relabel; the VALUE stays production's. */
+const opts = sendBackReasonOptions();
+check(
+  "the stored value is production's string even where the label is not",
+  `${opts.filter((o) => o.label !== o.value).length} of ${opts.length} relabelled`,
+  opts.every((o) => CS_TOOL_DRIVER_INITIATED_REASONS.includes(o.value)) &&
+    opts.some((o) => o.label !== o.value),
+);
+const sbTooLong = opts.filter((o) => o.label.length > MAX_SEND_BACK_LABEL_CHARS);
+check(
+  `every reason label fits the un-wrapping select (<=${MAX_SEND_BACK_LABEL_CHARS})`,
+  sbTooLong.length
+    ? sbTooLong.map((o) => `${o.label} (${o.label.length})`).join(" | ")
+    : `longest ${Math.max(...opts.map((o) => o.label.length))} of ${opts.length}`,
+  sbTooLong.length === 0,
+);
+
+// ---- the field is not the warehouse's `sendback_calculation_reason` -------
+
+/**
+ * ⛔⛔ `sendback_calculation_reason` is the warehouse's PENALTY RULE, and the
+ * Balance Dashboard already prints it as "the send-back reason". Naming this
+ * field `sendBackReason` would invite someone to join two unrelated things.
+ */
+const SB_CASE = buildSupportFormCase({
+  includeIssues: [ISSUE_SEND_BACK_REASON],
+  sendBack: true,
+});
+const sbIds = SB_CASE.fields.map((f) => f.id);
+check(
+  "the driver's answer is `returnReason`, not `sendBackReason`",
+  sbIds.filter((id) => /eason/i.test(id)).join(", "),
+  sbIds.includes("returnReason") && !sbIds.some((id) => /sendBackReason/i.test(id)),
+);
+check(
+  "...and the collision is written down where the field is defined",
+  "sendback_calculation_reason named in lib",
+  SB_SOURCES.rules.includes("sendback_calculation_reason"),
+);
+
+// ---- the copy does not claim the trip has gone -------------------------
+
+/**
+ * ⛔⛔ **Nothing on this form may speak in the past tense.** It is a STEP: the
+ * driver is mid-send-back, the button says Continue, and a penalty warning
+ * after it still asks whether they are sure. The first draft titled the sheet
+ * "Why You Sent This Trip Back" — telling the driver it was already done, on
+ * the one screen whose whole design says it is not. Found by walking; no gate
+ * can see a tense.
+ */
+const SB_ISSUE = SUPPORT_ISSUE_TYPES.find((i) => i.value === ISSUE_SEND_BACK_REASON)!;
+const PAST_TENSE = /\b(you sent|sent this trip|has been sent|was sent)\b/i;
+const sbCopy = [
+  ["issue label", SB_ISSUE.label],
+  ["issue description", SB_ISSUE.description],
+  ...SB_CASE.fields.flatMap((f) =>
+    [
+      ["field label", f.label],
+      ["help text", f.helpText],
+    ].filter((pair): pair is [string, string] => Boolean(pair[1])),
+  ),
+] as Array<[string, string]>;
+const pastTense = sbCopy.filter(([, text]) => PAST_TENSE.test(text));
+check(
+  "no copy on the send-back form says the trip has already gone",
+  pastTense.length
+    ? pastTense.map(([what, text]) => `${what}: "${text}"`).join(" | ")
+    : `${sbCopy.length} string(s) checked, all present-tense`,
+  pastTense.length === 0,
+);
+check(
+  "...and the sweep looked at a real number of strings",
+  `${sbCopy.length} string(s)`,
+  sbCopy.length >= 5,
+);
+
+// ---- the case ------------------------------------------------------------
+
+const sbValues = { issue: ISSUE_SEND_BACK_REASON };
+const sbVisible = SB_CASE.fields.filter((f) => isFieldVisible(f, sbValues)).map((f) => f.id);
+const EXPECTED_SB_FIELDS = ["issue", "returnReason", "returnNotes"];
+check(
+  "the case renders exactly the declared field set",
+  `${sbVisible.length} of ${SB_CASE.fields.length} visible: ${sbVisible.join(", ")}`,
+  sbVisible.length === EXPECTED_SB_FIELDS.length &&
+    EXPECTED_SB_FIELDS.every((id, i) => sbVisible[i] === id),
+);
+check(
+  "the free-text escape hatch is gated on OTHER being picked",
+  `visible with OTHER: ${isFieldVisible(SB_CASE.fields.find((f) => f.id === "returnReasonOther")!, { ...sbValues, returnReason: SEND_BACK_REASON_OTHER })}`,
+  isFieldVisible(SB_CASE.fields.find((f) => f.id === "returnReasonOther")!, {
+    ...sbValues,
+    returnReason: SEND_BACK_REASON_OTHER,
+  }) &&
+    !isFieldVisible(SB_CASE.fields.find((f) => f.id === "returnReasonOther")!, {
+      ...sbValues,
+      returnReason: "weather",
+    }),
+);
+/**
+ * ⛔⛔ **"Continue", not "Submit".** This form is a STEP — the driver is
+ * mid-send-back and the next screen asks whether they are sure. A button saying
+ * Submit would tell them they had just sent something, on the one case where
+ * they have not.
+ */
+check(
+  "the send-back reason form says Continue, and every other case says Submit",
+  `${SB_CASE.submitLabel} vs ${buildSupportFormCase().submitLabel}`,
+  SB_CASE.submitLabel === "Continue" &&
+    buildSupportFormCase().submitLabel === "Submit" &&
+    ASSIGN_CASE.submitLabel === "Submit",
+);
+check(
+  "...and the form files nothing itself — it hands its answers back",
+  `submitForm in the reason form: ${SB_SOURCES.form.includes("submitForm")}`,
+  !SB_SOURCES.form.includes("submitForm") &&
+    SB_SOURCES.form.includes("onCollected"),
+);
+
+// ---- the flow ------------------------------------------------------------
+
+const SHORT = mockInProgressTrips.find((t) => t.id === "1049800394")!;
+const ADVANCE = mockInProgressTrips.find((t) => t.id === "1049800395")!;
+check(
+  "row 13's two scenario rides are seeded and tagged",
+  `${SHORT?.scenario?.code} short-notice=${isShortNoticeSendBack(SHORT)} | ${ADVANCE?.scenario?.code} short-notice=${isShortNoticeSendBack(ADVANCE)}`,
+  isScenarioFor(SHORT, "send-back-reason-form") &&
+    isScenarioFor(ADVANCE, "send-back-reason-form") &&
+    isShortNoticeSendBack(SHORT) &&
+    !isShortNoticeSendBack(ADVANCE),
+);
+/**
+ * ⛔⛔ **The penalty warning is production's and appears ONLY for a short-notice
+ * send-back** — "The popup appears only for short-notice trip send backs."
+ * Without the advance branch, a reason form seen only on the way to a penalty
+ * screen is indistinguishable from part of that screen.
+ */
+check(
+  "a short-notice send-back reaches the penalty step; an advance one does not",
+  `${sendBackSteps(SHORT).join(" → ")} | ${sendBackSteps(ADVANCE).join(" → ")}`,
+  sendBackSteps(SHORT).includes("penalty") &&
+    !sendBackSteps(ADVANCE).includes("penalty"),
+);
+check(
+  "the reason step sits BEFORE the penalty step, not after it",
+  sendBackSteps(SHORT).join(" → "),
+  sendBackSteps(SHORT).indexOf("reason") < sendBackSteps(SHORT).indexOf("penalty"),
+);
+/**
+ * ⛔ Production's step 1 is NOT built — no artifact in the vault quotes its
+ * copy. Asserted explicitly so the prototype does not quietly imply production
+ * has one fewer step than it does.
+ */
+check(
+  "production's step 1 is declared unbuilt rather than silently omitted",
+  `SEND_BACK_CONFIRM_BUILT=${SEND_BACK_CONFIRM_BUILT}`,
+  SEND_BACK_CONFIRM_BUILT === false &&
+    !sendBackSteps(SHORT).includes("confirm"),
+);
+
+// ---- the penalty copy is production's, verbatim --------------------------
+
+/**
+ * ⭐⭐ Lifted from `Other/NEMT Driver App/Other - NEMT Driver App - Short-notice
+ * sendback popup copy update.md`, the "Update (step 2)" block. Asserted
+ * phrase-by-phrase because this is the one screen in the slice whose WORDS are
+ * production's — the layout is not, since no screenshot of it exists anywhere.
+ */
+const PENALTY_PHRASES = [
+  "If you send back this trip:",
+  "penalty will be applied and will be offered as a bonus for another driver to accept the trip",
+  "If the member ends up missing their appointment, your account may be subject to deactivation",
+  "Trips sent back earlier are less likely to result in penalties",
+  "Are you sure you want to proceed?",
+];
+const missingPhrases = PENALTY_PHRASES.filter(
+  (phrase) => !SB_SOURCES.penalty.replace(/\s+/g, " ").includes(phrase),
+);
+check(
+  "the penalty popup carries production's own copy, verbatim",
+  missingPhrases.length
+    ? `MISSING: ${missingPhrases.join(" | ")}`
+    : `${PENALTY_PHRASES.length} of ${PENALTY_PHRASES.length} phrases present`,
+  missingPhrases.length === 0,
+);
+check(
+  "...and Cancel / Continue are the actions the story names",
+  "AlertDialogCancel>Cancel + AlertDialogAction>Continue",
+  /<AlertDialogCancel[\s\S]{0,200}Cancel\s*<\/AlertDialogCancel>/.test(SB_SOURCES.penalty) &&
+    /<AlertDialogAction[\s\S]{0,300}Continue\s*<\/AlertDialogAction>/.test(SB_SOURCES.penalty),
+);
+check(
+  "the penalty amount is seeded, not hardcoded into the copy",
+  `$${SEND_BACK_PENALTY_USD}`,
+  SB_SOURCES.penalty.includes("SEND_BACK_PENALTY_USD") &&
+    !/\$25/.test(SB_SOURCES.penalty),
+);
+
+// ---- the trip actually leaves ---------------------------------------------
+
+/**
+ * ⛔⛔ **The first thing in this prototype that REMOVES a ride.** Every other
+ * slice annotates a trip. A driver who sends one back is returned to My Rides,
+ * and a trip still sitting there would read as the send-back having failed.
+ */
+check(
+  "a sent-back trip is filtered out of My Rides",
+  "sentBackTrips in the visibility filter",
+  SB_SOURCES.rides.includes("sentBackTrips.includes(trip.id)"),
+);
+check(
+  "...and it is filtered alongside pending, not instead of it",
+  "both predicates in one filter",
+  /!pendingIds\.has\(trip\.id\) &&\s*!sentBackTrips\.includes\(trip\.id\)/.test(
+    SB_SOURCES.rides,
+  ),
+);
+/**
+ * ⛔⛔ `send-back` is a PRODUCTION tile, and every other production tile falls
+ * through to a "not wired in the prototype" toast. This slice is the first to
+ * REPLACE what a production control does, so the branch has to be inside
+ * `handleGridTile` and has to RETURN — a branch that fell through would open
+ * the flow and then toast over it.
+ *
+ * ⚠️ Asserted on the handler's own body, not on where the two functions sit in
+ * the file. The first version compared `indexOf` positions and failed because
+ * `handleProductionTile` happens to be declared first — a check failing on
+ * source layout rather than behaviour.
+ */
+const gridHandler = SB_SOURCES.more.slice(
+  SB_SOURCES.more.indexOf("function handleGridTile"),
+  SB_SOURCES.more.indexOf("function handleProductionTile") > SB_SOURCES.more.indexOf("function handleGridTile")
+    ? SB_SOURCES.more.indexOf("function handleProductionTile")
+    : SB_SOURCES.more.length,
+);
+check(
+  "Send Back Trip is intercepted in the grid handler, and returns",
+  `branch present: ${gridHandler.includes('if (id === "send-back")')}`,
+  /if \(id === "send-back"\)[\s\S]{0,900}setSendBackReasonOpen\(true\);[\s\S]{0,60}return;/.test(
+    gridHandler,
+  ),
+);
+check(
+  "the send-back is recorded for Support but tracks no status",
+  "appTracksStatus: false",
+  /completeSendBack[\s\S]{0,900}appTracksStatus: false/.test(SB_SOURCES.more),
+);
+check(
+  "...and cancelling the penalty warning abandons the answers",
+  "setSendBackValues(null) on dismiss",
+  /if \(!next\) setSendBackValues\(null\)/.test(SB_SOURCES.more),
+);
+
+/** ⛔ Out of scope by user direction, asserted as an ABSENCE. */
+const ROW_13 = SOLUTIONS.find((s) => s.id === "send-back-reason-form")!;
+check(
+  "row 13 flags the two things it deliberately does NOT do",
+  ROW_13.proposedFeature.slice(-120),
+  ROW_13.proposedFeature.includes("⚠️ Not in prototype yet") &&
+    /Standing Order block/i.test(ROW_13.proposedFeature) &&
+    /row 14|scoring/i.test(ROW_13.proposedFeature),
+);
+check(
+  "...and rows 14 and 19 stay unbuilt, still gated on the scoring policy",
+  ["send-back-scoring", "eta-send-back-explicit"]
+    .map((id) => `${id}=${SOLUTIONS.find((r) => r.id === id)?.buildState}`)
+    .join(" "),
+  ["send-back-scoring", "eta-send-back-explicit"].every(
+    (id) => SOLUTIONS.find((r) => r.id === id)?.buildState === "not-yet",
+  ),
 );
 
 // ---------------------------------------------------------------------------

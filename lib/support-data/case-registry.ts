@@ -5,7 +5,12 @@ import {
   ISSUE_CANNOT_REACH_MEMBER,
   ISSUE_MISSED_SWIPE,
   ISSUE_RIDER_NO_SHOW,
+  ISSUE_SEND_BACK_REASON,
 } from "./issue-types";
+import {
+  SEND_BACK_REASON_OTHER,
+  sendBackReasonOptions,
+} from "@/lib/driver-data/send-back-reasons";
 import {
   ASSIGNMENT_SCOPE_SPECIFIC,
   ASSIGNMENT_SCOPE_STANDING,
@@ -56,6 +61,10 @@ const ONLY_CANNOT_REACH = {
 const ONLY_AUTO_ASSIGN = {
   field: "issue",
   equals: [ISSUE_AUTO_ASSIGN_REQUEST],
+};
+const ONLY_SEND_BACK = {
+  field: "issue",
+  equals: [ISSUE_SEND_BACK_REASON],
 };
 
 /**
@@ -147,6 +156,7 @@ export function buildSupportFormCase({
   missedSwipe,
   cannotReach,
   autoAssign = false,
+  sendBack = false,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -208,6 +218,14 @@ export function buildSupportFormCase({
    * to assemble, so there is nothing for a caller to get wrong by passing.
    */
   autoAssign?: boolean;
+  /**
+   * Build the send-back reason case — catalogue row 13.
+   *
+   * ⚠️ A plain boolean like `autoAssign`: the reason options are production's
+   * own list and depend on nothing about the trip, so there is nothing for a
+   * caller to assemble and nothing for them to get wrong.
+   */
+  sendBack?: boolean;
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -222,10 +240,18 @@ export function buildSupportFormCase({
     description: "Pick the issue that fits and we'll only ask what we need to.",
     category: "Rider",
     buildState: "in-prototype",
-    submitLabel: "Submit",
+    /**
+     * ⚠️ "Continue", not "Submit", for the send-back reason — and the word is
+     * load-bearing. That form is a STEP: the driver is mid-send-back and the
+     * next screen asks whether they are sure. A button saying Submit would tell
+     * them they had just sent something, on the one case where they have not.
+     */
+    submitLabel: sendBack ? "Continue" : "Submit",
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: autoAssign
+    zendeskEquivalent: sendBack
+      ? "Trip sent back"
+      : autoAssign
       ? "Driver assignment request"
       : cannotReach
         ? "Unable to reach member"
@@ -241,7 +267,7 @@ export function buildSupportFormCase({
      * a check that passed because the times were in order.
      */
     timeSequence:
-      cannotReach || autoAssign
+      cannotReach || autoAssign || sendBack
         ? undefined
         : missedSwipe
           ? SWIPE_TIME_SEQUENCE
@@ -816,6 +842,70 @@ export function buildSupportFormCase({
                 "e.g. dialysis Tue/Thu mornings, or they asked again this week",
               maxLength: 500,
               showIf: ONLY_AUTO_ASSIGN,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Why you sent this trip back ----------------------------------
+      //
+      // Catalogue row 13 — `Send-back`, 609 calls. A step inside the send-back
+      // flow rather than a case the driver picks: tapping Send Back Trip is
+      // already the driver saying what they want to do.
+      //
+      // ⛔⛔ **Scoped down by the user on 2026-10-12 and the scoping is the
+      // design.** The catalogue says "...that can bypass the Standing Order
+      // block"; the SO block is the user's to handle. Row 14 would weight the
+      // penalty by reason; the scoring policy is skipped. What is left is the
+      // part that applies to every send-back: say why.
+      //
+      // ⛔ So this changes NOTHING about whether the send-back is allowed or
+      // what it costs. It records an answer nobody collects today.
+      ...(sendBack
+        ? ([
+            {
+              id: "returnReason",
+              type: "select",
+              /**
+               * ⛔⛔ `returnReason`, NOT `sendBackReason`.
+               * `sendback_calculation_reason` is the warehouse's PENALTY RULE
+               * and is what the Balance Dashboard already prints as "the
+               * send-back reason". Two different things, and someone will try
+               * to join them.
+               */
+              label: "Why can't you take this trip?",
+              shortLabel: "your reason",
+              placeholder: "Select:",
+              required: true,
+              // Production's own CS Tool `DRIVER INITIATED` strings, narrowed
+              // to the ones a driver can truthfully answer. See the long note
+              // in `send-back-reasons.ts`.
+              options: sendBackReasonOptions(),
+              showIf: ONLY_SEND_BACK,
+            },
+            {
+              id: "returnReasonOther",
+              type: "text",
+              label: "Tell us what happened",
+              placeholder: "In a few words",
+              required: true,
+              /**
+               * ⚠️ Gated on the ANSWER, like every other escape hatch in this
+               * file, and safe for the same reason: `returnReason` is itself
+               * gated on this issue so it can hold a value on no other case.
+               */
+              showIf: {
+                field: "returnReason",
+                equals: [SEND_BACK_REASON_OTHER],
+              },
+            },
+            {
+              id: "returnNotes",
+              type: "textarea",
+              label: "Anything else Support should know? (optional)",
+              placeholder:
+                "e.g. I can be back in the area after 2pm if it helps",
+              maxLength: 500,
+              showIf: ONLY_SEND_BACK,
             },
           ] as SupportCaseDefinition["fields"])
         : []),

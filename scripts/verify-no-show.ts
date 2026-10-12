@@ -101,7 +101,23 @@ for (const trip of asIs) {
  * comparison-matrix row they do not demonstrate would be worse than exempting
  * them.
  */
-const OTHER_SLICE_RIDES = new Set(["1049800381", "1049800382"]);
+const OTHER_SLICE_RIDES = new Set([
+  "1049800381",
+  "1049800382",
+  /**
+   * ⚠️ Row 13's advance send-back ride (`13b`), added 2026-10-12. It carries no
+   * `locationRecords` at all, so the no-show walk finds nothing in its lookback
+   * and falls through to the form — the same shape as the Missed Swipe seeds
+   * and for the same reason. Nobody files a no-show on it; it exists to show a
+   * send-back that attracts no penalty.
+   *
+   * ⛔ Its sibling `1049800394` (`13a`) is deliberately NOT here: that leg is
+   * `wait-for-call`, so the no-show rule never reaches this branch for it. An
+   * id in this set that never refuses would inflate the carve-out while
+   * exercising nothing, which the count below exists to catch.
+   */
+  "1049800395",
+]);
 
 let refusing = 0;
 let exempted = 0;
@@ -123,7 +139,7 @@ check("some ride actually refuses", refusing > 0, `${refusing}`);
 // The exemption must stay a narrow carve-out, not a hole. If a Missed Swipe ride
 // stops refusing — or one is deleted — this says so rather than quietly
 // shrinking the population the check above runs on.
-check("every exempt ride is still exercised", exempted === 1,
+check("every exempt ride is still exercised", exempted === 2,
   `${exempted} of ${OTHER_SLICE_RIDES.size} exempt ids refuse (1049800382 is past pick-up, so no-show never applies)`);
 
 // ── The two stories, one ride each ──────────────────────────────

@@ -48,6 +48,13 @@ import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-
 import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
 import { AUTO_ASSIGN_LABEL } from "@/lib/driver-data/member-assignment";
+import { SendBackReasonForm } from "@/components/support/send-back-reason-form";
+import { SendBackPenaltyDialog } from "@/components/driver/send-back-penalty-dialog";
+import {
+  isShortNoticeSendBack,
+  SEND_BACK_PENALTY_USD,
+} from "@/lib/driver-data/send-back-reasons";
+import { ISSUE_SEND_BACK_REASON } from "@/lib/support-data/issue-types";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
   DRIVER_NAVY,
@@ -419,7 +426,7 @@ export function MoreOptionsScreen({
   // whether the driver already filed — which the app does know — not about what
   // Support did with it, which for a no-show it never learns. Using the pending
   // lookup here would let the same claim be filed twice over.
-  const { submittedForms } = useRideFlow();
+  const { submittedForms, submitForm, sendBackTrip } = useRideFlow();
   const { active } = useSolution();
   const pending = submittedForms.some((record) => record.tripId === trip.id);
 
@@ -430,6 +437,10 @@ export function MoreOptionsScreen({
   const [stageRefused, setStageRefused] = useState(false);
   const [cannotReachOpen, setCannotReachOpen] = useState(false);
   const [autoAssignOpen, setAutoAssignOpen] = useState(false);
+  const [sendBackReasonOpen, setSendBackReasonOpen] = useState(false);
+  const [sendBackPenaltyOpen, setSendBackPenaltyOpen] = useState(false);
+  // Held between the reason step and the penalty step — see `completeSendBack`.
+  const [sendBackValues, setSendBackValues] = useState<Record<string, string> | null>(null);
 
   /**
    * ⚠️ Nothing about guardrail 2 is known here.
@@ -470,6 +481,61 @@ export function MoreOptionsScreen({
     });
   }
 
+  /**
+   * The reason step is done. Go to the penalty warning if this send-back
+   * attracts one; otherwise finish immediately.
+   *
+   * ⚠️ The answers are HELD, not filed. Nothing has been sent back yet and the
+   * driver can still cancel — filing here would have produced a support record
+   * for a send-back that never happened.
+   */
+  function handleReasonCollected(values: Record<string, string>) {
+    setSendBackValues(values);
+    if (isShortNoticeSendBack(trip)) {
+      // Defer a tick: vaul reports the sheet's dismissal before the handler
+      // that caused it, and opening the dialog inside that window leaves the
+      // sheet's scroll lock on.
+      setTimeout(() => setSendBackPenaltyOpen(true), 0);
+      return;
+    }
+    completeSendBack(values);
+  }
+
+  /**
+   * The trip leaves the driver.
+   *
+   * ⛔⛔ **This is the first thing in the prototype that takes a ride away.**
+   * Every other slice annotates a trip; this one removes it, so My Rides must
+   * filter on `sentBackTrips` or the driver taps Send Back, is returned to
+   * their list, and sees the trip still sitting there.
+   *
+   * ⚠️ `appTracksStatus: false` — Support reads the reason, but what the client
+   * does with the returned trip never comes back to the app, so a Pending pill
+   * would promise a status nothing can fill in.
+   */
+  function completeSendBack(values?: Record<string, string>) {
+    const answers = values ?? sendBackValues;
+    setSendBackPenaltyOpen(false);
+    setSendBackValues(null);
+    if (answers) {
+      submitForm({
+        caseId: "support-form",
+        issue: ISSUE_SEND_BACK_REASON,
+        tripId: trip.id,
+        values: answers,
+        appTracksStatus: false,
+      });
+    }
+    sendBackTrip(trip.id);
+    toast({
+      title: "Trip sent back",
+      description: isShortNoticeSendBack(trip)
+        ? `It is back with the client, and a $${SEND_BACK_PENALTY_USD} penalty applies. Your reason went to Support with it.`
+        : "It is back with the client. Your reason went to Support with it.",
+    });
+    router.push("/my-rides");
+  }
+
   function handleGridTile(id: string) {
     if (id === "cannot-reach") {
       // ⚠️ No guard. Unlike Member No-Show there is no stage rule and no
@@ -477,6 +543,20 @@ export function MoreOptionsScreen({
       // facility desk at ten has made two different attempts on two different
       // numbers, and Support wants both.
       setCannotReachOpen(true);
+      return;
+    }
+    if (id === "send-back") {
+      /**
+       * ⛔⛔ **Intercepted before `handleProductionTile`.** `send-back` is a
+       * PRODUCTION tile and every other production tile falls through to a
+       * "not wired in the prototype" toast. This is the first slice that
+       * REPLACES what a production control does rather than adding a new one.
+       *
+       * ⚠️ Production's step 1 confirmation is missing — its copy is the one
+       * thing no artifact in the vault quotes. `sendBackSteps` names it so the
+       * gap is visible rather than implied away.
+       */
+      setSendBackReasonOpen(true);
       return;
     }
     if (id === "auto-assign") {
@@ -582,6 +662,24 @@ export function MoreOptionsScreen({
         // unchanged, so there is nothing new on it to see — returning the driver
         // to a screen that looks exactly as they left it would read as the
         // submit having failed.
+      />
+
+      <SendBackReasonForm
+        trip={trip}
+        open={sendBackReasonOpen}
+        onOpenChange={setSendBackReasonOpen}
+        onCollected={handleReasonCollected}
+      />
+      <SendBackPenaltyDialog
+        open={sendBackPenaltyOpen}
+        onOpenChange={(next) => {
+          setSendBackPenaltyOpen(next);
+          // ⛔ Cancelling at the penalty warning abandons the whole send-back,
+          // answers included. The trip stays with the driver, which is what
+          // "Cancel" has to mean on a screen asking "are you sure".
+          if (!next) setSendBackValues(null);
+        }}
+        onConfirm={completeSendBack}
       />
 
       <AutoAssignRequestForm

@@ -176,6 +176,21 @@ interface RideFlowValue {
    */
   preferredDriverOptOuts: string[];
   optOutOfPreferredDriverAsk: (member: string) => void;
+
+  /**
+   * Trips the driver has sent back this session.
+   *
+   * ⛔⛔ **A send-back REMOVES the trip from the driver**, which makes this the
+   * first thing in this provider that takes a ride away rather than annotating
+   * one. My Rides filters on it, so a sent-back trip is gone from every tab —
+   * which is the whole point: the driver has to be able to see that it worked.
+   *
+   * ⚠️ Session state, so a reload restores the seeded ride. That is the right
+   * behaviour for a demo and the wrong one to mistake for persistence.
+   */
+  sentBackTrips: string[];
+  sendBackTrip: (tripId: string) => void;
+  isTripSentBack: (tripId: string) => boolean;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -210,6 +225,8 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [confirmed, setConfirmed] = useState<string[]>([]);
   // Members who ticked "Don't ask again for this member".
   const [preferredOptOuts, setPreferredOptOuts] = useState<string[]>([]);
+  // Trips sent back this session — removed from My Rides.
+  const [sentBack, setSentBack] = useState<string[]>([]);
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -282,8 +299,15 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         setPreferredOptOuts((previous) =>
           previous.includes(member) ? previous : [...previous, member]
         ),
+
+      sentBackTrips: sentBack,
+      sendBackTrip: (tripId) =>
+        setSentBack((previous) =>
+          previous.includes(tripId) ? previous : [...previous, tripId]
+        ),
+      isTripSentBack: (tripId) => sentBack.includes(tripId),
     }),
-    [records, swipeRevision, postponed, confirmed, preferredOptOuts]
+    [records, swipeRevision, postponed, confirmed, preferredOptOuts, sentBack]
   );
 
   return (

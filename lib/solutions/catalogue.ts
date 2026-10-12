@@ -397,10 +397,21 @@ export const SOLUTIONS: Solution[] = [
     problem: "Send-backs denied, specifically Standing Orders",
     useCase: "Driver needs to send back an SO → denied → calls Support",
     proposedFeature:
-      "In-app send-back reason form that can bypass the Standing Order block",
+      "In-app send-back reason form, on every send-back — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 14's scoring decision and still open",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides/1049800394/more",
+      label:
+        "Tap Send Back Trip — a PRODUCTION tile, and the first one this prototype replaces rather than adds to. A reason step opens between production's two confirmation popups, offering its own CS Tool DRIVER INITIATED reasons narrowed to the ones a driver can truthfully answer. This trip is short-notice, so the $25 penalty warning follows; Continue sends it back and the ride leaves My Rides.",
+      alternates: [
+        {
+          route: "/my-rides/1049800395/more",
+          label:
+            "An ADVANCE trip. Same reason step, and then NO penalty warning at all — it goes straight back. Without this branch a reason form seen only on the way to a penalty screen cannot be told apart from part of the penalty screen.",
+        },
+      ],
+    },
   },
   {
     id: "send-back-scoring",

@@ -1962,6 +1962,117 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
+  // ===== 13a — a SHORT-NOTICE send-back, which attracts the penalty =====
+  //
+  // Catalogue row 13. `sameDay: true` is what makes production's step 2 penalty
+  // popup appear at all — per the story's AC, "The popup appears only for
+  // short-notice trip send backs."
+  //
+  // ⚠️ Accepted but not started: no swipe marks. A driver sends a trip back
+  // because they cannot do it, which is a decision made BEFORE they set off.
+  {
+    id: "1049800394",
+    date: "Thu, Jul 31, 2026",
+    rider: "DESMOND ARCHULETA",
+    client: "Verida",
+    market: "GA",
+    sameDay: true,
+    passengerCount: 1,
+    distance: "22.6 mi",
+    totalRevenue: 41.80,
+    notes: "Will-call return from the infusion centre",
+    legs: [
+      {
+        id: "1049800394",
+        legCode: "A",
+        type: "wait-for-call",
+        label: "Est Pick-up Time - Wait For Call",
+        time: "3:10 PM",
+        address: "1968 Peachtree Rd NW, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 41.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800394-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "4:05 PM",
+        address: "3240 Henderson Mill Rd, Atlanta, GA 30341",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    scenario: {
+      code: "13a",
+      label: "Send-back, short notice — penalty applies",
+      solutions: ["send-back-reason-form"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 13b — an ADVANCE send-back, which does NOT =====
+  //
+  // ⛔ The negative control, and the slice needs it: a reason form that can only
+  // ever be seen on the way to a penalty warning is indistinguishable from one
+  // that is PART of the penalty warning. Here the reason is collected and the
+  // trip goes back with no second popup at all.
+  {
+    id: "1049800395",
+    date: "Thu, Jul 31, 2026",
+    rider: "PRISCILLA VANTERPOOL",
+    client: "MTM",
+    market: "GA",
+    passengerCount: 2,
+    distance: "9.3 mi",
+    totalRevenue: 33.15,
+    notes: "Standing Tuesday physiotherapy",
+    legs: [
+      {
+        id: "1049800395",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "11:20 AM",
+        address: "740 Cascade Ave SW, Atlanta, GA 30310",
+        county: "Fulton County",
+        revenue: 33.15,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800395-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "12:00 PM",
+        address: "1821 Metropolitan Pkwy SW, Atlanta, GA 30315",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    scenario: {
+      code: "13b",
+      label: "Send-back, advance — no penalty",
+      solutions: ["send-back-reason-form"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
 ];
 
 export const mockCompletedTrips: Trip[] = [

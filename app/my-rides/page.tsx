@@ -34,7 +34,8 @@ export default function MyRidesPage() {
   // reachable in one tap. The real app's default tab is a product decision nobody
   // has made — revert to "needs-action" before treating this as production.
   const [activeTab, setActiveTab] = useState<TabValue>("in-progress");
-  const { submittedForms, isTripMemberSignatureMissing } = useRideFlow();
+  const { submittedForms, isTripMemberSignatureMissing, sentBackTrips } =
+    useRideFlow();
   const { active } = useSolution();
 
   /**
@@ -69,8 +70,23 @@ export default function MyRidesPage() {
       .map((record) => record.tripId)
       .filter((tripId): tripId is string => Boolean(tripId))
   );
-  const withoutPending = (trips: Trip[]) =>
-    focused(trips).filter((trip) => !pendingIds.has(trip.id));
+  /**
+   * ⛔⛔ **A sent-back trip is GONE, from every tab.**
+   *
+   * Catalogue row 13. This is the first thing in the prototype that removes a
+   * ride rather than annotating one, and the removal has to happen HERE rather
+   * than on the ride's own screen: a driver who sends a trip back is returned
+   * to this list, and a trip still sitting in it would read as the send-back
+   * having failed.
+   *
+   * ⚠️ Applied alongside the pending filter, not instead of it — the two hide
+   * rides for unrelated reasons and a ride can be neither, either or both.
+   */
+  const visible = (trips: Trip[]) =>
+    focused(trips).filter(
+      (trip) => !pendingIds.has(trip.id) && !sentBackTrips.includes(trip.id)
+    );
+  const withoutPending = visible;
 
   const allRides = [
     ...mockInProgressTrips,
