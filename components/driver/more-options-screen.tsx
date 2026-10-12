@@ -50,8 +50,11 @@ import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
 import { AUTO_ASSIGN_LABEL } from "@/lib/driver-data/member-assignment";
 import { SendBackReasonForm } from "@/components/support/send-back-reason-form";
 import { SendBackPenaltyDialog } from "@/components/driver/send-back-penalty-dialog";
+import { SendBackConfirmDialog } from "@/components/driver/send-back-confirm-dialog";
+import { StandingOrderWarningDialog } from "@/components/driver/standing-order-warning-dialog";
 import {
   isShortNoticeSendBack,
+  isStandingOrder,
   SEND_BACK_PENALTY_USD,
 } from "@/lib/driver-data/send-back-reasons";
 import { ISSUE_SEND_BACK_REASON } from "@/lib/support-data/issue-types";
@@ -437,7 +440,9 @@ export function MoreOptionsScreen({
   const [stageRefused, setStageRefused] = useState(false);
   const [cannotReachOpen, setCannotReachOpen] = useState(false);
   const [autoAssignOpen, setAutoAssignOpen] = useState(false);
+  const [sendBackConfirmOpen, setSendBackConfirmOpen] = useState(false);
   const [sendBackReasonOpen, setSendBackReasonOpen] = useState(false);
+  const [standingOrderOpen, setStandingOrderOpen] = useState(false);
   const [sendBackPenaltyOpen, setSendBackPenaltyOpen] = useState(false);
   // Held between the reason step and the penalty step — see `completeSendBack`.
   const [sendBackValues, setSendBackValues] = useState<Record<string, string> | null>(null);
@@ -482,23 +487,54 @@ export function MoreOptionsScreen({
   }
 
   /**
-   * The reason step is done. Go to the penalty warning if this send-back
-   * attracts one; otherwise finish immediately.
+   * Step 1 answered "Yes". Open the reason form.
+   *
+   * ⚠️ Deferred a tick, like every other hand-off in this file: a dialog's
+   * dismissal is reported before the handler that caused it, and opening the
+   * next surface inside that window leaves the first one's scroll lock on.
+   */
+  function handleSendBackConfirmed() {
+    setSendBackConfirmOpen(false);
+    setTimeout(() => setSendBackReasonOpen(true), 0);
+  }
+
+  /**
+   * The reason step is done — now the warnings, in order of what they cost.
+   *
+   * ⛔⛔ **Standing order before penalty.** A standing order's cost is the ORDER
+   * — every future trip, and the account — while the penalty is money. Raising
+   * the money warning first and the severe one second would read as an
+   * escalation the driver has already tapped past.
    *
    * ⚠️ The answers are HELD, not filed. Nothing has been sent back yet and the
-   * driver can still cancel — filing here would have produced a support record
-   * for a send-back that never happened.
+   * driver can still cancel at either warning — filing here would have produced
+   * a support record for a send-back that never happened.
    */
   function handleReasonCollected(values: Record<string, string>) {
     setSendBackValues(values);
+    if (isStandingOrder(trip)) {
+      setTimeout(() => setStandingOrderOpen(true), 0);
+      return;
+    }
     if (isShortNoticeSendBack(trip)) {
-      // Defer a tick: vaul reports the sheet's dismissal before the handler
-      // that caused it, and opening the dialog inside that window leaves the
-      // sheet's scroll lock on.
       setTimeout(() => setSendBackPenaltyOpen(true), 0);
       return;
     }
     completeSendBack(values);
+  }
+
+  /**
+   * The standing-order warning was accepted. Production's penalty warning still
+   * follows if this is also short-notice — two different consequences, and
+   * neither stands in for the other.
+   */
+  function handleStandingOrderAccepted() {
+    setStandingOrderOpen(false);
+    if (isShortNoticeSendBack(trip)) {
+      setTimeout(() => setSendBackPenaltyOpen(true), 0);
+      return;
+    }
+    completeSendBack();
   }
 
   /**
@@ -556,7 +592,7 @@ export function MoreOptionsScreen({
        * thing no artifact in the vault quotes. `sendBackSteps` names it so the
        * gap is visible rather than implied away.
        */
-      setSendBackReasonOpen(true);
+      setSendBackConfirmOpen(true);
       return;
     }
     if (id === "auto-assign") {
@@ -664,11 +700,27 @@ export function MoreOptionsScreen({
         // submit having failed.
       />
 
+      <SendBackConfirmDialog
+        open={sendBackConfirmOpen}
+        onOpenChange={setSendBackConfirmOpen}
+        onConfirm={handleSendBackConfirmed}
+      />
       <SendBackReasonForm
         trip={trip}
         open={sendBackReasonOpen}
         onOpenChange={setSendBackReasonOpen}
         onCollected={handleReasonCollected}
+      />
+      <StandingOrderWarningDialog
+        open={standingOrderOpen}
+        onOpenChange={(next) => {
+          setStandingOrderOpen(next);
+          // ⛔ Cancelling here abandons the whole send-back, answers included.
+          // The trip stays with the driver, which is what "Cancel" has to mean
+          // on a screen asking whether they are sure.
+          if (!next) setSendBackValues(null);
+        }}
+        onConfirm={handleStandingOrderAccepted}
       />
       <SendBackPenaltyDialog
         open={sendBackPenaltyOpen}

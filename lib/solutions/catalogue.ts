@@ -397,18 +397,23 @@ export const SOLUTIONS: Solution[] = [
     problem: "Send-backs denied, specifically Standing Orders",
     useCase: "Driver needs to send back an SO → denied → calls Support",
     proposedFeature:
-      "In-app send-back reason form, on every send-back — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 14's scoring decision and still open",
+      "In-app send-back reason form on every send-back, plus an explicit warning when the trip is a standing order — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 14's scoring decision and still open",
     klass: "form",
     buildState: "in-prototype",
     entry: {
       route: "/my-rides/1049800394/more",
       label:
-        "Tap Send Back Trip — a PRODUCTION tile, and the first one this prototype replaces rather than adds to. A reason step opens between production's two confirmation popups, offering its own CS Tool DRIVER INITIATED reasons narrowed to the ones a driver can truthfully answer. This trip is short-notice, so the $25 penalty warning follows; Continue sends it back and the ride leaves My Rides.",
+        "Tap Send Back Trip — a PRODUCTION tile, and the first one this prototype replaces rather than adds to. Production's own step 1 asks whether you mean it (No / Yes); the reason step follows, offering CS Tool DRIVER INITIATED reasons narrowed to the ones a driver can truthfully answer. This trip is short-notice, so production's $25 penalty warning ends the sequence. Continue sends it back and the ride leaves My Rides.",
       alternates: [
         {
           route: "/my-rides/1049800395/more",
           label:
-            "An ADVANCE trip. Same reason step, and then NO penalty warning at all — it goes straight back. Without this branch a reason form seen only on the way to a penalty screen cannot be told apart from part of the penalty screen.",
+            "An ADVANCE trip. Step 1 and the reason step, then NO warning at all — it goes straight back. Without this branch a reason form seen only on the way to a penalty screen cannot be told apart from part of the penalty screen.",
+        },
+        {
+          route: "/my-rides/1049800396/more",
+          label:
+            "A STANDING ORDER (SO-4471, dialysis Mon/Wed/Fri). After the reason, a warning says so in as many words: sending back one trip can cost the whole standing order, and repeated send-backs risk suspension. ⚠️ Not in prototype yet: this copy is PROPOSED — production says nothing at all here today, which is the problem. ⛔ It warns, it does not block; a hard block is what sends drivers to Support in the first place.",
         },
       ],
     },

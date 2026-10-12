@@ -326,6 +326,20 @@ export interface Trip {
    */
   sameDay?: boolean;
   /**
+   * The standing order this trip belongs to, if any.
+   *
+   * ⚠️ **An ID, not a boolean**, because that is the shape production has:
+   * `Project - Standing Order Offers` records that Verida carries an SO ID on
+   * the trip/leg payload, while Alivi has none and is matched to a generated
+   * internal id by member. A boolean would model neither and would have to be
+   * replaced the moment anything needed to name the order.
+   *
+   * ⛔ Presence is the whole predicate here — see `isStandingOrder`. The
+   * prototype does not resolve the order, list its trips or know its pattern;
+   * that is the Standing Order Offers project's work, not this one's.
+   */
+  standingOrderId?: string;
+  /**
    * Pills a SCREEN adds at render time, e.g. "Waiting on Support".
    *
    * ⚠️ Separate from `pills` because those are seed decoration and a scenario
@@ -2067,6 +2081,72 @@ export const mockInProgressTrips: Trip[] = [
     scenario: {
       code: "13b",
       label: "Send-back, advance — no penalty",
+      solutions: ["send-back-reason-form"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 13c — sending back a STANDING ORDER =====
+  //
+  // ⛔⛔ The trip a driver least wants to lose and least understands the cost
+  // of. A standing order is a recurring booking the client relies on, so
+  // sending back ONE of its trips can cost the driver every future one — and
+  // repeated send-backs on an SO put the account itself at risk. Nothing in
+  // the app says so today.
+  //
+  // ⚠️ Deliberately NOT short-notice. The standing-order warning and
+  // production's penalty warning are different consequences, and a ride that
+  // raised both would let a reviewer read them as one screen. The RULE handles
+  // every combination — see `sendBackSteps` and its truth table — but the seed
+  // demonstrates this one on its own.
+  //
+  // ⚠️ `standingOrderId` is a Verida-shaped id; Alivi has none and is matched
+  // by member. Carrying the id rather than a flag keeps that difference
+  // expressible.
+  {
+    id: "1049800396",
+    date: "Thu, Jul 31, 2026",
+    rider: "CORNELIUS BRAITHWAITE",
+    client: "Verida",
+    market: "GA",
+    standingOrderId: "SO-4471",
+    passengerCount: 1,
+    distance: "7.8 mi",
+    totalRevenue: 36.40,
+    notes: "Standing order — dialysis Mon/Wed/Fri",
+    legs: [
+      {
+        id: "1049800396",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "7:05 AM",
+        address: "1515 Fairburn Rd SW, Atlanta, GA 30331",
+        county: "Fulton County",
+        revenue: 36.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800396-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "7:45 AM",
+        address: "3193 Howell Mill Rd NW, Atlanta, GA 30327",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    scenario: {
+      code: "13c",
+      label: "Send-back of a STANDING ORDER",
       solutions: ["send-back-reason-form"],
     },
     incentiveTypes: [],

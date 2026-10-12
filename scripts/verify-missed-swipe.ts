@@ -265,6 +265,8 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   // nobody decided.
   "1049800394": "none",
   "1049800395": "none",
+  // Row 13's standing-order ride (`13c`) — same shape as the two above.
+  "1049800396": "none",
   [RIDE_1]: "pickup",
   [RIDE_2]: "dropoff",
 };
@@ -284,7 +286,7 @@ check("every in-progress ride was swept",
   `${swept} ridden, ${Object.keys(EXPECTED_TRIGGER).length} declared`);
 check("the sweep covers rides that DO and DO NOT trigger",
   Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length === 3 &&
-    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 7,
+    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 8,
   `${Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length} fire of ${swept}`);
 
 // ⛔ The two rides that stay quiet AT the pick-up must be quiet for the right

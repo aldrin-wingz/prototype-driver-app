@@ -77,11 +77,13 @@ import {
   DRIVER_ANSWERABLE_REASONS,
   isShortNoticeSendBack,
   MAX_SEND_BACK_LABEL_CHARS,
+  isStandingOrder,
   SEND_BACK_CONFIRM_BUILT,
   SEND_BACK_PENALTY_USD,
   SEND_BACK_REASON_OTHER,
   sendBackReasonOptions,
   sendBackSteps,
+  type SendBackStep,
 } from "../lib/driver-data/send-back-reasons";
 import { ISSUE_SEND_BACK_REASON } from "../lib/support-data/issue-types";
 import { getMemberOptions, MEMBER_WINDOW_DAYS } from "../lib/support-data/member-options";
@@ -90,6 +92,7 @@ import { solutionHref } from "../lib/solutions/solution-context";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
   mockRequestTrips,
+  type Trip,
   mockNeedsActionTrips,
   mockUpcomingTrips,
   mockInProgressTrips,
@@ -344,12 +347,13 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *   - Preferred driver (row 09) — the More Options tile, and the prompt raised
  *     at the end of the leg. The second is the one the case is really about and
  *     is on a different screen entirely.
- *   - Send-back (row 13) — a SHORT-NOTICE trip, which reaches production's
- *     penalty warning, and an ADVANCE one, which does not. A reason form only
- *     ever seen on the way to a penalty screen cannot be told apart from part
- *     of that screen.
+ *   - Send-back (row 13) — THREE: a SHORT-NOTICE trip, which reaches
+ *     production's penalty warning; an ADVANCE one, which reaches no warning at
+ *     all; and a STANDING ORDER, which reaches the proposed one. A reason form
+ *     only ever seen on the way to a warning cannot be told apart from part of
+ *     that warning.
  */
-const EXPECTED_ALTERNATES = 5;
+const EXPECTED_ALTERNATES = 6;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -491,7 +495,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 12;
+const EXPECTED_SCENARIO_RIDES = 13;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -587,7 +591,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 11;
+const EXPECTED_RIDE_ROUTES = 12;
 const EXPECTED_SURFACE_ROUTES = 2;
 check(
   "...and the two kinds of route were counted as declared",
@@ -653,9 +657,9 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // would read as built while having nothing of its own to show.
   "auto-assign-request": 1,
   "request-feed-member-filter": 1,
-  // Two, and the second is the negative control: `13a` short-notice (penalty),
-  // `13b` advance (none).
-  "send-back-reason-form": 2,
+  // Three: `13a` short-notice (penalty), `13b` advance (neither warning),
+  // `13c` standing order. The second is the negative control for both.
+  "send-back-reason-form": 3,
 };
 /**
  * ⚠️ A SECOND tab, declared separately rather than folded into the map above
@@ -2424,6 +2428,7 @@ check(
 
 const SHORT = mockInProgressTrips.find((t) => t.id === "1049800394")!;
 const ADVANCE = mockInProgressTrips.find((t) => t.id === "1049800395")!;
+const SO_RIDE = mockInProgressTrips.find((t) => t.id === "1049800396")!;
 check(
   "row 13's two scenario rides are seeded and tagged",
   `${SHORT?.scenario?.code} short-notice=${isShortNoticeSendBack(SHORT)} | ${ADVANCE?.scenario?.code} short-notice=${isShortNoticeSendBack(ADVANCE)}`,
@@ -2450,15 +2455,170 @@ check(
   sendBackSteps(SHORT).indexOf("reason") < sendBackSteps(SHORT).indexOf("penalty"),
 );
 /**
- * ⛔ Production's step 1 is NOT built — no artifact in the vault quotes its
- * copy. Asserted explicitly so the prototype does not quietly imply production
- * has one fewer step than it does.
+ * ⭐ Production's step 1 is built from the screenshot the user supplied on
+ * 2026-10-13 — the only place its copy has ever been written down.
+ *
+ * ⚠️ **Unconditional**: every send-back raises it. Only the penalty warning is
+ * conditional, per the copy-update story's AC.
  */
 check(
-  "production's step 1 is declared unbuilt rather than silently omitted",
+  "production's step 1 is built and raised on EVERY send-back",
   `SEND_BACK_CONFIRM_BUILT=${SEND_BACK_CONFIRM_BUILT}`,
-  SEND_BACK_CONFIRM_BUILT === false &&
-    !sendBackSteps(SHORT).includes("confirm"),
+  SEND_BACK_CONFIRM_BUILT === true &&
+    [SHORT, ADVANCE, SO_RIDE].every((t) => sendBackSteps(t)[0] === "confirm"),
+);
+
+/**
+ * ⛔⛔ **The whole step matrix**, declared rather than derived. Four screens are
+ * possible and which ones appear turns on two independent properties of the
+ * trip. A sequence assembled by three separate `if`s in a component is one
+ * nobody can read; this is the table it has to agree with.
+ */
+const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = [
+  {
+    trip: ADVANCE,
+    name: "plain advance trip",
+    steps: ["confirm", "reason"],
+  },
+  {
+    trip: SHORT,
+    name: "short-notice",
+    steps: ["confirm", "reason", "penalty"],
+  },
+  {
+    trip: SO_RIDE,
+    name: "standing order",
+    steps: ["confirm", "reason", "standing-order"],
+  },
+  {
+    // ⚠️ Not seeded — asserted. A ride raising BOTH warnings would let a
+    // reviewer read them as one screen, so the seed demonstrates them apart
+    // and the rule is checked on a trip built here.
+    trip: { ...SO_RIDE, sameDay: true },
+    name: "standing order AND short-notice",
+    steps: ["confirm", "reason", "standing-order", "penalty"],
+  },
+];
+for (const row of STEP_MATRIX) {
+  const actual = sendBackSteps(row.trip);
+  check(
+    `send-back steps — ${row.name}: ${row.steps.join(" → ")}`,
+    actual.join(" → "),
+    actual.length === row.steps.length &&
+      row.steps.every((step, i) => actual[i] === step),
+  );
+}
+check(
+  "the matrix covers both properties, on and off",
+  `${STEP_MATRIX.length} row(s)`,
+  STEP_MATRIX.some((r) => isStandingOrder(r.trip)) &&
+    STEP_MATRIX.some((r) => !isStandingOrder(r.trip)) &&
+    STEP_MATRIX.some((r) => isShortNoticeSendBack(r.trip)) &&
+    STEP_MATRIX.some((r) => !isShortNoticeSendBack(r.trip)),
+);
+/**
+ * ⛔⛔ **Standing order BEFORE penalty, always.** A standing order's cost is the
+ * ORDER — every future trip, and the account — while the penalty is money.
+ * Raising the money warning first would read as an escalation the driver has
+ * already tapped past.
+ */
+const both = sendBackSteps({ ...SO_RIDE, sameDay: true });
+check(
+  "the standing-order warning comes before the penalty warning",
+  both.join(" → "),
+  both.indexOf("standing-order") < both.indexOf("penalty"),
+);
+check(
+  "...and the reason comes before both of them",
+  both.join(" → "),
+  both.indexOf("reason") < both.indexOf("standing-order"),
+);
+
+/**
+ * ⛔⛔ **Production's two popups disagree about their own buttons, and both are
+ * reproduced exactly.** Step 1 says No/Yes; step 2 says Cancel/Continue, named
+ * as such in the copy-update story's acceptance criteria. Harmonising them
+ * would be this prototype quietly redesigning production and then presenting
+ * the result as a replica.
+ */
+const CONFIRM_SOURCE = readFileSync(
+  join(ROOT, "components/driver/send-back-confirm-dialog.tsx"),
+  "utf8",
+);
+check(
+  "step 1 carries production's own copy, verbatim",
+  "Trip sendbacks are strongly discouraged…",
+  CONFIRM_SOURCE.replace(/\s+/g, " ").includes(
+    "Trip sendbacks are strongly discouraged and may result in penalties. Do you want to proceed in sending back the trip?",
+  ),
+);
+check(
+  "...and step 1 says No/Yes while step 2 says Cancel/Continue",
+  "production disagrees with itself; both reproduced",
+  /<AlertDialogCancel[\s\S]{0,300}No\s*<\/AlertDialogCancel>/.test(CONFIRM_SOURCE) &&
+    /<AlertDialogAction[\s\S]{0,300}Yes\s*<\/AlertDialogAction>/.test(CONFIRM_SOURCE) &&
+    /<AlertDialogCancel[\s\S]{0,200}Cancel\s*<\/AlertDialogCancel>/.test(SB_SOURCES.penalty),
+);
+
+// ---- the standing-order warning ------------------------------------------
+
+const SO_SOURCE = readFileSync(
+  join(ROOT, "components/driver/standing-order-warning-dialog.tsx"),
+  "utf8",
+);
+check(
+  "row 13's standing-order ride is seeded and tagged",
+  SO_RIDE ? `${SO_RIDE.scenario?.code} · ${SO_RIDE.standingOrderId}` : "MISSING",
+  Boolean(SO_RIDE) &&
+    isScenarioFor(SO_RIDE, "send-back-reason-form") &&
+    isStandingOrder(SO_RIDE) &&
+    !isShortNoticeSendBack(SO_RIDE),
+);
+check(
+  "a standing order is identified by an ID, not a boolean flag",
+  `standingOrderId=${SO_RIDE.standingOrderId}`,
+  typeof SO_RIDE.standingOrderId === "string" &&
+    SO_RIDE.standingOrderId.length > 0,
+);
+check(
+  "...and no other seeded ride is a standing order, so the warning is specific",
+  `${ALL_SEEDED.filter(isStandingOrder).length} of ${ALL_SEEDED.length} seeded rides`,
+  ALL_SEEDED.filter(isStandingOrder).length === 1,
+);
+/**
+ * ⛔⛔ **It warns; it does not BLOCK.** A driver who genuinely cannot do the
+ * trip still has to be able to return it — a hard block is exactly what sends
+ * them to Support, which is the traffic this row exists to absorb.
+ */
+check(
+  "the standing-order warning offers a way through, not a dead end",
+  "Cancel + Continue, and Continue completes the send-back",
+  /<AlertDialogAction[\s\S]{0,300}Continue\s*<\/AlertDialogAction>/.test(SO_SOURCE) &&
+    SB_SOURCES.more.includes("handleStandingOrderAccepted"),
+);
+const SO_PHRASES = [
+  "the whole standing order",
+  "reassign every future trip to another driver",
+  "suspension",
+];
+const missingSo = SO_PHRASES.filter(
+  (phrase) => !SO_SOURCE.replace(/\s+/g, " ").includes(phrase),
+);
+check(
+  "it names both consequences — the order, and the account",
+  missingSo.length ? `MISSING: ${missingSo.join(" | ")}` : SO_PHRASES.join(" · "),
+  missingSo.length === 0,
+);
+/**
+ * ⛔ And it says so: this copy is PROPOSED, unlike the penalty dialog's, whose
+ * every phrase is production's. Nothing in the vault says what the app tells a
+ * driver about sending back a standing order — because it tells them nothing.
+ */
+check(
+  "the proposed copy is marked as proposed, where the penalty copy is not",
+  "PROPOSED declared in the component",
+  /PROPOSED, not production/i.test(SO_SOURCE) &&
+    /verbatim/i.test(SB_SOURCES.penalty),
 );
 
 // ---- the penalty copy is production's, verbatim --------------------------
@@ -2539,7 +2699,7 @@ const gridHandler = SB_SOURCES.more.slice(
 check(
   "Send Back Trip is intercepted in the grid handler, and returns",
   `branch present: ${gridHandler.includes('if (id === "send-back")')}`,
-  /if \(id === "send-back"\)[\s\S]{0,900}setSendBackReasonOpen\(true\);[\s\S]{0,60}return;/.test(
+  /if \(id === "send-back"\)[\s\S]{0,900}setSendBackConfirmOpen\(true\);[\s\S]{0,60}return;/.test(
     gridHandler,
   ),
 );

@@ -170,19 +170,81 @@ export function isShortNoticeSendBack(trip: Trip): boolean {
  * it — and because the reason is known by then, a future "this reason is free"
  * rule (catalogue row 14, out of scope) has somewhere to say so.
  *
- * ⚠️ `"confirm"` is PRODUCTION'S step 1 and is **not built yet** — its copy is
- * the one thing no artifact in the vault quotes, and the user is supplying it.
- * It is named here so the sequence is complete and the gap is visible, rather
- * than the prototype silently implying production has two steps.
+ * ⭐ `"confirm"` is PRODUCTION'S step 1 and is now BUILT — the user supplied the
+ * screenshot on 2026-10-13, which is the only place its copy has ever been
+ * written down. ⚠️ It is **unconditional**: every send-back raises it. Only the
+ * penalty warning is conditional.
+ *
+ * ⛔ So the longest sequence is FOUR screens — confirm, reason, standing-order,
+ * penalty — and that is a lot to put in front of a driver. Each says something
+ * the others do not: production asks whether they mean it, we ask why, we warn
+ * what a standing order costs, and production warns what the money costs. The
+ * length is worth flagging to whoever owns this flow.
  */
-export type SendBackStep = "confirm" | "reason" | "penalty";
+/**
+ * Whether this trip belongs to a standing order.
+ *
+ * ⚠️ Presence of the id, nothing more. The prototype does not resolve the
+ * order, know its pattern or list its other trips — that is
+ * `Project - Standing Order Offers`, and row 13 is not it.
+ */
+export function isStandingOrder(trip: Trip): boolean {
+  return Boolean(trip.standingOrderId);
+}
 
-export const SEND_BACK_CONFIRM_BUILT = false;
+/**
+ * The steps a send-back runs through, in order.
+ *
+ * ⛔⛔ **The reason sits BETWEEN the two production popups, and that is a
+ * decision.** Before step 1 asks why before the driver has said they want to.
+ * After the penalty means tapping "Continue" on *"Are you sure you want to
+ * proceed?"* and then being handed a form — a bait-and-switch that also moves
+ * the real last gate off the screen that claims to be it.
+ *
+ * Between them, the driver confirms intent, gives a reason, and THEN sees the
+ * consequence. The penalty warning stays the final gate, where production puts
+ * it — and because the reason is known by then, a future "this reason is free"
+ * rule (catalogue row 14, out of scope) has somewhere to say so.
+ *
+ * ⛔⛔ **`"standing-order"` goes immediately after the reason, before the
+ * penalty, and the order is the point.** A standing order's cost is the ORDER —
+ * every future trip, and the account — while the penalty is money. Showing the
+ * money warning first and the severe one second would read as an escalation
+ * the driver has already tapped past. So the severe one is raised the moment
+ * the driver has said what they want to do, and production's own gate still
+ * ends the sequence unchanged.
+ *
+ * ⚠️ **All four combinations are real and the rule handles each**; the seed
+ * demonstrates three of them (`13a` short-notice, `13b` plain, `13c` standing
+ * order). A standing order that is ALSO short-notice raises both warnings —
+ * two screens, two different consequences — which is correct and is asserted
+ * rather than seeded, because a ride raising both would let a reviewer read
+ * them as one screen.
+ *
+ * ⭐ `"confirm"` is PRODUCTION'S step 1 and is now BUILT — the user supplied the
+ * screenshot on 2026-10-13, which is the only place its copy has ever been
+ * written down. ⚠️ It is **unconditional**: every send-back raises it. Only the
+ * penalty warning is conditional.
+ *
+ * ⛔ So the longest sequence is FOUR screens — confirm, reason, standing-order,
+ * penalty — and that is a lot to put in front of a driver. Each says something
+ * the others do not: production asks whether they mean it, we ask why, we warn
+ * what a standing order costs, and production warns what the money costs. The
+ * length is worth flagging to whoever owns this flow.
+ */
+export type SendBackStep =
+  | "confirm"
+  | "reason"
+  | "standing-order"
+  | "penalty";
+
+export const SEND_BACK_CONFIRM_BUILT = true;
 
 export function sendBackSteps(trip: Trip): SendBackStep[] {
   const steps: SendBackStep[] = [];
   if (SEND_BACK_CONFIRM_BUILT) steps.push("confirm");
   steps.push("reason");
+  if (isStandingOrder(trip)) steps.push("standing-order");
   if (isShortNoticeSendBack(trip)) steps.push("penalty");
   return steps;
 }

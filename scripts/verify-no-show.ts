@@ -117,6 +117,13 @@ const OTHER_SLICE_RIDES = new Set([
    * exercising nothing, which the count below exists to catch.
    */
   "1049800395",
+  /**
+   * ⚠️ Row 13's standing-order ride (`13c`), added 2026-10-13 — same shape as
+   * `13b`: no `locationRecords`, so the no-show walk finds nothing and falls
+   * through to the form. Nobody files a no-show on it; it exists to show what
+   * sending back a standing order costs.
+   */
+  "1049800396",
 ]);
 
 let refusing = 0;
@@ -139,7 +146,7 @@ check("some ride actually refuses", refusing > 0, `${refusing}`);
 // The exemption must stay a narrow carve-out, not a hole. If a Missed Swipe ride
 // stops refusing — or one is deleted — this says so rather than quietly
 // shrinking the population the check above runs on.
-check("every exempt ride is still exercised", exempted === 2,
+check("every exempt ride is still exercised", exempted === 3,
   `${exempted} of ${OTHER_SLICE_RIDES.size} exempt ids refuse (1049800382 is past pick-up, so no-show never applies)`);
 
 // ── The two stories, one ride each ──────────────────────────────
