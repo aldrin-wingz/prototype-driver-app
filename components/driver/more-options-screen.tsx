@@ -48,6 +48,7 @@ import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-
 import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
 import { AUTO_ASSIGN_LABEL } from "@/lib/driver-data/member-assignment";
+import { useSolution } from "@/lib/solutions/solution-context";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -69,8 +70,18 @@ interface OptionTile {
   icon: typeof Phone;
   variant: TileVariant;
   color: string;
-  /** Renders full-width and centred instead of taking a grid column. */
-  fullWidth?: boolean;
+  /**
+   * Catalogue rows this tile belongs to — proposals only; a production tile has
+   * none and is always shown.
+   *
+   * ⛔⛔ **A proposal is scoped to its own build.** While a solution is focused
+   * the grid shows that solution's proposed tiles and no others, so a reviewer
+   * looking at "ask to be their regular driver" does not also meet "I can't
+   * reach the member" and read the two as one feature. Several ids because a
+   * build can span rows — the same convention `TripScenario.solutions` uses,
+   * and for the same reason: rows 04/05 and 09/10 are each ONE build.
+   */
+  solutions?: string[];
   /**
    * Fill the glyph rather than stroking it.
    *
@@ -82,6 +93,17 @@ interface OptionTile {
    */
   solid?: boolean;
 }
+
+/**
+ * A tile with its place in the grid worked out.
+ *
+ * ⛔⛔ **`fullWidth` is NOT on `OptionTile`, deliberately.** It is a function of
+ * how many tiles the grid ended up with and where this one sits — so a tile
+ * literal that set it would be asserting a layout it cannot know, and would
+ * survive a change in the count and leave a hole. Keeping it off the authored
+ * type makes that a compile error rather than something a check has to catch.
+ */
+type GridTile = OptionTile & { fullWidth: boolean };
 
 /**
  * The seven actions in the production More Options screen, in capture order.
@@ -174,19 +196,11 @@ const CANNOT_REACH_TILE: OptionTile = {
   // mail app.
   variant: "filled",
   color: DRIVER_NAVY,
-  fullWidth: true,
+  solutions: ["tag-number-invalid", "cannot-reach-member"],
 };
 
 /**
  * Catalogue row **09** — ask Support to send you this member's future trips.
- *
- * ⚠️ Full-width, and it does NOT pair with `CANNOT_REACH_TILE` into a row of
- * two. Pairing them would be the cheaper layout and it is wrong for the same
- * reason the note above gives: these are proposals, and a proposal that takes a
- * production tile's column — or that takes another proposal's, making the two
- * read as one feature — has changed the captured grid by more than adding a
- * row. The only edit to `s-03a` remains extra full-width rows above Send Back
- * Trip, however many there eventually are.
  */
 const AUTO_ASSIGN_TILE: OptionTile = {
   id: "auto-assign",
@@ -194,7 +208,7 @@ const AUTO_ASSIGN_TILE: OptionTile = {
   icon: UserRoundCheck,
   variant: "filled",
   color: DRIVER_NAVY,
-  fullWidth: true,
+  solutions: ["auto-assign-request", "request-feed-member-filter"],
 };
 
 /**
@@ -208,22 +222,52 @@ const AUTO_ASSIGN_TILE: OptionTile = {
 const PROPOSED_TILES: OptionTile[] = [CANNOT_REACH_TILE, AUTO_ASSIGN_TILE];
 
 /**
- * The grid as rendered: every production tile in its captured place, the
- * proposals inserted above `Send Back Trip`, and Send Back Trip widened to
- * full-width so it still ends the grid on its own row.
+ * The grid as rendered, for the solution in focus.
  *
- * ⚠️ Exported so `verify-solutions` can read the REAL array rather than
- * regex-matching this file's source. A regex over source proves a line is
- * spelled a certain way; it cannot prove the grid that line builds is the one
- * on screen, and the first time the insert was reshaped the regex was the only
- * thing that noticed — which is backwards.
+ * Two rules, both the user's, recorded 2026-10-12:
+ *
+ * **1. Pack two across; only a TRAILING odd tile goes full-width.** An even
+ * count fills left and right all the way down. An odd count pairs everything it
+ * can and centres the last one.
+ *
+ * ⛔⛔ **This SUPERSEDES the Phase 4/5 rule** that every proposal be full-width
+ * so production tiles kept their captured column. That rule was defensible with
+ * one proposal and wrong with two: it produced a stack of three full-width
+ * tiles that reads as three sections rather than one grid. Capture fidelity for
+ * `s-03a` is now same tiles, same order, same variants — **not** the same
+ * column for each one. A decision, not a drift.
+ *
+ * **2. A proposal belongs to its own build.** With a solution focused the grid
+ * shows that solution's proposed tiles and no others: a reviewer looking at
+ * "ask to be their regular driver" must not also meet "I can't reach the
+ * member", because two proposals side by side read as one feature. With
+ * NOTHING focused every proposal shows — the same rule `ridesForSolution` uses,
+ * where no focus means no filtering rather than an empty screen.
+ *
+ * ⚠️ Pure and exported so `verify-solutions` can build the real grid for each
+ * focus. A regex over this file proves a line is spelled a certain way; it
+ * cannot prove the grid that line builds is the one on screen.
  */
-export function buildGridTiles(): OptionTile[] {
-  return PRODUCTION_TILES.flatMap((tile) =>
-    tile.id === "send-back"
-      ? [...PROPOSED_TILES, { ...tile, fullWidth: true }]
-      : [tile]
+export function buildGridTiles(activeSolutionId: string | null): GridTile[] {
+  const proposals = PROPOSED_TILES.filter(
+    (tile) =>
+      activeSolutionId === null ||
+      (tile.solutions ?? []).includes(activeSolutionId)
   );
+
+  const packed = PRODUCTION_TILES.flatMap((tile) =>
+    // ⚠️ Inserted ABOVE `Send Back Trip`, never appended, so the destructive
+    // action stays last — where the capture has it and where a thumb expects it.
+    tile.id === "send-back" ? [...proposals, tile] : [tile]
+  );
+
+  // ⛔ Derived here and nowhere else. The last tile is full-width only when
+  // there is no partner for it; every other tile takes a column.
+  const odd = packed.length % 2 === 1;
+  return packed.map((tile, index) => ({
+    ...tile,
+    fullWidth: odd && index === packed.length - 1,
+  }));
 }
 
 /**
@@ -350,6 +394,7 @@ export function MoreOptionsScreen({
   // Support did with it, which for a no-show it never learns. Using the pending
   // lookup here would let the same claim be filed twice over.
   const { submittedForms } = useRideFlow();
+  const { active } = useSolution();
   const pending = submittedForms.some((record) => record.tripId === trip.id);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
@@ -382,7 +427,12 @@ export function MoreOptionsScreen({
    * driver's thumb expects it. Every production tile keeps its column and its
    * variant; the only change to the captured grid is one extra row.
    */
-  const gridTiles: OptionTile[] = buildGridTiles();
+  /**
+   * ⚠️ The grid depends on what is FOCUSED, so it is rebuilt per render rather
+   * than computed once at module scope. `active` is `undefined` for the plain
+   * mirror and the builder reads that as "no filtering", not "no proposals".
+   */
+  const gridTiles: GridTile[] = buildGridTiles(active?.id ?? null);
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -482,6 +532,12 @@ export function MoreOptionsScreen({
               "border-b border-[#F0F0F0]",
               // Vertical hairline on left-hand cells only, so the grid reads as
               // cells rather than boxed tiles.
+              //
+              // ⚠️ `index % 2 === 0` is correct ONLY because every tile before a
+              // full-width one takes exactly one column — which the packing rule
+              // guarantees by making full-width the last tile and nothing else.
+              // Any mid-grid full-width tile would shift the parity of every row
+              // after it and the hairlines would land down the wrong side.
               !tile.fullWidth && index % 2 === 0 && "border-r border-[#F0F0F0]"
             )}
             style={tile.fullWidth ? { gridColumn: "span 2" } : undefined}

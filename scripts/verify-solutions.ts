@@ -1039,6 +1039,19 @@ check(
   foundTiles.length === EXPECTED_PRODUCTION_TILES,
 );
 const PROPOSED_TILE_IDS = ["cannot-reach", "auto-assign"];
+/**
+ * Which catalogue rows each proposed tile belongs to — DECLARED here, not read
+ * off the tile. Reading the tile's own `solutions` would make the sweep below
+ * agree with whatever the tile says, which is a check validating its subject
+ * against itself.
+ *
+ * Several ids each because a build spans rows: 04/05 are one build and so are
+ * 09/10, exactly as their scenario rides are tagged.
+ */
+const PROPOSAL_OWNERS: Record<string, string[]> = {
+  "cannot-reach": ["tag-number-invalid", "cannot-reach-member"],
+  "auto-assign": ["auto-assign-request", "request-feed-member-filter"],
+};
 check(
   "...and every added tile sits OUTSIDE the production list",
   `${PROPOSED_TILE_IDS.filter((id) => tileBlock.includes(`id: "${id}"`)).length} of ${PROPOSED_TILE_IDS.length} leaked into it`,
@@ -1056,42 +1069,156 @@ check(
  * fullWidth: true }]`. That proved one line was spelled a certain way; it could
  * not prove the grid that line builds is the grid on screen, and adding a
  * second proposal reshaped the insert and broke the regex while the rendered
- * grid was still correct — the check failing for the one reason that was not a
- * defect. `buildGridTiles()` is exported precisely so this reads the data.
+ * grid was still correct. `buildGridTiles()` is exported precisely so this
+ * reads the data — and it now takes a focus, so the grid is built per focus.
  */
-const grid = buildGridTiles();
-const last = grid[grid.length - 1];
+
+/**
+ * ⚠️ **The declared grid, per focus.** Written out rather than derived from
+ * `PROPOSED_TILES`, because deriving it would make the check agree with
+ * whatever the builder does. `null` is the plain mirror.
+ *
+ * ⛔ The Phase 4/5 rule — every proposal full-width so production tiles keep
+ * their captured column — was SUPERSEDED by the user on 2026-10-12. Tiles now
+ * pack two across and only a trailing odd tile is full-width.
+ */
+const EXPECTED_GRIDS: Array<{
+  focus: string | null;
+  tiles: string[];
+  fullWidth: string | null;
+}> = [
+  {
+    // Nothing focused: no filtering, so both proposals show. Nine tiles — odd.
+    focus: null,
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "no-show", "cannot-reach", "auto-assign", "send-back",
+    ],
+    fullWidth: "send-back",
+  },
+  {
+    // Row 09 focused — the user's own worked example. Eight tiles, four clean
+    // rows of two, and ⛔ NO `cannot-reach`: it belongs to another build.
+    focus: "auto-assign-request",
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "no-show", "auto-assign", "send-back",
+    ],
+    fullWidth: null,
+  },
+  {
+    // Row 10 focused. Same build as 09, so the same tile — a build spans rows.
+    focus: "request-feed-member-filter",
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "no-show", "auto-assign", "send-back",
+    ],
+    fullWidth: null,
+  },
+  {
+    // Row 05 focused: its own tile, and ⛔ not row 09's.
+    focus: "cannot-reach-member",
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "no-show", "cannot-reach", "send-back",
+    ],
+    fullWidth: null,
+  },
+  {
+    // A built row with NO tile of its own: the captured seven, odd, so Send
+    // Back Trip is centred exactly as it is in `s-03a`.
+    focus: "missed-swipe",
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "no-show", "send-back",
+    ],
+    fullWidth: "send-back",
+  },
+];
+for (const { focus, tiles, fullWidth } of EXPECTED_GRIDS) {
+  const grid = buildGridTiles(focus);
+  const ids = grid.map((t) => t.id);
+  check(
+    `grid for ${focus ?? "no focus"} is the declared ${tiles.length} tiles, in order`,
+    `${ids.length}: ${ids.join(", ")}`,
+    ids.length === tiles.length && tiles.every((id, i) => ids[i] === id),
+  );
+  const wide = grid.filter((t) => t.fullWidth).map((t) => t.id);
+  check(
+    `...and ${fullWidth ? `only ${fullWidth} is full-width` : "nothing is full-width"}`,
+    `${wide.length} full-width: ${wide.join(", ") || "none"}`,
+    fullWidth === null
+      ? wide.length === 0
+      : wide.length === 1 && wide[0] === fullWidth,
+  );
+}
+
+/**
+ * ⛔⛔ **The packing rule itself**, asserted over every focus rather than per
+ * case: full-width is a function of parity and position and of nothing else.
+ * A tile that authored its own `fullWidth` would pass the per-grid checks above
+ * while leaving a hole the moment the count changed.
+ */
+for (const { focus } of EXPECTED_GRIDS) {
+  const grid = buildGridTiles(focus);
+  const odd = grid.length % 2 === 1;
+  check(
+    `packing for ${focus ?? "no focus"}: ${grid.length} tiles, ${odd ? "odd" : "even"}`,
+    `full-width count ${grid.filter((t) => t.fullWidth).length}, last=${grid[grid.length - 1]?.id}`,
+    grid.every((t, i) => Boolean(t.fullWidth) === (odd && i === grid.length - 1)),
+  );
+  check(
+    `...and Send Back Trip is still last for ${focus ?? "no focus"}`,
+    `${grid[grid.length - 1]?.id}`,
+    grid[grid.length - 1]?.id === "send-back",
+  );
+}
+/** The rule has to actually fire both ways, or parity is untested. */
 check(
-  "Send Back Trip is still last and still full-width",
-  `${grid.length} tiles, last = ${last?.id} (fullWidth: ${last?.fullWidth === true})`,
-  last?.id === "send-back" && last.fullWidth === true,
+  "the declared grids cover both an odd and an even count",
+  EXPECTED_GRIDS.map((g) => `${g.focus ?? "none"}=${buildGridTiles(g.focus).length}`).join(" "),
+  EXPECTED_GRIDS.some(({ focus }) => buildGridTiles(focus).length % 2 === 1) &&
+    EXPECTED_GRIDS.some(({ focus }) => buildGridTiles(focus).length % 2 === 0),
+);
+
+/**
+ * ⛔⛔ **A proposal never appears under another build's focus**, swept over
+ * EVERY built row rather than the few declared above — that is the user's rule
+ * and the sweep is what makes it a rule rather than four examples.
+ */
+let tileSweep = 0;
+let tileLeaks = 0;
+for (const row of builtRows) {
+  const ids = buildGridTiles(row.id).map((t) => t.id);
+  for (const proposal of PROPOSED_TILE_IDS) {
+    tileSweep += 1;
+    const belongs = PROPOSAL_OWNERS[proposal].includes(row.id);
+    if (ids.includes(proposal) !== belongs) tileLeaks += 1;
+  }
+}
+check(
+  "no proposed tile shows under a build it does not belong to",
+  `${tileLeaks} mismatch(es) of ${tileSweep} (row x proposal) pair(s)`,
+  tileLeaks === 0,
 );
 check(
-  "every production tile keeps its captured column and variant",
-  `${grid.filter((t) => !PROPOSED_TILE_IDS.includes(t.id) && t.id !== "send-back" && t.fullWidth).length} widened of ${EXPECTED_PRODUCTION_TILES - 1}`,
-  grid
-    .filter((t) => !PROPOSED_TILE_IDS.includes(t.id) && t.id !== "send-back")
-    .every((t) => !t.fullWidth),
+  "...and the sweep saw proposals both shown and hidden",
+  `${builtRows.length} built row(s) x ${PROPOSED_TILE_IDS.length} proposal(s)`,
+  builtRows.some((r) => buildGridTiles(r.id).some((t) => PROPOSED_TILE_IDS.includes(t.id))) &&
+    builtRows.some((r) => !buildGridTiles(r.id).some((t) => PROPOSED_TILE_IDS.includes(t.id))),
+);
+/**
+ * ⚠️ Every production tile still appears under every focus. The superseded rule
+ * protected their COLUMN; nothing ever licensed removing one.
+ */
+const droppedProduction = builtRows.filter(
+  (row) =>
+    !productionTileIds.every((id) => buildGridTiles(row.id).some((t) => t.id === id)),
 );
 check(
-  "every proposal is full-width, so none takes a production tile's column",
-  `${grid.filter((t) => PROPOSED_TILE_IDS.includes(t.id) && t.fullWidth).length} of ${PROPOSED_TILE_IDS.length}`,
-  grid
-    .filter((t) => PROPOSED_TILE_IDS.includes(t.id))
-    .every((t) => t.fullWidth === true),
-);
-check(
-  "the proposals sit between the production grid and Send Back Trip",
-  `proposal indices ${grid.map((t, i) => (PROPOSED_TILE_IDS.includes(t.id) ? i : -1)).filter((i) => i >= 0).join(", ")} of ${grid.length}`,
-  PROPOSED_TILE_IDS.every((id) => {
-    const i = grid.findIndex((t) => t.id === id);
-    return i > grid.findIndex((t) => t.id === "no-show") && i < grid.length - 1;
-  }),
-);
-check(
-  "the grid is the production list plus exactly the proposals",
-  `${grid.length} tiles = ${EXPECTED_PRODUCTION_TILES} production + ${PROPOSED_TILE_IDS.length} proposed`,
-  grid.length === EXPECTED_PRODUCTION_TILES + PROPOSED_TILE_IDS.length,
+  "every production tile survives every focus",
+  `${droppedProduction.length} of ${builtRows.length} row(s) lost one`,
+  droppedProduction.length === 0,
 );
 
 // ---------------------------------------------------------------------------
