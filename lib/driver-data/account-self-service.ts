@@ -161,26 +161,60 @@ export type ProofFactor =
  *
  * So every change carries BOTH — something that proves the person, and
  * something that proves the new value. They are never the same factor.
+ *
+ * ⭐ User direction, 2026-10-13: *"for email and phone, after confirming, ask
+ * for OTP."* That is the right shape and it is why `valueConfirmations` is a
+ * list — the typo guard and the reachability proof are two different jobs, and
+ * a contact detail needs both.
  */
 export interface ChangeRule {
   field: AccountField;
-  /** Proves the person asking is the account holder. */
-  identityProof: ProofFactor;
-  /** Proves the new value is real and was typed correctly. */
-  valueConfirmation: ProofFactor;
+  /**
+   * Proves the person asking is the account holder, in order.
+   *
+   * ⛔ A LIST for the same reason the other one is: a change can need more than
+   * one thing, and writing it as a single factor forced a choice that hid a
+   * hole. Requiring the CURRENT password to change the password locked out the
+   * only driver who needs that screen — the one who has forgotten it.
+   */
+  identityProofs: ProofFactor[];
+  /**
+   * Proves the new value is real — in order, each step run after the last.
+   *
+   * ⛔ A LIST, because typing twice is not enough on its own. Two fields that
+   * match prove the driver typed the same thing twice; they do not prove the
+   * thing exists. An email typed wrong twice is a lockout the app just
+   * confirmed. So every contact detail ends in a code sent TO THE NEW ONE,
+   * which is the only step that proves it can actually be reached.
+   *
+   * ⚠️ A password has no second step: there is nowhere to send a code, and the
+   * driver is left holding the only copy either way.
+   */
+  valueConfirmations: ProofFactor[];
 }
 
 /**
  * Half B — changing a detail while SIGNED IN.
  *
- * ⚠️ The password row is the one that does not rest on the session. A signed-in
- * session is a property of the handset, not the person; the threat here is a
- * borrowed unlocked phone, and the current password is what separates the two.
+ * ⭐ User direction, 2026-10-13: *"if I change password confirm with Phone OTP
+ * or email OTP."* The password row therefore does NOT rest on the session, and
+ * does not ask for the current password either — a code to a contact already on
+ * file, the driver choosing which.
+ *
+ * ⛔⛔ Asking for the CURRENT password was the first build and it was wrong in
+ * a way worth keeping written down: it locked out the only driver who needs
+ * that screen. Someone who remembers their password does not need to reset it;
+ * someone who has forgotten it cannot answer. The requirement read as security
+ * and functioned as a wall in front of the use case.
+ *
+ * ⚠️ The honest cost: a code to the PHONE on file arrives on the same handset a
+ * thief is already holding. `OTP_CHANNELS` offers the email as well, which does
+ * not — and a driver who still knows their password has no reason to be here.
  */
 export const SETTINGS_RULES: readonly ChangeRule[] = [
-  { field: "email", identityProof: "signed-in-session", valueConfirmation: "typed-twice" },
-  { field: "password", identityProof: "current-password", valueConfirmation: "typed-twice" },
-  { field: "phone", identityProof: "signed-in-session", valueConfirmation: "otp-to-new-contact" },
+  { field: "email", identityProofs: ["signed-in-session"], valueConfirmations: ["typed-twice", "otp-to-new-contact"] },
+  { field: "password", identityProofs: ["otp-to-contact-on-file"], valueConfirmations: ["typed-twice"] },
+  { field: "phone", identityProofs: ["signed-in-session"], valueConfirmations: ["otp-to-new-contact"] },
 ];
 
 /**
@@ -192,10 +226,13 @@ export const SETTINGS_RULES: readonly ChangeRule[] = [
  * the identity proof — that is the whole guard.
  */
 export const RECOVERY_RULES: readonly ChangeRule[] = [
-  { field: "email", identityProof: "current-password", valueConfirmation: "typed-twice" },
-  { field: "password", identityProof: "otp-to-contact-on-file", valueConfirmation: "typed-twice" },
-  { field: "phone", identityProof: "current-password", valueConfirmation: "otp-to-new-contact" },
+  { field: "email", identityProofs: ["current-password"], valueConfirmations: ["typed-twice", "otp-to-new-contact"] },
+  { field: "password", identityProofs: ["otp-to-contact-on-file"], valueConfirmations: ["typed-twice"] },
+  { field: "phone", identityProofs: ["current-password"], valueConfirmations: ["otp-to-new-contact"] },
 ];
+
+/** ⛔ There is no new contact to send a code to when the password changes. */
+export const PASSWORD_HAS_NO_NEW_CONTACT = true;
 
 export function changeRuleFor(
   field: AccountField,
@@ -206,6 +243,23 @@ export function changeRuleFor(
   if (!rule) throw new Error(`No ${where} rule for ${field}`);
   return rule;
 }
+
+/**
+ * Where a code can be sent to prove the account is yours. The driver picks.
+ *
+ * ⛔ Both are contacts ALREADY ON FILE. Neither is a contact being set — that
+ * distinction is the whole guard and it is why this list is separate from
+ * `CONTACT_FIELDS` below, which is about what is being CHANGED.
+ */
+export const OTP_CHANNELS: readonly AccountField[] = ["phone", "email"];
+
+/**
+ * ⛔ Email and phone are CONTACT details: the account reaches the driver
+ * through them, so a wrong one is a lockout the app itself created. Both must
+ * end in a code sent to the new value. A password is not a contact detail and
+ * has nowhere to send one.
+ */
+export const CONTACT_FIELDS: readonly AccountField[] = ["email", "phone"];
 
 /** The two factors a locked-out driver may offer. Nothing else counts. */
 export const RECOVERY_IDENTITY_PROOFS: readonly ProofFactor[] = [

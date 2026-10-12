@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/driver/bottom-nav";
 import { DriverNotesModal } from "@/components/driver/driver-notes-modal";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
   APP_VERSION, buildOptionsRows, DRIVER_NAME, INSTALL_ID_PLACEHOLDER,
@@ -49,6 +50,7 @@ const ICONS: Record<OptionsRowId, typeof History> = {
 
 export default function OptionsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const { active } = useSolution();
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -117,6 +119,16 @@ export default function OptionsPage() {
                 className={cls}
                 onClick={() => {
                   if (row.id === "driver-notes") { setNotesOpen(true); return; }
+                  /*
+                    ⚠️ Wired, not proposed. Logout is one of the CAPTURED eleven
+                    and in production it lands on the sign-in screen — it toasted
+                    only because no such screen existed in this prototype until
+                    row 15 built one. So this is replication catching up, and it
+                    is deliberately NOT gated: an unfocused run lands on the
+                    plain replicated sign-in, with row 15's proposed recovery
+                    link absent, which is exactly production's behaviour.
+                  */
+                  if (row.id === "logout") { router.push("/login"); return; }
                   toast({
                     title: row.label,
                     description: "Not wired in the prototype — this is the production action.",

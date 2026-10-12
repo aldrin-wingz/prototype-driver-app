@@ -33,7 +33,9 @@ import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
   ACCOUNT_SOLUTION_ID,
   ACCOUNT_ON_FILE,
-  changeRuleFor,
+  CONTACT_FIELDS,
+  OTP_CHANNELS,
+  PASSWORD_HAS_NO_NEW_CONTACT,
   maskEmail,
   maskPhone,
   OTP_ERROR_INVALID,
@@ -2971,29 +2973,101 @@ check(
  * identity proof, and identity and value are never the same factor.
  */
 const ALL_RULES = [...SETTINGS_RULES, ...RECOVERY_RULES];
-const identityByNewContact = ALL_RULES.filter(
-  (rule) => rule.identityProof === "otp-to-new-contact",
+const identityByNewContact = ALL_RULES.filter((rule) =>
+  rule.identityProofs.includes("otp-to-new-contact"),
 );
 check(
   "a code to the NEW contact never proves identity",
   `${identityByNewContact.length} of ${ALL_RULES.length} rule(s) misuse it`,
   identityByNewContact.length === 0,
 );
-const sameFactorTwice = ALL_RULES.filter((rule) => rule.identityProof === rule.valueConfirmation);
+const sameFactorTwice = ALL_RULES.filter((rule) =>
+  rule.identityProofs.some((proof) => rule.valueConfirmations.includes(proof)),
+);
 check(
   "...and no rule uses one factor for both questions",
   `${sameFactorTwice.length} of ${ALL_RULES.length} rule(s) collapse them`,
   sameFactorTwice.length === 0,
 );
-/** ⚠️ Would pass vacuously on an empty list. Assert there is something to check. */
+/** ⚠️ Would pass vacuously on empty lists. Assert there is something to check. */
+const emptyRules = ALL_RULES.filter(
+  (rule) => rule.identityProofs.length === 0 || rule.valueConfirmations.length === 0,
+);
 check(
   "...and there were rules to check, for both halves",
-  `${SETTINGS_RULES.length} settings + ${RECOVERY_RULES.length} recovery`,
-  SETTINGS_RULES.length === 3 && RECOVERY_RULES.length === 3,
+  `${SETTINGS_RULES.length} settings + ${RECOVERY_RULES.length} recovery, ${emptyRules.length} empty`,
+  SETTINGS_RULES.length === 3 && RECOVERY_RULES.length === 3 && emptyRules.length === 0,
 );
+
+/**
+ * ⭐ User direction, 2026-10-13: *"for email and phone, after confirming, ask
+ * for OTP."*
+ *
+ * ⛔ Typing an address twice proves the driver typed the same thing twice; it
+ * does not prove the address exists. An address mistyped identically twice is a
+ * lockout the app confirmed on its way out. So every CONTACT change must END in
+ * a code sent to the new value — in both halves, on both fields.
+ */
+const contactRules = ALL_RULES.filter((rule) => CONTACT_FIELDS.includes(rule.field));
+const notEndingInCode = contactRules.filter(
+  (rule) => rule.valueConfirmations.at(-1) !== "otp-to-new-contact",
+);
+check(
+  "every contact change ends in a code sent to the new value",
+  `${notEndingInCode.length} of ${contactRules.length} contact rule(s) do not`,
+  notEndingInCode.length === 0 && contactRules.length === 4,
+);
+/** ⛔ And the typo guard comes BEFORE it on the field that is typed twice. */
+const emailRules = ALL_RULES.filter((rule) => rule.field === "email");
+check(
+  "...and the email's typo guard runs before its code, not instead of it",
+  emailRules.map((r) => r.valueConfirmations.join(" → ")).join(" | "),
+  emailRules.length === 2 &&
+    emailRules.every((rule) =>
+      rule.valueConfirmations.indexOf("typed-twice") <
+        rule.valueConfirmations.indexOf("otp-to-new-contact")),
+);
+/** ⛔ A password has no new contact, so it cannot have that step. */
+const passwordRules = ALL_RULES.filter((rule) => rule.field === "password");
+check(
+  "a password change never sends a code to a new contact — there isn't one",
+  `${passwordRules.filter((r) => r.valueConfirmations.includes("otp-to-new-contact")).length} of ${passwordRules.length}`,
+  PASSWORD_HAS_NO_NEW_CONTACT &&
+    passwordRules.every((rule) => !rule.valueConfirmations.includes("otp-to-new-contact")),
+);
+
+/**
+ * ⭐ User direction: *"if I change password confirm with Phone OTP or email
+ * OTP."*
+ *
+ * ⛔⛔ And NOT with the current password. That was the first build, and it was
+ * wrong in a way worth asserting against: it locked out the only driver who
+ * needs the screen. Someone who remembers their password does not need to reset
+ * it; someone who has forgotten it cannot answer. The requirement read as
+ * security and worked as a wall in front of the use case.
+ */
+check(
+  "changing the password is confirmed by a code to a contact on file",
+  passwordRules.map((r) => r.identityProofs.join("+")).join(" / "),
+  passwordRules.length === 2 &&
+    passwordRules.every((rule) => rule.identityProofs.includes("otp-to-contact-on-file")),
+);
+check(
+  "...and never by the current password, which the driver may not have",
+  `${passwordRules.filter((r) => r.identityProofs.includes("current-password")).length} of ${passwordRules.length} still ask for it`,
+  passwordRules.every((rule) => !rule.identityProofs.includes("current-password")),
+);
+/** Both channels on file are offered, and neither is a contact being SET. */
+check(
+  "...and the driver picks which contact on file receives it",
+  `${OTP_CHANNELS.length} channel(s): ${OTP_CHANNELS.join(", ")}`,
+  OTP_CHANNELS.length === 2 &&
+    OTP_CHANNELS.includes("phone") && OTP_CHANNELS.includes("email"),
+);
+
 /** The locked-out driver may offer exactly two things. Nothing else counts. */
-const strayProofs = RECOVERY_RULES.filter(
-  (rule) => !RECOVERY_IDENTITY_PROOFS.includes(rule.identityProof),
+const strayProofs = RECOVERY_RULES.filter((rule) =>
+  rule.identityProofs.some((proof) => !RECOVERY_IDENTITY_PROOFS.includes(proof)),
 );
 check(
   "a locked-out driver proves identity only the two declared ways",
@@ -3003,16 +3077,8 @@ check(
 /** ⛔ And a session cannot travel: there is no session when you are locked out. */
 check(
   "...and no recovery rule leans on being signed in",
-  `${RECOVERY_RULES.filter((r) => r.identityProof === "signed-in-session").length} of ${RECOVERY_RULES.length}`,
-  RECOVERY_RULES.every((rule) => rule.identityProof !== "signed-in-session"),
-);
-/** ⚠️ The password row is the one that must NOT rest on the session. */
-check(
-  "changing the password asks for the current one, signed in or not",
-  [...SETTINGS_RULES, ...RECOVERY_RULES]
-    .filter((r) => r.field === "password")
-    .map((r) => r.identityProof).join(" / "),
-  changeRuleFor("password", "settings").identityProof === "current-password",
+  `${RECOVERY_RULES.filter((r) => r.identityProofs.includes("signed-in-session")).length} of ${RECOVERY_RULES.length}`,
+  RECOVERY_RULES.every((rule) => !rule.identityProofs.includes("signed-in-session")),
 );
 
 /* --- 13d. Nothing whole is printed back ---------------------------------- */
@@ -3120,6 +3186,50 @@ check(
   ["app/page.tsx", "app/my-rides/page.tsx", "app/requests/page.tsx"].every(
     (file) => !readFileSync(file, "utf8").includes("account-self-service"),
   ),
+);
+
+/**
+ * ⚠️ Logout is one of the CAPTURED eleven and in production it lands on the
+ * sign-in screen. It toasted here only because no such screen existed until
+ * row 15 built one, so wiring it is replication catching up — NOT a proposal,
+ * and deliberately not gated. An unfocused run therefore lands on the plain
+ * replicated sign-in with row 15's recovery link absent, which is what
+ * production does.
+ */
+check(
+  "Logout lands on the sign-in screen, as production does",
+  "router.push(\"/login\") on the logout row",
+  /row\.id === "logout"[\s\S]{0,80}router\.push\("\/login"\)/.test(A_SOURCES.options),
+);
+check(
+  "...and it is still one of the captured eleven, not a proposal",
+  `logout.proposed = ${buildOptionsRows(null).find((r) => r.id === "logout")?.proposed ?? false}`,
+  buildOptionsRows(null).some((r) => r.id === "logout") &&
+    !buildOptionsRows(null).find((r) => r.id === "logout")?.proposed,
+);
+
+/**
+ * ⛔⛔ `TOAST_LIMIT` is 1 (`hooks/use-toast.ts`), so two toasts raised in one
+ * handler show only the SECOND. A recovery flow that said "Email updated" and
+ * then "Welcome back" told the driver nothing about the thing they came for —
+ * two correct calls, one of them invisible, and nothing anywhere reports a
+ * dropped toast. The sign-in toast now carries what changed instead.
+ */
+check(
+  "the toast limit is still 1, so this rule still applies",
+  `TOAST_LIMIT = ${/TOAST_LIMIT = (\d+)/.exec(readFileSync("hooks/use-toast.ts", "utf8"))?.[1]}`,
+  /const TOAST_LIMIT = 1;/.test(readFileSync("hooks/use-toast.ts", "utf8")),
+);
+check(
+  "...and no handler raises a toast immediately before navigating away",
+  "no toast({...}) directly followed by signedIn(",
+  !/toast\(\{[\s\S]{0,260}?\}\);\s*\n\s*signedIn\(/.test(A_SOURCES.login),
+);
+check(
+  "...and what changed is carried into the one toast that survives",
+  "signedIn(`Email updated…`) / signedIn(`Phone number updated…`)",
+  /signedIn\(`Email updated/.test(A_SOURCES.login) &&
+    /signedIn\(`Phone number updated/.test(A_SOURCES.login),
 );
 
 /* --- 13g. The two halves are one build ----------------------------------- */

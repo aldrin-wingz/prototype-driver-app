@@ -38,8 +38,16 @@ import {
  * backend.
  */
 
-/** Why the code screen is open. The same six boxes serve three purposes. */
-type OtpPurpose = "sign-in" | "recover-prove" | "recover-new-phone";
+/**
+ * Why the code screen is open. The same six boxes serve four purposes.
+ *
+ * ⛔ `recover-prove` sends to the contact ALREADY ON FILE and proves identity.
+ * The other two `recover-new-*` send to the contact being SET and prove only
+ * that it can be reached. Same screen, opposite jobs — which is exactly why the
+ * rules keep them as different factors.
+ */
+type OtpPurpose =
+  | "sign-in" | "recover-prove" | "recover-new-phone" | "recover-new-email";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -87,8 +95,22 @@ export default function LoginPage() {
     go("otp");
   }
 
-  function signedIn(message: string) {
-    toast({ title: message, description: "Signed in — the prototype has no session; this is the demo landing." });
+  /**
+   * ⛔⛔ ONE toast, carrying what changed.
+   *
+   * `TOAST_LIMIT` is 1 (`hooks/use-toast.ts`), so a handler that fired "Email
+   * updated" and then "Welcome back" showed only the second — the driver
+   * reached the end of a recovery flow and was never told the thing they came
+   * for had happened. Two correct calls, one of them invisible. Found by
+   * walking; nothing anywhere reports a dropped toast.
+   */
+  function signedIn(changed?: string) {
+    toast({
+      title: changed ?? "Welcome back",
+      description: changed
+        ? "Signed in with your new details."
+        : "Signed in — the prototype has no session; this is the demo landing.",
+    });
     router.push("/");
   }
 
@@ -170,7 +192,7 @@ export default function LoginPage() {
               setError("That password is not correct.");
               return;
             }
-            signedIn("Welcome back");
+            signedIn();
           }}
         >
           Sign in
@@ -189,11 +211,13 @@ export default function LoginPage() {
 
   if (step === "otp") {
     const target =
-      otpPurpose === "recover-new-phone"
-        ? `+1 ${newPhone}`
-        : otpPurpose === "recover-prove"
-          ? `+1 ${maskPhone(ACCOUNT_ON_FILE.phone)}`
-          : `+1 ${phone}`;
+      otpPurpose === "recover-new-email"
+        ? newEmail.trim()
+        : otpPurpose === "recover-new-phone"
+          ? `+1 ${newPhone}`
+          : otpPurpose === "recover-prove"
+            ? `+1 ${maskPhone(ACCOUNT_ON_FILE.phone)}`
+            : `+1 ${phone}`;
     return (
       <AuthShell>
         <AuthTitle>{OTP_TITLE}</AuthTitle>
@@ -220,13 +244,13 @@ export default function LoginPage() {
               setOtpError(OTP_ERROR_INVALID);
               return;
             }
-            if (otpPurpose === "sign-in") { signedIn("Welcome back"); return; }
+            if (otpPurpose === "sign-in") { signedIn(); return; }
             if (otpPurpose === "recover-prove") { go("recover-update"); return; }
-            toast({
-              title: "Phone number updated",
-              description: `Your number is now +1 ${newPhone}.`,
-            });
-            signedIn("Welcome back");
+            if (otpPurpose === "recover-new-email") {
+              signedIn(`Email updated to ${newEmail.trim()}`);
+              return;
+            }
+            signedIn(`Phone number updated to +1 ${newPhone}`);
           }}
         >
           Verify
@@ -247,7 +271,15 @@ export default function LoginPage() {
         )}
         <AuthLink
           className="mt-5"
-          onClick={() => go(otpPurpose === "sign-in" ? "signin-phone" : "recover-identify")}
+          onClick={() =>
+            go(
+              otpPurpose === "sign-in"
+                ? "signin-phone"
+                : otpPurpose === "recover-prove"
+                  ? "recover-identify"
+                  : "recover-update",
+            )
+          }
         >
           {otpPurpose === "sign-in" ? "Change phone number" : "Back"}
         </AuthLink>
@@ -464,17 +496,12 @@ export default function LoginPage() {
               inputMode="email"
             />
           </AuthField>
-          <AuthButton
-            disabled={!emailReady}
-            onClick={() => {
-              toast({
-                title: "Email updated",
-                description: `You will sign in with ${newEmail.trim()} from now on.`,
-              });
-              signedIn("Welcome back");
-            }}
-          >
-            Save email
+          {/* ⛔ Typed twice proves the driver typed the same thing twice. It
+              does not prove the address exists — and an address mistyped the
+              same way twice is a lockout the app confirmed on its way out. The
+              code sent TO IT is the only step that proves it can be reached. */}
+          <AuthButton disabled={!emailReady} onClick={() => openOtp("recover-new-email")}>
+            Send code
           </AuthButton>
         </>
       ) : (
