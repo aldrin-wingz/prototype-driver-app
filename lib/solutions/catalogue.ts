@@ -443,8 +443,25 @@ export const SOLUTIONS: Solution[] = [
     proposedFeature:
       "Let drivers change their own email, password and phone number in the app",
     klass: "surface",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    /*
+      ⚠️ TWO entry points because the user asked for two: *"it must be allowed
+      in both the sign in/login and in the settings."* They are not one screen
+      shown twice — the driver is locked out in one and signed in in the other,
+      and that state decides what can be asked of them.
+
+      ⛔ `/login` reverses `references/captures/INDEX.md` §07, which records the
+      auth screens as deliberately NOT built into the base. Knowingly: row 15's
+      567 calls start there. The boundary §07 protected is kept by scope
+      instead — this route signs nobody in and gates nothing.
+    */
+    entry: {
+      route: "/login",
+      label: "Tap Forgot password? — then take the way out of the dead end",
+      alternates: [
+        { route: "/options/account", label: "Signed in: change the email, password or phone" },
+      ],
+    },
   },
   {
     id: "rider-initiated-cancellation",

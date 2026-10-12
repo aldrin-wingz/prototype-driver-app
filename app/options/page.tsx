@@ -4,15 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight, History, User, IdCard, Phone, NotepadText, Map, MapPin,
-  FileText, RefreshCcw, LogOut,
+  FileText, RefreshCcw, LogOut, KeyRound,
 } from "lucide-react";
 import { Header } from "@/components/driver/header";
 import { BottomNav } from "@/components/driver/bottom-nav";
 import { DriverNotesModal } from "@/components/driver/driver-notes-modal";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useSolution } from "@/lib/solutions/solution-context";
 import {
-  APP_VERSION, DRIVER_NAME, INSTALL_ID_PLACEHOLDER, OPTIONS_ROWS,
+  APP_VERSION, buildOptionsRows, DRIVER_NAME, INSTALL_ID_PLACEHOLDER,
   type OptionsRowId,
 } from "@/lib/driver-data/options-menu";
 
@@ -43,11 +44,20 @@ const ICONS: Record<OptionsRowId, typeof History> = {
   "driver-terms": FileText,
   "check-for-updates": RefreshCcw,
   logout: LogOut,
+  account: KeyRound,
 };
 
 export default function OptionsPage() {
   const { toast } = useToast();
+  const { active } = useSolution();
   const [notesOpen, setNotesOpen] = useState(false);
+
+  /*
+    ⚠️ ELEVEN captured rows, plus a twelfth only while catalogue row 15 is the
+    focused solution. The insertion rule lives in `options-menu.ts` so a check
+    can read the array rather than grep this file for a label.
+  */
+  const rows = buildOptionsRows(active?.id ?? null);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6F8] pb-20">
@@ -65,7 +75,7 @@ export default function OptionsPage() {
         </div>
 
         <div className="space-y-3">
-          {OPTIONS_ROWS.map((row) => {
+          {rows.map((row) => {
             const Icon = ICONS[row.id];
             const inner = (
               <>

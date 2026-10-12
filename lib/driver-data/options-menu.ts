@@ -1,3 +1,5 @@
+import { showsAccountProposals } from "./account-self-service";
+
 /**
  * The Options menu, replicated from capture shoot `DAB-2026-10-01`
  * (`05-01` … `05-04`), app build v6.0.537.
@@ -14,7 +16,9 @@
 export type OptionsRowId =
   | "ride-history" | "driver-dashboard" | "id-badge" | "contact-support"
   | "driver-notes" | "default-map-service" | "location" | "privacy-policy"
-  | "driver-terms" | "check-for-updates" | "logout";
+  | "driver-terms" | "check-for-updates" | "logout"
+  /** ⚠️ PROPOSED — catalogue row 15. Not in the capture. See `ACCOUNT_ROW`. */
+  | "account";
 
 export interface OptionsRow {
   id: OptionsRowId;
@@ -25,6 +29,8 @@ export interface OptionsRow {
   href?: string;
   /** Logout's chevron is red; every other row's is green. Capture `05-04`. */
   destructive?: boolean;
+  /** ⚠️ Not in `DAB-2026-10-01`. Rendered only when its solution is focused. */
+  proposed?: boolean;
 }
 
 /** Order is exactly as captured, top to bottom. */
@@ -70,3 +76,40 @@ export const DRIVER_NOTES_COPY = {
   cancel: "Cancel",
   send: "Send",
 } as const;
+
+/* -------------------------------------------------------------------------- */
+/* Catalogue row 15 — the proposed twelfth row                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * ⚠️ **A twelfth row on a screen that is capture-locked at eleven.**
+ *
+ * The captured menu has no account row of any kind, so this is an addition, not
+ * a correction. Fourth instance of the capture-lock question; the user answered
+ * "gated to the focused solution" on 2026-10-13, which is the same answer the
+ * two proposed More Options tiles got — an unfocused run still renders the
+ * captured screen row for row.
+ */
+export const ACCOUNT_ROW: OptionsRow & { after: OptionsRowId } = {
+  id: "account",
+  label: "Account",
+  description: "Change your email, password or phone number",
+  href: "/options/account",
+  proposed: true,
+  after: "driver-dashboard",
+};
+
+/**
+ * The rows to render right now.
+ *
+ * ⛔ Exported so `verify-solutions.ts` can read the DATA rather than grep the
+ * page for a label. The More Options grid taught this one the hard way: a check
+ * that matched source text passed while the array it claimed to describe said
+ * something else.
+ */
+export function buildOptionsRows(activeSolutionId: string | null): OptionsRow[] {
+  if (!showsAccountProposals(activeSolutionId)) return OPTIONS_ROWS;
+  return OPTIONS_ROWS.flatMap((row) =>
+    row.id === ACCOUNT_ROW.after ? [row, ACCOUNT_ROW] : [row],
+  );
+}

@@ -31,6 +31,36 @@ import {
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
+  ACCOUNT_SOLUTION_ID,
+  ACCOUNT_ON_FILE,
+  changeRuleFor,
+  maskEmail,
+  maskPhone,
+  OTP_ERROR_INVALID,
+  OTP_ERROR_RATE_LIMIT,
+  OTP_LENGTH,
+  OTP_RESEND_SECONDS,
+  OTP_TITLE,
+  PHONE_PLACEHOLDER,
+  PRODUCTION_LOGIN_STEPS,
+  PROPOSED_LOGIN_STEPS,
+  RECOVERY_FLOOR_LABEL,
+  RECOVERY_FLOOR_PROMPT,
+  RECOVERY_IDENTITY_PROOFS,
+  RECOVERY_LINK_LABEL,
+  RECOVERY_LINK_PROMPT,
+  RECOVERY_RULES,
+  recoveryRouteFor,
+  RESET_SUBTITLE,
+  RESET_TITLE,
+  SETTINGS_RULES,
+  SIGN_IN_EMAIL_SUBTITLE,
+  SIGN_IN_PHONE_SUBTITLE,
+  SIGN_IN_TITLE,
+  type RecoveryRoute,
+} from "../lib/driver-data/account-self-service";
+import { ACCOUNT_ROW, buildOptionsRows } from "../lib/driver-data/options-menu";
+import {
   firstTabWithRides,
   isScenarioFor,
   pillsFor,
@@ -352,8 +382,13 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *     all; and a STANDING ORDER, which reaches the proposed one. A reason form
  *     only ever seen on the way to a warning cannot be told apart from part of
  *     that warning.
+ *   - Account self-service (row 15) — the LOCKED-OUT half at `/login` and the
+ *     SIGNED-IN half at `/options/account`. User direction was explicitly both,
+ *     and they are not one screen shown twice: the driver can be asked for a
+ *     current password in one and cannot in the other, which is the entire
+ *     design question the slice puts up for review.
  */
-const EXPECTED_ALTERNATES = 6;
+const EXPECTED_ALTERNATES = 7;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -528,13 +563,41 @@ check(
   danglingIds.length === 0,
 );
 
+/**
+ * ⛔⛔ **A declared exemption, not a weakened check.**
+ *
+ * Catalogue row 15 is the first built row with no ride anywhere in its demo —
+ * both of its entry points are account surfaces, and a driver changing their
+ * password is not on a trip. The guarantee the check below defends ("a built
+ * row can actually be demonstrated") still holds for it; it simply is not
+ * demonstrated from the ride list.
+ *
+ * ⚠️ The exemption is NAMED and then itself checked, because the dangerous
+ * version of this is a filter that quietly swallows a row which really should
+ * have had rides. A row may only sit here if every one of its routes is a
+ * surface route — assert that rather than trust it.
+ */
+const RIDELESS_ROWS = new Set(["account-self-service"]);
+const wronglyExempt = [...RIDELESS_ROWS].filter((id) => {
+  const row = SOLUTIONS.find((s) => s.id === id);
+  if (!row || row.buildState !== "in-prototype") return true;
+  const routes = [row.entry?.route, ...(row.entry?.alternates ?? []).map((a) => a.route)];
+  return routes.some((route) => route?.startsWith("/my-rides/"));
+});
+check(
+  "the rideless exemption covers only rows that genuinely have no ride route",
+  `${wronglyExempt.length} wrongly exempt of ${RIDELESS_ROWS.size} exemption(s)`,
+  wronglyExempt.length === 0 && RIDELESS_ROWS.size > 0,
+);
+
 /** Every row that claims to be built must be demonstrable from the ride list. */
-const unbacked = builtRows.filter(
+const rideBackedRows = builtRows.filter((solution) => !RIDELESS_ROWS.has(solution.id));
+const unbacked = rideBackedRows.filter(
   (solution) => !tagged.some((trip) => isScenarioFor(trip, solution.id)),
 );
 check(
   "every in-prototype row has at least one scenario ride",
-  `${unbacked.length} unbacked of ${builtRows.length} built row(s)`,
+  `${unbacked.length} unbacked of ${rideBackedRows.length} ride-backed row(s), ${RIDELESS_ROWS.size} exempt`,
   unbacked.length === 0,
 );
 check(
@@ -592,7 +655,8 @@ check(
  * actually tested. The first number is the one that carries the assertion above.
  */
 const EXPECTED_RIDE_ROUTES = 12;
-const EXPECTED_SURFACE_ROUTES = 2;
+/** `/requests` (row 10) ×2, plus row 15's `/login` and `/options/account`. */
+const EXPECTED_SURFACE_ROUTES = 4;
 check(
   "...and the two kinds of route were counted as declared",
   `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
@@ -695,11 +759,13 @@ const declaredRows = new Set([
   ...Object.keys(EXPECTED_IN_PROGRESS),
   ...Object.keys(EXPECTED_NEEDS_ACTION),
 ]);
+/** ⚠️ Same declared exemption as above — row 15's demo is not on a ride. */
+const countableRows = builtRows.filter((row) => !RIDELESS_ROWS.has(row.id));
 check(
   "every built row's ride count was declared, in one tab or the other",
-  `${declaredRows.size} declared of ${builtRows.length} built`,
-  declaredRows.size === builtRows.length &&
-    builtRows.every((row) => declaredRows.has(row.id)),
+  `${declaredRows.size} declared of ${countableRows.length} countable (${RIDELESS_ROWS.size} exempt)`,
+  declaredRows.size === countableRows.length &&
+    countableRows.every((row) => declaredRows.has(row.id)),
 );
 /**
  * ⛔ The Needs Action tab must still hold the base's own unconfirmed ride.
@@ -1415,11 +1481,18 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   "request-feed-member-filter": "in-progress",
   "send-back-reason-form": "in-progress",
 };
+/**
+ * ⚠️ Row 15 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
+ * which the catalogue already anticipates ("the solution's scenario rides or an
+ * empty tab that says so by name"). Writing it in here as a tab it does not use
+ * would be the `"cannot-reach-member": 0` mistake the comment above warns about.
+ */
+const tabbedRows = built.filter((row) => !RIDELESS_ROWS.has(row.id));
 check(
   "every built row declares the tab it lands on",
-  `${Object.keys(EXPECTED_LANDING_TAB).length} declared of ${built.length} built`,
-  Object.keys(EXPECTED_LANDING_TAB).length === built.length &&
-    built.every((row) => row.id in EXPECTED_LANDING_TAB),
+  `${Object.keys(EXPECTED_LANDING_TAB).length} declared of ${tabbedRows.length} tabbed (${RIDELESS_ROWS.size} exempt)`,
+  Object.keys(EXPECTED_LANDING_TAB).length === tabbedRows.length &&
+    tabbedRows.every((row) => row.id in EXPECTED_LANDING_TAB),
 );
 for (const [id, expected] of Object.entries(EXPECTED_LANDING_TAB)) {
   const counts = tabCountsFor(id);
@@ -2770,6 +2843,430 @@ check(
   ["send-back-scoring", "eta-send-back-explicit"].every(
     (id) => SOLUTIONS.find((r) => r.id === id)?.buildState === "not-yet",
   ),
+);
+
+console.log("\n13. Account self-service — catalogue row 15");
+
+/**
+ * ⛔ Reads the RULES module and the two pages, never the catalogue text. The
+ * catalogue says what we propose; these say what the prototype does.
+ */
+const A_SOURCES = {
+  rules: readFileSync("lib/driver-data/account-self-service.ts", "utf8"),
+  login: readFileSync("app/login/page.tsx", "utf8"),
+  settings: readFileSync("app/options/account/page.tsx", "utf8"),
+  options: readFileSync("app/options/page.tsx", "utf8"),
+};
+
+/* --- 13a. The finding, as a truth table ---------------------------------- */
+
+/**
+ * ⛔⛔ **The slice's whole argument, and the one check that can disprove it.**
+ *
+ * All eight combinations, declared as literals. Three of the four reachable
+ * outcomes already exist in production — which is the claim the spec makes and
+ * the reason row 15 is a signpost rather than a new identity mechanism. If
+ * `recoveryRouteFor` ever stops agreeing with this table, the argument the
+ * screens are built on has changed and someone has to say so.
+ */
+const RECOVERY_TRUTH_TABLE: Array<[boolean, boolean, boolean, RecoveryRoute]> = [
+  // password, email inbox, phone handset       → route
+  [true,  true,  true,  "sign-in-email"],
+  [true,  true,  false, "sign-in-email"],
+  [true,  false, true,  "sign-in-email"],
+  // ⭐ Knows the password but has lost BOTH contacts — still gets in, because
+  // signing in with email never needed the inbox, only the address.
+  [true,  false, false, "sign-in-email"],
+  [false, true,  true,  "sign-in-phone-otp"],
+  // ⭐⭐ The 567 calls. Inbox gone, handset in hand, and production ALREADY
+  // lets them in — behind a quiet green line under a greyed button.
+  [false, false, true,  "sign-in-phone-otp"],
+  [false, true,  false, "reset-by-email"],
+  // ⛔ Nothing left. No in-app evidence can settle this and none should.
+  [false, false, false, "contact-support"],
+];
+let recoveryMismatches = 0;
+for (const [knowsPassword, canReceiveOnEmailOnFile, canReceiveOnPhoneOnFile, expected]
+  of RECOVERY_TRUTH_TABLE) {
+  const got = recoveryRouteFor({ knowsPassword, canReceiveOnEmailOnFile, canReceiveOnPhoneOnFile });
+  if (got !== expected) recoveryMismatches++;
+}
+check(
+  "every lockout resolves to the declared recovery route",
+  `${recoveryMismatches} mismatch(es) of ${RECOVERY_TRUTH_TABLE.length} combination(s)`,
+  recoveryMismatches === 0,
+);
+check(
+  "...and the table is exhaustive over its three inputs",
+  `${RECOVERY_TRUTH_TABLE.length} rows, expected 8`,
+  RECOVERY_TRUTH_TABLE.length === 8,
+);
+/**
+ * ⚠️ A table that answered "contact-support" everywhere would pass the two
+ * checks above and say the opposite of the spec. Assert the SPREAD.
+ */
+const routesReached = new Set(RECOVERY_TRUTH_TABLE.map(([, , , r]) => r));
+check(
+  "...and three of the four outcomes need no new mechanism",
+  `${routesReached.size} distinct outcome(s): ${[...routesReached].join(", ")}`,
+  routesReached.size === 4 &&
+    RECOVERY_TRUTH_TABLE.filter(([, , , r]) => r === "contact-support").length === 1,
+);
+
+/* --- 13b. Production's own strings, character for character -------------- */
+
+/**
+ * ⛔ The two OTP failures are DIFFERENT failures and production words them
+ * differently. An error is the one string a driver reads under pressure, so
+ * both are asserted verbatim against the capture index's record of them.
+ */
+const CAPTURED_STRINGS: Array<[string, string]> = [
+  ["CAP-124", "Invalid or expired OTP."],
+  ["CAP-125", "You must wait 90 seconds to request an OTP again."],
+  ["CAP-127", "Enter the email associated with your account and we'll send reset instructions."],
+  ["CAP-122", "Enter your phone number and we'll send you a verification code."],
+  ["CAP-126", "Enter your email and password to sign in."],
+];
+const missingStrings = CAPTURED_STRINGS.filter(([, text]) => !A_SOURCES.rules.includes(text));
+check(
+  "every replicated string matches its capture, character for character",
+  `${missingStrings.length} missing of ${CAPTURED_STRINGS.length} — ${CAPTURED_STRINGS.map(([c]) => c).join(", ")}`,
+  missingStrings.length === 0,
+);
+/**
+ * ⛔ The obvious version of this check — `OTP_ERROR_INVALID !==
+ * OTP_ERROR_RATE_LIMIT` — CANNOT FAIL, and `tsc` said so: two string literal
+ * types have no overlap, so the comparison is a tautology. What actually
+ * matters is that the two screens raise them in different circumstances, which
+ * is what the branch check below reads.
+ */
+check(
+  "the two OTP failures are raised by different events",
+  "wrong code → invalid; early resend → rate limit",
+  /code !== OTP_DEMO_CODE[\s\S]{0,120}OTP_ERROR_INVALID/.test(A_SOURCES.login) &&
+    /resendIn > 0[\s\S]{0,80}OTP_ERROR_RATE_LIMIT/.test(A_SOURCES.login),
+);
+check(
+  "...and both are rendered, not just declared",
+  `invalid=${A_SOURCES.login.includes("OTP_ERROR_INVALID")} rate=${A_SOURCES.login.includes("OTP_ERROR_RATE_LIMIT")}`,
+  A_SOURCES.login.includes("OTP_ERROR_INVALID") && A_SOURCES.login.includes("OTP_ERROR_RATE_LIMIT"),
+);
+check(
+  "the six boxes and the 88s countdown are the captured ones",
+  `OTP_LENGTH=${OTP_LENGTH} OTP_RESEND_SECONDS=${OTP_RESEND_SECONDS}`,
+  OTP_LENGTH === 6 && OTP_RESEND_SECONDS === 88,
+);
+
+/* --- 13c. ⛔⛔ Identity is never proved by the new contact ---------------- */
+
+/**
+ * ⛔⛔ **The guard that stops this being an account-takeover path.**
+ *
+ * An OTP to a NEW number proves the number exists and someone is holding it. It
+ * proves nothing about who. An email address is not a secret, so a recovery
+ * flow whose only check is "send a code to whatever number you give me" hands
+ * anyone who knows a driver's address an account that gets paid.
+ *
+ * So `otp-to-new-contact` may appear as a VALUE confirmation and never as an
+ * identity proof, and identity and value are never the same factor.
+ */
+const ALL_RULES = [...SETTINGS_RULES, ...RECOVERY_RULES];
+const identityByNewContact = ALL_RULES.filter(
+  (rule) => rule.identityProof === "otp-to-new-contact",
+);
+check(
+  "a code to the NEW contact never proves identity",
+  `${identityByNewContact.length} of ${ALL_RULES.length} rule(s) misuse it`,
+  identityByNewContact.length === 0,
+);
+const sameFactorTwice = ALL_RULES.filter((rule) => rule.identityProof === rule.valueConfirmation);
+check(
+  "...and no rule uses one factor for both questions",
+  `${sameFactorTwice.length} of ${ALL_RULES.length} rule(s) collapse them`,
+  sameFactorTwice.length === 0,
+);
+/** ⚠️ Would pass vacuously on an empty list. Assert there is something to check. */
+check(
+  "...and there were rules to check, for both halves",
+  `${SETTINGS_RULES.length} settings + ${RECOVERY_RULES.length} recovery`,
+  SETTINGS_RULES.length === 3 && RECOVERY_RULES.length === 3,
+);
+/** The locked-out driver may offer exactly two things. Nothing else counts. */
+const strayProofs = RECOVERY_RULES.filter(
+  (rule) => !RECOVERY_IDENTITY_PROOFS.includes(rule.identityProof),
+);
+check(
+  "a locked-out driver proves identity only the two declared ways",
+  `${strayProofs.length} stray of ${RECOVERY_RULES.length}, allowed: ${RECOVERY_IDENTITY_PROOFS.join(", ")}`,
+  strayProofs.length === 0 && RECOVERY_IDENTITY_PROOFS.length === 2,
+);
+/** ⛔ And a session cannot travel: there is no session when you are locked out. */
+check(
+  "...and no recovery rule leans on being signed in",
+  `${RECOVERY_RULES.filter((r) => r.identityProof === "signed-in-session").length} of ${RECOVERY_RULES.length}`,
+  RECOVERY_RULES.every((rule) => rule.identityProof !== "signed-in-session"),
+);
+/** ⚠️ The password row is the one that must NOT rest on the session. */
+check(
+  "changing the password asks for the current one, signed in or not",
+  [...SETTINGS_RULES, ...RECOVERY_RULES]
+    .filter((r) => r.field === "password")
+    .map((r) => r.identityProof).join(" / "),
+  changeRuleFor("password", "settings").identityProof === "current-password",
+);
+
+/* --- 13d. Nothing whole is printed back ---------------------------------- */
+
+check(
+  "a masked email keeps the domain and loses the name",
+  `${ACCOUNT_ON_FILE.email} → ${maskEmail(ACCOUNT_ON_FILE.email)}`,
+  !maskEmail(ACCOUNT_ON_FILE.email).includes(ACCOUNT_ON_FILE.email.split("@")[0]) &&
+    maskEmail(ACCOUNT_ON_FILE.email).includes("@"),
+);
+check(
+  "a masked phone keeps four digits and loses the rest",
+  `${ACCOUNT_ON_FILE.phone} → ${maskPhone(ACCOUNT_ON_FILE.phone)}`,
+  maskPhone(ACCOUNT_ON_FILE.phone).replace(/\D/g, "").length === 4,
+);
+/**
+ * ⛔ Seeded phones must sit in the `555-01xx` range reserved for fiction.
+ * CAP-123's captured `+1 (111) 111-1111` is test data and must never be seeded;
+ * CAP-122's `(555) 123-4567` is a PLACEHOLDER — nobody is reachable on it, so
+ * it may be replicated verbatim, and it is excluded by name rather than by luck.
+ */
+check(
+  "the seeded number is inside the fiction range",
+  `${ACCOUNT_ON_FILE.phone}`,
+  /^\(555\) 01\d{2}$/.test(ACCOUNT_ON_FILE.phone),
+);
+/**
+ * ⛔ The first version of this grepped the whole rules FILE for `111-1111` and
+ * failed — on the comment that documents why the number is banned. A check that
+ * a file does not MENTION a value cannot tell documentation from use. Read the
+ * seeded values instead; they are the only places a number can reach a screen.
+ */
+const SEEDED_NUMBERS = [ACCOUNT_ON_FILE.phone, PHONE_PLACEHOLDER];
+check(
+  "...and the captured test number was not seeded anywhere",
+  `${SEEDED_NUMBERS.length} seeded value(s): ${SEEDED_NUMBERS.join(", ")}`,
+  SEEDED_NUMBERS.every((value) => !value.replace(/\D/g, "").includes("1111111")),
+);
+
+/* --- 13e. The twelfth Options row is gated ------------------------------- */
+
+/**
+ * ⛔ Reads the ARRAY the page renders, not the page's source text. The More
+ * Options grid taught this one: a check that matched source passed while the
+ * array it claimed to describe said something else.
+ */
+const CAPTURED_OPTIONS_ROWS = 11;
+check(
+  "the Options menu is still the captured eleven when nothing is focused",
+  `${buildOptionsRows(null).length} row(s), expected ${CAPTURED_OPTIONS_ROWS}`,
+  buildOptionsRows(null).length === CAPTURED_OPTIONS_ROWS,
+);
+check(
+  "...and it is still eleven under a DIFFERENT solution",
+  `${buildOptionsRows("rider-no-show").length} row(s) focused on row 01`,
+  buildOptionsRows("rider-no-show").length === CAPTURED_OPTIONS_ROWS,
+);
+check(
+  "...and exactly one row appears when row 15 is focused",
+  `${buildOptionsRows(ACCOUNT_SOLUTION_ID).length} row(s), expected ${CAPTURED_OPTIONS_ROWS + 1}`,
+  buildOptionsRows(ACCOUNT_SOLUTION_ID).length === CAPTURED_OPTIONS_ROWS + 1,
+);
+const focusedRows = buildOptionsRows(ACCOUNT_SOLUTION_ID);
+check(
+  "...and it is flagged as proposed, so it cannot be mistaken for captured",
+  `${focusedRows.filter((r) => r.proposed).length} proposed of ${focusedRows.length}`,
+  focusedRows.filter((r) => r.proposed).length === 1 &&
+    buildOptionsRows(null).every((r) => !r.proposed),
+);
+check(
+  "...and it sits where it was declared, not at the end",
+  `after ${ACCOUNT_ROW.after} → index ${focusedRows.findIndex((r) => r.id === ACCOUNT_ROW.id)}`,
+  focusedRows[focusedRows.findIndex((r) => r.id === ACCOUNT_ROW.after) + 1]?.id === ACCOUNT_ROW.id,
+);
+/** ⛔ The recovery link is a proposal on a REPLICATED screen — same gate. */
+check(
+  "the recovery link obeys the same gate as the row",
+  "showsAccountProposals guards the Reset Password link",
+  /showProposals \? \(/.test(A_SOURCES.login) &&
+    A_SOURCES.login.includes("showsAccountProposals"),
+);
+check(
+  "...and one predicate serves both, so they cannot drift apart",
+  `options=${A_SOURCES.options.includes("buildOptionsRows")} login=${A_SOURCES.login.includes("showsAccountProposals")}`,
+  A_SOURCES.options.includes("buildOptionsRows") && A_SOURCES.login.includes("showsAccountProposals"),
+);
+
+/* --- 13f. /login gates nothing ------------------------------------------- */
+
+/**
+ * ⛔⛔ `references/captures/INDEX.md` §07 recorded the auth screens as
+ * deliberately NOT built. Building them reverses that knowingly — so the
+ * boundary it protected is kept by SCOPE instead: this route signs nobody in.
+ * A `/login` that started guarding the app would break every other solution's
+ * entry route at once, and would do it silently.
+ */
+check(
+  "/login redirects nothing and guards nothing",
+  "no middleware, no redirect out of other routes",
+  !existsSync("middleware.ts") && !existsSync("src/middleware.ts"),
+);
+check(
+  "...and no other page imports the auth gate",
+  "account-self-service is imported only by its own screens and the Options menu",
+  ["app/page.tsx", "app/my-rides/page.tsx", "app/requests/page.tsx"].every(
+    (file) => !readFileSync(file, "utf8").includes("account-self-service"),
+  ),
+);
+
+/* --- 13g. The two halves are one build ----------------------------------- */
+
+/**
+ * ⭐ The user asked for this in BOTH places. The OTP screen in settings and the
+ * OTP screen at sign-in are the same component, not two that look alike — which
+ * is what makes "both" literal rather than a coincidence maintained by hand.
+ */
+check(
+  "both halves render the same code boxes",
+  "AuthCodeBoxes in /login and /options/account",
+  A_SOURCES.login.includes("AuthCodeBoxes") && A_SOURCES.settings.includes("AuthCodeBoxes"),
+);
+check(
+  "...and both read the rules from lib, not from their own JSX",
+  `login=${A_SOURCES.login.includes("@/lib/driver-data/account-self-service")} settings=${A_SOURCES.settings.includes("@/lib/driver-data/account-self-service")}`,
+  A_SOURCES.login.includes("@/lib/driver-data/account-self-service") &&
+    A_SOURCES.settings.includes("@/lib/driver-data/account-self-service"),
+);
+/**
+ * ⛔⛔ The three change components MUST sit at module scope. Declared inside the
+ * page they were re-created each render, so React saw a new component type on
+ * every keystroke, unmounted the subtree and remounted it — the field lost
+ * focus and its own state after one character. It type-checked, built and
+ * rendered; it was simply unusable. No other gate here can see that.
+ */
+const nestedComponent = /export default function AccountPage[\s\S]*?\n  function Change/.test(
+  A_SOURCES.settings,
+);
+check(
+  "the change screens are module-scope components, not re-created per render",
+  `nested declaration present: ${nestedComponent}`,
+  !nestedComponent,
+);
+
+/* --- 13g2. ⛔⛔ The brand wordmark on a light ground ---------------------- */
+
+/**
+ * ⛔⛔ **An asset that renders perfectly and says nothing.**
+ *
+ * `wingz-wordmark-dark.svg` is the wordmark FOR a dark background: its six
+ * letter paths are `fill="white"`. Used on a white surface the word vanishes
+ * and only the emblem's green paths survive, so the screen shows two emblems
+ * stacked. Nothing throws, nothing logs, every other gate stays green.
+ *
+ * Found on the new login screens — and the SHIPPED ID Badge screen had been
+ * doing it since it was built, on a screen that is supposed to be faithful to
+ * capture `05-06`. Both now use a letters-only asset in their own sampled ink.
+ *
+ * ⚠️ Checked by reading the ASSETS, not by trusting the filenames.
+ */
+/**
+ * ⚠️ TWO derived assets, because the two surfaces sampled two different inks:
+ * the sign-in screens' wordmark is near-black (CAP-122/126/127), the ID Badge
+ * card's is indigo (CAP-105). Declared per asset so a single "it is not white"
+ * check cannot pass while both screens carry the wrong one.
+ */
+const LETTER_PATHS = 6;
+const TEXT_WORDMARKS: Array<[string, string]> = [
+  ["public/wingz-wordmark-text.svg", "#111111"],
+  ["public/wingz-wordmark-navy.svg", "#303068"],
+];
+/**
+ * ⛔ Reads the `<path>` ELEMENTS, not the file text. The first version matched
+ * the whole file and failed on the asset's own comment, which has to write
+ * `fill="white"` in order to explain why white is wrong. Second time in one
+ * session that a check matched this repo's documentation of the thing it bans:
+ * a grep for a string cannot tell a use from a mention.
+ */
+function letterFills(file: string): string[] {
+  return (readFileSync(file, "utf8").match(/<path[^>]*?\/>/g) ?? [])
+    .map((path) => /fill="([^"]+)"/.exec(path)?.[1] ?? "")
+    .filter(Boolean);
+}
+const badWordmarks = TEXT_WORDMARKS.filter(([file, colour]) => {
+  const fills = letterFills(file);
+  return fills.length !== LETTER_PATHS || fills.some((fill) => fill !== colour);
+});
+check(
+  "each text wordmark carries its own sampled ink, and no white letters",
+  `${badWordmarks.length} wrong of ${TEXT_WORDMARKS.length} asset(s), ${LETTER_PATHS} letter path(s) each`,
+  badWordmarks.length === 0,
+);
+/** ⛔ And they must differ, or one of the two captures is being ignored. */
+check(
+  "...and the two inks are actually different",
+  TEXT_WORDMARKS.map(([, c]) => c).join(" vs "),
+  new Set(TEXT_WORDMARKS.map(([, c]) => c)).size === 2,
+);
+/** The emblem must NOT be baked in, or the screen shows two emblems stacked. */
+const withEmblem = TEXT_WORDMARKS.filter(([file]) =>
+  letterFills(file).some((fill) => fill === "#00B692" || fill === "#00F9B8"),
+);
+check(
+  "...and neither bakes the emblem in beside the word",
+  `${withEmblem.length} of ${TEXT_WORDMARKS.length} still carry emblem paths`,
+  withEmblem.length === 0,
+);
+const sourceWhite = letterFills("public/wingz-wordmark-dark.svg").filter((f) => f === "white");
+check(
+  "the source wordmark is untouched, so the two stay distinguishable",
+  `${sourceWhite.length} white letter path(s) of ${LETTER_PATHS}`,
+  sourceWhite.length === LETTER_PATHS,
+);
+/** Every screen whose wordmark sits on a white surface. Declared, not derived. */
+const LIGHT_GROUND_SCREENS = [
+  "components/driver/auth/auth-shell.tsx",
+  "app/id-badge/page.tsx",
+];
+const wrongWordmark = LIGHT_GROUND_SCREENS.filter((file) =>
+  readFileSync(file, "utf8").includes("wingz-wordmark-dark.svg"),
+);
+check(
+  "no light-ground screen uses the dark-ground wordmark",
+  `${wrongWordmark.length} wrong of ${LIGHT_GROUND_SCREENS.length} screen(s)`,
+  wrongWordmark.length === 0 && LIGHT_GROUND_SCREENS.length >= 2,
+);
+
+/* --- 13h. Proposed copy is marked, production copy is not ---------------- */
+
+const ROW_15 = SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!;
+check(
+  "row 15 is in the prototype with both halves reachable",
+  `${ROW_15.buildState} · ${ROW_15.entry?.route} + ${(ROW_15.entry?.alternates ?? []).map((a) => a.route).join(", ")}`,
+  ROW_15.buildState === "in-prototype" &&
+    ROW_15.entry?.route === "/login" &&
+    (ROW_15.entry?.alternates ?? []).some((a) => a.route === "/options/account"),
+);
+check(
+  "the proposed login steps are separated from the replicated ones",
+  `${PRODUCTION_LOGIN_STEPS.length} replicated, ${PROPOSED_LOGIN_STEPS.length} proposed`,
+  PRODUCTION_LOGIN_STEPS.length === 4 && PROPOSED_LOGIN_STEPS.length === 3 &&
+    PRODUCTION_LOGIN_STEPS.every((step) => !PROPOSED_LOGIN_STEPS.includes(step)),
+);
+/** ⛔ No ⛔ may reach anything a driver reads. Swept again for this slice. */
+const DRIVER_FACING = [
+  SIGN_IN_TITLE, SIGN_IN_PHONE_SUBTITLE, SIGN_IN_EMAIL_SUBTITLE, OTP_TITLE,
+  RESET_TITLE, RESET_SUBTITLE, OTP_ERROR_INVALID, OTP_ERROR_RATE_LIMIT,
+  RECOVERY_LINK_PROMPT, RECOVERY_LINK_LABEL, RECOVERY_FLOOR_PROMPT,
+  RECOVERY_FLOOR_LABEL, ACCOUNT_ROW.label, ACCOUNT_ROW.description ?? "",
+];
+const markerLeaks = DRIVER_FACING.filter((text) => /⛔|⚠️|⭐/.test(text));
+check(
+  "no internal marker reaches driver-facing copy",
+  `${markerLeaks.length} leak(s) of ${DRIVER_FACING.length} string(s)`,
+  markerLeaks.length === 0,
 );
 
 // ---------------------------------------------------------------------------

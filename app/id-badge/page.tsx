@@ -38,7 +38,13 @@ export default function IdBadgePage() {
                 surfaces — better than redrawing the mark by eye. */}
             <div className="flex flex-col items-center gap-2">
               <Image src="/wingz-emblem.svg" alt="" width={72} height={72} />
-              <Image src="/wingz-wordmark-dark.svg" alt="Wingz" width={150} height={65} />
+              {/* ⛔ Was `-dark`, whose letters are `fill="white"` — on this
+                  white card the wordmark has been invisible since the screen was
+                  built, leaving the emblem alone where capture `05-06` shows
+                  emblem AND word. Found while building the login screens, which
+                  hit the identical trap. ⚠️ Navy, not the login screens' black —
+                  `05-06`'s wordmark is distinctly indigo. */}
+              <Image src="/wingz-wordmark-navy.svg" alt="Wingz" width={150} height={60} />
             </div>
             <p className="text-center text-3xl font-bold text-[#37474F]">{DRIVER_NAME}</p>
 
