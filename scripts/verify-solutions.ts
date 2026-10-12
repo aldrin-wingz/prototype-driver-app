@@ -71,6 +71,7 @@ import {
   REACH_OUTCOMES,
 } from "../lib/driver-data/reach-attempt";
 import { reachOptionsFor } from "../components/driver/reach-rider-modal";
+import { CANNOT_REACH_SOLUTIONS } from "../lib/driver-data/reach-attempt";
 import { buildGridTiles } from "../components/driver/more-options-screen";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
 import {
@@ -897,8 +898,11 @@ check(
 // ---- both modal variants carry the option ------------------------------
 /** Declared: three production options plus one proposal, in both variants. */
 const EXPECTED_REACH_OPTIONS = 4;
-const standard = reachOptionsFor(false);
-const sameDay = reachOptionsFor(true);
+// ⚠️ Built for the row that OWNS the proposal. The fourth option is gated on
+// the focused solution now, so a list built with no focus would also carry it
+// and this check could not tell "shown to its owner" from "shown to everyone".
+const standard = reachOptionsFor(false, "cannot-reach-member");
+const sameDay = reachOptionsFor(true, "cannot-reach-member");
 for (const [name, list] of [["standard", standard], ["same-day", sameDay]] as const) {
   check(
     `the ${name} modal offers ${EXPECTED_REACH_OPTIONS} options`,
@@ -912,6 +916,58 @@ for (const [name, list] of [["standard", standard], ["same-day", sameDay]] as co
       list[list.length - 1].value === "cannot-reach",
   );
 }
+/**
+ * ⛔⛔ **A proposal belongs to its own build — swept over every focus.**
+ *
+ * Found by the user, 2026-10-13: the fourth option rendered on EVERY focus, so
+ * a reviewer walking row 16's decline met "I can't reach the member" on the way
+ * past. `buildGridTiles` has enforced this on the More Options grid since
+ * Phase 6; the modal was missed.
+ *
+ * ⚠️ Swept across every built row with a denominator, not spot-checked on one —
+ * a rule proven on a single id cannot tell a gate from a coincidence. And both
+ * directions: the owners must still SEE it, or this is just a deletion.
+ */
+const REACH_OWNERS = new Set(CANNOT_REACH_SOLUTIONS);
+let focusesSwept = 0;
+let wrongFocus: string[] = [];
+for (const row of [...builtRows.map((r) => r.id), null]) {
+  for (const variant of [false, true]) {
+    focusesSwept += 1;
+    const shown = reachOptionsFor(variant, row).some((o) => o.proposed);
+    // `null` is the plain mirror and carries every proposal, the same rule
+    // `ridesForSolution` and `buildGridTiles` use.
+    const expected = row === null || REACH_OWNERS.has(row);
+    if (shown !== expected) wrongFocus.push(`${row ?? "no focus"}/${variant ? "same-day" : "standard"}`);
+  }
+}
+check(
+  "the proposed option shows for its own rows and no others",
+  `${wrongFocus.length} wrong of ${focusesSwept} focus/variant pair(s)${wrongFocus.length ? " — " + wrongFocus.join(", ") : ""}`,
+  wrongFocus.length === 0,
+);
+check(
+  "...and the sweep covered every built row, both variants, plus no focus",
+  `${focusesSwept} pair(s) over ${builtRows.length} built row(s) + 1`,
+  focusesSwept === (builtRows.length + 1) * 2,
+);
+/** ⛔ The three PRODUCTION options are never filtered — whatever is in focus. */
+let productionSwept = 0;
+const productionMissing = [...builtRows.map((r) => r.id), null].flatMap((row) =>
+  [false, true].flatMap((variant) => {
+    productionSwept += 1;
+    const values: string[] = reachOptionsFor(variant, row).map((o) => o.value);
+    return ["confirmed", "declined", "later"].every((v) => values.includes(v))
+      ? []
+      : [`${row ?? "no focus"}/${variant ? "same-day" : "standard"}`];
+  }),
+);
+check(
+  "...while the three production options survive every focus",
+  `${productionMissing.length} incomplete of ${productionSwept} pair(s)`,
+  productionMissing.length === 0 && productionSwept > 2,
+);
+
 /**
  * ⛔ The variants must genuinely differ. If the same-day third option ever
  * matched the standard one, both demos would show the same alternative and the
@@ -3704,11 +3760,19 @@ check(
  * nothing else would catch.
  */
 for (const sameDay of [false, true]) {
-  const options = reachOptionsFor(sameDay);
+  // ⚠️ Built under ROW 16's OWN focus, which is how a reviewer meets it — and
+  // the list is three options there, not four: rows 04/05's proposal is gated
+  // out. Checking under no focus would quietly test a different screen.
+  const options = reachOptionsFor(sameDay, "rider-initiated-cancellation");
   check(
     `the ${sameDay ? "same-day" : "standard"} modal offers "Rider declined the trip"`,
     `${options.filter((o) => o.value === "declined").length} of ${options.length} option(s)`,
     options.filter((o) => o.value === "declined").length === 1,
+  );
+  check(
+    `...and row 16's focus carries no OTHER row's proposal`,
+    `${options.filter((o) => o.proposed).length} proposal(s) of ${options.length}`,
+    options.filter((o) => o.proposed).length === 0 && options.length === 3,
   );
 }
 

@@ -106,6 +106,39 @@ export const MAX_OUTCOME_LABEL_CHARS = 32;
 export const CANNOT_REACH_LABEL = "I can't reach the member";
 
 /**
+ * The catalogue rows this proposal belongs to.
+ *
+ * ⛔⛔ **A proposal belongs to its own build.** `buildGridTiles` has enforced
+ * this on the More Options grid since Phase 6 — with a solution focused, the
+ * grid shows that solution's proposed tiles and no others, because two
+ * proposals side by side read as one feature. The Reach Rider modal's fourth
+ * option is the same kind of thing and was MISSED: it showed on every focus,
+ * so a reviewer walking row 16 met "I can't reach the member" on the way to a
+ * flow it has nothing to do with. Found by the user, 2026-10-13.
+ *
+ * ⚠️ Named here rather than inside the modal so the rule sits beside the label
+ * it governs, and so `verify-solutions` can build the real option list for each
+ * focus instead of grepping for a line.
+ */
+export const CANNOT_REACH_SOLUTIONS: readonly string[] = [
+  "tag-number-invalid",
+  "cannot-reach-member",
+];
+
+/**
+ * Whether the proposed fourth option shows for the solution in focus.
+ *
+ * ⚠️ `null` — nothing focused — shows it, the same rule `ridesForSolution` and
+ * `buildGridTiles` use: no focus means no filtering rather than an empty
+ * screen, so the plain mirror still carries every proposal.
+ */
+export function showsCannotReachOption(activeSolutionId: string | null): boolean {
+  return (
+    activeSolutionId === null || CANNOT_REACH_SOLUTIONS.includes(activeSolutionId)
+  );
+}
+
+/**
  * ⛔ Submitting changes NOTHING about the trip.
  *
  * The same outcome as today's `No, try again later`: the modal closes, the trip

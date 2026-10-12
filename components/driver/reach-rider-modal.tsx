@@ -6,7 +6,11 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-form";
 import { RiderDeclinedForm } from "@/components/support/rider-declined-form";
-import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
+import {
+  CANNOT_REACH_LABEL,
+  showsCannotReachOption,
+} from "@/lib/driver-data/reach-attempt";
+import { useSolution } from "@/lib/solutions/solution-context";
 import {
   DECLINED_BODY,
   DECLINED_CONTINUE,
@@ -50,14 +54,28 @@ interface ReachOption {
 }
 
 /**
- * The option list for a variant.
+ * The option list for a variant, for the solution in focus.
  *
  * ⚠️ Built per variant rather than patched, because the difference is not
  * cosmetic: the same-day third option ADVANCES the trip where the standard one
  * closes without changing anything. A single list with a swapped label would
  * make two different behaviours look like one.
+ *
+ * ⛔⛔ **The fourth option is a PROPOSAL and belongs to its own build.** It is
+ * rows 04/05, and it used to render on every focus — so a reviewer walking
+ * row 16's decline met it on the way past, and two proposals in one flow read
+ * as one feature. `buildGridTiles` has applied this rule to the More Options
+ * grid since Phase 6; the modal was missed. The three PRODUCTION options are
+ * never filtered: they are what the screen does today, whatever is in focus.
+ *
+ * ⚠️ `activeSolutionId` is a PARAMETER, not context read inside: this stays
+ * pure so `verify-solutions` can build the real list for each focus rather than
+ * grep for a line.
  */
-export function reachOptionsFor(sameDay: boolean): ReachOption[] {
+export function reachOptionsFor(
+  sameDay: boolean,
+  activeSolutionId: string | null
+): ReachOption[] {
   return [
     { value: "confirmed", label: "Yes, I confirmed with the rider" },
     { value: "declined", label: "Rider declined the trip" },
@@ -68,16 +86,21 @@ export function reachOptionsFor(sameDay: boolean): ReachOption[] {
           note: "Note: Don't worry—you can still start the trip on the pickup day, but it's best to confirm with the rider in advance.",
         }
       : { value: "later", label: "No, try again later" },
-    {
-      value: "cannot-reach",
-      label: CANNOT_REACH_LABEL,
-      // ⚠️ The one piece of copy that says what the OPTION does rather than what
-      // the driver did. It is here because the honest answer is "nothing happens
-      // to your trip", and a driver who expects the trip to move on would read
-      // the unchanged screen afterwards as a failed submit.
-      note: "Tell us which number you tried and what happened. Your trip stays unconfirmed — you can still confirm it yourself if you reach them later.",
-      proposed: true,
-    },
+    ...(showsCannotReachOption(activeSolutionId)
+      ? ([
+          {
+            value: "cannot-reach",
+            label: CANNOT_REACH_LABEL,
+            // ⚠️ The one piece of copy that says what the OPTION does rather than
+            // what the driver did. It is here because the honest answer is
+            // "nothing happens to your trip", and a driver who expects the trip
+            // to move on would read the unchanged screen afterwards as a failed
+            // submit.
+            note: "Tell us which number you tried and what happened. Your trip stays unconfirmed — you can still confirm it yourself if you reach them later.",
+            proposed: true,
+          },
+        ] as ReachOption[])
+      : []),
   ];
 }
 
@@ -100,8 +123,10 @@ export function ReachRiderModal({
   const [formOpen, setFormOpen] = useState(false);
   const [declineFormOpen, setDeclineFormOpen] = useState(false);
 
+  const { active } = useSolution();
   const sameDay = Boolean(trip.sameDay);
-  const options = reachOptionsFor(sameDay);
+  // ⚠️ `active` is `undefined` for the plain mirror; the rule takes `null`.
+  const options = reachOptionsFor(sameDay, active?.id ?? null);
   const selected = options.find((option) => option.value === choice);
 
   function close() {
