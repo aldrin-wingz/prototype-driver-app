@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSolution } from "@/lib/solutions/solution-context";
 import { useToast } from "@/hooks/use-toast";
 import {
-  AuthButton, AuthCodeBoxes, AuthField, AuthInput, AuthLink, AuthPhoneInput,
+  AuthButton, AuthField, AuthInput, AuthLink, AuthPhoneInput,
   AuthShell, AuthSubtitle, AuthTitle,
 } from "@/components/driver/auth/auth-shell";
+import { MaskedPasswordInput } from "@/components/driver/auth/masked-password-input";
+import { VerificationCodeScreen } from "@/components/driver/auth/verification-code-screen";
 import {
   ACCOUNT_ON_FILE, DEMO_PASSWORD, isEmailShaped, isPasswordShaped, isPhoneShaped,
-  maskEmail, maskPhone, OTP_DEMO_CODE, OTP_ERROR_INVALID, OTP_ERROR_RATE_LIMIT,
-  OTP_LENGTH, OTP_RESEND_SECONDS, OTP_TITLE, PHONE_PLACEHOLDER,
+  maskEmail, maskPhone, OTP_DEMO_CODE, PHONE_PLACEHOLDER,
   RECOVERY_FLOOR_LABEL, RECOVERY_FLOOR_PROMPT, RECOVERY_LINK_LABEL,
   RECOVERY_LINK_PROMPT, RESET_SUBTITLE, RESET_TITLE, showsAccountProposals,
   SIGN_IN_EMAIL_SUBTITLE, SIGN_IN_PHONE_SUBTITLE, SIGN_IN_TITLE,
@@ -63,11 +64,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  // OTP
+  /*
+    ⛔ Only the PURPOSE lives here. The code itself, the countdown and both
+    captured errors moved into `VerificationCodeScreen` when the five paths were
+    folded onto one screen. Leaving the old state behind would have been worse
+    than untidy: a check greps this file for the error branches, and dead state
+    would have kept it green against code that no longer renders.
+  */
   const [otpPurpose, setOtpPurpose] = useState<OtpPurpose>("sign-in");
-  const [code, setCode] = useState("");
-  const [resendIn, setResendIn] = useState(OTP_RESEND_SECONDS);
-  const [otpError, setOtpError] = useState<string | undefined>();
 
   // Recovery
   const [newEmail, setNewEmail] = useState("");
@@ -75,23 +79,13 @@ export default function LoginPage() {
   const [newPhone, setNewPhone] = useState("");
   const [updating, setUpdating] = useState<"email" | "phone">("email");
 
-  /** CAP-123's countdown. Only runs while the code screen is actually open. */
-  useEffect(() => {
-    if (step !== "otp" || resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [step, resendIn]);
-
   function go(next: LoginStep) {
     setError(undefined);
-    setOtpError(undefined);
     setStep(next);
   }
 
   function openOtp(purpose: OtpPurpose) {
     setOtpPurpose(purpose);
-    setCode("");
-    setResendIn(OTP_RESEND_SECONDS);
     go("otp");
   }
 
@@ -210,6 +204,13 @@ export default function LoginPage() {
   }
 
   if (step === "otp") {
+    /*
+      ⭐ The SAME screen the settings half uses, from the same component — user
+      direction 2026-10-13: *"All cases the OTP should copy what we have in sign
+      up and be its own page with a resend option."* Five entry points, one
+      screen; the code check, the countdown and both captured errors live in it
+      rather than being re-implemented per caller.
+    */
     const target =
       otpPurpose === "recover-new-email"
         ? newEmail.trim()
@@ -218,73 +219,30 @@ export default function LoginPage() {
           : otpPurpose === "recover-prove"
             ? `+1 ${maskPhone(ACCOUNT_ON_FILE.phone)}`
             : `+1 ${phone}`;
+
     return (
-      <AuthShell>
-        <AuthTitle>{OTP_TITLE}</AuthTitle>
-        <AuthSubtitle>
-          We sent a {OTP_LENGTH}-digit code to {target}
-        </AuthSubtitle>
-        <AuthCodeBoxes
-          value={code}
-          onChange={(v) => { setCode(v); setOtpError(undefined); }}
-          length={OTP_LENGTH}
-          invalid={otpError === OTP_ERROR_INVALID}
-        />
-        {/* ⛔ Both captured errors are red text under the thing they belong to.
-            CAP-124's sits under the boxes; CAP-125's sits under the number
-            field. Here the number field is a screen back, so the rate-limit
-            message goes under the resend control that provoked it. */}
-        {otpError === OTP_ERROR_INVALID && (
-          <p className="mt-3 text-sm text-[#E5484D]">{OTP_ERROR_INVALID}</p>
-        )}
-        <AuthButton
-          disabled={code.length < OTP_LENGTH}
-          onClick={() => {
-            if (code !== OTP_DEMO_CODE) {
-              setOtpError(OTP_ERROR_INVALID);
-              return;
-            }
-            if (otpPurpose === "sign-in") { signedIn(); return; }
-            if (otpPurpose === "recover-prove") { go("recover-update"); return; }
-            if (otpPurpose === "recover-new-email") {
-              signedIn(`Email updated to ${newEmail.trim()}`);
-              return;
-            }
-            signedIn(`Phone number updated to +1 ${newPhone}`);
-          }}
-        >
-          Verify
-        </AuthButton>
-        <button
-          type="button"
-          onClick={() => {
-            if (resendIn > 0) { setOtpError(OTP_ERROR_RATE_LIMIT); return; }
-            setResendIn(OTP_RESEND_SECONDS);
-            setOtpError(undefined);
-          }}
-          className="mx-auto mt-6 block text-[15px] text-gray-500"
-        >
-          {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
-        </button>
-        {otpError === OTP_ERROR_RATE_LIMIT && (
-          <p className="mt-2 text-center text-sm text-[#E5484D]">{OTP_ERROR_RATE_LIMIT}</p>
-        )}
-        <AuthLink
-          className="mt-5"
-          onClick={() =>
-            go(
-              otpPurpose === "sign-in"
-                ? "signin-phone"
-                : otpPurpose === "recover-prove"
-                  ? "recover-identify"
-                  : "recover-update",
-            )
+      <VerificationCodeScreen
+        target={target}
+        secondaryLabel={otpPurpose === "sign-in" ? "Change phone number" : "Back"}
+        onSecondary={() =>
+          go(
+            otpPurpose === "sign-in"
+              ? "signin-phone"
+              : otpPurpose === "recover-prove"
+                ? "recover-identify"
+                : "recover-update",
+          )
+        }
+        onVerified={() => {
+          if (otpPurpose === "sign-in") { signedIn(); return; }
+          if (otpPurpose === "recover-prove") { go("recover-update"); return; }
+          if (otpPurpose === "recover-new-email") {
+            signedIn(`Email updated to ${newEmail.trim()}`);
+            return;
           }
-        >
-          {otpPurpose === "sign-in" ? "Change phone number" : "Back"}
-        </AuthLink>
-        <DemoHint>Code for this prototype: <b>{OTP_DEMO_CODE}</b></DemoHint>
-      </AuthShell>
+          signedIn(`Phone number updated to +1 ${newPhone}`);
+        }}
+      />
     );
   }
 
@@ -408,12 +366,15 @@ export default function LoginPage() {
           This is what tells us the account is yours, so we can change what you
           have lost access to.
         </AuthSubtitle>
+        {/* ⚠️ The reveal-last field is used HERE and on the settings password
+            screens — both proposals. CAP-126's sign-in field keeps production's
+            plain eye-only behaviour, because it is a replicated screen and a
+            capture cannot be improved quietly. */}
         <AuthField label="Current password" error={error}>
-          <AuthInput
+          <MaskedPasswordInput
             value={password}
-            onChange={(e) => { setPassword(e.target.value); setError(undefined); }}
+            onChange={(next) => { setPassword(next); setError(undefined); }}
             placeholder="Enter your password"
-            type="password"
             autoComplete="current-password"
           />
         </AuthField>

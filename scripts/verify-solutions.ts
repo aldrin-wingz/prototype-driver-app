@@ -2853,10 +2853,43 @@ console.log("\n13. Account self-service — catalogue row 15");
  * ⛔ Reads the RULES module and the two pages, never the catalogue text. The
  * catalogue says what we propose; these say what the prototype does.
  */
+/**
+ * ⛔⛔ **A grep for a banned string matches this repo's own explanation of why
+ * it is banned.** That happened THREE times building row 15 — on `111-1111`,
+ * on `fill="white"`, and on `type="password"` — and each time the check failed
+ * against correct code, which is the failure mode most likely to get a good
+ * check deleted rather than fixed.
+ *
+ * A substring search cannot tell a USE from a MENTION, and this repo documents
+ * its traps in comments right beside the code that avoids them. So any check
+ * asserting a string is ABSENT reads the code with comments stripped.
+ *
+ * ⚠️ Deliberately crude — it is a gate helper, not a parser. It removes block
+ * comments, line comments and the empty braces a JSX comment leaves behind,
+ * which is every form this codebase writes.
+ *
+ * ⛔⛔ The first version matched JSX comments with `\{\s*\/\*[\s\S]*?\*\/\s*\}`
+ * — and a lazy quantifier BACKTRACKS. When a `*​/` was not immediately followed
+ * by `}` the engine simply ran on to the next one that was, deleting every line
+ * in between. It removed a whole JSX element and then reported that element
+ * missing: a helper written to stop checks failing against correct code, doing
+ * exactly that. Stripping block comments FIRST cannot backtrack past one,
+ * because each match ends at its own terminator.
+ */
+function codeOnly(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/\{\s*\}/g, "");
+}
+
 const A_SOURCES = {
   rules: readFileSync("lib/driver-data/account-self-service.ts", "utf8"),
   login: readFileSync("app/login/page.tsx", "utf8"),
   settings: readFileSync("app/options/account/page.tsx", "utf8"),
+  /** ⭐ The one code screen every path uses, and the one password field. */
+  code: readFileSync("components/driver/auth/verification-code-screen.tsx", "utf8"),
+  secret: readFileSync("components/driver/auth/masked-password-input.tsx", "utf8"),
   options: readFileSync("app/options/page.tsx", "utf8"),
 };
 
@@ -2945,13 +2978,39 @@ check(
 check(
   "the two OTP failures are raised by different events",
   "wrong code → invalid; early resend → rate limit",
-  /code !== OTP_DEMO_CODE[\s\S]{0,120}OTP_ERROR_INVALID/.test(A_SOURCES.login) &&
-    /resendIn > 0[\s\S]{0,80}OTP_ERROR_RATE_LIMIT/.test(A_SOURCES.login),
+  /code !== OTP_DEMO_CODE[\s\S]{0,120}OTP_ERROR_INVALID/.test(A_SOURCES.code) &&
+    /resendIn > 0[\s\S]{0,80}OTP_ERROR_RATE_LIMIT/.test(A_SOURCES.code),
 );
+/**
+ * ⛔ Each message is bound to the CONDITION that shows it.
+ *
+ * The first version only asserted that both strings appeared somewhere in the
+ * file — so replacing a guard with `false &&` left the check green while the
+ * message became unreachable. A source-text check cannot see a dead branch on
+ * its own; tying the string to its trigger is what makes it able to.
+ */
+const RENDERED_ERRORS: Array<[string, RegExp]> = [
+  ["OTP_ERROR_INVALID", /error === OTP_ERROR_INVALID && \([\s\S]{0,160}\{OTP_ERROR_INVALID\}/],
+  ["OTP_ERROR_RATE_LIMIT", /error === OTP_ERROR_RATE_LIMIT && \([\s\S]{0,160}\{OTP_ERROR_RATE_LIMIT\}/],
+];
+const unrendered = RENDERED_ERRORS.filter(([, pattern]) => !pattern.test(A_SOURCES.code));
 check(
-  "...and both are rendered, not just declared",
-  `invalid=${A_SOURCES.login.includes("OTP_ERROR_INVALID")} rate=${A_SOURCES.login.includes("OTP_ERROR_RATE_LIMIT")}`,
-  A_SOURCES.login.includes("OTP_ERROR_INVALID") && A_SOURCES.login.includes("OTP_ERROR_RATE_LIMIT"),
+  "...and each is rendered under the condition that raises it",
+  `${unrendered.length} of ${RENDERED_ERRORS.length} not bound to a guard: ${unrendered.map(([n]) => n).join(", ") || "none"}`,
+  unrendered.length === 0,
+);
+/**
+ * ⛔⛔ And NEITHER half may raise them itself. The screens were folded onto one
+ * component precisely so the invalid-code message cannot end up worded five
+ * slightly different ways, or one path quietly forget the rate limit — a
+ * second implementation anywhere undoes that silently.
+ */
+const reimplemented = [["login", A_SOURCES.login], ["settings", A_SOURCES.settings]]
+  .filter(([, src]) => /OTP_ERROR_(INVALID|RATE_LIMIT)/.test(codeOnly(src as string)));
+check(
+  "...and neither page raises an OTP error of its own",
+  `${reimplemented.length} of 2 page(s) re-implement it: ${reimplemented.map(([n]) => n).join(", ") || "none"}`,
+  reimplemented.length === 0,
 );
 check(
   "the six boxes and the 88s countdown are the captured ones",
@@ -3239,10 +3298,35 @@ check(
  * OTP screen at sign-in are the same component, not two that look alike — which
  * is what makes "both" literal rather than a coincidence maintained by hand.
  */
+/**
+ * ⭐ User direction, 2026-10-13: *"All cases the OTP should copy what we have in
+ * sign up and be its own page with a resend option."*
+ *
+ * So the test is not that the two look alike — it is that there is only ONE of
+ * them. Both halves must import the same screen, and nothing may hand-roll the
+ * boxes beside it.
+ */
+const OTP_HOSTS = [["login", A_SOURCES.login], ["settings", A_SOURCES.settings]] as const;
+/** ⚠️ The USAGE, not the import — an unused import is tsc's job, not this. */
+const notUsingShared = OTP_HOSTS.filter(
+  ([, src]) => !codeOnly(src).includes("<VerificationCodeScreen"),
+);
 check(
-  "both halves render the same code boxes",
-  "AuthCodeBoxes in /login and /options/account",
-  A_SOURCES.login.includes("AuthCodeBoxes") && A_SOURCES.settings.includes("AuthCodeBoxes"),
+  "both halves render the one shared code screen",
+  `${notUsingShared.length} of ${OTP_HOSTS.length} host(s) do not`,
+  notUsingShared.length === 0,
+);
+const handRolled = OTP_HOSTS.filter(([, src]) => codeOnly(src).includes("AuthCodeBoxes"));
+check(
+  "...and neither builds its own set of boxes beside it",
+  `${handRolled.length} of ${OTP_HOSTS.length} host(s) do`,
+  handRolled.length === 0,
+);
+/** ⛔ It is a PAGE, not a panel — it renders the shell, so it takes the screen. */
+check(
+  "...and the code screen is its own page, with a resend on it",
+  "AuthShell + Resend code in {n}s",
+  A_SOURCES.code.includes("<AuthShell>") && /Resend code in \$\{resendIn\}s/.test(A_SOURCES.code),
 );
 check(
   "...and both read the rules from lib, not from their own JSX",
@@ -3341,12 +3425,128 @@ const LIGHT_GROUND_SCREENS = [
   "app/id-badge/page.tsx",
 ];
 const wrongWordmark = LIGHT_GROUND_SCREENS.filter((file) =>
-  readFileSync(file, "utf8").includes("wingz-wordmark-dark.svg"),
+  codeOnly(readFileSync(file, "utf8")).includes("wingz-wordmark-dark.svg"),
 );
 check(
   "no light-ground screen uses the dark-ground wordmark",
   `${wrongWordmark.length} wrong of ${LIGHT_GROUND_SCREENS.length} screen(s)`,
   wrongWordmark.length === 0 && LIGHT_GROUND_SCREENS.length >= 2,
+);
+
+/* --- 13g3. The password field, and one step per page -------------------- */
+
+/**
+ * ⭐ User direction, 2026-10-13: *"For change PW have a show password to type.
+ * And even if hidden show briefly the latest character typed."*
+ *
+ * ⛔ `type="password"` CANNOT do the flash — the browser decides what a masked
+ * field shows. So the field is `type="text"` with a masked DISPLAY value and
+ * the real password held in state. That makes the next check the important one.
+ */
+check(
+  "the password field can reveal the whole value and flash the last character",
+  "show/hide toggle + timed reveal",
+  /aria-label=\{shown \? "Hide password" : "Show password"\}/.test(A_SOURCES.secret) &&
+    /setRevealIndex\(index\);/.test(A_SOURCES.secret) &&
+    /setTimeout\(\(\) => setRevealIndex\(-1\), REVEAL_MS\)/.test(A_SOURCES.secret),
+);
+/**
+ * ⛔⛔ The real value is rebuilt from the CARET, not from the text.
+ *
+ * Two wrong versions came before the one this asserts. "Whatever is longer than
+ * before is the new character" breaks on any edit that is not an append. A
+ * prefix/suffix diff fixes insertions but **not deletions**: every masked
+ * character is the same glyph, so deleting the 4th bullet of eight produces
+ * exactly the string that deleting the 8th would, and the diff removes the LAST
+ * character instead of the one under the caret. No diff can tell those apart —
+ * `selectionStart` can.
+ *
+ * It fails SILENTLY either way: the field looks right and holds a different
+ * password than it shows, on a screen whose whole job is to be typed blind.
+ */
+check(
+  "...and it rebuilds the real value from the caret, not from the text",
+  "selectionStart drives the splice; insert and delete handled apart",
+  /selectionStart/.test(A_SOURCES.secret) &&
+    /function handle\(nextDisplay: string, caret: number\)/.test(A_SOURCES.secret) &&
+    /if \(delta > 0\)/.test(A_SOURCES.secret) && /if \(delta < 0\)/.test(A_SOURCES.secret),
+);
+/** ⛔ A deletion must splice at the caret — never trim the tail. */
+check(
+  "...and a deletion removes the run at the caret, not the last character",
+  "value.slice(0, caret) + value.slice(caret - delta)",
+  /onChange\(value\.slice\(0, caret\) \+ value\.slice\(caret - delta\)\);/.test(A_SOURCES.secret) &&
+    !/value\.slice\(0, -1\)/.test(codeOnly(A_SOURCES.secret)),
+);
+/** ⛔ The masked display must never be a password input, or the flash shows a bullet. */
+check(
+  "...and the masked field is not itself a password input",
+  'type="text" with a masked display value',
+  /type="text"/.test(A_SOURCES.secret) && !/type="password"/.test(codeOnly(A_SOURCES.secret)),
+);
+/**
+ * ⚠️ Used on the PROPOSED password screens only. CAP-126's sign-in field keeps
+ * production's plain eye-only behaviour, because it is a replicated screen and
+ * a capture cannot be improved quietly.
+ */
+const PROPOSED_PASSWORD_SCREENS = [["settings", A_SOURCES.settings], ["recovery", A_SOURCES.login]] as const;
+/** ⚠️ `<MaskedPasswordInput`, the USAGE — the bare name also matches the import,
+ *  which survives the element being swapped out underneath it. */
+const usingReveal = PROPOSED_PASSWORD_SCREENS.filter(
+  ([, src]) => codeOnly(src).includes("<MaskedPasswordInput"),
+);
+check(
+  "the reveal field is used on both proposed password screens",
+  `${usingReveal.length} of ${PROPOSED_PASSWORD_SCREENS.length}`,
+  usingReveal.length === PROPOSED_PASSWORD_SCREENS.length,
+);
+check(
+  "...and CAP-126's sign-in field is left exactly as captured",
+  "plain eye toggle, no reveal on the replicated screen",
+  /autoComplete="current-password"[\s\S]{0,120}className="pr-12"/.test(A_SOURCES.login) ||
+    /type=\{showPassword \? "text" : "password"\}/.test(A_SOURCES.login),
+);
+
+/**
+ * ⭐ User direction: *"make it a next page after clicking continue and then a
+ * next page for the 6 digit code."* Three pages, not three sections of one.
+ */
+const SETTINGS_STEPS = ["form", "channel", "code"];
+const missingSteps = SETTINGS_STEPS.filter(
+  (step) => !A_SOURCES.settings.includes(`"${step}"`),
+);
+check(
+  "the settings half is a step machine, one step per page",
+  `${missingSteps.length} missing of ${SETTINGS_STEPS.length}: ${SETTINGS_STEPS.join(" → ")}`,
+  missingSteps.length === 0 &&
+    /type Step = "form" \| "channel" \| "code";/.test(A_SOURCES.settings),
+);
+/** ⛔ The password path, and only it, stops at the channel page on the way. */
+const channelHops = codeOnly(A_SOURCES.settings).match(/setStep\("channel"\)/g) ?? [];
+check(
+  "...and only the password change passes through the channel page",
+  `${channelHops.length} hop(s) into the channel page, expected 1`,
+  channelHops.length === 1 &&
+    /onContinue=\{\(\) => setStep\("channel"\)\}/.test(A_SOURCES.settings),
+);
+/** ⛔ And Back from the code screen returns to it, not past it. */
+check(
+  "...and Back from the code screen returns to the channel page",
+  'onSecondary → "channel" when the field is the password',
+  /setStep\(field === "password" \? "channel" : "form"\)/.test(A_SOURCES.settings),
+);
+/**
+ * ⛔⛔ The draft has to live ABOVE the step. The code screen takes over the
+ * viewport, so a form holding its own draft unmounts the moment the code is
+ * sent and comes back EMPTY when the driver taps Back — the flow would lose
+ * the new email on the way to confirming it.
+ */
+check(
+  "...and the draft survives the page change, because it lives above it",
+  "useState for every draft field sits in AccountPage",
+  /export default function AccountPage[\s\S]{0,1200}const \[emailAgain, setEmailAgain\] = useState/.test(
+    A_SOURCES.settings,
+  ),
 );
 
 /* --- 13h. Proposed copy is marked, production copy is not ---------------- */
