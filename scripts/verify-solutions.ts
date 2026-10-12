@@ -2474,10 +2474,10 @@ check(
  * trip. A sequence assembled by three separate `if`s in a component is one
  * nobody can read; this is the table it has to agree with.
  *
- * ⛔ **Order set by the user 2026-10-13, and it MOVES A PRODUCTION SCREEN.** In
- * the real app the "strongly discouraged" popup is step 1 and nothing precedes
- * it. Here the reason form comes first and that popup comes third. Declared
- * loudly because a reader who knows production will assume a bug.
+ * ⚠️ **Order set by the user 2026-10-13.** Production raises its "strongly
+ * discouraged" popup FIRST, before anything; here the reason form precedes it.
+ * Still a deviation, and declared so a reader who knows the real app does not
+ * assume a bug.
  */
 const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = [
   {
@@ -2493,7 +2493,7 @@ const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = 
   {
     trip: SO_RIDE,
     name: "standing order",
-    steps: ["reason", "standing-order", "confirm"],
+    steps: ["reason", "confirm", "standing-order"],
   },
   {
     // ⚠️ Not seeded — asserted. A ride raising BOTH warnings would let a
@@ -2501,7 +2501,7 @@ const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = 
     // and the rule is checked on a trip built here.
     trip: { ...SO_RIDE, sameDay: true },
     name: "standing order AND short-notice",
-    steps: ["reason", "standing-order", "confirm", "penalty"],
+    steps: ["reason", "confirm", "standing-order", "penalty"],
   },
 ];
 for (const row of STEP_MATRIX) {
@@ -2534,14 +2534,34 @@ check(
 );
 const both = sendBackSteps({ ...SO_RIDE, sameDay: true });
 /**
- * ⛔⛔ Standing order → production's discouragement → penalty. Escalating: the
- * consequence specific to THIS trip, the general one, then the money.
+ * ⛔⛔ **General before specific.** Production's own "are you sure" — raised on
+ * every send-back — comes before the warnings a trip has to EARN. A driver
+ * sending back an ordinary advance trip sees two screens; the extra ones are
+ * earned by something true about the trip.
  */
 check(
-  "the warnings escalate — standing order, then production's, then the penalty",
+  "production's popup comes before the warnings a trip has to earn",
   both.join(" → "),
-  both.indexOf("standing-order") < both.indexOf("confirm") &&
+  both.indexOf("confirm") < both.indexOf("standing-order") &&
     both.indexOf("confirm") < both.indexOf("penalty"),
+);
+check(
+  "...and the standing-order warning comes before the penalty",
+  both.join(" → "),
+  both.indexOf("standing-order") < both.indexOf("penalty"),
+);
+/**
+ * ⚠️ The unconditional steps are the first two, always — so the two extra
+ * screens only ever appear at the END of the sequence, never interleaved.
+ */
+check(
+  "every trip starts with the same two screens, whatever else follows",
+  STEP_MATRIX.map((r) => sendBackSteps(r.trip).slice(0, 2).join("+")).join(" "),
+  STEP_MATRIX.every(
+    (r) =>
+      sendBackSteps(r.trip)[0] === "reason" &&
+      sendBackSteps(r.trip)[1] === "confirm",
+  ),
 );
 check(
   "...and the penalty warning is always last when it appears",

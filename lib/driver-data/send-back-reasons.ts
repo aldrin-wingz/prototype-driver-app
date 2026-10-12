@@ -171,51 +171,48 @@ export function isStandingOrder(trip: Trip): boolean {
  * The steps a send-back runs through, in order.
  *
  * ```
- * reason  →  standing-order  →  confirm  →  penalty
- *            (standing orders)   (always)   (short-notice)
+ * reason  →  confirm  →  standing-order  →  penalty
+ * (always)   (always)    (standing orders)  (short-notice)
  * ```
  *
- * ⛔⛔ **The reason comes FIRST, and production's own first popup comes
- * THIRD.** That is a deliberate deviation from production ordering, set by the
- * user on 2026-10-13, and it is worth saying plainly: in the real app the
- * "strongly discouraged" popup is step 1 and nothing precedes it. Here it does
- * not open the flow, it closes in on it.
+ * ⛔⛔ **The reason comes FIRST, and that is the one ordering decision with a
+ * reason behind it rather than a preference.** An answer collected after a
+ * warning comes from a driver who has just been argued at and is tapping
+ * through; first is the only point in the sequence where the answer is theirs
+ * rather than a reaction.
  *
- * The sequence escalates. Ask why first, while the driver still has something
- * to say and nothing has been argued at them. Then the consequence specific to
- * THIS trip — a standing order risks the whole order and the account. Then
- * production's general discouragement. Then production's money warning, which
- * is the last gate because it is the one with a number in it.
+ * After that the sequence runs **general before specific**: production's own
+ * "are you sure" — which it raises on every send-back — and then only the
+ * consequences that actually apply to THIS trip. A driver sending back an
+ * ordinary advance trip sees two screens; the extra ones are earned by
+ * something true about the trip.
  *
- * ⛔ Asking why AFTER three warnings would collect an answer from a driver who
- * has already been talked at twice and is tapping through; asking it first is
- * the only point in the sequence where the answer is theirs rather than a
- * reaction.
+ * ⚠️ **Production raises `confirm` FIRST, before anything.** Here it is second,
+ * after the reason. That is still a deviation from production ordering — a
+ * smaller one than before, but a reader who knows the real app will notice it,
+ * so it is said plainly rather than left to be discovered.
  *
- * ⚠️ **Only `penalty` and `standing-order` are conditional.** `confirm` is
+ * ⚠️ **Only `standing-order` and `penalty` are conditional.** `confirm` is
  * production's and is raised on every send-back; the penalty warning appears
- * only for a short-notice trip, per the copy-update story's AC. The user's
- * ordering note marked "(if applicable)" against the standing-order step only,
- * and did not change either of those rules.
+ * only for a short-notice trip, per the copy-update story's AC.
  *
- * ⛔⛔ **Standing-order before penalty.** A standing order's cost is the ORDER —
- * every future trip, and the account — while the penalty is money. Showing the
- * money warning first and the severe one second would read as an escalation the
- * driver has already tapped past.
+ * ⛔ **The penalty is last wherever it appears.** It is the screen with a number
+ * in it, and production puts it at the end of its own sequence; nothing here
+ * moves it.
  *
  * ⚠️ **All four combinations are real and the rule handles each**; the seed
  * demonstrates three (`13a` short-notice, `13b` plain, `13c` standing order). A
- * standing order that is ALSO short-notice raises both warnings — four screens
- * in all — which is correct and is asserted rather than seeded, because a ride
- * raising both would let a reviewer read them as one screen.
+ * standing order that is ALSO short-notice raises both conditional warnings —
+ * four screens — which is correct and is asserted rather than seeded, because a
+ * ride raising both would let a reviewer read them as one screen.
  *
  * ⚠️ **Four screens is a lot to put in front of a driver.** Each says something
  * the others do not, but the length is worth flagging to whoever owns this flow.
  */
 export type SendBackStep =
   | "reason"
-  | "standing-order"
   | "confirm"
+  | "standing-order"
   | "penalty";
 
 /** Production's own popup is built — see `SendBackConfirmDialog`. */
@@ -223,8 +220,8 @@ export const SEND_BACK_CONFIRM_BUILT = true;
 
 export function sendBackSteps(trip: Trip): SendBackStep[] {
   const steps: SendBackStep[] = ["reason"];
-  if (isStandingOrder(trip)) steps.push("standing-order");
   if (SEND_BACK_CONFIRM_BUILT) steps.push("confirm");
+  if (isStandingOrder(trip)) steps.push("standing-order");
   if (isShortNoticeSendBack(trip)) steps.push("penalty");
   return steps;
 }

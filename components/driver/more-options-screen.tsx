@@ -487,45 +487,45 @@ export function MoreOptionsScreen({
   }
 
   /**
-   * The reason step is done — now the warnings, in escalating order.
-   *
-   * ⛔⛔ **Order set by the user 2026-10-13, and it moves a PRODUCTION screen.**
-   * The "strongly discouraged" popup is production's step 1 and in the real app
-   * nothing precedes it; here it comes third. The sequence escalates instead:
-   * the consequence specific to this trip, then the general discouragement,
-   * then the money. The rule is `sendBackSteps`; this follows it.
+   * The reason step is done. Production's own "are you sure" follows — it is
+   * raised on every send-back, so there is no branch here.
    *
    * ⚠️ The answers are HELD, not filed. Nothing has been sent back yet and the
-   * driver can still cancel at any of the three warnings — filing here would
-   * have produced a support record for a send-back that never happened.
+   * driver can still back out at any of the warnings — filing here would have
+   * produced a support record for a send-back that never happened.
    */
   function handleReasonCollected(values: Record<string, string>) {
     setSendBackValues(values);
     // Defer a tick at every hand-off: a sheet or dialog reports its dismissal
     // before the handler that caused it, and opening the next surface inside
     // that window leaves the first one's scroll lock on.
+    setTimeout(() => setSendBackConfirmOpen(true), 0);
+  }
+
+  /**
+   * Production's popup answered "Yes". Now only the warnings this trip has
+   * actually earned — general before specific, per `sendBackSteps`.
+   */
+  function handleSendBackConfirmed() {
+    setSendBackConfirmOpen(false);
     if (isStandingOrder(trip)) {
       setTimeout(() => setStandingOrderOpen(true), 0);
       return;
     }
-    setTimeout(() => setSendBackConfirmOpen(true), 0);
+    if (isShortNoticeSendBack(trip)) {
+      setTimeout(() => setSendBackPenaltyOpen(true), 0);
+      return;
+    }
+    completeSendBack();
   }
 
   /**
-   * The standing-order warning was accepted. Production's own discouragement
-   * popup follows — it is raised on every send-back, so there is no branch here.
+   * The standing-order warning was accepted. The penalty warning still follows
+   * if this trip is also short-notice — two different consequences, and neither
+   * stands in for the other.
    */
   function handleStandingOrderAccepted() {
     setStandingOrderOpen(false);
-    setTimeout(() => setSendBackConfirmOpen(true), 0);
-  }
-
-  /**
-   * Production's popup answered "Yes". The penalty warning follows only if this
-   * trip is short-notice; otherwise the send-back completes.
-   */
-  function handleSendBackConfirmed() {
-    setSendBackConfirmOpen(false);
     if (isShortNoticeSendBack(trip)) {
       setTimeout(() => setSendBackPenaltyOpen(true), 0);
       return;
