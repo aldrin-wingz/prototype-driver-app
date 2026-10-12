@@ -1020,6 +1020,138 @@ export const mockRequestTrips: Trip[] = [
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
+
+  // ===== 10a / 10b / 10c — the member filter has something to find =====
+  //
+  // Catalogue row 10: "Request Feed filter by member, so the driver can find
+  // that member's trips themselves."
+  //
+  // ⛔⛔ **Without these the feature cannot be demonstrated at all.** Before this
+  // slice every one of the 23 seeded requests carried a DIFFERENT rider name, so
+  // filtering by any member returned exactly one trip — a control that is
+  // indistinguishable from a broken one. AMARA OKONKWO is the member who already
+  // appears twice in `mockCompletedTrips`, which is what makes her the one the
+  // driver "already drives": the form's member picker reads that history and the
+  // feed filter reads these, and they are two halves of one scenario.
+  //
+  // Three trips across all three seeded days on purpose — a filter that returned
+  // only today's would look identical to one that was silently day-scoped.
+  //
+  // ⚠️ Alivi / Fort Myers, matching HER completed rides rather than the feed's
+  // Atlanta majority. The relationship is the thing being demonstrated, and a
+  // member whose history is in Florida does not start appearing in Georgia.
+  {
+    id: "REQ-AO-001",
+    date: "Thu, Sep 24, 2026",
+    rider: "AMARA OKONKWO",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 4,
+    distance: "4.1 mi away",
+    totalRevenue: 26.29,
+    notes: "Dialysis — same chair time every week",
+    legs: [
+      {
+        id: "leg-1",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:40 AM",
+        address: "3820 Palm Beach Blvd, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 26.29,
+      },
+      {
+        id: "leg-1b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:25 AM",
+        address: "16271 Bass Rd, Fort Myers, FL 33908",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "request",
+    pills: [{ label: "Expires in 5 days", variant: "neutral" }],
+    scenario: {
+      code: "10a",
+      label: "Her trips, posted to the feed",
+      solutions: ["request-feed-member-filter", "auto-assign-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "REQ-AO-002",
+    date: "Fri, Sep 25, 2026",
+    rider: "AMARA OKONKWO",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 4,
+    distance: "4.1 mi away",
+    totalRevenue: 26.29,
+    notes: "Dialysis — same chair time every week",
+    legs: [
+      {
+        id: "leg-1",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:40 AM",
+        address: "3820 Palm Beach Blvd, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 26.29,
+      },
+      {
+        id: "leg-1b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:25 AM",
+        address: "16271 Bass Rd, Fort Myers, FL 33908",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "request",
+    pills: [{ label: "Expires in 6 days", variant: "neutral" }],
+    scenario: {
+      code: "10b",
+      label: "Her trips, posted to the feed",
+      solutions: ["request-feed-member-filter", "auto-assign-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "REQ-AO-003",
+    date: "Sat, Sep 26, 2026",
+    rider: "AMARA OKONKWO",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 4,
+    distance: "4.1 mi away",
+    totalRevenue: 31.40,
+    notes: "Follow-up at the vascular clinic",
+    legs: [
+      {
+        id: "leg-1",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "1:15 PM",
+        address: "3820 Palm Beach Blvd, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 31.40,
+      },
+    ],
+    status: "request",
+    pills: [{ label: "Expires in 7 days", variant: "neutral" }],
+    scenario: {
+      code: "10c",
+      label: "Her trips, posted to the feed",
+      solutions: ["request-feed-member-filter", "auto-assign-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
 ];
 
 // Mock upcoming trips (accepted but not started)
@@ -1763,6 +1895,71 @@ export const mockInProgressTrips: Trip[] = [
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: true,
+  },
+
+  // ===== 09a — the member asks to be assigned to you =====
+  //
+  // Catalogue row 09. AMARA OKONKWO is ONBOARD — `pickedUpAt` is set, so Ride
+  // Details reads "Ride" with DROP OFF MEMBER — because that is the moment the
+  // 610 calls describe: the member is in the car and asks the driver to be
+  // their regular, and the driver rings Support from the kerb.
+  //
+  // ⚠️ A SEPARATE ride from `260731-780322`, which is also hers. That one was
+  // deliberately stripped of its scenario on 2026-09-09 and left as ordinary
+  // Needs Action content so the tab is not empty; giving it a scenario pill
+  // again would quietly reverse that decision to save seeding one ride.
+  //
+  // ⭐ Her two COMPLETED rides (Jul 18, Jul 6) are what make this work: the
+  // form's locked member picker reads `member-options` and prints "2 trips in
+  // the last 30 days" beside her name, which is the only checkable evidence the
+  // request carries.
+  {
+    id: "1049800393",
+    date: "Thu, Jul 31, 2026",
+    rider: "AMARA OKONKWO",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 4,
+    distance: "5.2 mi",
+    totalRevenue: 26.29,
+    notes: "Dialysis — same chair time every week",
+    legs: [
+      {
+        id: "1049800393",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:40 AM",
+        address: "3820 Palm Beach Blvd, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 26.29,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "9:28 AM",
+          pickedUpAt: "9:44 AM",
+          droppedOffAt: null,
+          pickedUpOdometer: 71204,
+        },
+      },
+      {
+        id: "1049800393-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:25 AM",
+        address: "16271 Bass Rd, Fort Myers, FL 33908",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    pills: [],
+    scenario: {
+      code: "09a",
+      label: "Member asks to be assigned to you",
+      solutions: ["auto-assign-request", "request-feed-member-filter"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
   },
 
 ];

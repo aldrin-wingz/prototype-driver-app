@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   CornerUpRight,
   PhoneOff,
+  UserRoundCheck,
   Phone,
   Mail,
   Calendar,
@@ -44,7 +45,9 @@ import {
   type NoShowTreatment,
 } from "@/lib/driver-data/no-show-rules";
 import { CannotReachMemberForm } from "@/components/support/cannot-reach-member-form";
+import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { CANNOT_REACH_LABEL } from "@/lib/driver-data/reach-attempt";
+import { AUTO_ASSIGN_LABEL } from "@/lib/driver-data/member-assignment";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -173,6 +176,55 @@ const CANNOT_REACH_TILE: OptionTile = {
   color: DRIVER_NAVY,
   fullWidth: true,
 };
+
+/**
+ * Catalogue row **09** — ask Support to send you this member's future trips.
+ *
+ * ⚠️ Full-width, and it does NOT pair with `CANNOT_REACH_TILE` into a row of
+ * two. Pairing them would be the cheaper layout and it is wrong for the same
+ * reason the note above gives: these are proposals, and a proposal that takes a
+ * production tile's column — or that takes another proposal's, making the two
+ * read as one feature — has changed the captured grid by more than adding a
+ * row. The only edit to `s-03a` remains extra full-width rows above Send Back
+ * Trip, however many there eventually are.
+ */
+const AUTO_ASSIGN_TILE: OptionTile = {
+  id: "auto-assign",
+  label: AUTO_ASSIGN_LABEL,
+  icon: UserRoundCheck,
+  variant: "filled",
+  color: DRIVER_NAVY,
+  fullWidth: true,
+};
+
+/**
+ * The proposed tiles, in catalogue order, newest LAST.
+ *
+ * ⚠️ Order is the catalogue's, not the order they were built in — a driver
+ * reading the grid should meet them in the same sequence the catalogue
+ * sequences them, and "whatever we added most recently" is not a sequence
+ * anyone can predict.
+ */
+const PROPOSED_TILES: OptionTile[] = [CANNOT_REACH_TILE, AUTO_ASSIGN_TILE];
+
+/**
+ * The grid as rendered: every production tile in its captured place, the
+ * proposals inserted above `Send Back Trip`, and Send Back Trip widened to
+ * full-width so it still ends the grid on its own row.
+ *
+ * ⚠️ Exported so `verify-solutions` can read the REAL array rather than
+ * regex-matching this file's source. A regex over source proves a line is
+ * spelled a certain way; it cannot prove the grid that line builds is the one
+ * on screen, and the first time the insert was reshaped the regex was the only
+ * thing that noticed — which is backwards.
+ */
+export function buildGridTiles(): OptionTile[] {
+  return PRODUCTION_TILES.flatMap((tile) =>
+    tile.id === "send-back"
+      ? [...PROPOSED_TILES, { ...tile, fullWidth: true }]
+      : [tile]
+  );
+}
 
 /**
  * The refusal wording, per treatment.
@@ -306,6 +358,7 @@ export function MoreOptionsScreen({
 
   const [stageRefused, setStageRefused] = useState(false);
   const [cannotReachOpen, setCannotReachOpen] = useState(false);
+  const [autoAssignOpen, setAutoAssignOpen] = useState(false);
 
   /**
    * ⚠️ Nothing about guardrail 2 is known here.
@@ -329,11 +382,7 @@ export function MoreOptionsScreen({
    * driver's thumb expects it. Every production tile keeps its column and its
    * variant; the only change to the captured grid is one extra row.
    */
-  const gridTiles: OptionTile[] = PRODUCTION_TILES.flatMap((tile) =>
-    tile.id === "send-back"
-      ? [CANNOT_REACH_TILE, { ...tile, fullWidth: true }]
-      : [tile]
-  );
+  const gridTiles: OptionTile[] = buildGridTiles();
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -352,6 +401,14 @@ export function MoreOptionsScreen({
       // facility desk at ten has made two different attempts on two different
       // numbers, and Support wants both.
       setCannotReachOpen(true);
+      return;
+    }
+    if (id === "auto-assign") {
+      // ⚠️ No guard, and no stage rule. A member can ask to be assigned to you
+      // at any point in a ride, and the request is about trips that do not
+      // exist yet — so there is no state of THIS trip that could make it
+      // premature or too late.
+      setAutoAssignOpen(true);
       return;
     }
     if (id === "no-show") {
@@ -443,6 +500,15 @@ export function MoreOptionsScreen({
         // unchanged, so there is nothing new on it to see — returning the driver
         // to a screen that looks exactly as they left it would read as the
         // submit having failed.
+      />
+
+      <AutoAssignRequestForm
+        trip={trip}
+        open={autoAssignOpen}
+        onOpenChange={setAutoAssignOpen}
+        // ⛔ Same reasoning, and more so: this request is not attached to the
+        // ride at all, so the ride has nothing to show about it either now or
+        // later.
       />
     </div>
   );

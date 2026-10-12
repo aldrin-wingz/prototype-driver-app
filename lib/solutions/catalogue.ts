@@ -315,10 +315,16 @@ export const SOLUTIONS: Solution[] = [
     problem: "Member wants the same driver next time",
     useCase:
       "Member asks → driver calls to confirm it is assigned → trip is not created yet → Support asks the broker → broker is slow → repeat follow-ups",
-    proposedFeature: "In-app request to be auto-assigned that member's future trips",
+    proposedFeature:
+      "In-app request to be auto-assigned that member's future trips — ⚠️ Not in prototype yet: actually assigning them. The request goes to the CS queue and nothing is held, claimed or created. `Project - Standing Order Offers` is building the system that does the assigning; this is the support call it absorbs until that exists.",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    sharedBuildWith: "request-feed-member-filter",
+    entry: {
+      route: "/my-rides/1049800393/more",
+      label:
+        "AMARA OKONKWO is onboard and has asked to be assigned to you. Tap 'Ask to be their regular driver'. The member is locked from this ride and the form prints the two trips you have already driven her in the last 30 days — the one checkable claim the request carries. Submitting changes nothing about any trip, and the toast says so.",
+    },
   },
   {
     id: "request-feed-member-filter",
@@ -331,8 +337,20 @@ export const SOLUTIONS: Solution[] = [
     proposedFeature:
       "Request Feed filter by member, so the driver can find that member's trips themselves",
     klass: "surface",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    sharedBuildWith: "auto-assign-request",
+    entry: {
+      route: "/requests?member=AMARA%20OKONKWO",
+      label:
+        "Lands with the Member filter already applied — open the filter sheet to see AMARA OKONKWO selected. Her three posted trips come back across all three days, so you can take them yourself instead of waiting for the assignment request. ⚠️ The Member row is the only PROPOSED control in that sheet — and the only one besides Incentive Filter that filters anything at all; the other four are production's, replicated and inert.",
+      alternates: [
+        {
+          route: "/requests?member=THEODORE%20ASHBY",
+          label:
+            "THEODORE ASHBY instead — a member you really have driven, with nothing posted. The feed goes empty with Clear Filters, which is the honest answer and not a broken control.",
+        },
+      ],
+    },
   },
   {
     id: "vehicle-capacity-cleanse",

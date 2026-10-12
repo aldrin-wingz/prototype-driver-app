@@ -46,6 +46,7 @@ export const ISSUE_RIDER_NO_SHOW = "rider-no-show";
 export const ISSUE_CANCEL_AT_DOOR = "cancel-at-door";
 export const ISSUE_MISSED_SWIPE = "missed-swipe";
 export const ISSUE_CANNOT_REACH_MEMBER = "cannot-reach-member";
+export const ISSUE_AUTO_ASSIGN_REQUEST = "auto-assign-request";
 
 /**
  * The support issues a driver can file.
@@ -107,6 +108,21 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Two entry points, one form. Offered as a fourth option in the Reach Rider modal (both the standard and the same-day variant) and as a tile in More Options. ⛔ Filing changes nothing about the trip — it stays unconfirmed, exactly as 'No, try again later' leaves it today.",
+  },
+  {
+    value: ISSUE_AUTO_ASSIGN_REQUEST,
+    label: "Ask to Be Their Regular Driver",
+    // ⚠️ No ⛔ in here. That marker is the repo's note-to-ourselves notation and
+    // `description` is the one field on this type a DRIVER reads — the form
+    // prints it under the title. Say the limit in words instead.
+    description:
+      "For a member who wants you next time. Tell us who and why, and Support will ask the client to send you their future trips. Sending this does not assign, hold or claim anything — it asks.",
+    // Hidden like the rest: the tile is on a ride, so the member is already
+    // known by the time the form opens. A dropdown would make the driver name
+    // a member the entry point was standing on.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from the 'Ask to be their regular driver' tile in More Options, with the member taken from that ride and locked. ⚠️ Deliberately THIN: `Project - Standing Order Offers` is the long-term home for driver-owned recurring work. This is the support request that absorbs the calls until that exists.",
   },
 ];
 

@@ -47,6 +47,24 @@ interface SolutionValue {
 
 const SolutionContext = createContext<SolutionValue | null>(null);
 
+/**
+ * A route with the solution id attached.
+ *
+ * ⛔⛔ **A naive `${route}?solution=${id}` breaks the moment an entry route
+ * carries its own query**, producing `/requests?member=X?solution=Y` — a second
+ * `?` that every parser reads as part of the first value, so the solution is
+ * silently dropped AND the member filter arrives named `X?solution=Y`. No entry
+ * route had a query until catalogue row 10 deep-linked its filter, so the bug
+ * was latent in two places at once: here and the strip's alternate buttons.
+ *
+ * Named in `lib/` and used by both, because the two call sites agreeing by
+ * coincidence is exactly how they drift.
+ */
+export function solutionHref(route: string, id: string): string {
+  const separator = route.includes("?") ? "&" : "?";
+  return `${route}${separator}${SOLUTION_PARAM}=${encodeURIComponent(id)}`;
+}
+
 function writeParam(id: string | null) {
   const url = new URL(window.location.href);
   if (id) url.searchParams.set(SOLUTION_PARAM, id);
@@ -139,7 +157,7 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
       // Claimed BEFORE the push, so the mirror effect's very first render after
       // `setActiveId` already knows to stay out of the way.
       pendingFocus.current = target.split("?")[0];
-      router.push(`${target}?${SOLUTION_PARAM}=${solution.id}`);
+      router.push(solutionHref(target, solution.id));
     },
     [router],
   );

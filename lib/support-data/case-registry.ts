@@ -1,10 +1,15 @@
 import {
   getIssueOptions,
+  ISSUE_AUTO_ASSIGN_REQUEST,
   ISSUE_CANCEL_AT_DOOR,
   ISSUE_CANNOT_REACH_MEMBER,
   ISSUE_MISSED_SWIPE,
   ISSUE_RIDER_NO_SHOW,
 } from "./issue-types";
+import {
+  ASSIGNMENT_REASON_OTHER,
+  ASSIGNMENT_REASONS,
+} from "@/lib/driver-data/member-assignment";
 import {
   REACH_OUTCOME_OTHER,
   REACH_OUTCOMES,
@@ -47,6 +52,10 @@ const ONLY_CANNOT_REACH = {
   field: "issue",
   equals: [ISSUE_CANNOT_REACH_MEMBER],
 };
+const ONLY_AUTO_ASSIGN = {
+  field: "issue",
+  equals: [ISSUE_AUTO_ASSIGN_REQUEST],
+};
 
 /**
  * Every case that is filed against one leg.
@@ -54,6 +63,13 @@ const ONLY_CANNOT_REACH = {
  * `legId` belongs to all of them, so it is declared once under this gate rather
  * than copied per case — two identical-looking leg pickers under different gates
  * are two fields that can drift.
+ *
+ * ⛔⛔ **`ISSUE_AUTO_ASSIGN_REQUEST` is deliberately ABSENT.** It is the first
+ * case that is not about a leg at all: it names a MEMBER and asks about trips
+ * that do not exist yet. Adding it here would put a required, locked leg picker
+ * on a request whose whole point is that there is no trip to pick — and the
+ * leg it locked to would be the one the driver happened to be standing on,
+ * which Support would then read as the subject of the request.
  */
 const ANY_LEG_CASE = {
   field: "issue",
@@ -129,6 +145,7 @@ export function buildSupportFormCase({
   askWaitTimes = true,
   missedSwipe,
   cannotReach,
+  autoAssign = false,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -181,6 +198,15 @@ export function buildSupportFormCase({
    * unanswerable required select when that happens.
    */
   cannotReach?: { contactOptions: SupportFieldOption[] };
+  /**
+   * Build the "ask to be their regular driver" case — catalogue row 09.
+   *
+   * ⚠️ A plain boolean, unlike `cannotReach`, because this case needs nothing
+   * from the trip that `prefillFrom` cannot reach on its own. The member comes
+   * through `riderName` like any other prefill; there is no per-trip option list
+   * to assemble, so there is nothing for a caller to get wrong by passing.
+   */
+  autoAssign?: boolean;
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -198,11 +224,13 @@ export function buildSupportFormCase({
     submitLabel: "Submit",
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: cannotReach
-      ? "Unable to reach member"
-      : missedSwipe
-        ? "Missed swipe"
-        : "Member no-show",
+    zendeskEquivalent: autoAssign
+      ? "Driver assignment request"
+      : cannotReach
+        ? "Unable to reach member"
+        : missedSwipe
+          ? "Missed swipe"
+          : "Member no-show",
     /**
      * ⚠️ `undefined` for Can't Reach, not a fallback.
      *
@@ -211,11 +239,12 @@ export function buildSupportFormCase({
      * passes because it has nothing to look at, which is indistinguishable from
      * a check that passed because the times were in order.
      */
-    timeSequence: cannotReach
-      ? undefined
-      : missedSwipe
-        ? SWIPE_TIME_SEQUENCE
-        : WAIT_TIME_SEQUENCE,
+    timeSequence:
+      cannotReach || autoAssign
+        ? undefined
+        : missedSwipe
+          ? SWIPE_TIME_SEQUENCE
+          : WAIT_TIME_SEQUENCE,
     fields: [
       {
         id: "issue",
@@ -663,6 +692,91 @@ export function buildSupportFormCase({
               helpText:
                 "A screenshot of your phone's call log showing the attempt. ⚠️ Not in prototype yet — the real form would require this, and you can submit without it here.",
               showIf: ONLY_CANNOT_REACH,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Ask to Be Their Regular Driver --------------------------------
+      //
+      // Catalogue row 09 — `Trip / Ride Assignment`, 610 calls. The member asks
+      // the driver to be their regular; the driver phones Support; Support asks
+      // the client; the client is slow; the driver phones again. This form is
+      // the first of those calls, written down.
+      //
+      // ⛔⛔ **It is deliberately THIN.** `Project - Standing Order Offers` is a
+      // live three-phase project building the real thing — driver-owned
+      // recurring work, with a Standing Orders nav section, SO ids per
+      // client-market, Planner blocks and a Dispatch tab. This is not a small
+      // version of that and must not grow into one. It is the support request
+      // that absorbs the calls *until* that exists, and when it exists this
+      // row's volume belongs to it.
+      //
+      // ⛔ So: no ride rows, no stepper, no dates. The earlier CASE-03 spec
+      // collected SPECIFIC rides a member had mentioned, which is a different
+      // request — that one names trips, this one names a standing preference.
+      // Asking for ride ids here would invite a driver to file trip details
+      // against a case nobody will match them to.
+      ...(autoAssign
+        ? ([
+            {
+              id: "member",
+              type: "member-picker",
+              label: "Which member?",
+              required: true,
+              prefillFrom: "riderName",
+              /**
+               * ⛔ Locked, and taken from the ride the tile was tapped on. The
+               * picker's search path exists and is not reached from here — the
+               * entry point already knows who, so opening it would ask the
+               * driver to re-identify the member they are sitting with.
+               *
+               * ⚠️ What the locked state RENDERS is the point: the member's
+               * client and how many rides the driver has done with them in the
+               * last 30 days, read from `member-options`. That count is the only
+               * evidence in the request Support can check, and "I already drive
+               * them most weeks" below is the claim it corroborates.
+               */
+              lockWhenPrefilled: true,
+              lockedBadge: "From this ride",
+              showIf: ONLY_AUTO_ASSIGN,
+            },
+            {
+              id: "assignmentReason",
+              type: "select",
+              label: "Why should their trips come to you?",
+              shortLabel: "your reason",
+              placeholder: "Select:",
+              required: true,
+              options: [...ASSIGNMENT_REASONS],
+              showIf: ONLY_AUTO_ASSIGN,
+            },
+            {
+              id: "assignmentReasonOther",
+              type: "text",
+              label: "Tell us why",
+              placeholder: "In a few words",
+              required: true,
+              /**
+               * ⚠️ Gated on the ANSWER, not the issue — same shape as
+               * `reachOutcomeOther` and `spokeWithRelation`, and safe for the
+               * same reason: `assignmentReason` is itself gated on this issue,
+               * so it can hold a value on no other case. A second case asking
+               * `assignmentReason` would need a compound condition here rather
+               * than this comment.
+               */
+              showIf: {
+                field: "assignmentReason",
+                equals: [ASSIGNMENT_REASON_OTHER],
+              },
+            },
+            {
+              id: "assignmentNotes",
+              type: "textarea",
+              label: "Anything else Support should know? (optional)",
+              placeholder:
+                "e.g. dialysis Tue/Thu mornings, or the family asked for the same driver each week",
+              maxLength: 500,
+              showIf: ONLY_AUTO_ASSIGN,
             },
           ] as SupportCaseDefinition["fields"])
         : []),

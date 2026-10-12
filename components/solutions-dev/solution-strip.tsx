@@ -10,7 +10,7 @@ import {
   formatShare,
   SOLUTIONS,
 } from "@/lib/solutions/catalogue";
-import { useSolution } from "@/lib/solutions/solution-context";
+import { useSolution, solutionHref } from "@/lib/solutions/solution-context";
 import { UseCaseFlow } from "./use-case-flow";
 import { cn } from "@/lib/utils";
 
@@ -164,7 +164,7 @@ export function SolutionStrip() {
                   <button
                     key={alternate.route}
                     type="button"
-                    onClick={() => router.push(`${alternate.route}?solution=${active.id}`)}
+                    onClick={() => router.push(solutionHref(alternate.route, active.id))}
                     className="mt-1 flex w-full items-start gap-1.5 rounded text-left text-[11px] leading-snug text-[#7D9A92] hover:text-[#E6EFEC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4FD1AE]"
                   >
                     <CornerDownRight className="mt-0.5 h-3 w-3 shrink-0 text-[#4FD1AE]" />

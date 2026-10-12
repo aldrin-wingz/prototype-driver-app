@@ -9,6 +9,7 @@ import { RequestMap } from "@/components/driver/request-map";
 import { RequestListSheet } from "@/components/driver/request-list-sheet";
 import { FilterRequestsModal, type RequestFilters } from "@/components/driver/filter-requests-modal";
 import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
+import { filterRequestsByMember } from "@/lib/driver-data/member-assignment";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -50,6 +51,16 @@ function RequestsPageContent() {
   const { toast } = useToast();
 
   const incentiveParam = searchParams.get("incentive") as IncentiveType | null;
+  /**
+   * Catalogue row 10's deep link — `/requests?member=AMARA%20OKONKWO`.
+   *
+   * ⚠️ Deep-linked for the same reason `incentive` is: the selector has to be
+   * able to land a reviewer IN the demonstrated state. A catalogue entry that
+   * just said "open the filter sheet and pick her" would be an instruction, not
+   * a demo, and the alternate branch — a member with nothing posted — would be
+   * indistinguishable from the primary one by route.
+   */
+  const memberParam = searchParams.get("member");
 
   const [tab, setTab] = useState<RequestTab>("standard");
   const [detent, setDetent] = useState<SheetDetent>(DEFAULT_DETENT);
@@ -58,12 +69,26 @@ function RequestsPageContent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<RequestFilters>(() => ({
     incentiveType: incentiveParam ?? undefined,
+    member: memberParam ?? undefined,
   }));
 
+  /**
+   * ⛔⛔ **Only two of the sheet's six filters are applied here**, and that is
+   * inherited, not an oversight of this slice. `pickupLocation`, `day`,
+   * `client`, `sortBy` and `mode` are rendered by `FilterRequestsModal` and
+   * read by nothing — the base replicated the captured production sheet
+   * faithfully, controls and all. Wiring them is a change to base behaviour and
+   * belongs in its own decision, not smuggled in beside a feature.
+   *
+   * `member` is catalogue row 10 and does filter. `incentiveType` predates it.
+   */
   const filtered = useMemo(() => {
     let result = mockRequestTrips;
     if (appliedFilters.incentiveType) {
       result = result.filter((t) => t.incentiveTypes.includes(appliedFilters.incentiveType as IncentiveType));
+    }
+    if (appliedFilters.member) {
+      result = filterRequestsByMember(result, appliedFilters.member);
     }
     return result;
   }, [appliedFilters]);
@@ -75,9 +100,18 @@ function RequestsPageContent() {
   const active = groups.find((g) => g.key === activeKey) ?? groups[0];
   const dayTrips = active?.trips ?? [];
 
+  // ⚠️ Both params in ONE effect, setting the whole filter object. Two effects
+  // each calling `setAppliedFilters` with their own key would race, and the
+  // second to run would erase the first's filter — which reads on screen as a
+  // deep link that silently ignored half of itself.
   React.useEffect(() => {
-    if (incentiveParam) setAppliedFilters({ incentiveType: incentiveParam });
-  }, [incentiveParam]);
+    if (incentiveParam || memberParam) {
+      setAppliedFilters({
+        incentiveType: incentiveParam ?? undefined,
+        member: memberParam ?? undefined,
+      });
+    }
+  }, [incentiveParam, memberParam]);
 
   /**
    * The first count is trips ON SCREEN; the second is the total for the day
@@ -100,7 +134,16 @@ function RequestsPageContent() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    /*
+      ⛔⛔ `relative` is load-bearing. The filter button below is positioned
+      `absolute right-14 top-2`, and with no positioned ancestor it resolved
+      against the VIEWPORT — so it floated up out of the page and landed inside
+      the solutions strip's header row, overlapping the strip's own controls and
+      stealing the tap that opens the solution picker. Invisible until row 10
+      made `/requests` an entry route and someone actually tried to switch
+      solutions from it.
+    */
+    <div className="relative flex h-screen flex-col overflow-hidden">
       <Header
         title="Requests"
         showFilter={false}

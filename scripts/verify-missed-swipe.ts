@@ -250,6 +250,12 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   "1049800377": "pickup",
   "1049800376": "none",   // no trail
   "1049800379": "none",   // every mark recorded
+  // ⚠️ Row 09's scenario ride (`09a`, AMARA OKONKWO onboard). Added to this
+  // DECLARED set rather than left to fall through — an undeclared ride here is
+  // a ride whose swipe behaviour nobody decided. It carries no `locationRecords`
+  // at all, so the trail has nothing to challenge the drop-off with, which is
+  // the same reason `1049800376` is quiet.
+  "1049800393": "none",   // no trail
   [RIDE_1]: "pickup",
   [RIDE_2]: "dropoff",
 };
@@ -269,7 +275,7 @@ check("every in-progress ride was swept",
   `${swept} ridden, ${Object.keys(EXPECTED_TRIGGER).length} declared`);
 check("the sweep covers rides that DO and DO NOT trigger",
   Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length === 3 &&
-    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 4,
+    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 5,
   `${Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length} fire of ${swept}`);
 
 // ⛔ The two rides that stay quiet AT the pick-up must be quiet for the right

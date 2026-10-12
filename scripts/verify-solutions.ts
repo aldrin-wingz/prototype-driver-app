@@ -45,8 +45,28 @@ import {
   REACH_OUTCOMES,
 } from "../lib/driver-data/reach-attempt";
 import { reachOptionsFor } from "../components/driver/reach-rider-modal";
+import { buildGridTiles } from "../components/driver/more-options-screen";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
-import { ISSUE_CANNOT_REACH_MEMBER } from "../lib/support-data/issue-types";
+import {
+  ISSUE_AUTO_ASSIGN_REQUEST,
+  ISSUE_CANNOT_REACH_MEMBER,
+  SUPPORT_ISSUE_TYPES,
+} from "../lib/support-data/issue-types";
+import {
+  ASSIGNMENT_REASON_OTHER,
+  ASSIGNMENT_REASONS,
+  AUTO_ASSIGN_CHANGES_NOTHING,
+  AUTO_ASSIGN_LABEL,
+  filterRequestsByMember,
+  GROUP_RIDER_PREFIX,
+  isGroupRide,
+  MAX_REASON_LABEL_CHARS,
+  memberFilterOptions,
+} from "../lib/driver-data/member-assignment";
+import { buildAutoAssignRequest } from "../components/support/auto-assign-request-form";
+import { getMemberOptions, MEMBER_WINDOW_DAYS } from "../lib/support-data/member-options";
+import { areRequiredFieldsFilled, isFieldVisible } from "../lib/support/field-rules";
+import { solutionHref } from "../lib/solutions/solution-context";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
   mockRequestTrips,
@@ -298,8 +318,11 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *   - Can't Reach Member (row 04) — the STANDARD confirmation modal, whose third
  *     option changes nothing, and the SAME-DAY one, whose third option advances
  *     the trip. Those are different alternatives for the proposal to beat.
+ *   - Request Feed member filter (row 10) — a member WITH trips posted, and a
+ *     member with none. A filter that can only be seen finding something cannot
+ *     be told apart from one that ignores its argument.
  */
-const EXPECTED_ALTERNATES = 2;
+const EXPECTED_ALTERNATES = 3;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -441,7 +464,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 6;
+const EXPECTED_SCENARIO_RIDES = 10;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -492,6 +515,8 @@ check(
 /** The entry route's own ride has to be one of them, or the link lands nowhere. */
 let entryMismatches = 0;
 let entryChecked = 0;
+let rideRoutes = 0;
+let surfaceRoutes = 0;
 for (const solution of builtRows) {
   // ⚠️ `entry.alternates`, NOT `solution.alternates`. The first version read the
   // wrong level, found `undefined`, and quietly checked 3 routes instead of 4 —
@@ -503,19 +528,47 @@ for (const solution of builtRows) {
   ];
   for (const route of routes) {
     if (!route) continue;
+    entryChecked += 1;
+    /**
+     * ⛔⛔ **Not every entry route is a ride route, and assuming so made this
+     * check pass by accident for five slices.** It read `route.split("/")[2]`
+     * — the id in `/my-rides/<id>` — and row 10's `/requests?member=…` yields
+     * `undefined`, which then "mismatched" a tagged ride it was never about.
+     *
+     * So the two kinds are counted SEPARATELY, both with denominators. A ride
+     * route must land on a ride tagged for its row. A surface route has no ride
+     * to land on; what makes it honest is that the page exists, which
+     * `checkEntry` above already asserted for every route including this one.
+     */
+    if (!route.startsWith("/my-rides/")) {
+      surfaceRoutes += 1;
+      continue;
+    }
+    rideRoutes += 1;
     const id = route.split("/")[2];
     const trip = ALL_SEEDED.find((t) => t.id === id);
-    entryChecked += 1;
     if (!trip || !isScenarioFor(trip, solution.id)) entryMismatches += 1;
   }
 }
 check(
-  "every entry route lands on a ride tagged for that row",
-  `${entryMismatches} mismatch(es) of ${entryChecked} route(s)`,
+  "every RIDE entry route lands on a ride tagged for that row",
+  `${entryMismatches} mismatch(es) of ${rideRoutes} ride route(s)`,
   entryMismatches === 0,
 );
+/**
+ * ⚠️ Declared separately, so a ride route that quietly became a surface route —
+ * or the reverse — cannot keep the total intact while changing what was
+ * actually tested. The first number is the one that carries the assertion above.
+ */
+const EXPECTED_RIDE_ROUTES = 8;
+const EXPECTED_SURFACE_ROUTES = 2;
+check(
+  "...and the two kinds of route were counted as declared",
+  `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
+  rideRoutes === EXPECTED_RIDE_ROUTES && surfaceRoutes === EXPECTED_SURFACE_ROUTES,
+);
 /** Declared, because a route silently skipped is a check that stops checking. */
-const EXPECTED_ENTRY_ROUTES = 7;
+const EXPECTED_ENTRY_ROUTES = EXPECTED_RIDE_ROUTES + EXPECTED_SURFACE_ROUTES;
 check(
   "...and every declared route was reached",
   `${entryChecked} checked (expected ${EXPECTED_ENTRY_ROUTES})`,
@@ -567,6 +620,12 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // not place — which 1b and ride 2 now cover between them, so it was removed
   // rather than left as a fourth card saying nothing new.
   "missed-swipe": 2,
+  // Rows 09 and 10 are one build and ONE ride demonstrates both — AMARA
+  // OKONKWO onboard, `09a`. Declared twice rather than once, because the two
+  // rows land independently and a row that silently shared another's ride
+  // would read as built while having nothing of its own to show.
+  "auto-assign-request": 1,
+  "request-feed-member-filter": 1,
 };
 /**
  * ⚠️ A SECOND tab, declared separately rather than folded into the map above
@@ -979,21 +1038,60 @@ check(
   `${foundTiles.length} of ${EXPECTED_PRODUCTION_TILES}`,
   foundTiles.length === EXPECTED_PRODUCTION_TILES,
 );
+const PROPOSED_TILE_IDS = ["cannot-reach", "auto-assign"];
 check(
-  "...and exactly one tile was added, outside that list",
-  `cannot-reach in production list: ${tileBlock.includes('id: "cannot-reach"')}`,
-  !tileBlock.includes('id: "cannot-reach"') &&
-    REACH_SOURCES.more.includes('id: "cannot-reach"'),
+  "...and every added tile sits OUTSIDE the production list",
+  `${PROPOSED_TILE_IDS.filter((id) => tileBlock.includes(`id: "${id}"`)).length} of ${PROPOSED_TILE_IDS.length} leaked into it`,
+  PROPOSED_TILE_IDS.every(
+    (id) =>
+      !tileBlock.includes(`id: "${id}"`) &&
+      REACH_SOURCES.more.includes(`id: "${id}"`),
+  ),
 );
+
 /**
- * ⛔ Send Back Trip stays LAST and stays full-width. It is the destructive
- * action; a proposal that pushed it out of the position the capture gives it
- * would be this slice rearranging production to make room for itself.
+ * ⛔⛔ **Read from the REAL array, not a regex over the file.**
+ *
+ * This check used to match the source text `[CANNOT_REACH_TILE, { ...tile,
+ * fullWidth: true }]`. That proved one line was spelled a certain way; it could
+ * not prove the grid that line builds is the grid on screen, and adding a
+ * second proposal reshaped the insert and broke the regex while the rendered
+ * grid was still correct — the check failing for the one reason that was not a
+ * defect. `buildGridTiles()` is exported precisely so this reads the data.
  */
+const grid = buildGridTiles();
+const last = grid[grid.length - 1];
 check(
   "Send Back Trip is still last and still full-width",
-  "CANNOT_REACH_TILE inserted above send-back",
-  /\[CANNOT_REACH_TILE, \{ \.\.\.tile, fullWidth: true \}\]/.test(REACH_SOURCES.more),
+  `${grid.length} tiles, last = ${last?.id} (fullWidth: ${last?.fullWidth === true})`,
+  last?.id === "send-back" && last.fullWidth === true,
+);
+check(
+  "every production tile keeps its captured column and variant",
+  `${grid.filter((t) => !PROPOSED_TILE_IDS.includes(t.id) && t.id !== "send-back" && t.fullWidth).length} widened of ${EXPECTED_PRODUCTION_TILES - 1}`,
+  grid
+    .filter((t) => !PROPOSED_TILE_IDS.includes(t.id) && t.id !== "send-back")
+    .every((t) => !t.fullWidth),
+);
+check(
+  "every proposal is full-width, so none takes a production tile's column",
+  `${grid.filter((t) => PROPOSED_TILE_IDS.includes(t.id) && t.fullWidth).length} of ${PROPOSED_TILE_IDS.length}`,
+  grid
+    .filter((t) => PROPOSED_TILE_IDS.includes(t.id))
+    .every((t) => t.fullWidth === true),
+);
+check(
+  "the proposals sit between the production grid and Send Back Trip",
+  `proposal indices ${grid.map((t, i) => (PROPOSED_TILE_IDS.includes(t.id) ? i : -1)).filter((i) => i >= 0).join(", ")} of ${grid.length}`,
+  PROPOSED_TILE_IDS.every((id) => {
+    const i = grid.findIndex((t) => t.id === id);
+    return i > grid.findIndex((t) => t.id === "no-show") && i < grid.length - 1;
+  }),
+);
+check(
+  "the grid is the production list plus exactly the proposals",
+  `${grid.length} tiles = ${EXPECTED_PRODUCTION_TILES} production + ${PROPOSED_TILE_IDS.length} proposed`,
+  grid.length === EXPECTED_PRODUCTION_TILES + PROPOSED_TILE_IDS.length,
 );
 
 // ---------------------------------------------------------------------------
@@ -1118,7 +1216,7 @@ check(
   asymmetric.length === 0 && shared.length > 0,
 );
 /** Declared, because a pair silently dropping out would pass everything above. */
-const EXPECTED_SHARED_ROWS = 4;
+const EXPECTED_SHARED_ROWS = 6;
 check(
   "the declared number of rows share a build",
   `${shared.length} of ${EXPECTED_SHARED_ROWS} — ${shared.map((r) => r.order).join(", ")}`,
@@ -1146,6 +1244,12 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   "missed-swipe": "in-progress",
   "tag-number-invalid": "needs-action",
   "cannot-reach-member": "needs-action",
+  // Rows 09 and 10 share ride `09a`, which is In Progress. Row 10's own entry
+  // is the Request Feed rather than My Rides — but a reviewer who switches to
+  // it and then opens My Rides still has to land somewhere with its ride on it,
+  // which is the whole point of this rule.
+  "auto-assign-request": "in-progress",
+  "request-feed-member-filter": "in-progress",
 };
 check(
   "every built row declares the tab it lands on",
@@ -1186,6 +1290,525 @@ check(
   "with nothing focused the first tab still wins",
   `${firstTabWithRides(tabCountsFor(null))} with counts ${tabCountsFor(null).map((t) => t.count).join("/")}`,
   firstTabWithRides(tabCountsFor(null)) === TAB_ORDER[0],
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n11. Trip / Ride Assignment — rows 09 and 10, one member, two surfaces");
+// ---------------------------------------------------------------------------
+
+const ASSIGN_SOURCES = {
+  form: readFileSync(join(ROOT, "components/support/auto-assign-request-form.tsx"), "utf8"),
+  more: readFileSync(join(ROOT, "components/driver/more-options-screen.tsx"), "utf8"),
+  sheet: readFileSync(join(ROOT, "components/driver/filter-requests-modal.tsx"), "utf8"),
+  feed: readFileSync(join(ROOT, "app/requests/page.tsx"), "utf8"),
+};
+for (const [name, src] of Object.entries(ASSIGN_SOURCES)) {
+  check(`the ${name} source was read`, `${src.length} chars`, src.length > 1200);
+}
+
+// ---- the case ------------------------------------------------------------
+
+const ASSIGN_CASE = buildSupportFormCase({
+  includeIssues: [ISSUE_AUTO_ASSIGN_REQUEST],
+  autoAssign: true,
+});
+/**
+ * ⛔⛔ **Asserted on what RENDERS, not on `case.fields`.**
+ *
+ * The first version of this check read the raw array and failed with thirteen
+ * fields — and it was the check that was wrong, not the case. The no-show core
+ * block (`noShowType`, `legId`, the wait times, `knocked`, `spokeWith*`) is
+ * emitted UNCONDITIONALLY by the builder and gated at RENDER time by `showIf`.
+ * Every case therefore carries them in its array and shows almost none of them.
+ * So the set that matters is the one `isFieldVisible` lets through for this
+ * issue, which is also the set `areRequiredFieldsFilled` gates Submit on.
+ */
+const assignValues = { issue: ISSUE_AUTO_ASSIGN_REQUEST };
+const assignVisible = ASSIGN_CASE.fields.filter((f) => isFieldVisible(f, assignValues));
+const assignIds = assignVisible.map((f) => f.id);
+const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentReason", "assignmentNotes"];
+check(
+  "the case renders exactly the declared field set",
+  `${assignIds.length} of ${ASSIGN_CASE.fields.length} field(s) visible: ${assignIds.join(", ")}`,
+  assignIds.length === EXPECTED_ASSIGN_FIELDS.length &&
+    EXPECTED_ASSIGN_FIELDS.every((id, i) => assignIds[i] === id),
+);
+
+/**
+ * ⛔⛔ **No leg picker.** This is the first case that is not filed against a
+ * leg — it names a MEMBER and asks about trips that do not exist yet. A locked
+ * leg picker here would attach the request to whichever ride the driver
+ * happened to be standing on, and Support would read that leg as its subject.
+ *
+ * ⚠️ Asserted twice on purpose: the field must not RENDER, and it must not be
+ * gated by `ANY_LEG_CASE`. The first alone would pass if someone widened that
+ * gate and then hid the field another way.
+ */
+check(
+  "the case renders no leg picker",
+  `legId visible: ${assignIds.includes("legId")}`,
+  !assignIds.includes("legId"),
+);
+check(
+  "...and this issue is not in the leg-case gate at all",
+  `legId gate: ${JSON.stringify(ASSIGN_CASE.fields.find((f) => f.id === "legId")?.showIf?.equals)}`,
+  !ASSIGN_CASE.fields
+    .find((f) => f.id === "legId")
+    ?.showIf?.equals.includes(ISSUE_AUTO_ASSIGN_REQUEST),
+);
+/**
+ * ⛔ The whole no-show / missed-swipe core stays hidden — with a denominator, so
+ * "nothing leaked" cannot mean "nothing was looked at".
+ */
+const OTHER_CASE_FIELDS = [
+  "noShowType", "legId", "waitedFrom", "leftAt", "waitedWhere", "knocked",
+  "spokeWithWho", "spokeWithRelation", "contactNumber", "reachOutcome",
+];
+const leakedOther = OTHER_CASE_FIELDS.filter((id) => assignIds.includes(id));
+check(
+  "no other case's field renders on this one",
+  `${leakedOther.length} of ${OTHER_CASE_FIELDS.length} leaked${leakedOther.length ? `: ${leakedOther.join(", ")}` : ""}`,
+  leakedOther.length === 0,
+);
+/**
+ * ⛔⛔ And Submit must be reachable. A required field that is hidden but still
+ * counted would disable the button forever — the `requireOneOf` landmine in
+ * another spelling. Checked by filling only what renders.
+ */
+const filledAssign: Record<string, string> = {
+  issue: ISSUE_AUTO_ASSIGN_REQUEST,
+  member: "AMARA OKONKWO",
+  assignmentReason: ASSIGNMENT_REASONS[0].value,
+};
+check(
+  "filling only the visible required fields enables Submit",
+  `required visible: ${assignVisible.filter((f) => f.required && !f.requiredNotEnforced).map((f) => f.id).join(", ")}`,
+  areRequiredFieldsFilled(ASSIGN_CASE.fields, filledAssign),
+);
+check(
+  "...and leaving the reason empty still blocks it",
+  "assignmentReason blank",
+  !areRequiredFieldsFilled(ASSIGN_CASE.fields, {
+    issue: ISSUE_AUTO_ASSIGN_REQUEST,
+    member: "AMARA OKONKWO",
+  }),
+);
+check(
+  "...and names no time sequence, because it asks no times",
+  `timeSequence=${JSON.stringify(ASSIGN_CASE.timeSequence)}`,
+  ASSIGN_CASE.timeSequence === undefined,
+);
+check(
+  "it maps to its own Zendesk equivalent",
+  `${ASSIGN_CASE.zendeskEquivalent}`,
+  ASSIGN_CASE.zendeskEquivalent === "Driver assignment request",
+);
+check(
+  "it resolves in the CS queue, not by auto-resolve",
+  `${ASSIGN_CASE.resolution}`,
+  ASSIGN_CASE.resolution === "cs-queue",
+);
+
+/**
+ * ⛔ The negative control: none of this block exists on any other case.
+ *
+ * ⚠️ Enumerated separately from `EXPECTED_ASSIGN_FIELDS`, because that list is
+ * what RENDERS at rest and `assignmentReasonOther` is hidden until its answer
+ * is picked. Deriving the denominator from the visible set would have left the
+ * one conditional field unchecked for leakage — the exact way a denominator
+ * goes quietly short.
+ */
+const PLAIN_CASE_IDS = buildSupportFormCase().fields.map((f) => f.id);
+const ASSIGN_OWN_FIELDS = [
+  "member",
+  "assignmentReason",
+  "assignmentReasonOther",
+  "assignmentNotes",
+];
+const leaked = ASSIGN_OWN_FIELDS.filter((id) => PLAIN_CASE_IDS.includes(id));
+check(
+  "the block is absent when autoAssign is not passed",
+  `${leaked.length} of ${ASSIGN_OWN_FIELDS.length} leaked`,
+  leaked.length === 0,
+);
+
+const memberField = ASSIGN_CASE.fields.find((f) => f.id === "member")!;
+check(
+  "the member is a picker, prefilled from the ride and LOCKED",
+  `type=${memberField.type} prefillFrom=${memberField.prefillFrom} locked=${memberField.lockWhenPrefilled}`,
+  memberField.type === "member-picker" &&
+    memberField.prefillFrom === "riderName" &&
+    memberField.lockWhenPrefilled === true,
+);
+
+const reasonField = ASSIGN_CASE.fields.find((f) => f.id === "assignmentReason")!;
+check(
+  "the reason select offers the declared options, from lib",
+  `${reasonField.options?.length} of ${ASSIGNMENT_REASONS.length}`,
+  reasonField.options?.length === ASSIGNMENT_REASONS.length &&
+    reasonField.required === true,
+);
+/**
+ * ⚠️ The shared `select` primitive does not wrap and does not ellipsize — a long
+ * option is cut mid-word. Learned on Can't Reach Member and re-asserted here,
+ * because the next person to add a reason will not have been there.
+ */
+const tooLong = ASSIGNMENT_REASONS.filter((o) => o.label.length > MAX_REASON_LABEL_CHARS);
+check(
+  `every reason label fits the un-wrapping select (<=${MAX_REASON_LABEL_CHARS})`,
+  tooLong.length
+    ? tooLong.map((o) => `${o.label} (${o.label.length})`).join(" | ")
+    : `longest ${Math.max(...ASSIGNMENT_REASONS.map((o) => o.label.length))} of ${ASSIGNMENT_REASONS.length}`,
+  tooLong.length === 0,
+);
+/**
+ * The free-text escape hatch is gated on the ANSWER, not on the issue — which is
+ * why it is absent from the visible set above and appears only once "Something
+ * else" is picked.
+ */
+const otherField = ASSIGN_CASE.fields.find((f) => f.id === "assignmentReasonOther")!;
+check(
+  "the 'something else' text is gated on the reason ANSWER",
+  `showIf=${JSON.stringify(otherField.showIf)}`,
+  otherField.showIf?.field === "assignmentReason" &&
+    otherField.showIf.equals.includes(ASSIGNMENT_REASON_OTHER),
+);
+check(
+  "...and that answer is actually offered, so the gate can open",
+  `${ASSIGNMENT_REASON_OTHER} in options: ${ASSIGNMENT_REASONS.some((o) => o.value === ASSIGNMENT_REASON_OTHER)}`,
+  ASSIGNMENT_REASONS.some((o) => o.value === ASSIGNMENT_REASON_OTHER),
+);
+check(
+  "...and picking it really does reveal the field",
+  `visible with reason=${ASSIGNMENT_REASON_OTHER}: ${isFieldVisible(otherField, { issue: ISSUE_AUTO_ASSIGN_REQUEST, assignmentReason: ASSIGNMENT_REASON_OTHER })}`,
+  isFieldVisible(otherField, {
+    issue: ISSUE_AUTO_ASSIGN_REQUEST,
+    assignmentReason: ASSIGNMENT_REASON_OTHER,
+  }) &&
+    !isFieldVisible(otherField, {
+      issue: ISSUE_AUTO_ASSIGN_REQUEST,
+      assignmentReason: ASSIGNMENT_REASONS[0].value,
+    }),
+);
+
+/**
+ * ⛔⛔ **`description` is the one field on an issue type that a DRIVER reads** —
+ * `support-form-sheet` prints it under the form's title — and the first draft of
+ * row 09's leaked a ⛔ straight into it. That marker is this repo's
+ * note-to-ourselves notation; on a driver's screen it is a red octagon with no
+ * meaning. Found by walking, which is the only gate that looks at the words.
+ *
+ * ⚠️ `⚠️` is deliberately still allowed: "⚠️ Not in prototype yet" is LOCKED
+ * driver-facing vocabulary and is meant to be seen. Only the internal marker is
+ * banned, and `note` is exempt because nothing renders it.
+ */
+const INTERNAL_MARKER = "⛔";
+const markerLeaks = SUPPORT_ISSUE_TYPES.filter((i) =>
+  i.description.includes(INTERNAL_MARKER),
+);
+check(
+  "no driver-facing issue description carries the internal marker",
+  markerLeaks.length
+    ? markerLeaks.map((i) => i.value).join(", ")
+    : `${SUPPORT_ISSUE_TYPES.length} description(s) clean`,
+  markerLeaks.length === 0,
+);
+check(
+  "...and the marker check is looking at something, not at an empty list",
+  `${SUPPORT_ISSUE_TYPES.filter((i) => i.note?.includes(INTERNAL_MARKER)).length} of ${SUPPORT_ISSUE_TYPES.length} notes DO use it`,
+  SUPPORT_ISSUE_TYPES.some((i) => i.note?.includes(INTERNAL_MARKER)),
+);
+
+// ---- the entry point -----------------------------------------------------
+
+check(
+  "More Options opens the shared form",
+  "<AutoAssignRequestForm",
+  ASSIGN_SOURCES.more.includes("<AutoAssignRequestForm"),
+);
+check(
+  "...and builds no case of its own",
+  `buildSupportFormCase occurrences: ${(ASSIGN_SOURCES.more.match(/buildSupportFormCase/g) ?? []).length}`,
+  !ASSIGN_SOURCES.more.includes("buildSupportFormCase"),
+);
+check(
+  "the tile label comes from lib, not a string in the grid",
+  AUTO_ASSIGN_LABEL,
+  ASSIGN_SOURCES.more.includes("label: AUTO_ASSIGN_LABEL"),
+);
+
+/**
+ * ⛔⛔ **Filing changes nothing.** No trip state, no confirmation, no Pending.
+ * Checked three ways because each one alone is weak: the declared constant, the
+ * absence of a tracked status, and the absence of any trip-context resolution —
+ * that last one is what would silently attach the request to the ride it was
+ * opened from.
+ */
+check(
+  "the decision is named in lib, not left implicit in the form",
+  `AUTO_ASSIGN_CHANGES_NOTHING=${AUTO_ASSIGN_CHANGES_NOTHING}`,
+  AUTO_ASSIGN_CHANGES_NOTHING === true,
+);
+check(
+  "filing tracks no status, because there is none to track",
+  "appTracksStatus: false",
+  ASSIGN_SOURCES.form.includes("appTracksStatus: false"),
+);
+/**
+ * ⚠️ Matches a CALL — `resolveTripContext(` — not the bare name. The first
+ * version grepped the name and failed on the form's own comment saying the
+ * function is deliberately NOT called: the same trap `verify-base`'s FORBIDDEN
+ * list carries, where a string in a comment fails the build.
+ */
+check(
+  "...and the request is not attached to the ride it was opened from",
+  `resolveTripContext( calls: ${(ASSIGN_SOURCES.form.match(/resolveTripContext\(/g) ?? []).length}`,
+  !/resolveTripContext\(/.test(ASSIGN_SOURCES.form),
+);
+check(
+  "...and nothing in the form confirms, advances or completes a trip",
+  "confirmTrip / submitSwipe / postponePickup",
+  !/confirmTrip|submitSwipe|postponePickup/.test(ASSIGN_SOURCES.form),
+);
+
+// ---- the prefill actually resolves ---------------------------------------
+
+const ASSIGN_RIDE = mockInProgressTrips.find((t) => t.id === "1049800393");
+check(
+  "row 09's scenario ride is seeded and tagged",
+  ASSIGN_RIDE ? `${ASSIGN_RIDE.id} — ${ASSIGN_RIDE.scenario?.code} — ${ASSIGN_RIDE.rider}` : "MISSING",
+  Boolean(ASSIGN_RIDE) && isScenarioFor(ASSIGN_RIDE!, "auto-assign-request"),
+);
+const assignBuilt = buildAutoAssignRequest(ASSIGN_RIDE!);
+check(
+  "the form opens with the member already filled from that ride",
+  `member=${assignBuilt.initialValues.member} issue=${assignBuilt.initialValues.issue}`,
+  assignBuilt.initialValues.member === ASSIGN_RIDE!.rider &&
+    assignBuilt.initialValues.issue === ISSUE_AUTO_ASSIGN_REQUEST,
+);
+/**
+ * ⛔⛔ **The locked picker renders the member's RIDE COUNT, and that is the only
+ * checkable evidence in the whole request.** If the member cannot be resolved
+ * from `member-options`, the locked branch renders nothing and the field falls
+ * through to an empty search box — a required, supposedly-locked field showing
+ * a placeholder, which is precisely the defect the Can't Reach leg picker had
+ * and which all four gates missed.
+ */
+const resolvedMember = getMemberOptions().find((m) => m.name === ASSIGN_RIDE!.rider);
+check(
+  "...and that member resolves in the picker, with history to show",
+  resolvedMember
+    ? `${resolvedMember.name} — ${resolvedMember.client} — ${resolvedMember.tripCount} trip(s) in ${MEMBER_WINDOW_DAYS}d`
+    : "UNRESOLVED — the locked picker would render an empty search box",
+  Boolean(resolvedMember) && resolvedMember!.tripCount >= 2,
+);
+/** The window has to exclude something real, or it is decorative. */
+check(
+  "the member window excludes a member the driver really drove",
+  `${getMemberOptions().length} inside the ${MEMBER_WINDOW_DAYS}-day window of ${new Set(mockCompletedTrips.map((t) => t.rider)).size} driven`,
+  getMemberOptions().length < new Set(mockCompletedTrips.map((t) => t.rider)).size,
+);
+
+// ---- row 10, the Request Feed member filter ------------------------------
+
+check(
+  "the filter sheet offers a Member row",
+  'placeholder="Member"',
+  ASSIGN_SOURCES.sheet.includes('placeholder="Member"') &&
+    ASSIGN_SOURCES.sheet.includes("memberFilterOptions()"),
+);
+check(
+  "...and the feed actually applies it",
+  "filterRequestsByMember",
+  ASSIGN_SOURCES.feed.includes("filterRequestsByMember(result, appliedFilters.member)"),
+);
+/**
+ * ⛔ Both halves of the scenario read ONE member list. The form picks from
+ * `member-options` and so does the filter; if they diverged, a driver could file
+ * a request for a member the filter cannot find, or the reverse.
+ */
+const filterNames = memberFilterOptions().map((o) => o.value);
+check(
+  "the filter and the form draw on the same member list",
+  `${filterNames.length} filter option(s) vs ${getMemberOptions().length} picker option(s)`,
+  filterNames.length === getMemberOptions().length &&
+    getMemberOptions().every((m) => filterNames.includes(m.name)),
+);
+
+/** Declared, because a filter that finds one trip is indistinguishable from a
+ *  filter that ignores its argument. */
+const EXPECTED_FEED_HITS: Record<string, number> = {
+  "AMARA OKONKWO": 3,
+  "THEODORE ASHBY": 0,
+};
+for (const [name, expected] of Object.entries(EXPECTED_FEED_HITS)) {
+  const hits = filterRequestsByMember(mockRequestTrips, name);
+  check(
+    `filtering the feed to ${name} returns ${expected}`,
+    `${hits.length} of ${mockRequestTrips.length} — ${hits.map((t) => t.scenario?.code ?? t.id).join(", ")}`,
+    hits.length === expected,
+  );
+}
+check(
+  "the demo member's trips span more than one day, so the filter is not day-scoped by accident",
+  `${new Set(filterRequestsByMember(mockRequestTrips, "AMARA OKONKWO").map((t) => t.date)).size} distinct day(s)`,
+  new Set(filterRequestsByMember(mockRequestTrips, "AMARA OKONKWO").map((t) => t.date)).size >= 2,
+);
+check(
+  "an empty result is a REAL case, so the filter can be seen finding nothing",
+  `${Object.values(EXPECTED_FEED_HITS).filter((n) => n === 0).length} of ${Object.keys(EXPECTED_FEED_HITS).length} declared empty`,
+  Object.values(EXPECTED_FEED_HITS).some((n) => n === 0) &&
+    Object.values(EXPECTED_FEED_HITS).some((n) => n > 0),
+);
+check(
+  "no filter returns the whole feed, which would be a filter doing nothing",
+  `max hits ${Math.max(...Object.values(EXPECTED_FEED_HITS))} of ${mockRequestTrips.length}`,
+  Math.max(...Object.values(EXPECTED_FEED_HITS)) < mockRequestTrips.length,
+);
+
+/** ⛔ A multi-load has no one member and must never match one. */
+const groupRides = mockRequestTrips.filter(isGroupRide);
+check(
+  `group rides exist to be excluded (prefix "${GROUP_RIDER_PREFIX}")`,
+  `${groupRides.length} of ${mockRequestTrips.length} — ${groupRides.map((t) => t.rider).join(", ")}`,
+  groupRides.length > 0,
+);
+check(
+  "...and no member filter ever returns one",
+  `${memberFilterOptions().filter((o) => filterRequestsByMember(mockRequestTrips, o.value).some(isGroupRide)).length} of ${memberFilterOptions().length} member(s) matched a group ride`,
+  memberFilterOptions().every(
+    (o) => !filterRequestsByMember(mockRequestTrips, o.value).some(isGroupRide),
+  ),
+);
+check(
+  "an empty member leaves the feed untouched, rather than returning nothing",
+  `${filterRequestsByMember(mockRequestTrips, "").length} of ${mockRequestTrips.length}`,
+  filterRequestsByMember(mockRequestTrips, "").length === mockRequestTrips.length,
+);
+
+// ---- the deep link the catalogue points at -------------------------------
+
+/**
+ * ⛔⛔ Row 10 is the FIRST entry route carrying its own query string, and the
+ * naive `${route}?solution=${id}` both call sites used would have produced a
+ * second `?`. Checked on the helper, and then on the real catalogue routes.
+ */
+check(
+  "solutionHref joins with & when the route already has a query",
+  solutionHref("/requests?member=X", "row-10"),
+  solutionHref("/requests?member=X", "row-10") === "/requests?member=X&solution=row-10",
+);
+check(
+  "...and still joins with ? when it does not",
+  solutionHref("/my-rides", "row-10"),
+  solutionHref("/my-rides", "row-10") === "/my-rides?solution=row-10",
+);
+const everyRoute = SOLUTIONS.filter((s) => s.entry).flatMap((s) => [
+  s.entry!.route,
+  ...(s.entry!.alternates ?? []).map((a) => a.route),
+]);
+const doubleQuery = everyRoute.filter(
+  (r) => (solutionHref(r, "x").match(/\?/g) ?? []).length !== 1,
+);
+check(
+  "no catalogue route produces a second ? once the solution id is attached",
+  doubleQuery.length ? doubleQuery.join(", ") : `${everyRoute.length} route(s), all single-query`,
+  doubleQuery.length === 0,
+);
+check(
+  "both call sites use the helper rather than building the href themselves",
+  "solutionHref in context + strip",
+  readFileSync(join(ROOT, "lib/solutions/solution-context.tsx"), "utf8").includes("solutionHref(target,") &&
+    readFileSync(join(ROOT, "components/solutions-dev/solution-strip.tsx"), "utf8").includes("solutionHref(alternate.route,"),
+);
+
+/**
+ * ⛔⛔ **A page that positions a child `absolute` must position ITSELF.**
+ *
+ * `app/requests/page.tsx` floats its filter button at `absolute right-14 top-2`.
+ * With no positioned ancestor that resolved against the VIEWPORT, so the button
+ * escaped the page entirely and landed inside the solutions strip's header row
+ * — overlapping the strip's controls and swallowing the tap that opens the
+ * solution picker. Typecheck, all four verify scripts and `next build` were
+ * green with that on screen; it took trying to switch solutions FROM the
+ * Request Feed to see it, which only became a thing anyone would do when row 10
+ * made `/requests` an entry route.
+ *
+ * Scanned across every page with a denominator, because the next page to float
+ * something will not remember this.
+ */
+const REQUESTS_PAGE = readFileSync(join(ROOT, "app/requests/page.tsx"), "utf8");
+check(
+  "the Request Feed anchors its floating filter button to the page",
+  'root div carries "relative"',
+  /<div className="relative flex h-screen/.test(REQUESTS_PAGE),
+);
+check(
+  "...and it really does float that button, so the anchor matters",
+  `absolute+top on the filter button: ${/aria-label="Filter Requests"[\s\S]{0,200}absolute/.test(REQUESTS_PAGE) || /absolute[\s\S]{0,200}aria-label="Filter Requests"/.test(REQUESTS_PAGE)}`,
+  /className="absolute right-14 top-2/.test(REQUESTS_PAGE),
+);
+/**
+ * ⚠️ **Scoped to this page, and that is a real limitation, not a choice.**
+ *
+ * A source regex cannot answer the question that matters — whether a given
+ * `absolute` element has a positioned ANCESTOR — because that is a property of
+ * the rendered tree, not of one file. A broad scan over `app/**\/page.tsx` finds
+ * ten pages that float something and flags eight of them, nearly all because an
+ * `absolute` badge sits inside its own `relative` button several levels down.
+ * Asserting on that would be a check that fails for the wrong reason.
+ *
+ * So this asserts the one page this slice measured in the browser and fixed.
+ * ⛔ The other nine floating pages have NOT been audited against the solutions
+ * strip; `/requests` was found only because row 10 made it an entry route and
+ * someone tried to switch solutions from it.
+ */
+// ---- the two rows are one build ------------------------------------------
+
+const ROW_09 = SOLUTIONS.find((s) => s.id === "auto-assign-request")!;
+const ROW_10 = SOLUTIONS.find((s) => s.id === "request-feed-member-filter")!;
+check(
+  "rows 09 and 10 point at each other as one build",
+  `${ROW_09.order}->${ROW_09.sharedBuildWith} / ${ROW_10.order}->${ROW_10.sharedBuildWith}`,
+  ROW_09.sharedBuildWith === ROW_10.id && ROW_10.sharedBuildWith === ROW_09.id,
+);
+check(
+  "...and they share the subject area and its call total",
+  `${ROW_09.subjectArea} ${ROW_09.calls} / ${ROW_10.subjectArea} ${ROW_10.calls}`,
+  ROW_09.subjectArea === ROW_10.subjectArea && ROW_09.calls === ROW_10.calls,
+);
+/**
+ * ⛔ Rows 11 and 12 are the same subject area and are NOT buildable — a one-off
+ * data cleanse and a backend path, neither with a driver-facing surface. They
+ * must stay `not-yet` with a null entry, or the catalogue would claim a
+ * prototype demonstrates something that has no screen.
+ */
+const SAME_AREA_NO_SURFACE = ["vehicle-capacity-cleanse", "vehicle-capacity-backend"];
+check(
+  "the subject area's two no-surface rows stay unbuilt, with a reason",
+  `${SAME_AREA_NO_SURFACE.length} row(s) checked`,
+  SAME_AREA_NO_SURFACE.every((id) => {
+    const row = SOLUTIONS.find((r) => r.id === id);
+    return (
+      row?.klass === "no-app-surface" &&
+      row.buildState === "not-yet" &&
+      row.entry === null &&
+      Boolean(row.noSurfaceReason)
+    );
+  }),
+);
+
+/**
+ * ⚠️ The scope boundary, asserted rather than only written down. Row 09 is the
+ * support request that absorbs these calls today; `Project - Standing Order
+ * Offers` is building the system that actually assigns. The catalogue has to
+ * SAY so, or the next reader builds the second one here.
+ */
+check(
+  "row 09 flags what it does NOT do, in the locked vocabulary",
+  ROW_09.proposedFeature.slice(-90),
+  ROW_09.proposedFeature.includes("⚠️ Not in prototype yet") &&
+    ROW_09.proposedFeature.includes("Standing Order Offers"),
 );
 
 // ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { memberFilterOptions } from "@/lib/driver-data/member-assignment";
 
 interface FilterRequestsModalProps {
   isOpen: boolean;
@@ -22,6 +23,20 @@ export interface RequestFilters {
   pickupLocation?: string;
   day?: string;
   client?: string;
+  /**
+   * Catalogue row **10** — the member whose trips to show.
+   *
+   * ⛔⛔ **This one and `incentiveType` are the only entries here that actually
+   * filter anything.** `pickupLocation`, `day`, `client`, `sortBy` and `mode`
+   * are rendered, stored and read by NOTHING — they are inherited from the base,
+   * which replicated the captured production sheet faithfully, controls and all.
+   * That is a deliberate, logged state and not something this slice quietly
+   * fixed: wiring the others is base behaviour to change on purpose, not a side
+   * effect of adding a feature. If you are here because a filter did nothing,
+   * this is why, and `app/requests/page.tsx` is where the two live ones are
+   * applied.
+   */
+  member?: string;
   sortBy?: string;
   mode?: string;
   incentiveType?: string;
@@ -37,6 +52,7 @@ export function FilterRequestsModal({
     pickupLocation: undefined,
     day: undefined,
     client: undefined,
+    member: undefined,
     sortBy: "expiration-date",
     mode: "full-trip",
     ...initialFilters,
@@ -51,6 +67,7 @@ export function FilterRequestsModal({
         pickupLocation: undefined,
         day: undefined,
         client: undefined,
+        member: undefined,
         sortBy: "expiration-date",
         mode: "full-trip",
         ...initialFilters,
@@ -69,6 +86,7 @@ export function FilterRequestsModal({
       pickupLocation: undefined,
       day: undefined,
       client: undefined,
+      member: undefined,
       sortBy: "expiration-date",
       mode: "full-trip",
     });
@@ -144,6 +162,40 @@ export function FilterRequestsModal({
                 <SelectItem value="verida">Verida</SelectItem>
                 <SelectItem value="uber">Uber</SelectItem>
                 <SelectItem value="lyft">Lyft</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/*
+              Member — catalogue row 10, and the one PROPOSED control in this
+              sheet.
+
+              ⚠️ The options are members the driver has DRIVEN in the last 30
+              days, not the riders currently in the feed. Listing the feed's own
+              names would put twenty strangers in a dropdown to solve a problem
+              that only arises for a member the driver already knows — and it is
+              the same list the "ask to be their regular driver" form picks from,
+              so the two halves of one scenario cannot disagree about who the
+              driver knows. See `lib/driver-data/member-assignment.ts`.
+
+              It can legitimately come up empty: that member simply has no trips
+              posted right now, which is a real answer and the one the Clear
+              Filters empty state already handles.
+            */}
+            <Select
+              value={filters.member || ""}
+              onValueChange={(value) =>
+                setFilters({ ...filters, member: value || undefined })
+              }
+            >
+              <SelectTrigger className="h-12 border-[#10B981] bg-white px-4 py-3 text-left text-gray-900">
+                <SelectValue placeholder="Member" />
+              </SelectTrigger>
+              <SelectContent>
+                {memberFilterOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
