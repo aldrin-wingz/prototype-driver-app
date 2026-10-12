@@ -57,33 +57,48 @@ export const AUTO_ASSIGN_CHANGES_NOTHING = true;
  * words on a phone-width screen. Every option below is held under this, and a
  * check asserts it so a later edit cannot quietly re-break it.
  */
-export const MAX_REASON_LABEL_CHARS = 34;
-
-export const ASSIGNMENT_REASON_OTHER = "other";
+export const MAX_SCOPE_LABEL_CHARS = 34;
 
 /**
- * **Who asked**, and when.
+ * **What the driver is asking for**, and the field that decides whether a
+ * schedule is owed.
  *
- * ⛔⛔ **This replaced a list of the driver's REASONS**, and the swap followed
- * directly from renaming the case. The old options were "the member asked me
- * directly", "I already drive them most weeks", "they need help I'm set up
- * for" — a driver arguing their own case. Once the tile says the member
- * requested them, "the member asked me directly" is the PREMISE, and a form
- * offering it as one option among five invites a driver to pick a different one
- * and file a member request nobody made.
+ * ⛔⛔ **This replaced a list of WHO asked, which replaced a list of the
+ * driver's reasons.** Both earlier versions asked about the request's
+ * provenance, and neither told Support anything it could act on: once the case
+ * says the member requested this driver, Support's next question is not who
+ * said so, it is **what to actually set up**. "All their future trips", "a
+ * standing order" and "one specific trip" are three different pieces of work
+ * for three different teams — only the second and third have a schedule, and
+ * without one neither can be matched to anything.
  *
- * So the question is now the one piece of evidence Support actually needs: who
- * made the request. ⚠️ A caregiver, a family member or the facility's care team
- * speaking for a member is ordinary in NEMT and is not the same claim as the
- * member asking in person — Support weighs them differently, so the form must
- * be able to tell them apart.
+ * ⚠️ `ASSIGNMENT_SCOPE_ALL` is the only answer that owes nothing further, which
+ * is why it is named: the two fields below are gated on NOT being it, and a
+ * gate written as "is one of the other two" silently stops covering a fourth
+ * answer the day someone adds one.
  */
-export const ASSIGNMENT_REASONS: SupportFieldOption[] = [
-  { value: "member-this-ride", label: "The member, on this ride" },
-  { value: "member-earlier", label: "The member, on an earlier ride" },
-  { value: "caregiver", label: "A family member or caregiver" },
-  { value: "facility", label: "The facility or care team" },
-  { value: ASSIGNMENT_REASON_OTHER, label: "Someone else" },
+export const ASSIGNMENT_SCOPE_ALL = "all-future";
+export const ASSIGNMENT_SCOPE_STANDING = "standing-order";
+export const ASSIGNMENT_SCOPE_SPECIFIC = "specific-trip";
+
+export const ASSIGNMENT_SCOPES: SupportFieldOption[] = [
+  { value: ASSIGNMENT_SCOPE_ALL, label: "All their future trips" },
+  { value: ASSIGNMENT_SCOPE_STANDING, label: "A standing order" },
+  { value: ASSIGNMENT_SCOPE_SPECIFIC, label: "Only a specific trip" },
+];
+
+/**
+ * The scopes that owe a schedule.
+ *
+ * ⛔ Declared as a list rather than written inline in the field's `showIf`,
+ * because TWO fields gate on it — the standing-order pattern and the specific
+ * trip's date — and the check asserts the pair covers exactly this set. Two
+ * inline copies could drift into leaving one scope with no schedule field at
+ * all, which is the one state this design exists to prevent.
+ */
+export const SCOPES_NEEDING_SCHEDULE = [
+  ASSIGNMENT_SCOPE_STANDING,
+  ASSIGNMENT_SCOPE_SPECIFIC,
 ];
 
 /**

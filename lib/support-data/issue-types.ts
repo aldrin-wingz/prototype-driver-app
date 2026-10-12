@@ -116,7 +116,7 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     // `description` is the one field on this type a DRIVER reads — the form
     // prints it under the title. Say the limit in words instead.
     description:
-      "For a member who has asked you to be their driver. Tell us who asked and when, and Support will take it to the client. Sending this does not assign, hold or claim anything — it asks.",
+      "For a member who has asked you to be their driver. Tell us whether that is all their trips, a standing order or one specific one, and Support will take it to the client. Sending this does not assign, hold or claim anything — it asks.",
     // Hidden like the rest: the tile is on a ride, so the member is already
     // known by the time the form opens. A dropdown would make the driver name
     // a member the entry point was standing on.

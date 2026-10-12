@@ -53,14 +53,17 @@ import {
   SUPPORT_ISSUE_TYPES,
 } from "../lib/support-data/issue-types";
 import {
-  ASSIGNMENT_REASON_OTHER,
-  ASSIGNMENT_REASONS,
+  ASSIGNMENT_SCOPE_ALL,
+  ASSIGNMENT_SCOPE_SPECIFIC,
+  ASSIGNMENT_SCOPE_STANDING,
+  ASSIGNMENT_SCOPES,
   AUTO_ASSIGN_CHANGES_NOTHING,
   AUTO_ASSIGN_LABEL,
   filterRequestsByMember,
   GROUP_RIDER_PREFIX,
   isGroupRide,
-  MAX_REASON_LABEL_CHARS,
+  MAX_SCOPE_LABEL_CHARS,
+  SCOPES_NEEDING_SCHEDULE,
   MAX_TILE_LABEL_CHARS,
   memberFilterOptions,
   PREFERRED_DRIVER_SOLUTIONS,
@@ -1461,7 +1464,7 @@ const ASSIGN_CASE = buildSupportFormCase({
 const assignValues = { issue: ISSUE_AUTO_ASSIGN_REQUEST };
 const assignVisible = ASSIGN_CASE.fields.filter((f) => isFieldVisible(f, assignValues));
 const assignIds = assignVisible.map((f) => f.id);
-const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentReason", "assignmentNotes"];
+const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentScope", "assignmentNotes"];
 check(
   "the case renders exactly the declared field set",
   `${assignIds.length} of ${ASSIGN_CASE.fields.length} field(s) visible: ${assignIds.join(", ")}`,
@@ -1513,7 +1516,7 @@ check(
 const filledAssign: Record<string, string> = {
   issue: ISSUE_AUTO_ASSIGN_REQUEST,
   member: "AMARA OKONKWO",
-  assignmentReason: ASSIGNMENT_REASONS[0].value,
+  assignmentScope: ASSIGNMENT_SCOPE_ALL,
 };
 check(
   "filling only the visible required fields enables Submit",
@@ -1521,8 +1524,8 @@ check(
   areRequiredFieldsFilled(ASSIGN_CASE.fields, filledAssign),
 );
 check(
-  "...and leaving the reason empty still blocks it",
-  "assignmentReason blank",
+  "...and leaving the scope empty still blocks it",
+  "assignmentScope blank",
   !areRequiredFieldsFilled(ASSIGN_CASE.fields, {
     issue: ISSUE_AUTO_ASSIGN_REQUEST,
     member: "AMARA OKONKWO",
@@ -1576,82 +1579,139 @@ check(
     memberField.lockWhenPrefilled === true,
 );
 
-const reasonField = ASSIGN_CASE.fields.find((f) => f.id === "assignmentReason")!;
+const scopeField = ASSIGN_CASE.fields.find((f) => f.id === "assignmentScope")!;
 check(
-  "the reason select offers the declared options, from lib",
-  `${reasonField.options?.length} of ${ASSIGNMENT_REASONS.length}`,
-  reasonField.options?.length === ASSIGNMENT_REASONS.length &&
-    reasonField.required === true,
+  "the scope select offers the declared options, from lib",
+  `${scopeField.options?.length} of ${ASSIGNMENT_SCOPES.length}`,
+  scopeField.options?.length === ASSIGNMENT_SCOPES.length &&
+    scopeField.required === true,
 );
 /**
- * ⚠️ The shared `select` primitive does not wrap and does not ellipsize — a long
- * option is cut mid-word. Learned on Can't Reach Member and re-asserted here,
- * because the next person to add a reason will not have been there.
+ * ⚠️ The shared `select` primitive does not wrap and does not ellipsize — a
+ * long option is cut mid-word. Learned on Can't Reach Member, re-asserted here
+ * because the next person to add a scope will not have been there.
  */
-const tooLong = ASSIGNMENT_REASONS.filter((o) => o.label.length > MAX_REASON_LABEL_CHARS);
+const tooLong = ASSIGNMENT_SCOPES.filter((o) => o.label.length > MAX_SCOPE_LABEL_CHARS);
 check(
-  `every reason label fits the un-wrapping select (<=${MAX_REASON_LABEL_CHARS})`,
+  `every scope label fits the un-wrapping select (<=${MAX_SCOPE_LABEL_CHARS})`,
   tooLong.length
     ? tooLong.map((o) => `${o.label} (${o.label.length})`).join(" | ")
-    : `longest ${Math.max(...ASSIGNMENT_REASONS.map((o) => o.label.length))} of ${ASSIGNMENT_REASONS.length}`,
+    : `longest ${Math.max(...ASSIGNMENT_SCOPES.map((o) => o.label.length))} of ${ASSIGNMENT_SCOPES.length}`,
   tooLong.length === 0,
-);
-/**
- * The free-text escape hatch is gated on the ANSWER, not on the issue — which is
- * why it is absent from the visible set above and appears only once "Something
- * else" is picked.
- */
-const otherField = ASSIGN_CASE.fields.find((f) => f.id === "assignmentReasonOther")!;
-check(
-  "the 'something else' text is gated on the reason ANSWER",
-  `showIf=${JSON.stringify(otherField.showIf)}`,
-  otherField.showIf?.field === "assignmentReason" &&
-    otherField.showIf.equals.includes(ASSIGNMENT_REASON_OTHER),
-);
-check(
-  "...and that answer is actually offered, so the gate can open",
-  `${ASSIGNMENT_REASON_OTHER} in options: ${ASSIGNMENT_REASONS.some((o) => o.value === ASSIGNMENT_REASON_OTHER)}`,
-  ASSIGNMENT_REASONS.some((o) => o.value === ASSIGNMENT_REASON_OTHER),
-);
-check(
-  "...and picking it really does reveal the field",
-  `visible with reason=${ASSIGNMENT_REASON_OTHER}: ${isFieldVisible(otherField, { issue: ISSUE_AUTO_ASSIGN_REQUEST, assignmentReason: ASSIGNMENT_REASON_OTHER })}`,
-  isFieldVisible(otherField, {
-    issue: ISSUE_AUTO_ASSIGN_REQUEST,
-    assignmentReason: ASSIGNMENT_REASON_OTHER,
-  }) &&
-    !isFieldVisible(otherField, {
-      issue: ISSUE_AUTO_ASSIGN_REQUEST,
-      assignmentReason: ASSIGNMENT_REASONS[0].value,
-    }),
 );
 
 /**
- * ⛔⛔ **`description` is the one field on an issue type that a DRIVER reads** —
- * `support-form-sheet` prints it under the form's title — and the first draft of
- * row 09's leaked a ⛔ straight into it. That marker is this repo's
- * note-to-ourselves notation; on a driver's screen it is a red octagon with no
- * meaning. Found by walking, which is the only gate that looks at the words.
+ * ⛔⛔ **Every scope that owes a schedule has a field to put one in, and the
+ * one that owes nothing has none.**
  *
- * ⚠️ `⚠️` is deliberately still allowed: "⚠️ Not in prototype yet" is LOCKED
- * driver-facing vocabulary and is meant to be seen. Only the internal marker is
- * banned, and `note` is exempt because nothing renders it.
+ * This is the point of the whole block. "All their future trips" needs no
+ * schedule; a standing order and a specific trip each need a different kind.
+ * The failure this guards is a scope with NO schedule field — Support gets
+ * "set up a standing order" with nothing to match trips against — and it is
+ * invisible on screen, because the form simply shows one field fewer.
  */
-const INTERNAL_MARKER = "⛔";
-const markerLeaks = SUPPORT_ISSUE_TYPES.filter((i) =>
-  i.description.includes(INTERNAL_MARKER),
+const SCHEDULE_FIELDS: Record<string, string> = {
+  [ASSIGNMENT_SCOPE_STANDING]: "standingOrderSchedule",
+  [ASSIGNMENT_SCOPE_SPECIFIC]: "specificTripWhen",
+};
+check(
+  "the scopes owing a schedule are exactly the ones with a schedule field",
+  `owing: ${SCOPES_NEEDING_SCHEDULE.join(", ")} | fields for: ${Object.keys(SCHEDULE_FIELDS).join(", ")}`,
+  SCOPES_NEEDING_SCHEDULE.length === Object.keys(SCHEDULE_FIELDS).length &&
+    SCOPES_NEEDING_SCHEDULE.every((scope) => SCHEDULE_FIELDS[scope]),
+);
+for (const scope of ASSIGNMENT_SCOPES) {
+  const values = { issue: ISSUE_AUTO_ASSIGN_REQUEST, assignmentScope: scope.value };
+  const visible = ASSIGN_CASE.fields
+    .filter((f) => isFieldVisible(f, values))
+    .map((f) => f.id);
+  const owed = SCHEDULE_FIELDS[scope.value];
+  check(
+    `"${scope.label}" ${owed ? `reveals ${owed}` : "asks for no schedule"}`,
+    `visible: ${visible.join(", ")}`,
+    owed
+      ? visible.includes(owed) &&
+        // ...and ONLY its own. A standing order must not be asked for a
+        // specific trip's date, or the form would ask the same question twice
+        // in two shapes.
+        Object.values(SCHEDULE_FIELDS)
+          .filter((id) => id !== owed)
+          .every((id) => !visible.includes(id))
+      : Object.values(SCHEDULE_FIELDS).every((id) => !visible.includes(id)),
+  );
+  check(
+    `...and Submit for "${scope.label}" needs ${owed ?? "no schedule"}`,
+    `required visible: ${ASSIGN_CASE.fields
+      .filter((f) => isFieldVisible(f, values) && f.required && !f.requiredNotEnforced)
+      .map((f) => f.id)
+      .join(", ")}`,
+    owed
+      ? !areRequiredFieldsFilled(ASSIGN_CASE.fields, {
+          ...values,
+          member: "AMARA OKONKWO",
+        }) &&
+        areRequiredFieldsFilled(ASSIGN_CASE.fields, {
+          ...values,
+          member: "AMARA OKONKWO",
+          [owed]: "every Tue and Thu, 9:40 AM",
+        })
+      : areRequiredFieldsFilled(ASSIGN_CASE.fields, {
+          ...values,
+          member: "AMARA OKONKWO",
+        }),
+  );
+}
+/**
+ * ⛔⛔ **Help text that quotes an option must quote one that EXISTS.**
+ *
+ * Found by walking: the scope field's help said Pick \u201cjust a specific trip\u201d
+ * while the select offered \u201cOnly a specific trip\u201d. Help text pointing at a
+ * choice that is not on the list is worse than no help — the driver looks for
+ * it, does not find it, and distrusts the rest of the form. Swept over every
+ * select on every case rather than this one field, because the next person to
+ * write help text will not have been here.
+ */
+const QUOTED = /[\u201c\u201d"]([^\u201c\u201d"]{3,60})[\u201c\u201d"]/g;
+let quotesChecked = 0;
+const badQuotes: string[] = [];
+for (const supportCase of [ASSIGN_CASE, buildSupportFormCase(), reachCase]) {
+  for (const field of supportCase.fields) {
+    if (field.type !== "select" || !field.options || !field.helpText) continue;
+    for (const match of field.helpText.matchAll(QUOTED)) {
+      quotesChecked += 1;
+      const phrase = match[1];
+      if (!field.options.some((o) => o.label === phrase)) {
+        badQuotes.push(`${field.id}: \u201c${phrase}\u201d`);
+      }
+    }
+  }
+}
+check(
+  "every option quoted in a select's help text is a real option",
+  badQuotes.length
+    ? badQuotes.join(" | ")
+    : `${quotesChecked} quoted phrase(s) across 3 case(s), all matched`,
+  badQuotes.length === 0,
 );
 check(
-  "no driver-facing issue description carries the internal marker",
-  markerLeaks.length
-    ? markerLeaks.map((i) => i.value).join(", ")
-    : `${SUPPORT_ISSUE_TYPES.length} description(s) clean`,
-  markerLeaks.length === 0,
+  "...and the sweep found a quote to check, rather than passing on nothing",
+  `${quotesChecked} quoted phrase(s)`,
+  quotesChecked > 0,
 );
+
+/** The two schedule fields are different SHAPES, not one field copied. */
 check(
-  "...and the marker check is looking at something, not at an empty list",
-  `${SUPPORT_ISSUE_TYPES.filter((i) => i.note?.includes(INTERNAL_MARKER)).length} of ${SUPPORT_ISSUE_TYPES.length} notes DO use it`,
-  SUPPORT_ISSUE_TYPES.some((i) => i.note?.includes(INTERNAL_MARKER)),
+  "a standing order's schedule is free text; a specific trip's is a datetime",
+  `${ASSIGN_CASE.fields.find((f) => f.id === "standingOrderSchedule")?.type} / ${ASSIGN_CASE.fields.find((f) => f.id === "specificTripWhen")?.type}`,
+  ASSIGN_CASE.fields.find((f) => f.id === "standingOrderSchedule")?.type === "text" &&
+    ASSIGN_CASE.fields.find((f) => f.id === "specificTripWhen")?.type === "datetime",
+);
+/** And the scope that owes nothing really is reachable and really owes nothing. */
+check(
+  "the no-schedule scope is one of the offered answers",
+  ASSIGNMENT_SCOPE_ALL,
+  ASSIGNMENT_SCOPES.some((o) => o.value === ASSIGNMENT_SCOPE_ALL) &&
+    !SCOPES_NEEDING_SCHEDULE.includes(ASSIGNMENT_SCOPE_ALL),
 );
 
 // ---- the entry point -----------------------------------------------------
@@ -1923,34 +1983,53 @@ check(
   AUTO_ASSIGN_LABEL.length <= MAX_TILE_LABEL_CHARS,
 );
 /**
- * ⛔ And the reason field had to move with it. While the tile said the driver
- * was asking, "The member asked me directly" was a reasonable option; once the
- * tile says the member requested them, that option is the PREMISE, and offering
- * it among five invites a driver to pick another and file a member request
- * nobody made. The field now asks WHO asked.
+ * ⛔⛔ **The field beneath the member has been rewritten twice, and the second
+ * rewrite is the one that matters.**
+ *
+ * v1 asked why the DRIVER wanted it. v2, when the tile was renamed, asked WHO
+ * had asked. Both described the request's provenance, and neither told Support
+ * anything it could act on — once the case says the member requested this
+ * driver, the next question is not who said so, it is **what to set up**.
+ * Removed on user direction 2026-10-12: *"The options for who asked for you
+ * doesn't make sense, please just remove."*
+ *
+ * ⛔ Asserted as an ABSENCE with the old ids named, because a field block that
+ * is merely unreferenced still renders.
  */
-check(
-  "the reason field asks who asked, not why the driver wants it",
-  ASSIGN_CASE.fields.find((f) => f.id === "assignmentReason")!.label ?? "",
-  /who/i.test(ASSIGN_CASE.fields.find((f) => f.id === "assignmentReason")!.label ?? ""),
+const RETIRED_ASSIGN_FIELDS = ["assignmentReason", "assignmentReasonOther"];
+const stillPresent = RETIRED_ASSIGN_FIELDS.filter((id) =>
+  ASSIGN_CASE.fields.some((f) => f.id === id),
 );
 check(
-  "...and every option names a person who could have asked",
-  ASSIGNMENT_REASONS.map((o) => o.label).join(" | "),
-  ASSIGNMENT_REASONS.every((o) =>
-    /member|caregiver|family|facility|care team|someone/i.test(o.label),
+  "the retired provenance fields are gone from the case",
+  stillPresent.length
+    ? stillPresent.join(", ")
+    : `${RETIRED_ASSIGN_FIELDS.length} retired id(s), none present`,
+  stillPresent.length === 0,
+);
+check(
+  "...and nothing in the repo still reads them",
+  RETIRED_ASSIGN_FIELDS.join(", "),
+  !RETIRED_ASSIGN_FIELDS.some(
+    (id) =>
+      readFileSync(join(ROOT, "lib/support-data/case-registry.ts"), "utf8").includes(id) ||
+      readFileSync(join(ROOT, "lib/driver-data/member-assignment.ts"), "utf8").includes(id),
   ),
 );
-/**
- * ⚠️ A caregiver or the facility speaking for a member is ordinary in NEMT and
- * is NOT the same claim as the member asking in person. Support weighs them
- * differently, so the form has to be able to tell them apart.
- */
+/** What replaced them asks about the WORK, not the provenance. */
 check(
-  "the options distinguish the member themselves from someone speaking for them",
-  `${ASSIGNMENT_REASONS.filter((o) => /^the member/i.test(o.label)).length} direct of ${ASSIGNMENT_REASONS.length}`,
-  ASSIGNMENT_REASONS.some((o) => /^the member/i.test(o.label)) &&
-    ASSIGNMENT_REASONS.some((o) => /caregiver|family|facility|care team/i.test(o.label)),
+  "the field beneath the member asks what to set up, not who asked or why",
+  scopeField.label ?? "",
+  /trips/i.test(scopeField.label ?? "") &&
+    !/who|why/i.test(scopeField.label ?? ""),
+);
+check(
+  "...and its three answers are three different pieces of work",
+  ASSIGNMENT_SCOPES.map((o) => o.label).join(" | "),
+  ASSIGNMENT_SCOPES.length === 3 &&
+    ASSIGNMENT_SCOPES.some((o) => /all/i.test(o.label)) &&
+    ASSIGNMENT_SCOPES.some((o) => /standing order/i.test(o.label)) &&
+    ASSIGNMENT_SCOPES.some((o) => /specific/i.test(o.label)),
 );
 
 // ---- the end-of-leg prompt -----------------------------------------------

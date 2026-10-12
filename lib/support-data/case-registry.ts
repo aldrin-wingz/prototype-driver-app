@@ -7,8 +7,9 @@ import {
   ISSUE_RIDER_NO_SHOW,
 } from "./issue-types";
 import {
-  ASSIGNMENT_REASON_OTHER,
-  ASSIGNMENT_REASONS,
+  ASSIGNMENT_SCOPE_SPECIFIC,
+  ASSIGNMENT_SCOPE_STANDING,
+  ASSIGNMENT_SCOPES,
 } from "@/lib/driver-data/member-assignment";
 import {
   REACH_OUTCOME_OTHER,
@@ -741,32 +742,70 @@ export function buildSupportFormCase({
               showIf: ONLY_AUTO_ASSIGN,
             },
             {
-              id: "assignmentReason",
+              id: "assignmentScope",
               type: "select",
-              label: "Who asked for you?",
-              shortLabel: "who asked",
+              label: "Which of their trips?",
+              shortLabel: "what you are asking for",
               placeholder: "Select:",
               required: true,
-              options: [...ASSIGNMENT_REASONS],
+              options: [...ASSIGNMENT_SCOPES],
+              /**
+               * ⛔⛔ **The question Support can act on.** Two earlier versions
+               * asked about the request's provenance — why the driver wanted
+               * it, then who had asked — and neither told anyone what to set
+               * up. These three answers are three different pieces of work.
+               */
+              /**
+               * ⚠️ The quoted option is quoted EXACTLY as the select spells it.
+               * The first draft said \u201cjust a specific trip\u201d while the option
+               * read \u201cOnly a specific trip\u201d — help text pointing at a choice
+               * that is not on the list, which is worse than no help at all.
+               * A check asserts every quoted phrase matches a real option.
+               */
+              helpText:
+                "A standing order is a repeating ride. Pick \u201cOnly a specific trip\u201d if they only asked about one.",
               showIf: ONLY_AUTO_ASSIGN,
             },
             {
-              id: "assignmentReasonOther",
+              id: "standingOrderSchedule",
               type: "text",
-              label: "Who asked?",
-              placeholder: "In a few words",
+              label: "What\u2019s the schedule?",
+              shortLabel: "the schedule",
+              placeholder: "e.g. every Tue and Thu, 9:40 AM pickup",
               required: true,
+              helpText:
+                "Which days and roughly what time. Support matches incoming trips against this, so a pattern is worth more than an exact minute.",
               /**
-               * ⚠️ Gated on the ANSWER, not the issue — same shape as
-               * `reachOutcomeOther` and `spokeWithRelation`, and safe for the
-               * same reason: `assignmentReason` is itself gated on this issue,
-               * so it can hold a value on no other case. A second case asking
-               * `assignmentReason` would need a compound condition here rather
+               * ⚠️ Gated on the ANSWER, like `reachOutcomeOther` and
+               * `spokeWithRelation`, and safe for the same reason:
+               * `assignmentScope` is itself gated on this issue, so it can hold
+               * a value on no other case. A second case asking
+               * `assignmentScope` would need a compound condition here rather
                * than this comment.
                */
               showIf: {
-                field: "assignmentReason",
-                equals: [ASSIGNMENT_REASON_OTHER],
+                field: "assignmentScope",
+                equals: [ASSIGNMENT_SCOPE_STANDING],
+              },
+            },
+            {
+              id: "specificTripWhen",
+              type: "datetime",
+              label: "When is that trip?",
+              shortLabel: "when the trip is",
+              required: true,
+              /**
+               * ⛔ A `datetime`, not free text like the standing-order pattern
+               * above. A specific trip has one pick-up moment and Support has
+               * to find it in a list; a recurring order has a shape no date
+               * picker can express. Two different questions, two field types,
+               * and neither one doing the other's job badly.
+               */
+              helpText:
+                "The pick-up date and time they gave you, as near as you have it.",
+              showIf: {
+                field: "assignmentScope",
+                equals: [ASSIGNMENT_SCOPE_SPECIFIC],
               },
             },
             {

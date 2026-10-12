@@ -323,7 +323,7 @@ export const SOLUTIONS: Solution[] = [
     entry: {
       route: "/my-rides/1049800393/more",
       label:
-        "AMARA OKONKWO is onboard and has asked you to be her driver. Tap 'Member requested me as preferred driver'. The member is locked from this ride and the form prints the two trips you have already driven her in the last 30 days — the one checkable claim the request carries. It asks WHO asked, because a caregiver or the facility speaking for a member is a different claim from the member asking in person. Submitting changes nothing about any trip, and the toast says so.",
+        "AMARA OKONKWO is onboard and has asked you to be her driver. Tap 'Member requested me as preferred driver'. The member is locked from this ride and the form prints the two trips you have already driven her in the last 30 days — the one checkable claim the request carries. It asks what to actually SET UP — all their future trips, a standing order, or one specific trip — and the last two require a schedule, because Support cannot match an incoming trip against a request that does not say when. Submitting changes nothing about any trip, and the toast says so.",
       alternates: [
         {
           route: "/my-rides/1049800393",
