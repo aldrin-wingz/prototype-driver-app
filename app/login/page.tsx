@@ -2,60 +2,44 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSolution } from "@/lib/solutions/solution-context";
 import { useToast } from "@/hooks/use-toast";
 import {
   AuthButton, AuthField, AuthInput, AuthLink, AuthPhoneInput,
   AuthShell, AuthSubtitle, AuthTitle,
 } from "@/components/driver/auth/auth-shell";
-import { MaskedPasswordInput } from "@/components/driver/auth/masked-password-input";
 import { VerificationCodeScreen } from "@/components/driver/auth/verification-code-screen";
 import {
-  ACCOUNT_ON_FILE, DEMO_PASSWORD, isEmailShaped, isPasswordShaped, isPhoneShaped,
-  maskEmail, maskPhone, OTP_DEMO_CODE, PHONE_PLACEHOLDER,
-  RECOVERY_FLOOR_LABEL, RECOVERY_FLOOR_PROMPT, RECOVERY_LINK_LABEL,
-  RECOVERY_LINK_PROMPT, RESET_SUBTITLE, RESET_TITLE, showsAccountProposals,
-  SIGN_IN_EMAIL_SUBTITLE, SIGN_IN_PHONE_SUBTITLE, SIGN_IN_TITLE,
-  type LoginStep,
+  DEMO_PASSWORD, isEmailShaped, isPhoneShaped, maskEmail, PHONE_PLACEHOLDER,
+  RESET_SUBTITLE, RESET_TITLE, SIGN_IN_EMAIL_SUBTITLE, SIGN_IN_PHONE_SUBTITLE,
+  SIGN_IN_TITLE, type LoginStep,
 } from "@/lib/driver-data/account-self-service";
 
 /**
- * Catalogue row 15, half A — the pre-auth half.
+ * The sign-in screens — **replication only**.
  *
- * ⛔ `references/captures/INDEX.md` §07 says the auth screens were *"shipped,
- * captured, and deliberately NOT built into the base"*. Building them here
- * REVERSES that decision knowingly, because row 15's 567 calls start on them.
- * The boundary it was protecting is kept instead by scope: this route signs
- * nobody in and gates nothing. Every other route stays reachable without it.
+ * ⏸️ Row 15's pre-auth proposal was built here and then removed on 2026-10-13
+ * by user direction: *"lets remove the flow in the sign in for now."* What is
+ * left is four screens copied from captures, carrying nothing of their own:
+ * `signin-phone` (CAP-122), `signin-email` (CAP-126), `otp` (CAP-123/124/125)
+ * and `reset` (CAP-127).
  *
- * Four of the seven steps are replicated from captures and are not the proposal
- * — `signin-phone` (CAP-122), `signin-email` (CAP-126), `otp` (CAP-123/124/125)
- * and `reset` (CAP-127). The proposal is the three `recover-*` steps and the one
- * link that reaches them, and that link is gated to the focused solution.
+ * ⛔ **So this route is no longer row 15's entry point.** It exists because the
+ * CAPTURED Logout row lands on a sign-in screen in production, and until this
+ * slice there was nowhere for it to go. That is replication catching up.
  *
- * ⚠️ One route, not seven. There is no session to carry a half-finished
- * recovery across a navigation, and a reload that dumped the driver back on
- * step 1 would read as the flow failing rather than as the prototype having no
- * backend.
+ * ⚠️ It still reverses `references/captures/INDEX.md` §07, which records the
+ * auth screens as deliberately not built into the base — on a thinner argument
+ * now that the proposal is gone. The boundary §07 protected is kept by scope:
+ * this route signs nobody in and gates nothing.
+ *
+ * ⛔⛔ CAP-127's dead end is therefore replicated WITHOUT its answer. Reset
+ * Password still promises instructions sent to an inbox the driver may have
+ * lost, and nothing on the screen offers a way round it. That is what
+ * production does today, and it is where row 15's 567 calls start.
  */
-
-/**
- * Why the code screen is open. The same six boxes serve four purposes.
- *
- * ⛔ `recover-prove` sends to the contact ALREADY ON FILE and proves identity.
- * The other two `recover-new-*` send to the contact being SET and prove only
- * that it can be reached. Same screen, opposite jobs — which is exactly why the
- * rules keep them as different factors.
- */
-type OtpPurpose =
-  | "sign-in" | "recover-prove" | "recover-new-phone" | "recover-new-email";
-
 export default function LoginPage() {
   const router = useRouter();
-  const { active } = useSolution();
   const { toast } = useToast();
-
-  const showProposals = showsAccountProposals(active?.id ?? null);
 
   const [step, setStep] = useState<LoginStep>("signin-phone");
   const [phone, setPhone] = useState("");
@@ -64,51 +48,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  /*
-    ⛔ Only the PURPOSE lives here. The code itself, the countdown and both
-    captured errors moved into `VerificationCodeScreen` when the five paths were
-    folded onto one screen. Leaving the old state behind would have been worse
-    than untidy: a check greps this file for the error branches, and dead state
-    would have kept it green against code that no longer renders.
-  */
-  const [otpPurpose, setOtpPurpose] = useState<OtpPurpose>("sign-in");
-
-  // Recovery
-  const [newEmail, setNewEmail] = useState("");
-  const [newEmailAgain, setNewEmailAgain] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [updating, setUpdating] = useState<"email" | "phone">("email");
-
   function go(next: LoginStep) {
     setError(undefined);
     setStep(next);
   }
 
-  function openOtp(purpose: OtpPurpose) {
-    setOtpPurpose(purpose);
-    go("otp");
-  }
-
-  /**
-   * ⛔⛔ ONE toast, carrying what changed.
-   *
-   * `TOAST_LIMIT` is 1 (`hooks/use-toast.ts`), so a handler that fired "Email
-   * updated" and then "Welcome back" showed only the second — the driver
-   * reached the end of a recovery flow and was never told the thing they came
-   * for had happened. Two correct calls, one of them invisible. Found by
-   * walking; nothing anywhere reports a dropped toast.
-   */
-  function signedIn(changed?: string) {
+  function signedIn() {
     toast({
-      title: changed ?? "Welcome back",
-      description: changed
-        ? "Signed in with your new details."
-        : "Signed in — the prototype has no session; this is the demo landing.",
+      title: "Welcome back",
+      description: "Signed in — the prototype has no session; this is the demo landing.",
     });
     router.push("/");
   }
-
-  /* ---------------------------------------------------------------- steps */
 
   if (step === "signin-phone") {
     return (
@@ -123,22 +74,20 @@ export default function LoginPage() {
             inputMode="tel"
           />
         </AuthField>
-        <AuthButton disabled={!isPhoneShaped(phone)} onClick={() => openOtp("sign-in")}>
+        <AuthButton disabled={!isPhoneShaped(phone)} onClick={() => go("otp")}>
           Send code
         </AuthButton>
         <AuthLink className="mt-6" onClick={() => go("signin-email")}>
           Sign in with email instead
         </AuthLink>
         <p className="mt-5 text-center text-[15px] text-gray-500">
-          Not a driver yet?{" "}
-          <span className="font-bold text-[#2FD98A]">Sign up</span>
+          Not a driver yet? <span className="font-bold text-[#2FD98A]">Sign up</span>
         </p>
       </AuthShell>
     );
   }
 
   if (step === "signin-email") {
-    const ready = isEmailShaped(email) && password.length > 0;
     return (
       <AuthShell>
         <AuthTitle>{SIGN_IN_TITLE}</AuthTitle>
@@ -152,6 +101,10 @@ export default function LoginPage() {
             autoComplete="username"
           />
         </AuthField>
+        {/* ⚠️ Production's plain eye toggle, kept exactly as CAP-126 shows it.
+            The reveal-last-character field is a PROPOSAL and lives only on the
+            settings password screen — a replicated screen cannot be improved
+            quietly. */}
         <AuthField label="Password" error={error}>
           <div className="relative">
             <AuthInput
@@ -168,7 +121,6 @@ export default function LoginPage() {
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
             >
-              {/* CAP-126's show/hide eye. */}
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
                 <circle cx="12" cy="12" r="3" />
@@ -180,7 +132,7 @@ export default function LoginPage() {
           <AuthLink onClick={() => go("reset")}>Forgot password?</AuthLink>
         </div>
         <AuthButton
-          disabled={!ready}
+          disabled={!(isEmailShaped(email) && password.length > 0)}
           onClick={() => {
             if (password !== DEMO_PASSWORD) {
               setError("That password is not correct.");
@@ -195,340 +147,54 @@ export default function LoginPage() {
           Sign in with phone instead
         </AuthLink>
         <p className="mt-5 text-center text-[15px] text-gray-500">
-          Not a driver yet?{" "}
-          <span className="font-bold text-[#2FD98A]">Sign up</span>
+          Not a driver yet? <span className="font-bold text-[#2FD98A]">Sign up</span>
         </p>
-        <DemoHint>Password for this prototype: <b>{DEMO_PASSWORD}</b></DemoHint>
+        <p className="mt-8 text-center text-xs text-gray-400">
+          Password for this prototype: <b>{DEMO_PASSWORD}</b>
+        </p>
       </AuthShell>
     );
   }
 
   if (step === "otp") {
-    /*
-      ⭐ The SAME screen the settings half uses, from the same component — user
-      direction 2026-10-13: *"All cases the OTP should copy what we have in sign
-      up and be its own page with a resend option."* Five entry points, one
-      screen; the code check, the countdown and both captured errors live in it
-      rather than being re-implemented per caller.
-    */
-    const target =
-      otpPurpose === "recover-new-email"
-        ? newEmail.trim()
-        : otpPurpose === "recover-new-phone"
-          ? `+1 ${newPhone}`
-          : otpPurpose === "recover-prove"
-            ? `+1 ${maskPhone(ACCOUNT_ON_FILE.phone)}`
-            : `+1 ${phone}`;
-
     return (
       <VerificationCodeScreen
-        target={target}
-        secondaryLabel={otpPurpose === "sign-in" ? "Change phone number" : "Back"}
-        onSecondary={() =>
-          go(
-            otpPurpose === "sign-in"
-              ? "signin-phone"
-              : otpPurpose === "recover-prove"
-                ? "recover-identify"
-                : "recover-update",
-          )
-        }
-        onVerified={() => {
-          if (otpPurpose === "sign-in") { signedIn(); return; }
-          if (otpPurpose === "recover-prove") { go("recover-update"); return; }
-          if (otpPurpose === "recover-new-email") {
-            signedIn(`Email updated to ${newEmail.trim()}`);
-            return;
-          }
-          signedIn(`Phone number updated to +1 ${newPhone}`);
-        }}
+        purpose="sign-in"
+        target={`+1 ${phone}`}
+        secondaryLabel="Change phone number"
+        onSecondary={() => go("signin-phone")}
+        onVerified={signedIn}
       />
     );
   }
 
-  if (step === "reset") {
-    return (
-      <AuthShell>
-        <AuthTitle>{RESET_TITLE}</AuthTitle>
-        <AuthSubtitle>{RESET_SUBTITLE}</AuthSubtitle>
-        <AuthField label="Email">
-          <AuthInput
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-            inputMode="email"
-          />
-        </AuthField>
-        <AuthButton
-          disabled={!isEmailShaped(email)}
-          onClick={() =>
-            toast({
-              title: "Reset instructions sent",
-              description: `Check ${maskEmail(email)} for a link.`,
-            })
-          }
-        >
-          Reset Password
-        </AuthButton>
-
-        {/* ⭐⭐ THE PROPOSAL. Two lines of copy on an otherwise replicated
-            screen, and they are the whole of half A's change to production.
-            This is the screen where a driver without their inbox has just run
-            out of road: the sentence above promises a link they cannot read.
-
-            ⛔ Gated — a new feature must not appear in another prototype. */}
-        {showProposals ? (
-          <div className="mt-8 rounded-2xl border border-[#2FD98A] bg-[#F2FDF8] p-4 text-center">
-            <p className="text-[15px] text-gray-700">{RECOVERY_LINK_PROMPT}</p>
-            <AuthLink className="mt-2" onClick={() => go("recover-identify")}>
-              {RECOVERY_LINK_LABEL}
-            </AuthLink>
-          </div>
-        ) : null}
-
-        <AuthLink className="mt-6" onClick={() => go("signin-email")}>
-          Sign in
-        </AuthLink>
-      </AuthShell>
-    );
-  }
-
-  if (step === "recover-identify") {
-    /* Either contact identifies the account — the driver knows what it was,
-       they simply cannot receive on it any more. */
-    const identified = isEmailShaped(email) || isPhoneShaped(email);
-    return (
-      <AuthShell>
-        <AuthTitle>Recover your account</AuthTitle>
-        <AuthSubtitle>
-          Tell us which account this is, then prove it is yours one of two ways.
-        </AuthSubtitle>
-
-        <AuthField label="Email or phone number on file">
-          <AuthInput
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="The one you can no longer use"
-            inputMode="email"
-          />
-        </AuthField>
-        {/* ⚠️ "Can no longer use" is NOT "cannot remember". A driver whose work
-            address was deactivated still knows what it was — that distinction is
-            why this screen can ask for it at all. */}
-
-        {/* ⛔ Both choices stay disabled until the account has been named.
-            The subtitle promises "tell us which account this is, THEN prove it
-            is yours" — and the first build let you skip straight to the proof
-            with the field empty, which is the screen contradicting its own
-            instruction. Found by walking; no gate can see it. */}
-        <div className="mt-8 space-y-3">
-          <ProofChoice
-            title="I know my password"
-            body="Fastest. Nothing has to be delivered anywhere."
-            disabled={!identified}
-            onClick={() => go("recover-password")}
-          />
-          <ProofChoice
-            title={`Send a code to ${maskPhone(ACCOUNT_ON_FILE.phone)}`}
-            body="The number already on your account — not a new one."
-            disabled={!identified}
-            onClick={() => openOtp("recover-prove")}
-          />
-        </div>
-
-        {/* ⛔ The floor, and it is honest. Someone with no password, no inbox
-            and no handset has produced nothing the app can check. An OTP to a
-            NEW number would prove that number exists, not that they own the
-            account — and an email address is not a secret, so accepting it
-            would hand anyone who knows one a driver account that gets paid. */}
-        <p className="mt-8 text-center text-[15px] text-gray-500">
-          {RECOVERY_FLOOR_PROMPT}
-        </p>
-        <AuthLink
-          className="mt-1"
-          onClick={() => toast({ title: "Contact Support", description: RECOVERY_FLOOR_LABEL })}
-        >
-          Contact Support
-        </AuthLink>
-
-        <AuthLink className="mt-6" onClick={() => go("reset")}>
-          Back
-        </AuthLink>
-      </AuthShell>
-    );
-  }
-
-  if (step === "recover-password") {
-    return (
-      <AuthShell>
-        <AuthTitle>Confirm your password</AuthTitle>
-        <AuthSubtitle>
-          This is what tells us the account is yours, so we can change what you
-          have lost access to.
-        </AuthSubtitle>
-        {/* ⚠️ The reveal-last field is used HERE and on the settings password
-            screens — both proposals. CAP-126's sign-in field keeps production's
-            plain eye-only behaviour, because it is a replicated screen and a
-            capture cannot be improved quietly. */}
-        <AuthField label="Current password" error={error}>
-          <MaskedPasswordInput
-            value={password}
-            onChange={(next) => { setPassword(next); setError(undefined); }}
-            placeholder="Enter your password"
-            autoComplete="current-password"
-          />
-        </AuthField>
-        <AuthButton
-          disabled={password.length === 0}
-          onClick={() => {
-            if (password !== DEMO_PASSWORD) {
-              setError("That password is not correct.");
-              return;
-            }
-            go("recover-update");
-          }}
-        >
-          Continue
-        </AuthButton>
-        <AuthLink className="mt-6" onClick={() => go("recover-identify")}>
-          Back
-        </AuthLink>
-        <DemoHint>Password for this prototype: <b>{DEMO_PASSWORD}</b></DemoHint>
-      </AuthShell>
-    );
-  }
-
-  // recover-update
-  const emailReady =
-    isEmailShaped(newEmail) && newEmail.trim() === newEmailAgain.trim();
+  // reset — CAP-127, replicated with the dead end intact.
   return (
     <AuthShell>
-      <AuthTitle>What should we change?</AuthTitle>
-      <AuthSubtitle>
-        You are verified. Set the detail you have lost access to and we will sign
-        you in with it.
-      </AuthSubtitle>
-
-      <div className="mt-7 flex gap-2 rounded-xl bg-gray-100 p-1">
-        {(["email", "phone"] as const).map((which) => (
-          <button
-            key={which}
-            type="button"
-            onClick={() => { setUpdating(which); setError(undefined); }}
-            className={
-              updating === which
-                ? "flex-1 rounded-lg bg-white py-2.5 text-[15px] font-bold text-gray-900 shadow-sm"
-                : "flex-1 rounded-lg py-2.5 text-[15px] font-semibold text-gray-500"
-            }
-          >
-            {which === "email" ? "Email" : "Phone number"}
-          </button>
-        ))}
-      </div>
-
-      {updating === "email" ? (
-        <>
-          <p className="mt-6 text-[15px] text-gray-500">
-            Currently {maskEmail(ACCOUNT_ON_FILE.email)}
-          </p>
-          <AuthField label="New email">
-            <AuthInput
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="Enter your new email"
-              inputMode="email"
-            />
-          </AuthField>
-          {/* ⛔ Typed twice is a TYPO GUARD, not a proof of anything. There is
-              no inbox here to confirm against, so the second field is the only
-              thing standing between a slip of the thumb and a new lockout. */}
-          <AuthField
-            label="Confirm new email"
-            error={
-              newEmailAgain.length > 0 && newEmail.trim() !== newEmailAgain.trim()
-                ? "These do not match."
-                : undefined
-            }
-          >
-            <AuthInput
-              value={newEmailAgain}
-              onChange={(e) => setNewEmailAgain(e.target.value)}
-              placeholder="Type it again"
-              inputMode="email"
-            />
-          </AuthField>
-          {/* ⛔ Typed twice proves the driver typed the same thing twice. It
-              does not prove the address exists — and an address mistyped the
-              same way twice is a lockout the app confirmed on its way out. The
-              code sent TO IT is the only step that proves it can be reached. */}
-          <AuthButton disabled={!emailReady} onClick={() => openOtp("recover-new-email")}>
-            Send code
-          </AuthButton>
-        </>
-      ) : (
-        <>
-          <p className="mt-6 text-[15px] text-gray-500">
-            Currently {maskPhone(ACCOUNT_ON_FILE.phone)}
-          </p>
-          <AuthField label="New phone number">
-            <AuthPhoneInput
-              value={newPhone}
-              onChange={(e) => setNewPhone(e.target.value)}
-              placeholder={PHONE_PLACEHOLDER}
-              inputMode="tel"
-            />
-          </AuthField>
-          <AuthButton
-            disabled={!isPhoneShaped(newPhone)}
-            onClick={() => openOtp("recover-new-phone")}
-          >
-            Send code
-          </AuthButton>
-        </>
-      )}
-
-      <AuthLink className="mt-6" onClick={() => go("recover-identify")}>
-        Back
+      <AuthTitle>{RESET_TITLE}</AuthTitle>
+      <AuthSubtitle>{RESET_SUBTITLE}</AuthSubtitle>
+      <AuthField label="Email">
+        <AuthInput
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Enter your email"
+          inputMode="email"
+        />
+      </AuthField>
+      <AuthButton
+        disabled={!isEmailShaped(email)}
+        onClick={() =>
+          toast({
+            title: "Reset instructions sent",
+            description: `Check ${maskEmail(email)} for a link.`,
+          })
+        }
+      >
+        Reset Password
+      </AuthButton>
+      <AuthLink className="mt-6" onClick={() => go("signin-email")}>
+        Sign in
       </AuthLink>
     </AuthShell>
-  );
-}
-
-function ProofChoice({
-  title, body, disabled, onClick,
-}: {
-  title: string;
-  body: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={
-        disabled
-          ? "w-full rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left"
-          : "w-full rounded-2xl border border-gray-300 bg-white p-4 text-left"
-      }
-    >
-      <p className={disabled ? "text-[16px] font-bold text-gray-400" : "text-[16px] font-bold text-gray-900"}>
-        {title}
-      </p>
-      <p className={disabled ? "mt-1 text-sm text-gray-400" : "mt-1 text-sm text-gray-500"}>
-        {body}
-      </p>
-    </button>
-  );
-}
-
-/**
- * ⚠️ Says out loud that a value is a demo stand-in. The alternative is a screen
- * that silently cannot be got past, which reads as the prototype being broken.
- */
-function DemoHint({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-8 text-center text-xs text-gray-400">{children}</p>
   );
 }

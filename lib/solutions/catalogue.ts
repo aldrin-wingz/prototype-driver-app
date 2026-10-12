@@ -445,22 +445,23 @@ export const SOLUTIONS: Solution[] = [
     klass: "surface",
     buildState: "in-prototype",
     /*
-      ⚠️ TWO entry points because the user asked for two: *"it must be allowed
-      in both the sign in/login and in the settings."* They are not one screen
-      shown twice — the driver is locked out in one and signed in in the other,
-      and that state decides what can be asked of them.
+      ⏸️ ONE entry point. The pre-auth half was built and then removed on
+      2026-10-13 by user direction — *"lets remove the flow in the sign in for
+      now. Lets keep the changing pw and email or phone when they have already
+      logged in."*
 
-      ⛔ `/login` reverses `references/captures/INDEX.md` §07, which records the
-      auth screens as deliberately NOT built into the base. Knowingly: row 15's
-      567 calls start there. The boundary §07 protected is kept by scope
-      instead — this route signs nobody in and gates nothing.
+      ⛔ `/login` still exists, but it is NOT listed here any more: with the
+      proposal gone it is pure replication, carrying nothing of row 15's. It
+      stays because the CAPTURED Logout row lands on a sign-in screen in
+      production and until this slice there was nowhere for it to go.
+
+      ⚠️ So the dead end CAP-127 documents is replicated WITHOUT its answer,
+      which is exactly what production does today — and is where this row's 567
+      calls start.
     */
     entry: {
-      route: "/login",
-      label: "Tap Forgot password? — then take the way out of the dead end",
-      alternates: [
-        { route: "/options/account", label: "Signed in: change the email, password or phone" },
-      ],
+      route: "/options/account",
+      label: "Signed in: change the email, password or phone",
     },
   },
   {

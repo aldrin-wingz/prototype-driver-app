@@ -33,9 +33,10 @@ import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import {
   ACCOUNT_SOLUTION_ID,
   ACCOUNT_ON_FILE,
+  CODE_PURPOSE_FOR,
+  CODE_PURPOSE_LABEL,
   CONTACT_FIELDS,
   OTP_CHANNELS,
-  PASSWORD_HAS_NO_NEW_CONTACT,
   maskEmail,
   maskPhone,
   OTP_ERROR_INVALID,
@@ -44,22 +45,15 @@ import {
   OTP_RESEND_SECONDS,
   OTP_TITLE,
   PHONE_PLACEHOLDER,
+  PRE_AUTH_RECOVERY_PARKED,
   PRODUCTION_LOGIN_STEPS,
-  PROPOSED_LOGIN_STEPS,
-  RECOVERY_FLOOR_LABEL,
-  RECOVERY_FLOOR_PROMPT,
-  RECOVERY_IDENTITY_PROOFS,
-  RECOVERY_LINK_LABEL,
-  RECOVERY_LINK_PROMPT,
-  RECOVERY_RULES,
-  recoveryRouteFor,
   RESET_SUBTITLE,
   RESET_TITLE,
   SETTINGS_RULES,
   SIGN_IN_EMAIL_SUBTITLE,
   SIGN_IN_PHONE_SUBTITLE,
   SIGN_IN_TITLE,
-  type RecoveryRoute,
+  type CodePurpose,
 } from "../lib/driver-data/account-self-service";
 import { ACCOUNT_ROW, buildOptionsRows } from "../lib/driver-data/options-menu";
 import {
@@ -384,13 +378,13 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *     all; and a STANDING ORDER, which reaches the proposed one. A reason form
  *     only ever seen on the way to a warning cannot be told apart from part of
  *     that warning.
- *   - Account self-service (row 15) — the LOCKED-OUT half at `/login` and the
- *     SIGNED-IN half at `/options/account`. User direction was explicitly both,
- *     and they are not one screen shown twice: the driver can be asked for a
- *     current password in one and cannot in the other, which is the entire
- *     design question the slice puts up for review.
+ *
+ * ⏸️ Row 15 had a second branch — the LOCKED-OUT half at `/login` — until the
+ * pre-auth flow was parked on 2026-10-13. It has one entry again, and the count
+ * below went back to 6 rather than being left at 7 with a row quietly failing
+ * to supply its alternate.
  */
-const EXPECTED_ALTERNATES = 7;
+const EXPECTED_ALTERNATES = 6;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -657,8 +651,8 @@ check(
  * actually tested. The first number is the one that carries the assertion above.
  */
 const EXPECTED_RIDE_ROUTES = 12;
-/** `/requests` (row 10) ×2, plus row 15's `/login` and `/options/account`. */
-const EXPECTED_SURFACE_ROUTES = 4;
+/** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
+const EXPECTED_SURFACE_ROUTES = 3;
 check(
   "...and the two kinds of route were counted as declared",
   `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
@@ -2893,59 +2887,58 @@ const A_SOURCES = {
   options: readFileSync("app/options/page.tsx", "utf8"),
 };
 
-/* --- 13a. The finding, as a truth table ---------------------------------- */
+/* --- 13a. ⏸️ The pre-auth half is parked, and stays gone ----------------- */
 
 /**
- * ⛔⛔ **The slice's whole argument, and the one check that can disprove it.**
+ * ⏸️ Account recovery from the sign-in screen was built and then removed on
+ * 2026-10-13 by user direction. The eight-row truth table that lived here went
+ * with it — an exhaustive check over a function no screen reaches is the exact
+ * shape of a check that has stopped testing anything, and it would have stayed
+ * green forever while the product it described did not exist.
  *
- * All eight combinations, declared as literals. Three of the four reachable
- * outcomes already exist in production — which is the claim the spec makes and
- * the reason row 15 is a signpost rather than a new identity mechanism. If
- * `recoveryRouteFor` ever stops agreeing with this table, the argument the
- * screens are built on has changed and someone has to say so.
+ * ⛔ What is checked instead is that it really is GONE, in both directions: no
+ * recovery step survives in the route, and nothing re-introduces one quietly.
  */
-const RECOVERY_TRUTH_TABLE: Array<[boolean, boolean, boolean, RecoveryRoute]> = [
-  // password, email inbox, phone handset       → route
-  [true,  true,  true,  "sign-in-email"],
-  [true,  true,  false, "sign-in-email"],
-  [true,  false, true,  "sign-in-email"],
-  // ⭐ Knows the password but has lost BOTH contacts — still gets in, because
-  // signing in with email never needed the inbox, only the address.
-  [true,  false, false, "sign-in-email"],
-  [false, true,  true,  "sign-in-phone-otp"],
-  // ⭐⭐ The 567 calls. Inbox gone, handset in hand, and production ALREADY
-  // lets them in — behind a quiet green line under a greyed button.
-  [false, false, true,  "sign-in-phone-otp"],
-  [false, true,  false, "reset-by-email"],
-  // ⛔ Nothing left. No in-app evidence can settle this and none should.
-  [false, false, false, "contact-support"],
+const PARKED_RECOVERY_MARKERS = [
+  "recover-identify", "recover-password", "recover-update",
+  "RECOVERY_LINK_LABEL", "recoveryRouteFor", "RECOVERY_RULES",
 ];
-let recoveryMismatches = 0;
-for (const [knowsPassword, canReceiveOnEmailOnFile, canReceiveOnPhoneOnFile, expected]
-  of RECOVERY_TRUTH_TABLE) {
-  const got = recoveryRouteFor({ knowsPassword, canReceiveOnEmailOnFile, canReceiveOnPhoneOnFile });
-  if (got !== expected) recoveryMismatches++;
-}
-check(
-  "every lockout resolves to the declared recovery route",
-  `${recoveryMismatches} mismatch(es) of ${RECOVERY_TRUTH_TABLE.length} combination(s)`,
-  recoveryMismatches === 0,
+const survivingRecovery = PARKED_RECOVERY_MARKERS.filter((marker) =>
+  codeOnly(A_SOURCES.login).includes(marker),
 );
 check(
-  "...and the table is exhaustive over its three inputs",
-  `${RECOVERY_TRUTH_TABLE.length} rows, expected 8`,
-  RECOVERY_TRUTH_TABLE.length === 8,
+  "the parked recovery flow left nothing behind in the sign-in route",
+  `${survivingRecovery.length} of ${PARKED_RECOVERY_MARKERS.length} marker(s) survive: ${survivingRecovery.join(", ") || "none"}`,
+  survivingRecovery.length === 0 && PRE_AUTH_RECOVERY_PARKED,
+);
+/** ⛔⛔ And the dead end it answered is replicated WITHOUT the answer. */
+check(
+  "...so CAP-127's dead end is replicated with no way round it",
+  "Reset Password present, recovery link absent",
+  A_SOURCES.login.includes("RESET_SUBTITLE") &&
+    !codeOnly(A_SOURCES.login).includes("No longer have access"),
 );
 /**
- * ⚠️ A table that answered "contact-support" everywhere would pass the two
- * checks above and say the opposite of the spec. Assert the SPREAD.
+ * ⛔ `/login` is no longer row 15's entry. With the proposal gone it carries
+ * nothing of the row's — it exists because the CAPTURED Logout row lands on a
+ * sign-in screen in production. A catalogue entry pointing at it would claim a
+ * demo that is not there.
  */
-const routesReached = new Set(RECOVERY_TRUTH_TABLE.map(([, , , r]) => r));
+const ROW_15_ROUTES = [
+  SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!.entry?.route,
+  ...(SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!.entry?.alternates ?? []).map((a) => a.route),
+];
 check(
-  "...and three of the four outcomes need no new mechanism",
-  `${routesReached.size} distinct outcome(s): ${[...routesReached].join(", ")}`,
-  routesReached.size === 4 &&
-    RECOVERY_TRUTH_TABLE.filter(([, , , r]) => r === "contact-support").length === 1,
+  "...and row 15 no longer claims the sign-in route as a demo",
+  `${ROW_15_ROUTES.length} route(s): ${ROW_15_ROUTES.join(", ")}`,
+  ROW_15_ROUTES.length === 1 && ROW_15_ROUTES[0] === "/options/account",
+);
+/** ⚠️ Every step left in the route is replicated. None is a proposal. */
+check(
+  "...and every remaining sign-in step is one of the captured four",
+  `${PRODUCTION_LOGIN_STEPS.length} step(s): ${PRODUCTION_LOGIN_STEPS.join(", ")}`,
+  PRODUCTION_LOGIN_STEPS.length === 4 &&
+    /type LoginStep =[\s\S]{0,400}"reset";/.test(A_SOURCES.rules),
 );
 
 /* --- 13b. Production's own strings, character for character -------------- */
@@ -3021,17 +3014,18 @@ check(
 /* --- 13c. ⛔⛔ Identity is never proved by the new contact ---------------- */
 
 /**
- * ⛔⛔ **The guard that stops this being an account-takeover path.**
+ * ⛔⛔ **The guard that keeps a contact change from being a takeover path.**
  *
- * An OTP to a NEW number proves the number exists and someone is holding it. It
- * proves nothing about who. An email address is not a secret, so a recovery
- * flow whose only check is "send a code to whatever number you give me" hands
- * anyone who knows a driver's address an account that gets paid.
+ * A code to a NEW address or number proves it exists and someone is holding it.
+ * It proves nothing about who. So `otp-to-new-contact` may appear as a VALUE
+ * confirmation and never as an identity proof, and identity and value are never
+ * the same factor.
  *
- * So `otp-to-new-contact` may appear as a VALUE confirmation and never as an
- * identity proof, and identity and value are never the same factor.
+ * ⏸️ One table now, not two — the recovery table went with the parked pre-auth
+ * half. The rule is unchanged and is what the remaining table is checked
+ * against.
  */
-const ALL_RULES = [...SETTINGS_RULES, ...RECOVERY_RULES];
+const ALL_RULES = [...SETTINGS_RULES];
 const identityByNewContact = ALL_RULES.filter((rule) =>
   rule.identityProofs.includes("otp-to-new-contact"),
 );
@@ -3053,9 +3047,9 @@ const emptyRules = ALL_RULES.filter(
   (rule) => rule.identityProofs.length === 0 || rule.valueConfirmations.length === 0,
 );
 check(
-  "...and there were rules to check, for both halves",
-  `${SETTINGS_RULES.length} settings + ${RECOVERY_RULES.length} recovery, ${emptyRules.length} empty`,
-  SETTINGS_RULES.length === 3 && RECOVERY_RULES.length === 3 && emptyRules.length === 0,
+  "...and there were rules to check, one per field",
+  `${ALL_RULES.length} rule(s), ${emptyRules.length} empty`,
+  ALL_RULES.length === 3 && emptyRules.length === 0,
 );
 
 /**
@@ -3065,7 +3059,7 @@ check(
  * ⛔ Typing an address twice proves the driver typed the same thing twice; it
  * does not prove the address exists. An address mistyped identically twice is a
  * lockout the app confirmed on its way out. So every CONTACT change must END in
- * a code sent to the new value — in both halves, on both fields.
+ * a code sent to the new value.
  */
 const contactRules = ALL_RULES.filter((rule) => CONTACT_FIELDS.includes(rule.field));
 const notEndingInCode = contactRules.filter(
@@ -3074,25 +3068,22 @@ const notEndingInCode = contactRules.filter(
 check(
   "every contact change ends in a code sent to the new value",
   `${notEndingInCode.length} of ${contactRules.length} contact rule(s) do not`,
-  notEndingInCode.length === 0 && contactRules.length === 4,
+  notEndingInCode.length === 0 && contactRules.length === 2,
 );
 /** ⛔ And the typo guard comes BEFORE it on the field that is typed twice. */
-const emailRules = ALL_RULES.filter((rule) => rule.field === "email");
+const emailRule = ALL_RULES.find((rule) => rule.field === "email")!;
 check(
   "...and the email's typo guard runs before its code, not instead of it",
-  emailRules.map((r) => r.valueConfirmations.join(" → ")).join(" | "),
-  emailRules.length === 2 &&
-    emailRules.every((rule) =>
-      rule.valueConfirmations.indexOf("typed-twice") <
-        rule.valueConfirmations.indexOf("otp-to-new-contact")),
+  emailRule.valueConfirmations.join(" → "),
+  emailRule.valueConfirmations.indexOf("typed-twice") <
+    emailRule.valueConfirmations.indexOf("otp-to-new-contact"),
 );
 /** ⛔ A password has no new contact, so it cannot have that step. */
-const passwordRules = ALL_RULES.filter((rule) => rule.field === "password");
+const passwordRule = ALL_RULES.find((rule) => rule.field === "password")!;
 check(
   "a password change never sends a code to a new contact — there isn't one",
-  `${passwordRules.filter((r) => r.valueConfirmations.includes("otp-to-new-contact")).length} of ${passwordRules.length}`,
-  PASSWORD_HAS_NO_NEW_CONTACT &&
-    passwordRules.every((rule) => !rule.valueConfirmations.includes("otp-to-new-contact")),
+  passwordRule.valueConfirmations.join(" → "),
+  !passwordRule.valueConfirmations.includes("otp-to-new-contact"),
 );
 
 /**
@@ -3102,42 +3093,23 @@ check(
  * ⛔⛔ And NOT with the current password. That was the first build, and it was
  * wrong in a way worth asserting against: it locked out the only driver who
  * needs the screen. Someone who remembers their password does not need to reset
- * it; someone who has forgotten it cannot answer. The requirement read as
- * security and worked as a wall in front of the use case.
+ * it; someone who has forgotten it cannot answer.
  */
 check(
   "changing the password is confirmed by a code to a contact on file",
-  passwordRules.map((r) => r.identityProofs.join("+")).join(" / "),
-  passwordRules.length === 2 &&
-    passwordRules.every((rule) => rule.identityProofs.includes("otp-to-contact-on-file")),
+  passwordRule.identityProofs.join("+"),
+  passwordRule.identityProofs.includes("otp-to-contact-on-file"),
 );
 check(
   "...and never by the current password, which the driver may not have",
-  `${passwordRules.filter((r) => r.identityProofs.includes("current-password")).length} of ${passwordRules.length} still ask for it`,
-  passwordRules.every((rule) => !rule.identityProofs.includes("current-password")),
+  `current-password present: ${passwordRule.identityProofs.includes("current-password")}`,
+  !passwordRule.identityProofs.includes("current-password"),
 );
-/** Both channels on file are offered, and neither is a contact being SET. */
 check(
   "...and the driver picks which contact on file receives it",
   `${OTP_CHANNELS.length} channel(s): ${OTP_CHANNELS.join(", ")}`,
   OTP_CHANNELS.length === 2 &&
     OTP_CHANNELS.includes("phone") && OTP_CHANNELS.includes("email"),
-);
-
-/** The locked-out driver may offer exactly two things. Nothing else counts. */
-const strayProofs = RECOVERY_RULES.filter((rule) =>
-  rule.identityProofs.some((proof) => !RECOVERY_IDENTITY_PROOFS.includes(proof)),
-);
-check(
-  "a locked-out driver proves identity only the two declared ways",
-  `${strayProofs.length} stray of ${RECOVERY_RULES.length}, allowed: ${RECOVERY_IDENTITY_PROOFS.join(", ")}`,
-  strayProofs.length === 0 && RECOVERY_IDENTITY_PROOFS.length === 2,
-);
-/** ⛔ And a session cannot travel: there is no session when you are locked out. */
-check(
-  "...and no recovery rule leans on being signed in",
-  `${RECOVERY_RULES.filter((r) => r.identityProofs.includes("signed-in-session")).length} of ${RECOVERY_RULES.length}`,
-  RECOVERY_RULES.every((rule) => !rule.identityProofs.includes("signed-in-session")),
 );
 
 /* --- 13d. Nothing whole is printed back ---------------------------------- */
@@ -3212,17 +3184,16 @@ check(
   `after ${ACCOUNT_ROW.after} → index ${focusedRows.findIndex((r) => r.id === ACCOUNT_ROW.id)}`,
   focusedRows[focusedRows.findIndex((r) => r.id === ACCOUNT_ROW.after) + 1]?.id === ACCOUNT_ROW.id,
 );
-/** ⛔ The recovery link is a proposal on a REPLICATED screen — same gate. */
+/**
+ * ⏸️ The gate used to cover two things — this row and a proposed link on the
+ * replicated Reset Password screen. With the pre-auth half parked it has one
+ * subject, and the sign-in route must carry NO gated proposal at all.
+ */
 check(
-  "the recovery link obeys the same gate as the row",
-  "showsAccountProposals guards the Reset Password link",
-  /showProposals \? \(/.test(A_SOURCES.login) &&
-    A_SOURCES.login.includes("showsAccountProposals"),
-);
-check(
-  "...and one predicate serves both, so they cannot drift apart",
-  `options=${A_SOURCES.options.includes("buildOptionsRows")} login=${A_SOURCES.login.includes("showsAccountProposals")}`,
-  A_SOURCES.options.includes("buildOptionsRows") && A_SOURCES.login.includes("showsAccountProposals"),
+  "the gate's only subject is the Options row now",
+  `login references the gate: ${codeOnly(A_SOURCES.login).includes("showsAccountProposals")}`,
+  !codeOnly(A_SOURCES.login).includes("showsAccountProposals") &&
+    A_SOURCES.options.includes("buildOptionsRows"),
 );
 
 /* --- 13f. /login gates nothing ------------------------------------------- */
@@ -3272,23 +3243,26 @@ check(
  * handler show only the SECOND. A recovery flow that said "Email updated" and
  * then "Welcome back" told the driver nothing about the thing they came for —
  * two correct calls, one of them invisible, and nothing anywhere reports a
- * dropped toast. The sign-in toast now carries what changed instead.
+ * dropped toast.
+ *
+ * ⏸️ That flow is parked, so the rule now guards the settings half: a change
+ * raises exactly one toast and does NOT navigate on top of it.
  */
 check(
   "the toast limit is still 1, so this rule still applies",
   `TOAST_LIMIT = ${/TOAST_LIMIT = (\d+)/.exec(readFileSync("hooks/use-toast.ts", "utf8"))?.[1]}`,
   /const TOAST_LIMIT = 1;/.test(readFileSync("hooks/use-toast.ts", "utf8")),
 );
+const settingsToasts = codeOnly(A_SOURCES.settings).match(/toast\(\{/g) ?? [];
 check(
-  "...and no handler raises a toast immediately before navigating away",
-  "no toast({...}) directly followed by signedIn(",
-  !/toast\(\{[\s\S]{0,260}?\}\);\s*\n\s*signedIn\(/.test(A_SOURCES.login),
+  "...and a saved change raises exactly one toast, from one place",
+  `${settingsToasts.length} toast call(s) in the settings half`,
+  settingsToasts.length === 1 && /function finish\(title: string, description: string\)/.test(A_SOURCES.settings),
 );
 check(
-  "...and what changed is carried into the one toast that survives",
-  "signedIn(`Email updated…`) / signedIn(`Phone number updated…`)",
-  /signedIn\(`Email updated/.test(A_SOURCES.login) &&
-    /signedIn\(`Phone number updated/.test(A_SOURCES.login),
+  "...and it does not navigate out from under it",
+  "finish() clears the step; no router push on save",
+  !codeOnly(A_SOURCES.settings).includes("router.push"),
 );
 
 /* --- 13g. The two halves are one build ----------------------------------- */
@@ -3485,25 +3459,29 @@ check(
   /type="text"/.test(A_SOURCES.secret) && !/type="password"/.test(codeOnly(A_SOURCES.secret)),
 );
 /**
- * ⚠️ Used on the PROPOSED password screens only. CAP-126's sign-in field keeps
- * production's plain eye-only behaviour, because it is a replicated screen and
- * a capture cannot be improved quietly.
+ * ⚠️ Used on the PROPOSED password screen only. ⏸️ There were two until the
+ * recovery flow was parked. CAP-126's sign-in field was never one of them and
+ * still keeps production's plain eye-only behaviour, because it is a replicated
+ * screen and a capture cannot be improved quietly.
+ *
+ * ⚠️ `<MaskedPasswordInput`, the USAGE — the bare name also matches the import,
+ * which survives the element being swapped out underneath it.
  */
-const PROPOSED_PASSWORD_SCREENS = [["settings", A_SOURCES.settings], ["recovery", A_SOURCES.login]] as const;
-/** ⚠️ `<MaskedPasswordInput`, the USAGE — the bare name also matches the import,
- *  which survives the element being swapped out underneath it. */
+const PROPOSED_PASSWORD_SCREENS = [["settings", A_SOURCES.settings]] as const;
 const usingReveal = PROPOSED_PASSWORD_SCREENS.filter(
   ([, src]) => codeOnly(src).includes("<MaskedPasswordInput"),
 );
 check(
-  "the reveal field is used on both proposed password screens",
+  "the reveal field is used on the proposed password screen",
   `${usingReveal.length} of ${PROPOSED_PASSWORD_SCREENS.length}`,
-  usingReveal.length === PROPOSED_PASSWORD_SCREENS.length,
+  usingReveal.length === PROPOSED_PASSWORD_SCREENS.length &&
+    PROPOSED_PASSWORD_SCREENS.length > 0,
 );
+/** ⛔ And NOT on the replicated sign-in screen, which keeps production's eye. */
 check(
   "...and CAP-126's sign-in field is left exactly as captured",
   "plain eye toggle, no reveal on the replicated screen",
-  /autoComplete="current-password"[\s\S]{0,120}className="pr-12"/.test(A_SOURCES.login) ||
+  !codeOnly(A_SOURCES.login).includes("<MaskedPasswordInput") &&
     /type=\{showPassword \? "text" : "password"\}/.test(A_SOURCES.login),
 );
 
@@ -3549,28 +3527,106 @@ check(
   ),
 );
 
+/* --- 13g4. Every code screen says what it is confirming ----------------- */
+
+/**
+ * ⭐ User direction, 2026-10-13: *"for these verification codes be explicit what
+ * we are confirming — whether it is changing pw or changing email."*
+ *
+ * ⛔ The six boxes look identical whatever brought the driver there, and a code
+ * arriving while two things are half-changed has no referent without this line.
+ */
+const PURPOSES: CodePurpose[] = ["sign-in", "change-email", "change-password", "change-phone"];
+const unlabelled = PURPOSES.filter((purpose) => !CODE_PURPOSE_LABEL[purpose]?.trim());
+check(
+  "every code purpose has a label a driver can read",
+  `${unlabelled.length} unlabelled of ${PURPOSES.length}`,
+  unlabelled.length === 0,
+);
+/** ⛔ They must actually DIFFER, or the line says nothing. */
+check(
+  "...and no two purposes say the same thing",
+  `${new Set(Object.values(CODE_PURPOSE_LABEL)).size} distinct of ${PURPOSES.length}`,
+  new Set(Object.values(CODE_PURPOSE_LABEL)).size === PURPOSES.length,
+);
+/** Each field maps to its own purpose — three fields, three distinct purposes. */
+const fieldPurposes = CONTACT_FIELDS.concat("password").map((f) => CODE_PURPOSE_FOR[f]);
+check(
+  "...and each changeable field names its own",
+  `${new Set(fieldPurposes).size} distinct of ${fieldPurposes.length}: ${fieldPurposes.join(", ")}`,
+  new Set(fieldPurposes).size === 3 && !fieldPurposes.includes("sign-in"),
+);
+check(
+  "...and the screen renders the label, not just declares it",
+  "CODE_PURPOSE_LABEL[purpose] in the code screen",
+  /\{CODE_PURPOSE_LABEL\[purpose\]\}/.test(A_SOURCES.code),
+);
+/**
+ * ⛔⛔ REQUIRED, not optional with a default. A caller that forgets to say what
+ * it is confirming must not compile — a guarantee no check here can make, so
+ * the check is that the TYPE still carries it.
+ */
+check(
+  "...and a caller cannot omit it",
+  "purpose: CodePurpose, no `?` and no default",
+  /\n  purpose: CodePurpose;/.test(A_SOURCES.code) &&
+    !/purpose\?/.test(A_SOURCES.code) && !/purpose = /.test(A_SOURCES.code),
+);
+const callers = [["settings", A_SOURCES.settings], ["login", A_SOURCES.login]] as const;
+const silentCallers = callers.filter(
+  ([, src]) => codeOnly(src).includes("<VerificationCodeScreen") && !/purpose=/.test(codeOnly(src)),
+);
+check(
+  "...and every caller passes one",
+  `${silentCallers.length} of ${callers.length} caller(s) do not`,
+  silentCallers.length === 0,
+);
+
+/* --- 13g5. The channel is SELECTED, then confirmed ---------------------- */
+
+/**
+ * ⭐ User direction, 2026-10-13: *"make it click first to select before jumping
+ * into the verification code."*
+ *
+ * ⛔ The first build sent the code on tap. A code cannot be un-sent: a mis-tap
+ * put the driver on a screen waiting for something delivered to the wrong
+ * place, with the rate limit (CAP-125) between them and a second try.
+ */
+check(
+  "picking a channel selects it rather than sending the code",
+  "onClick sets state; a separate button sends",
+  /onClick=\{\(\) => setChosen\(option\)\}/.test(A_SOURCES.settings) &&
+    /onClick=\{\(\) => onPick\(chosen!\)\}/.test(A_SOURCES.settings),
+);
+check(
+  "...and that button is disabled until something is selected",
+  "disabled={chosen === null}",
+  /disabled=\{chosen === null\}/.test(A_SOURCES.settings),
+);
+/** ⚠️ And the selection is visible, or "selected" is a state only the code knows. */
+check(
+  "...and the selection is shown on screen",
+  "aria-pressed + a selected style branch",
+  /aria-pressed=\{selected\}/.test(A_SOURCES.settings) &&
+    /const selected = chosen === option;/.test(A_SOURCES.settings),
+);
+
 /* --- 13h. Proposed copy is marked, production copy is not ---------------- */
 
 const ROW_15 = SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!;
 check(
-  "row 15 is in the prototype with both halves reachable",
-  `${ROW_15.buildState} · ${ROW_15.entry?.route} + ${(ROW_15.entry?.alternates ?? []).map((a) => a.route).join(", ")}`,
+  "row 15 is in the prototype, demonstrated from the signed-in half",
+  `${ROW_15.buildState} · ${ROW_15.entry?.route}`,
   ROW_15.buildState === "in-prototype" &&
-    ROW_15.entry?.route === "/login" &&
-    (ROW_15.entry?.alternates ?? []).some((a) => a.route === "/options/account"),
-);
-check(
-  "the proposed login steps are separated from the replicated ones",
-  `${PRODUCTION_LOGIN_STEPS.length} replicated, ${PROPOSED_LOGIN_STEPS.length} proposed`,
-  PRODUCTION_LOGIN_STEPS.length === 4 && PROPOSED_LOGIN_STEPS.length === 3 &&
-    PRODUCTION_LOGIN_STEPS.every((step) => !PROPOSED_LOGIN_STEPS.includes(step)),
+    ROW_15.entry?.route === "/options/account" &&
+    (ROW_15.entry?.alternates ?? []).length === 0,
 );
 /** ⛔ No ⛔ may reach anything a driver reads. Swept again for this slice. */
 const DRIVER_FACING = [
   SIGN_IN_TITLE, SIGN_IN_PHONE_SUBTITLE, SIGN_IN_EMAIL_SUBTITLE, OTP_TITLE,
   RESET_TITLE, RESET_SUBTITLE, OTP_ERROR_INVALID, OTP_ERROR_RATE_LIMIT,
-  RECOVERY_LINK_PROMPT, RECOVERY_LINK_LABEL, RECOVERY_FLOOR_PROMPT,
-  RECOVERY_FLOOR_LABEL, ACCOUNT_ROW.label, ACCOUNT_ROW.description ?? "",
+  ...Object.values(CODE_PURPOSE_LABEL),
+  ACCOUNT_ROW.label, ACCOUNT_ROW.description ?? "",
 ];
 const markerLeaks = DRIVER_FACING.filter((text) => /⛔|⚠️|⭐/.test(text));
 check(

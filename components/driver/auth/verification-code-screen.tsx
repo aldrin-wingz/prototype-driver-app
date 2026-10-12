@@ -5,8 +5,8 @@ import {
   AuthButton, AuthCodeBoxes, AuthLink, AuthShell, AuthSubtitle, AuthTitle,
 } from "./auth-shell";
 import {
-  OTP_DEMO_CODE, OTP_ERROR_INVALID, OTP_ERROR_RATE_LIMIT, OTP_LENGTH,
-  OTP_RESEND_SECONDS, OTP_TITLE,
+  CODE_PURPOSE_LABEL, OTP_DEMO_CODE, OTP_ERROR_INVALID, OTP_ERROR_RATE_LIMIT,
+  OTP_LENGTH, OTP_RESEND_SECONDS, OTP_TITLE, type CodePurpose,
 } from "@/lib/driver-data/account-self-service";
 
 /**
@@ -28,8 +28,20 @@ import {
  * a settings card is a different screen that happens to look similar.
  */
 export function VerificationCodeScreen({
-  target, actionLabel = "Verify", secondaryLabel, onSecondary, onVerified,
+  purpose, target, actionLabel = "Verify", secondaryLabel, onSecondary, onVerified,
 }: {
+  /**
+   * ⭐ What this code is CONFIRMING, printed on the screen.
+   *
+   * User direction, 2026-10-13: *"for these verification codes be explicit what
+   * we are confirming — whether it is changing pw or changing email."* The six
+   * boxes look identical whatever brought the driver here, and a code arriving
+   * while two things are half-changed has no referent without this line.
+   *
+   * ⛔ REQUIRED, not optional with a default. A caller that forgets to say what
+   * it is confirming does not compile — a guarantee no check can make.
+   */
+  purpose: CodePurpose;
   /** Printed in the subtitle — already masked or formatted by the caller. */
   target: string;
   actionLabel?: string;
@@ -50,6 +62,11 @@ export function VerificationCodeScreen({
   return (
     <AuthShell>
       <AuthTitle>{OTP_TITLE}</AuthTitle>
+      <div className="mt-4 flex justify-center">
+        <span className="rounded-full bg-[#F2FDF8] px-4 py-1.5 text-[14px] font-bold text-[#17936A]">
+          {CODE_PURPOSE_LABEL[purpose]}
+        </span>
+      </div>
       <AuthSubtitle>
         We sent a {OTP_LENGTH}-digit code to {target}
       </AuthSubtitle>

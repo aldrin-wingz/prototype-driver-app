@@ -25,7 +25,11 @@ export const SIGN_IN_EMAIL_SUBTITLE = "Enter your email and password to sign in.
 export const OTP_TITLE = "Enter verification code";
 /** CAP-127. */
 export const RESET_TITLE = "Reset Password";
-/** CAP-127 — ⛔⛔ this sentence IS the dead end. See `recoveryRouteFor`. */
+/**
+ * CAP-127 — ⛔⛔ this sentence IS the dead end: reset instructions go to the
+ * inbox the driver has just lost. Replicated as production words it; the
+ * proposal that answered it is parked, see `PRE_AUTH_RECOVERY_PARKED`.
+ */
 export const RESET_SUBTITLE =
   "Enter the email associated with your account and we'll send reset instructions.";
 
@@ -84,58 +88,39 @@ export function maskPhone(phone: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* ⛔⛔ The finding: three of the four lockouts already have a way in           */
+/* ⏸️ The pre-auth half is PARKED                                              */
 /* -------------------------------------------------------------------------- */
 
-export type AccountField = "email" | "password" | "phone";
-
 /**
- * What a locked-out driver still has.
+ * ⏸️ **Account recovery from the sign-in screen was built and then removed**,
+ * by user direction on 2026-10-13: *"lets remove the flow in the sign in for
+ * now. Lets keep the changing pw and email or phone when they have already
+ * logged in."*
  *
- * ⚠️ "Can receive on the email" is NOT "knows the email address". A driver whose
- * work address was deactivated still knows what it was — they just cannot read
- * anything sent to it. Conflating the two is what makes the dead end look
- * unavoidable, because email+password sign-in never needed the inbox at all.
+ * What went with it: a `recoveryRouteFor` truth table over the eight ways a
+ * driver can be locked out, a `RECOVERY_RULES` proof table, and three screens
+ * reached from a link on CAP-127. It is all in commit `accd40c` if it comes
+ * back.
+ *
+ * ⛔ It was removed rather than left behind a flag. Nothing called it, and an
+ * eight-row truth table over a function no screen reaches is the exact shape of
+ * a check that has stopped testing anything — it would have stayed green
+ * forever while the product it described did not exist.
+ *
+ * ⭐ **The finding it encoded is still true and is kept as prose**, in
+ * `References/Phase 8 Spec - Account Self-Service.md` §2: production already
+ * trusts the phone, so three of the four lockouts are already solvable today —
+ * drivers call Support because `Forgot password?` is the loud link into
+ * CAP-127's dead end, and `Sign in with phone instead` is a quiet green line
+ * under a greyed button.
  */
-export interface RecoveryInputs {
-  knowsPassword: boolean;
-  canReceiveOnEmailOnFile: boolean;
-  canReceiveOnPhoneOnFile: boolean;
-}
-
-export type RecoveryRoute =
-  /** Email + password still works — the inbox is irrelevant to signing in. */
-  | "sign-in-email"
-  /** ⭐ The door production already has and does not point at. */
-  | "sign-in-phone-otp"
-  /** Production's reset, which only works if the inbox is reachable. */
-  | "reset-by-email"
-  /** ⛔ Nothing left in the account. No in-app evidence can settle this. */
-  | "contact-support";
-
-/**
- * ⛔⛔ **The slice's whole argument, executable.**
- *
- * Three of the four outcomes are reachable in production TODAY. Drivers call
- * Support anyway, because `Forgot password?` is the loud link on CAP-126 and it
- * leads into `RESET_SUBTITLE` — a reset sent to the inbox they just lost —
- * while `Sign in with phone instead` is a quiet green line under a greyed
- * button. The product has the exit; the screen does not point at it.
- *
- * Order matters and is deliberate: password first because it needs nothing
- * delivered, phone second because it needs only a handset, email reset last
- * because it is the one that strands people.
- */
-export function recoveryRouteFor(inputs: RecoveryInputs): RecoveryRoute {
-  if (inputs.knowsPassword) return "sign-in-email";
-  if (inputs.canReceiveOnPhoneOnFile) return "sign-in-phone-otp";
-  if (inputs.canReceiveOnEmailOnFile) return "reset-by-email";
-  return "contact-support";
-}
+export const PRE_AUTH_RECOVERY_PARKED = true;
 
 /* -------------------------------------------------------------------------- */
 /* What proves what                                                            */
 /* -------------------------------------------------------------------------- */
+
+export type AccountField = "email" | "password" | "phone";
 
 export type ProofFactor =
   /** They typed the current password. */
@@ -218,29 +203,14 @@ export const SETTINGS_RULES: readonly ChangeRule[] = [
 ];
 
 /**
- * Half A — changing a detail while LOCKED OUT.
- *
- * Same value confirmations, but the session no longer exists, so identity has
- * to come from one of the two things a locked-out owner can still produce.
- * ⛔ `otp-to-new-contact` appears ONLY as a value confirmation here, never as
- * the identity proof — that is the whole guard.
+ * ⚠️ No `where` argument any more. It took `"settings" | "recovery"` while both
+ * halves existed; with the pre-auth half parked there is one table, and a
+ * parameter with one legal value is a parameter that reads as a choice nobody
+ * can make.
  */
-export const RECOVERY_RULES: readonly ChangeRule[] = [
-  { field: "email", identityProofs: ["current-password"], valueConfirmations: ["typed-twice", "otp-to-new-contact"] },
-  { field: "password", identityProofs: ["otp-to-contact-on-file"], valueConfirmations: ["typed-twice"] },
-  { field: "phone", identityProofs: ["current-password"], valueConfirmations: ["otp-to-new-contact"] },
-];
-
-/** ⛔ There is no new contact to send a code to when the password changes. */
-export const PASSWORD_HAS_NO_NEW_CONTACT = true;
-
-export function changeRuleFor(
-  field: AccountField,
-  where: "settings" | "recovery",
-): ChangeRule {
-  const rules = where === "settings" ? SETTINGS_RULES : RECOVERY_RULES;
-  const rule = rules.find((r) => r.field === field);
-  if (!rule) throw new Error(`No ${where} rule for ${field}`);
+export function changeRuleFor(field: AccountField): ChangeRule {
+  const rule = SETTINGS_RULES.find((r) => r.field === field);
+  if (!rule) throw new Error(`No rule for ${field}`);
   return rule;
 }
 
@@ -276,46 +246,56 @@ export const RECOVERY_IDENTITY_PROOFS: readonly ProofFactor[] = [
  * half-finished recovery across a navigation, and a reload that dropped the
  * driver back to step 1 would read as the flow failing.
  */
+/**
+ * ⛔ **Every step here is REPLICATED. None is a proposal.**
+ *
+ * With the recovery flow parked, `/login` carries nothing of row 15's — it
+ * exists because the captured Logout row lands on it, which is what production
+ * does. That is replication catching up, not a feature, and it is why the route
+ * is not row 15's entry point any more.
+ */
 export type LoginStep =
-  /** CAP-122 — replicated. */
+  /** CAP-122. */
   | "signin-phone"
-  /** CAP-126 — replicated. */
+  /** CAP-126. */
   | "signin-email"
-  /** CAP-123 / 124 / 125 — replicated, both errors. */
+  /** CAP-123 / 124 / 125, both errors. */
   | "otp"
-  /** CAP-127 — replicated, plus ONE proposed link. */
-  | "reset"
-  /** Proposed — which account, and which proof they can offer. */
-  | "recover-identify"
-  /** Proposed — the current password. The code branch reuses `otp`. */
-  | "recover-password"
-  /** Proposed — the new email or the new phone. */
-  | "recover-update";
+  /** CAP-127. */
+  | "reset";
 
 export const PRODUCTION_LOGIN_STEPS: readonly LoginStep[] = [
   "signin-phone", "signin-email", "otp", "reset",
 ];
-export const PROPOSED_LOGIN_STEPS: readonly LoginStep[] = [
-  "recover-identify", "recover-password", "recover-update",
-];
 
 /**
- * ⭐ The whole of half A's change to production, in two lines of copy.
+ * ⭐ What a code screen is CONFIRMING, said on the screen.
  *
- * PROPOSED — not captured. It sits under the Reset Password button, because
- * that is the screen where a driver without their inbox has just run out of
- * road.
+ * User direction, 2026-10-13: *"for these verification codes be explicit what
+ * we are confirming — whether it is changing pw or changing email."* The six
+ * boxes look identical whatever brought the driver there, and a code that
+ * arrives while three things are half-changed is a code with no referent.
+ *
+ * ⛔ `VerificationCodeScreen` takes this as a REQUIRED prop, so a new caller
+ * that forgets to say what it is confirming does not compile. A check cannot
+ * make that guarantee; a type can.
  */
-export const RECOVERY_LINK_PROMPT = "No longer have access to this email?";
-export const RECOVERY_LINK_LABEL = "Recover your account another way";
+export type CodePurpose =
+  | "sign-in" | "change-email" | "change-password" | "change-phone";
 
-/**
- * ⛔ The floor, and it is honest. A driver with no password, no inbox and no
- * handset has produced nothing the app can check, and no screen should pretend
- * otherwise. PROPOSED copy.
- */
-export const RECOVERY_FLOOR_PROMPT = "Lost all three?";
-export const RECOVERY_FLOOR_LABEL = "Contact Support — we'll verify you another way";
+export const CODE_PURPOSE_LABEL: Record<CodePurpose, string> = {
+  "sign-in": "Signing in",
+  "change-email": "Changing your email",
+  "change-password": "Changing your password",
+  "change-phone": "Changing your phone number",
+};
+
+/** The purpose for each field's change. Keeps the mapping out of the JSX. */
+export const CODE_PURPOSE_FOR: Record<AccountField, CodePurpose> = {
+  email: "change-email",
+  password: "change-password",
+  phone: "change-phone",
+};
 
 /* -------------------------------------------------------------------------- */
 /* The twelfth Options row                                                     */

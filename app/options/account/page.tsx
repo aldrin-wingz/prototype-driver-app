@@ -9,7 +9,7 @@ import { AuthButton, AuthField, AuthInput, AuthPhoneInput } from "@/components/d
 import { MaskedPasswordInput } from "@/components/driver/auth/masked-password-input";
 import { VerificationCodeScreen } from "@/components/driver/auth/verification-code-screen";
 import {
-  ACCOUNT_ON_FILE, changeRuleFor, isEmailShaped, isPasswordShaped,
+  ACCOUNT_ON_FILE, changeRuleFor, CODE_PURPOSE_FOR, isEmailShaped, isPasswordShaped,
   isPhoneShaped, maskEmail, maskPhone, MIN_PASSWORD_CHARS, OTP_CHANNELS,
   OTP_LENGTH, PHONE_PLACEHOLDER, type AccountField,
 } from "@/lib/driver-data/account-self-service";
@@ -92,6 +92,7 @@ export default function AccountPage() {
 
     return (
       <VerificationCodeScreen
+        purpose={CODE_PURPOSE_FOR[field]}
         target={target}
         actionLabel="Verify and save"
         secondaryLabel="Back"
@@ -207,7 +208,7 @@ function EmailForm({
   onValue: (v: string) => void; onAgain: (v: string) => void;
   onContinue: () => void;
 }) {
-  const rule = changeRuleFor("email", "settings");
+  const rule = changeRuleFor("email");
   const matches = value.trim() === again.trim();
   return (
     <>
@@ -249,7 +250,7 @@ function PhoneForm({
 }: {
   value: string; onValue: (v: string) => void; onContinue: () => void;
 }) {
-  const rule = changeRuleFor("phone", "settings");
+  const rule = changeRuleFor("phone");
   return (
     <>
       <p className="text-[15px] text-gray-600">
@@ -288,7 +289,7 @@ function PasswordForm({
   onValue: (v: string) => void; onAgain: (v: string) => void;
   onContinue: () => void;
 }) {
-  const rule = changeRuleFor("password", "settings");
+  const rule = changeRuleFor("password");
   const matches = value === again;
   return (
     <>
@@ -320,15 +321,21 @@ function PasswordForm({
 }
 
 /**
- * ⭐ Its own page, after Continue — user direction 2026-10-13.
+ * ⭐ Its own page, after Continue — user direction 2026-10-13, and the pick is
+ * a SELECTION followed by Continue rather than a tap that fires.
  *
- * ⛔ Both options are contacts ALREADY ON FILE. Neither is a contact being set:
- * a code to something the driver just typed would prove that thing exists, not
- * that the account is theirs. The email channel is offered beside the phone
- * because a code to the phone on file arrives on the same handset a thief is
- * already holding.
+ * ⛔ The first build sent the code on tap. A code cannot be un-sent: a mis-tap
+ * put the driver on a screen waiting for something delivered to the wrong
+ * place, with the rate limit (CAP-125) between them and a second try. Two taps
+ * to do something irreversible is the cheap fix.
+ *
+ * Both options are contacts ALREADY ON FILE. Neither is a contact being set: a
+ * code to something just typed would prove that thing exists, not that the
+ * account is theirs. The email sits beside the phone because a code to the
+ * phone on file arrives on the same handset a thief is already holding.
  */
 function ChannelPage({ onPick }: { onPick: (channel: AccountField) => void }) {
+  const [chosen, setChosen] = useState<AccountField | null>(null);
   return (
     <>
       <p className="text-[15px] text-gray-600">
@@ -336,24 +343,44 @@ function ChannelPage({ onPick }: { onPick: (channel: AccountField) => void }) {
         on your account. Pick where.
       </p>
       <div className="mt-5 space-y-3">
-        {OTP_CHANNELS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onPick(option)}
-            className="w-full rounded-2xl border border-gray-300 bg-white p-4 text-left"
-          >
-            <p className="text-[16px] font-bold text-gray-900">
-              {option === "phone" ? "Text message" : "Email"}
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              {option === "phone"
-                ? maskPhone(ACCOUNT_ON_FILE.phone)
-                : maskEmail(ACCOUNT_ON_FILE.email)}
-            </p>
-          </button>
-        ))}
+        {OTP_CHANNELS.map((option) => {
+          const selected = chosen === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setChosen(option)}
+              aria-pressed={selected}
+              className={
+                selected
+                  ? "flex w-full items-center gap-3 rounded-2xl border-2 border-[#2FD98A] bg-[#F2FDF8] p-4 text-left"
+                  : "flex w-full items-center gap-3 rounded-2xl border-2 border-gray-200 bg-white p-4 text-left"
+              }
+            >
+              <span
+                className={
+                  selected
+                    ? "mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-[6px] border-[#2FD98A]"
+                    : "mt-0.5 h-5 w-5 flex-shrink-0 rounded-full border-2 border-gray-300"
+                }
+              />
+              <span className="min-w-0">
+                <span className="block text-[16px] font-bold text-gray-900">
+                  {option === "phone" ? "Text message" : "Email"}
+                </span>
+                <span className="mt-1 block text-sm text-gray-500">
+                  {option === "phone"
+                    ? maskPhone(ACCOUNT_ON_FILE.phone)
+                    : maskEmail(ACCOUNT_ON_FILE.email)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
+      <AuthButton disabled={chosen === null} onClick={() => onPick(chosen!)}>
+        Send code
+      </AuthButton>
     </>
   );
 }
