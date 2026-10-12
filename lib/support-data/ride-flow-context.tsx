@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, useRef, useState } from "react";
 import type { TripChange } from "@/lib/driver-data/trip-change-request";
+import type { AddLegRequest } from "@/lib/driver-data/add-leg-request";
 import { getIssueLabel } from "./issue-types";
 import { findPendingForTrip } from "@/lib/support/request-visibility";
 import { swipeClockFor, type SwipeMark } from "@/lib/driver-data/missed-swipe-rules";
@@ -231,6 +232,26 @@ interface RideFlowValue {
   tripChangeRequests: Record<string, TripChange[]>;
   requestTripChange: (tripId: string, changes: TripChange[]) => void;
   tripChangeRequest: (tripId: string) => TripChange[] | undefined;
+
+  // ---- Add Leg to Trip (catalogue row 19) -------------------------------
+  /**
+   * The leg the driver has asked Support to add, per **trip group**.
+   *
+   * ⛔⛔ **Keyed by GROUP, not by ride** — the one difference from row 20's
+   * record, and it is load-bearing. A new leg is a claim about the whole
+   * sequence, so every leg of the group has to show it, including the one the
+   * driver was not looking at when they filed. Keying by ride would show the
+   * request on the leg they happened to open and leave its sibling silent about
+   * a change to its own pick-up time.
+   *
+   * ⛔ One open request per group. A second would reach Support as two tickets
+   * disagreeing about the same running order. ⚠️ Nothing can withdraw or amend
+   * it from inside the app — **row 17**, and this is the sixth build leaning on
+   * it.
+   */
+  addLegRequests: Record<string, AddLegRequest>;
+  requestAddLeg: (groupKey: string, request: AddLegRequest) => void;
+  addLegRequest: (groupKey: string) => AddLegRequest | undefined;
 }
 
 /** A wall clock in the seed's own format, e.g. "2:14 PM". */
@@ -272,6 +293,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [tripChanges, setTripChanges] = useState<Record<string, TripChange[]>>(
     {}
   );
+  const [addLegs, setAddLegs] = useState<Record<string, AddLegRequest>>({});
   // A counter, not a clock or a random source: ids stay predictable across a demo.
   const nextId = useRef(1);
 
@@ -370,6 +392,11 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       // distinct from an empty array, which the diff gate makes impossible but
       // which a caller reading `.length` could not tell apart from "no request".
       tripChangeRequest: (tripId) => tripChanges[tripId],
+
+      addLegRequests: addLegs,
+      requestAddLeg: (key, request) =>
+        setAddLegs((previous) => ({ ...previous, [key]: request })),
+      addLegRequest: (key) => addLegs[key],
     }),
     [
       records,
@@ -380,6 +407,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       sentBack,
       cancelRequested,
       tripChanges,
+      addLegs,
     ]
   );
 

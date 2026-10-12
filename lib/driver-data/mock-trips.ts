@@ -1668,6 +1668,70 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
+  // ===== 19a (leg B) — Add Leg to Trip, the group's live half =====
+  //
+  // Catalogue row **19**. The other half of this group, `1049800402`, is
+  // COMPLETED and lives in `mockCompletedTrips` — which is the whole point:
+  // `groupMembers(trip, ALL_POOLS)` finds it, and row 16's `legsInGroup` on
+  // `LIVE_POOLS` deliberately does not.
+  //
+  // ⭐ 3:00 PM is chosen, not arbitrary. The estimate off this group's own legs
+  // is 50 minutes, so a new leg at 1:00 PM ends at 1:50 and leaves this one
+  // alone — SLACK — while one at 2:30 PM ends at 3:20 and pushes it to 3:35.
+  // One group, both cascade outcomes, decided by what the driver types.
+  {
+    id: "1049800403",
+    date: "Thu, Jul 31, 2026",
+    rider: "MARGUERITE PELLERIN",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "7.1 mi",
+    totalRevenue: 36.90,
+    notes: "Return leg — same member as the 9:40 AM pick-up",
+    tripGroup: "rt-1049800402",
+    contacts: {
+      riderPhone: "(404) 555-0119",
+      pickupPhone: "(404) 555-0127",
+    },
+    legs: [
+      {
+        id: "1049800403",
+        legCode: "B",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "3:00 PM",
+        address: "1405 Clifton Rd NE, Atlanta, GA 30322",
+        county: "DeKalb County",
+        revenue: 36.90,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800403-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "3:50 PM",
+        address: "870 Ponce de Leon Ave NE, Atlanta, GA 30306",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "19b",
+      label: "Add a leg from the LIVE half of the group",
+      solutions: ["add-leg-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
 ];
 
 // ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
@@ -2419,6 +2483,118 @@ export const mockInProgressTrips: Trip[] = [
 ];
 
 export const mockCompletedTrips: Trip[] = [
+  // ===== 19a (leg A) — Add Leg to Trip, the FINISHED half =====
+  //
+  // Catalogue row **19**, and the ride the whole slice turns on. It is done, so
+  // nothing may be inserted ahead of it — and it is also the only state in this
+  // app that offers a support action at all, because user direction 1.1 asked
+  // for one: *"for a completed leg we still need to give the option
+  // somewhere."* A driver who has just swiped drop-off is exactly who hears
+  // "actually, I also need the pharmacy".
+  //
+  // ⛔⛔ Seeded in the COMPLETED pool with a `tripGroup`, which `legsInGroup`
+  // (row 16, `LIVE_POOLS`) cannot see and `groupLegs` (row 19, `ALL_POOLS`)
+  // must. Two cases, two pools, one matcher — see `trip-groups.ts`.
+  {
+    id: "1049800402",
+    date: "Thu, Jul 31, 2026",
+    rider: "MARGUERITE PELLERIN",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "7.1 mi",
+    totalRevenue: 36.90,
+    notes: "Member mentioned a pharmacy stop on the way home",
+    tripGroup: "rt-1049800402",
+    contacts: {
+      riderPhone: "(404) 555-0119",
+      pickupPhone: "(404) 555-0127",
+    },
+    legs: [
+      {
+        id: "1049800402",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:40 AM",
+        address: "870 Ponce de Leon Ave NE, Atlanta, GA 30306",
+        county: "Fulton County",
+        revenue: 36.90,
+        progress: {
+          startedAt: "9:26 AM",
+          pickedUpAt: "9:42 AM",
+          droppedOffAt: "10:28 AM",
+        },
+      },
+      {
+        id: "1049800402-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:25 AM",
+        address: "1405 Clifton Rd NE, Atlanta, GA 30322",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    scenario: {
+      code: "19a",
+      label: "Add a leg from a FINISHED leg — the entry point",
+      solutions: ["add-leg-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 19b — one finished leg, no group =====
+  //
+  // ⭐ The commonest real case, and a different code path: with no sibling and
+  // only one anchor there is no span to average, so `estimateFromGroup` returns
+  // `null` and the form falls back to `NEW_LEG_DEFAULT_MINUTES` — saying so in
+  // different words, because "estimated from this trip's other legs" would be a
+  // lie about a trip that has none. The new leg becomes **B**.
+  {
+    id: "1049800404",
+    date: "Thu, Jul 31, 2026",
+    rider: "AUGUSTINE DELACROIX",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 28.60,
+    notes: "",
+    contacts: {
+      riderPhone: "(239) 555-0171",
+    },
+    legs: [
+      {
+        id: "1049800404",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "11:10 AM",
+        address: "2745 Cleveland Ave, Fort Myers, FL 33901",
+        county: "Lee County",
+        revenue: 28.60,
+        progress: {
+          startedAt: "10:58 AM",
+          pickedUpAt: "11:12 AM",
+          droppedOffAt: "11:46 AM",
+        },
+      },
+    ],
+    status: "completed",
+    pills: [],
+    scenario: {
+      code: "19c",
+      label: "One finished leg, no group — the fallback estimate",
+      solutions: ["add-leg-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
   // === RECENT (July 2026) — the member history the Trip Request case reads ===
   //
   // A Trip Request is for rides a member told the driver about that aren't in the

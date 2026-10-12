@@ -21,6 +21,7 @@ import {
   Hourglass,
   CalendarX,
   PencilLine,
+  CalendarPlus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -65,6 +66,16 @@ import {
   TRIP_CHANGE_REQUESTED_TITLE,
 } from "@/lib/driver-data/trip-change-request";
 import { TripChangeForm } from "@/components/support/trip-change-form";
+import {
+  addLegRefusal,
+  canRequestAddLeg,
+  groupKey,
+  showsAddLegEntry,
+  ADD_LEG_LABEL,
+  ADD_LEG_REQUESTED_DETAIL,
+  ADD_LEG_REQUESTED_TITLE,
+} from "@/lib/driver-data/add-leg-request";
+import { AddLegForm } from "@/components/support/add-leg-form";
 import { RideSignatureScreen } from "./ride-signature-screen";
 import {
   MissedSwipePrompt,
@@ -350,6 +361,7 @@ export function RideDetailLayout({
     confirmTrip,
     isCancellationRequested,
     tripChangeRequest,
+    addLegRequest,
     preferredDriverOptOuts,
     optOutOfPreferredDriverAsk,
   } = useRideFlow();
@@ -415,6 +427,29 @@ export function RideDetailLayout({
       : []
   );
 
+  /**
+   * Catalogue row 19 — the leg this TRIP GROUP is waiting on, if any.
+   *
+   * ⛔ Looked up by GROUP, so the sibling leg the driver was not looking at when
+   * they filed also says that its own pick-up time is part of a request.
+   */
+  const legRequest = addLegRequest(groupKey(trip));
+  /**
+   * ⭐ **The one surface in this app that a `completed` ride offers.**
+   *
+   * User direction 1.1: a completed leg still needs a way in, because the
+   * driver who has just swiped drop-off is exactly who hears *"actually, I also
+   * need the pharmacy."* ⛔ Deliberately NOT the More grid — a completed ride
+   * cannot reach `/more` at all, and the grid would offer Member No-Show and
+   * Send Back Trip on a ride that is finished.
+   *
+   * ⛔⛔ And it obeys *a proposal belongs to its own build*, like the tile and
+   * the pencil.
+   */
+  const addLegShown =
+    showsAddLegEntry(active?.id ?? null) &&
+    canRequestAddLeg(state, Boolean(legRequest));
+
   // ⚠️ Reads the EFFECTIVE `state` above, not `seededState`. A driver who just
   // confirmed a Needs Action ride is on an In Progress one, and both admit a
   // change request — but a rule reading the seed would be answering about the
@@ -433,6 +468,7 @@ export function RideDetailLayout({
   const [preferredOpen, setPreferredOpen] = useState(false);
   const [preferredFormOpen, setPreferredFormOpen] = useState(false);
   const [tripChangeOpen, setTripChangeOpen] = useState(false);
+  const [addLegOpen, setAddLegOpen] = useState(false);
   const [dropOffReading, setDropOffReading] = useState<number | null>(null);
   const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
     null
@@ -718,6 +754,52 @@ export function RideDetailLayout({
           </div>
         )}
 
+        {/* ⛔ Prints the POSITION and the knock-on, not just the headline. The
+            new leg is deliberately NOT drawn into the timeline below — a leg
+            that does not exist, rendered as if it does, is the one thing this
+            form must not do — so this block is the only place the request is
+            visible at all. ⚠️ It appears on EVERY leg of the group, including
+            one whose own pick-up time is in the shift list. */}
+        {legRequest && (
+          <div className="mx-4 mt-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4">
+            <div className="flex items-start gap-3">
+              <CalendarPlus className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D97706]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#92400E]">
+                  {ADD_LEG_REQUESTED_TITLE}
+                </p>
+                <p className="mt-0.5 text-sm text-[#92400E]">
+                  {ADD_LEG_REQUESTED_DETAIL}
+                </p>
+                <p className="mt-2 text-sm text-[#92400E]">
+                  <span className="font-medium">
+                    Leg {legRequest.letter} — {legRequest.pickupLabel} →{" "}
+                    {legRequest.dropoffLabel}
+                  </span>
+                  <span className="block text-xs">
+                    {legRequest.pickupAddress} → {legRequest.dropoffAddress}
+                  </span>
+                </p>
+                {legRequest.shifts.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {legRequest.shifts.map((shift) => (
+                      <li key={shift.tripId} className="text-sm text-[#92400E]">
+                        <span className="font-medium">
+                          Leg {shift.letter} pick-up:
+                        </span>{" "}
+                        <span className="line-through opacity-70">
+                          {shift.fromLabel}
+                        </span>{" "}
+                        → <span className="font-semibold">{shift.toLabel}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ⛔ Prints the CHANGES, not just the headline. The timeline underneath
             is unchanged and will stay unchanged until the client acts, so a
             banner saying only "Change requested" would leave the driver with no
@@ -820,6 +902,26 @@ export function RideDetailLayout({
               />
             ))}
           </div>
+
+          {/* ⭐ Catalogue row 19's third entry point, and the only action a
+              COMPLETED ride offers. In the BODY, under the timeline, never in a
+              footer — the completed state deliberately renders no footer at all
+              and the capture has none, so putting it there would rewrite
+              captured chrome to hold a proposal.
+
+              ⚠️ Only on `completed`. The other two states reach the same form
+              through the More Options tile, and two doors to one form on one
+              screen is two things to keep in step. */}
+          {state === "completed" && addLegShown && (
+            <button
+              type="button"
+              onClick={() => setAddLegOpen(true)}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#303068] py-3.5 text-base font-bold text-[#303068]"
+            >
+              <CalendarPlus className="h-5 w-5" />
+              {ADD_LEG_LABEL}
+            </button>
+          )}
 
           {trip.notes && (
             <p className="mt-2 text-sm text-gray-600">
@@ -1103,6 +1205,13 @@ export function RideDetailLayout({
         trip={trip}
         open={preferredFormOpen}
         onOpenChange={setPreferredFormOpen}
+      />
+
+      <AddLegForm
+        trip={trip}
+        leg={activeLeg}
+        open={addLegOpen}
+        onOpenChange={setAddLegOpen}
       />
 
       {/* ⛔ No `onSubmitted` navigation — the driver is already on the ride, and

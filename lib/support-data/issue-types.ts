@@ -1,5 +1,6 @@
 import { hasInProgressLegs } from "./leg-options";
 import { TRIP_CHANGE_LABEL } from "@/lib/driver-data/trip-change-request";
+import { ADD_LEG_LABEL } from "@/lib/driver-data/add-leg-request";
 import type {
   SupportBuildState,
   SupportFieldOption,
@@ -51,6 +52,7 @@ export const ISSUE_AUTO_ASSIGN_REQUEST = "auto-assign-request";
 export const ISSUE_SEND_BACK_REASON = "send-back-reason";
 export const ISSUE_RIDER_DECLINED = "rider-declined";
 export const ISSUE_TRIP_CHANGE_REQUEST = "trip-change-request";
+export const ISSUE_ADD_LEG_REQUEST = "add-leg-request";
 
 /**
  * The support issues a driver can file.
@@ -175,6 +177,18 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Entered from the Update Trip Details tile in More Options, or the pencil on a ride's own anchor rows. ⛔ Submitting changes NOTHING on the ride — the client owns the manifest. The ride keeps its old times and addresses and gains a 'Change requested' banner saying what was asked for.",
+  },
+  {
+    value: ISSUE_ADD_LEG_REQUEST,
+    label: ADD_LEG_LABEL,
+    // ⚠️ Says what the driver is asking for AND where it sits, because the
+    // position is the half of this form nobody expects to have to give.
+    description:
+      "For a member who needs another ride on this same trip. Tell us where the new leg goes in the order and when it starts — we will work out the rest of the timings for you to check.",
+    // Hidden: all three entry points name the issue when they open the form.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from the Add Leg to Trip tile in More Options, or — for a leg that is already finished — the one dedicated button on the completed ride. ⛔ Submitting adds NOTHING to the manifest; the client owns it. The group gains a 'Leg requested' banner naming the position asked for and which existing legs would shift.",
   },
 ];
 

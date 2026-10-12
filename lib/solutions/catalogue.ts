@@ -536,8 +536,24 @@ export const SOLUTIONS: Solution[] = [
     proposedFeature:
       "In-app request form to add a leg, tagged critical when it is same-day or the driver has already started",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides/1049800402",
+      label:
+        "A FINISHED leg, and the one dedicated action a completed ride offers — the moment the member says they also need the pharmacy. The form places the new leg by drag or by tapping a gap; leg A is done so nothing can go before it. A 1:00 PM pick-up leaves leg B alone, a 2:30 PM one pushes it from 3:00 to 3:35 — the driver types only the pick-up time and the rest is worked out from this trip's own legs.",
+      alternates: [
+        {
+          route: "/my-rides/1049800403/more",
+          label:
+            "The same group from its live half, through the Add Leg to Trip tile in More Options. Same form, same locked leg A — the entry point changes, the case does not.",
+        },
+        {
+          route: "/my-rides/1049800404",
+          label:
+            "One finished leg and no round trip at all — the commonest real case. With no sibling there is no span to average, so the estimate falls back to a declared default and says so in different words. The new leg becomes B.",
+        },
+      ],
+    },
   },
   {
     id: "change-pickup-dropoff",

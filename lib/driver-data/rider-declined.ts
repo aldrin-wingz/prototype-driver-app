@@ -1,9 +1,5 @@
-import {
-  mockInProgressTrips,
-  mockNeedsActionTrips,
-  mockUpcomingTrips,
-  type Trip,
-} from "./mock-trips";
+import { type Trip } from "./mock-trips";
+import { groupMembers, LIVE_POOLS } from "./trip-groups";
 import type { SupportFieldOption } from "@/types/support";
 
 /**
@@ -235,14 +231,14 @@ const LEG_SEPARATOR = ",";
  * answer for a one-way ride.
  */
 export function legsInGroup(trip: Trip): Trip[] {
-  if (!trip.tripGroup) return [trip];
-  const pool = [
-    ...mockNeedsActionTrips,
-    ...mockUpcomingTrips,
-    ...mockInProgressTrips,
-  ];
-  const group = pool.filter((other) => other.tripGroup === trip.tripGroup);
-  return group.length > 0 ? group : [trip];
+  /**
+   * ⛔⛔ **`LIVE_POOLS`, and the exclusion is load-bearing.** It leaves out
+   * completed trips, because a member cannot decline a leg they have already
+   * ridden. Row 19 calls the same matcher with `ALL_POOLS` for the opposite
+   * reason. The pools are declared separately in `trip-groups.ts` precisely so
+   * neither case can be widened into the other's by accident.
+   */
+  return groupMembers(trip, LIVE_POOLS);
 }
 
 /**

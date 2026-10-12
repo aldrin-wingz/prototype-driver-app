@@ -165,7 +165,61 @@ import {
   isFieldVisible,
 } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
-import { ISSUE_TRIP_CHANGE_REQUEST } from "../lib/support-data/issue-types";
+import {
+  ISSUE_ADD_LEG_REQUEST,
+  ISSUE_TRIP_CHANGE_REQUEST,
+} from "../lib/support-data/issue-types";
+import {
+  groupMembers,
+  ALL_POOLS,
+  LIVE_POOLS,
+} from "../lib/driver-data/trip-groups";
+import { legsInGroup } from "../lib/driver-data/rider-declined";
+import {
+  addLegRefusal,
+  addLegTiming,
+  allowedSlots,
+  canRequestAddLeg,
+  cascadeShifts,
+  earliestSlot,
+  estimateFromGroup,
+  groupKey,
+  groupLegs,
+  isTripToday,
+  minutesToClock,
+  newLegMinutes,
+  shiftFieldId,
+  showsAddLegEntry,
+  timeInputToMinutes,
+  ADD_DROPOFF_ADDRESS_FIELD,
+  ADD_DROPOFF_TIME_FIELD,
+  ADD_LEG_LABEL,
+  ADD_LEG_REFUSAL,
+  ADD_LEG_REQUESTED_DETAIL,
+  ADD_LEG_REQUESTED_TITLE,
+  ADD_LEG_SUBMIT_TOAST,
+  ADD_LEG_TRACKED_BY_APP,
+  ADD_NOTES_FIELD,
+  ADD_PICKUP_ADDRESS_FIELD,
+  ADD_PICKUP_TIME_FIELD,
+  ADD_SOURCE_FIELD,
+  ADD_SOURCE_OPTIONS,
+  ADD_TIMING_FIELD,
+  ESTIMATE_HELP,
+  LEG_TURNAROUND_MINUTES,
+  NEW_LEG_DEFAULT_MINUTES,
+  OVERNIGHT_WARNING,
+  SLOT_BLOCKED_REASON,
+  SLOT_FIELD,
+  TIMING_LABEL,
+} from "../lib/driver-data/add-leg-request";
+import {
+  addLegDerive,
+  addLegPlan,
+  buildAddLeg,
+  buildAddLegCase,
+  ADD_LEG_KEY_FIELDS,
+} from "../components/support/add-leg-form";
 import { solutionHref } from "../lib/solutions/solution-context";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
@@ -436,7 +490,7 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * below went back to 6 rather than being left at 7 with a row quietly failing
  * to supply its alternate.
  */
-const EXPECTED_ALTERNATES = 8;
+const EXPECTED_ALTERNATES = 10;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -578,7 +632,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 17;
+const EXPECTED_SCENARIO_RIDES = 20;
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -702,7 +756,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 16;
+const EXPECTED_RIDE_ROUTES = 19;
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
 const EXPECTED_SURFACE_ROUTES = 3;
 check(
@@ -799,7 +853,42 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   // ⭐ ONE here, the `20a` ride where nothing has started and both ends are
   // still editable. See the note beside its In Progress entry above.
   "change-pickup-dropoff": 1,
+  /**
+   * ⛔⛔ ONE of row 19's THREE scenario rides, and the other two are in a pool
+   * no My Rides tab counts — see `EXPECTED_COMPLETED_SCENARIOS` below. Row 19 is
+   * the first built row whose demo lives mostly outside the tabbed pools, so a
+   * number here that looked right would be hiding two thirds of it.
+   */
+  "add-leg-request": 1,
 };
+
+/**
+ * Scenario rides in the COMPLETED pool, which `tabCountsFor` cannot see.
+ *
+ * ⛔⛔ **A denominator the tab maps structurally cannot supply.** My Rides has
+ * four tabs and none of them is "completed", so every count above is taken over
+ * live pools only. Until row 19 that was harmless — no scenario ride was
+ * finished. Row 19's entry point IS a finished ride, so without this a row could
+ * declare "1 ride" while demonstrating three.
+ */
+const EXPECTED_COMPLETED_SCENARIOS: Record<string, number> = {
+  // `19a` the finished leg of the group, and `19c` the solo finished leg.
+  "add-leg-request": 2,
+};
+for (const [id, expected] of Object.entries(EXPECTED_COMPLETED_SCENARIOS)) {
+  const shown = ridesForSolution(mockCompletedTrips, id);
+  check(
+    `focusing ${id} has ${expected} completed scenario ride(s)`,
+    `${shown.length} of ${mockCompletedTrips.length} — ${shown.map((t) => t.scenario?.code).join(", ")}`,
+    shown.length === expected,
+  );
+}
+check(
+  "no OTHER built row hides rides in the completed pool",
+  `${scenarioRides(mockCompletedTrips).length} completed scenario ride(s), ${Object.values(EXPECTED_COMPLETED_SCENARIOS).reduce((a, b) => a + b, 0)} declared`,
+  scenarioRides(mockCompletedTrips).length ===
+    Object.values(EXPECTED_COMPLETED_SCENARIOS).reduce((a, b) => a + b, 0),
+);
 for (const [id, expected] of Object.entries(EXPECTED_IN_PROGRESS)) {
   const shown = ridesForSolution(inProgress, id);
   check(
@@ -1311,7 +1400,20 @@ const EXPECTED_GRIDS: Array<{
     focus: null,
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
-      "auto-assign", "trip-change", "no-show", "cannot-reach", "send-back",
+      "auto-assign", "add-leg", "trip-change", "no-show", "cannot-reach",
+      "send-back",
+    ],
+    // ⚠️ ELEVEN now — odd again, so `send-back` is centred full-width exactly as
+    // `s-03a` has it. The parity has flipped twice as proposals landed, which is
+    // the packing rule working rather than a regression.
+    fullWidth: "send-back",
+  },
+  {
+    // Row 19 focused — its own tile and ⛔ no other proposal. Eight tiles.
+    focus: "add-leg-request",
+    tiles: [
+      "map-pickup", "map-dropoff", "call", "email-support", "calendar",
+      "add-leg", "no-show", "send-back",
     ],
     fullWidth: null,
   },
@@ -1628,6 +1730,14 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
    * is a bigger claim than this row has earned.
    */
   "change-pickup-dropoff": "in-progress",
+  /**
+   * ⚠️ Needs Action — its only TABBED ride is the group's live half. The entry
+   * point and the second alternate are both completed rides, which no tab shows
+   * at all, so a reviewer who focuses row 19 and then opens My Rides sees one
+   * of its three demos. The selector routes to `entry.route` directly, so the
+   * entry is still what opens.
+   */
+  "add-leg-request": "needs-action",
 };
 /**
  * ⚠️ Row 15 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
@@ -4618,6 +4728,630 @@ check(
   "row 20 does NOT claim to track what happens next",
   `TRIP_CHANGE_TRACKED_BY_APP=${TRIP_CHANGE_TRACKED_BY_APP}`,
   TRIP_CHANGE_TRACKED_BY_APP === false,
+);
+
+
+// ===========================================================================
+console.log("\n16. Add Leg to Trip — catalogue row 19");
+
+const ADD_ENTRY = "1049800402";   // 19a — the FINISHED leg of the group
+const ADD_LIVE = "1049800403";    // 19b — its live half
+const ADD_SOLO = "1049800404";    // 19c — one finished leg, no group
+const leg19a = ALL_SEEDED.find((t) => t.id === ADD_ENTRY)!;
+const leg19b = ALL_SEEDED.find((t) => t.id === ADD_LIVE)!;
+const leg19c = ALL_SEEDED.find((t) => t.id === ADD_SOLO)!;
+check(
+  "all three scenario rides are seeded",
+  `${[leg19a, leg19b, leg19c].filter(Boolean).length} of 3 — ${[leg19a, leg19b, leg19c].map((t) => t?.scenario?.code).join(", ")}`,
+  Boolean(leg19a) && Boolean(leg19b) && Boolean(leg19c),
+);
+
+// ---- 16a · ⛔⛔ Two pools, one matcher ------------------------------------
+/**
+ * The finding this whole slice turns on. Row 16 must NOT see a completed leg
+ * (you cannot report that a member declined a ride they already took); row 19
+ * must, because a finished leg is its commonest entry point. One function
+ * serving both would be wrong for one of them.
+ */
+check(
+  "the two declared pools genuinely differ",
+  `live ${LIVE_POOLS.length}, all ${ALL_POOLS.length}`,
+  ALL_POOLS.length > LIVE_POOLS.length,
+);
+check(
+  "⛔ row 16 CANNOT see the finished half of the group",
+  `legsInGroup(19b) → ${legsInGroup(leg19b).map((t) => t.id).join(", ")}`,
+  legsInGroup(leg19b).length === 1 && legsInGroup(leg19b)[0].id === ADD_LIVE,
+);
+check(
+  "⭐ ...and row 19 CAN",
+  `groupLegs(19b) → ${groupLegs(leg19b).map((l) => `${l.letter}:${l.trip.id}`).join(", ")}`,
+  groupLegs(leg19b).length === 2 &&
+    groupLegs(leg19b).some((l) => l.trip.id === ADD_ENTRY),
+);
+check(
+  "both ends of the group see the SAME order",
+  `from 19a: ${groupLegs(leg19a).map((l) => l.letter).join("")} · from 19b: ${groupLegs(leg19b).map((l) => l.letter).join("")}`,
+  groupLegs(leg19a).map((l) => l.trip.id).join() ===
+    groupLegs(leg19b).map((l) => l.trip.id).join(),
+);
+
+// ---- 16b · The forbidden slot --------------------------------------------
+const legs19 = groupLegs(leg19a);
+check(
+  "the finished leg is read as finished and the live one as pending",
+  legs19.map((l) => `${l.letter}:${l.activity}`).join(", "),
+  legs19[0].activity === "completed" && legs19[1].activity === "pending",
+);
+/**
+ * ⛔ User direction: *"if one of the legs are already active/completed you can't
+ * put it before it."* Slot 0 sits ahead of a finished leg, so it is closed.
+ */
+check(
+  "nothing may go before the finished leg",
+  `earliest slot ${earliestSlot(legs19)}, allowed ${allowedSlots(legs19).join(", ")} of 0..${legs19.length}`,
+  earliestSlot(legs19) === 1 &&
+    allowedSlots(legs19).join(",") === "1,2" &&
+    !allowedSlots(legs19).includes(0),
+);
+/**
+ * ⛔⛔ The floor is one past the LAST started leg, not the first. A group whose
+ * second leg is under way must not accept an insertion between the two.
+ */
+const syntheticLegs = [
+  { ...legs19[0], index: 0, activity: "pending" as const },
+  { ...legs19[1], index: 1, activity: "active" as const },
+];
+check(
+  "...and the floor follows the LAST started leg, not the first",
+  `earliest ${earliestSlot(syntheticLegs)} with pending→active`,
+  earliestSlot(syntheticLegs) === 2,
+);
+check(
+  "a group with nothing started opens every slot",
+  `allowed ${allowedSlots(legs19.map((l) => ({ ...l, activity: "pending" as const }))).join(", ")}`,
+  allowedSlots(legs19.map((l) => ({ ...l, activity: "pending" as const })))
+    .join(",") === "0,1,2",
+);
+
+// ---- 16c · ⭐ The estimate, and where it comes from -----------------------
+/**
+ * ⛔ NOT from location. There are no coordinates in the seed and no routing
+ * engine, so a figure sold as distance-based would be invented. What the group
+ * knows is how long its own legs are scheduled to take.
+ */
+check(
+  "the estimate is the mean of the group's own legs, to 5 minutes",
+  `${newLegMinutes(legs19).minutes} min from ${newLegMinutes(legs19).source} (legs: 45, 50)`,
+  newLegMinutes(legs19).minutes === 50 &&
+    newLegMinutes(legs19).source === "group",
+);
+/** ⭐ The commonest real case, and a different branch. */
+const legsSolo = groupLegs(leg19c);
+check(
+  "a lone finished leg has no sample, so the declared default is used",
+  `${newLegMinutes(legsSolo).minutes} min from ${newLegMinutes(legsSolo).source}, ${legsSolo.length} leg(s)`,
+  legsSolo.length === 1 &&
+    estimateFromGroup(legsSolo) === null &&
+    newLegMinutes(legsSolo).minutes === NEW_LEG_DEFAULT_MINUTES &&
+    newLegMinutes(legsSolo).source === "default",
+);
+check(
+  "the two sources give genuinely different numbers and different help",
+  `${newLegMinutes(legs19).minutes} vs ${newLegMinutes(legsSolo).minutes}`,
+  newLegMinutes(legs19).minutes !== newLegMinutes(legsSolo).minutes &&
+    // ⚠️ Widened to `string` on purpose. Both sides are `as const` literals, so
+    // tsc proves the comparison can never be false and REJECTS it — while at
+    // runtime it is the check that would catch someone making the two help
+    // strings identical. The cast keeps the check and satisfies the compiler.
+    (ESTIMATE_HELP.group as string) !== (ESTIMATE_HELP.default as string),
+);
+check(
+  "⛔ neither help string claims the estimate came from a location",
+  `${[ESTIMATE_HELP.group, ESTIMATE_HELP.default].filter((t) => /distance|location|route|miles/i.test(t)).length} of 2`,
+  ![ESTIMATE_HELP.group, ESTIMATE_HELP.default].some((t) =>
+    /distance|location|route|miles/i.test(t),
+  ),
+);
+
+// ---- 16d · ⭐⭐ The cascade ------------------------------------------------
+/**
+ * The behaviour worth having: a leg with SLACK does not move. A driver
+ * inserting a one o'clock leg must not be told the three o'clock return has
+ * changed.
+ *
+ * ⚠️ The two cases below are a pair. One alone proves nothing — a cascade that
+ * never fires and one that always fires both pass a single-case check.
+ */
+const estimate19 = newLegMinutes(legs19).minutes;
+const early = timeInputToMinutes("13:00")!;
+const slackCase = cascadeShifts(legs19, 1, early, early + estimate19);
+check(
+  "⭐ a leg with slack is NOT shifted",
+  `new leg 1:00 PM → ${minutesToClock(early + estimate19)}, leg B stays at ${legs19[1].pickupLabel} — ${slackCase.shifts.length} shift(s)`,
+  slackCase.shifts.length === 0,
+);
+const late = timeInputToMinutes("14:30")!;
+const pushCase = cascadeShifts(legs19, 1, late, late + estimate19);
+check(
+  "...and a leg that no longer fits IS",
+  `new leg 2:30 PM → ${minutesToClock(late + estimate19)}, then ${pushCase.shifts.map((s) => `${s.letter} ${s.fromLabel}→${s.toLabel}`).join(", ")}`,
+  pushCase.shifts.length === 1 &&
+    pushCase.shifts[0].tripId === ADD_LIVE &&
+    pushCase.shifts[0].toLabel === "3:35 PM",
+);
+check(
+  "...and the shift is exactly the turnaround past the new drop-off",
+  `${minutesToClock(late + estimate19)} + ${LEG_TURNAROUND_MINUTES} min = ${pushCase.shifts[0]?.toLabel}`,
+  pushCase.shifts[0]?.toMinutes === late + estimate19 + LEG_TURNAROUND_MINUTES,
+);
+check(
+  "neither case runs past midnight",
+  `${slackCase.overnight} / ${pushCase.overnight}`,
+  !slackCase.overnight && !pushCase.overnight,
+);
+/** ⚠️ Single-day only, inherited — reported rather than printed as a wrong time. */
+const lateNight = timeInputToMinutes("23:30")!;
+check(
+  "⛔ a cascade that would cross midnight is REPORTED, not printed",
+  `11:30 PM + ${estimate19} min → overnight=${cascadeShifts(legs19, 2, lateNight, lateNight + estimate19).overnight}`,
+  cascadeShifts(legs19, 2, lateNight, lateNight + estimate19).overnight === true,
+);
+
+// ---- 16e · The case the three entry points build -------------------------
+const built19 = buildAddLeg(leg19a, leg19a.legs[0]);
+const ids19 = built19.supportCase.fields
+  .filter((f) => f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST))
+  .map((f) => f.id);
+const EXPECTED_ADD_FIELDS = [
+  SLOT_FIELD,
+  ADD_PICKUP_TIME_FIELD,
+  ADD_PICKUP_ADDRESS_FIELD,
+  ADD_DROPOFF_ADDRESS_FIELD,
+  ADD_DROPOFF_TIME_FIELD,
+  ADD_TIMING_FIELD,
+  ADD_SOURCE_FIELD,
+  ADD_NOTES_FIELD,
+];
+check(
+  "the case at rest builds the declared eight fields, in order",
+  `${ids19.length}: ${ids19.join(", ")}`,
+  ids19.length === EXPECTED_ADD_FIELDS.length &&
+    EXPECTED_ADD_FIELDS.every((id, i) => ids19[i] === id),
+);
+/**
+ * ⭐⭐ The field set FOLLOWS the answers — the only case in the registry that
+ * does. A pick-up time that pushes leg B adds an editable time for leg B; one
+ * that does not, does not.
+ */
+const pushedCase = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+});
+const slackCaseFields = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "13:00",
+});
+const shiftFieldsIn = (c: typeof pushedCase) =>
+  c.fields.filter((f) => f.id.startsWith("addLegShift_")).map((f) => f.id);
+check(
+  "⭐⭐ a pick-up that pushes leg B ADDS an editable time for it",
+  `2:30 PM → ${shiftFieldsIn(pushedCase).join(", ") || "none"}`,
+  shiftFieldsIn(pushedCase).join(",") === shiftFieldId(ADD_LIVE),
+);
+check(
+  "...and one that does not, does not",
+  `1:00 PM → ${shiftFieldsIn(slackCaseFields).join(", ") || "none"}`,
+  shiftFieldsIn(slackCaseFields).length === 0,
+);
+check(
+  "...so the two field sets are genuinely different lengths",
+  `${pushedCase.fields.length} vs ${slackCaseFields.fields.length}`,
+  pushedCase.fields.length !== slackCaseFields.fields.length,
+);
+/** The time sequence follows the fields, so a backwards edit still warns. */
+check(
+  "the derived time sequence names the new leg's ends then every shifted leg",
+  `${pushedCase.timeSequence?.join(", ")}`,
+  (pushedCase.timeSequence ?? []).join(",") ===
+    [ADD_PICKUP_TIME_FIELD, ADD_DROPOFF_TIME_FIELD, shiftFieldId(ADD_LIVE)].join(","),
+);
+
+// ---- 16f · The leg-order control's payload -------------------------------
+const slotField = built19.supportCase.fields.find((f) => f.id === SLOT_FIELD)!;
+check(
+  "the slot field carries a typed payload, not options",
+  `type=${slotField.type} legOrder=${Boolean(slotField.legOrder)} options=${slotField.options?.length ?? 0}`,
+  slotField.type === "leg-order" &&
+    Boolean(slotField.legOrder) &&
+    !slotField.options,
+);
+/**
+ * ⛔⛔ The control decides nothing — the blocked rows and their REASONS arrive
+ * from `add-leg-request.ts`. A reorder list working out its own legal moves
+ * would be a correctness rule inside JSX.
+ */
+const rows19 = slotField.legOrder!.rows;
+check(
+  "the finished row is blocked, with a reason, and the live one is not",
+  rows19.map((r) => `${r.letter}:${r.blockedReason ? "locked" : "open"}`).join(", "),
+  Boolean(rows19[0].blockedReason) && !rows19[1].blockedReason,
+);
+check(
+  "...and the reason says WHY, not just that it cannot be done",
+  `${rows19[0].blockedReason}`,
+  rows19[0].blockedReason === SLOT_BLOCKED_REASON.completed,
+);
+check(
+  "the two blocked reasons are distinct, so the activity is doing work",
+  `${Object.values(SLOT_BLOCKED_REASON).join(" / ")}`,
+  new Set(Object.values(SLOT_BLOCKED_REASON)).size === 2,
+);
+/**
+ * ⛔⛔ Walk-found 2026-10-13. The list printed `New leg B` directly above
+ * `Leg B`: the new leg took its post-insertion letter while every existing leg
+ * kept its pre-insertion one. The letter is the question this control exists to
+ * answer, and two adjacent rows claiming the same one answers it twice over.
+ */
+const rowsAtSlot1 = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+}).fields.find((f) => f.id === SLOT_FIELD)!.legOrder!;
+check(
+  "⛔ placing at slot 1 renumbers the leg behind it, so no two rows share a letter",
+  `${rowsAtSlot1.newLegLabel} · rows ${rowsAtSlot1.rows.map((r) => r.letter).join(", ")}`,
+  rowsAtSlot1.newLegLabel === "New leg B" &&
+    rowsAtSlot1.rows.map((r) => r.letter).join(",") === "A,C",
+);
+const rowsAtSlot2 = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "2",
+}).fields.find((f) => f.id === SLOT_FIELD)!.legOrder!;
+check(
+  "...and placing it last leaves every existing letter alone",
+  `${rowsAtSlot2.newLegLabel} · rows ${rowsAtSlot2.rows.map((r) => r.letter).join(", ")}`,
+  rowsAtSlot2.newLegLabel === "New leg C" &&
+    rowsAtSlot2.rows.map((r) => r.letter).join(",") === "A,B",
+);
+check(
+  "⛔ ...and a SHIFTED leg is named by its new letter too — the second site",
+  `${pushCase.shifts.map((s) => `Leg ${s.letter}`).join(", ")}`,
+  pushCase.shifts.length === 1 && pushCase.shifts[0].letter === "C",
+);
+check(
+  "the control is told which value fields to preview from",
+  `${slotField.legOrder!.pickupTimeField} / ${slotField.legOrder!.dropoffTimeField}`,
+  slotField.legOrder!.pickupTimeField === ADD_PICKUP_TIME_FIELD &&
+    slotField.legOrder!.dropoffTimeField === ADD_DROPOFF_TIME_FIELD,
+);
+check(
+  "the opening slot is an ALLOWED one, never 0 by default",
+  `opens at ${built19.initialValues[SLOT_FIELD]}, allowed ${slotField.legOrder!.allowedSlots.join(", ")}`,
+  slotField.legOrder!.allowedSlots.includes(
+    Number(built19.initialValues[SLOT_FIELD]),
+  ) && built19.initialValues[SLOT_FIELD] !== "0",
+);
+
+// ---- 16g · ⛔⛔ The recompute key cannot retrigger itself ------------------
+/**
+ * The sheet writes `derive(values).patch` in an effect keyed on
+ * `derive(values).key`. If the patch could change the key, that effect would
+ * write, re-key and write again — forever. They are disjoint by construction,
+ * and this is where that is pinned.
+ */
+const planValues = {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+};
+const planned = addLegPlan(leg19a, planValues);
+/**
+ * ⛔⛔ Reads the REAL function and the REAL key field list, not a restatement.
+ * The first version of this check declared its own `keyIds` and `patchIds`
+ * arrays and compared those — so a break that added a patched field to the
+ * actual key produced NO failure. A check that compares two copies of a claim
+ * is testing the copies.
+ */
+const realDerive = addLegDerive(leg19a, planValues);
+const patchIds = Object.keys(realDerive.patch);
+check(
+  "the patch writes the fields it is supposed to",
+  `${patchIds.join(", ")}`,
+  patchIds.includes(ADD_DROPOFF_TIME_FIELD) &&
+    planned.shifts.every((shift) => patchIds.includes(shiftFieldId(shift.tripId))),
+);
+check(
+  "⛔⛔ nothing the patch writes appears in the key",
+  `key reads ${ADD_LEG_KEY_FIELDS.join(", ")} · patch writes ${patchIds.join(", ")}`,
+  patchIds.every((id) => !ADD_LEG_KEY_FIELDS.includes(id)),
+);
+/**
+ * ⛔⛔ The direct proof, and the one a field-list comparison cannot give:
+ * applying the patch must leave the key UNCHANGED. If it does not, the sheet's
+ * effect writes, re-keys and writes again — forever.
+ */
+const afterPatch = addLegDerive(leg19a, { ...planValues, ...realDerive.patch });
+check(
+  "⛔⛔ ...so applying the patch leaves the key identical — the effect cannot retrigger",
+  `"${realDerive.key}" → "${afterPatch.key}"`,
+  afterPatch.key === realDerive.key,
+);
+/**
+ * ⛔⛔ **Changing the pick-up must change what the patch proposes.** This is the
+ * walk-found defect: the derive guarded on an empty drop-off, so after the first
+ * write it never proposed again — 2:30 PM → 1:00 PM left the drop-off at 3:20 PM
+ * and the knock-on for Leg C still on screen.
+ *
+ * ⚠️ Asserted of `addLegDerive`, NOT `addLegPlan`. The plan-level check below
+ * passed throughout the defect, because the plan was never the broken part —
+ * the third time in two slices that a check aimed one layer away from the fault.
+ */
+const atLate = addLegDerive(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+  [ADD_DROPOFF_TIME_FIELD]: "15:20",
+});
+const atEarly = addLegDerive(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "13:00",
+  // ⛔ The stale drop-off the app wrote a moment ago — the exact state the
+  // defect left behind.
+  [ADD_DROPOFF_TIME_FIELD]: "15:20",
+});
+check(
+  "⛔⛔ moving the pick-up re-proposes the drop-off, even over an app-written one",
+  `2:30 PM → ${atLate.patch[ADD_DROPOFF_TIME_FIELD]} · 1:00 PM → ${atEarly.patch[ADD_DROPOFF_TIME_FIELD]}`,
+  atLate.patch[ADD_DROPOFF_TIME_FIELD] === "15:20" &&
+    atEarly.patch[ADD_DROPOFF_TIME_FIELD] === "13:50",
+);
+check(
+  "...and the knock-on goes with it — a shift at 2:30 PM, none at 1:00 PM",
+  `${Object.keys(atLate.patch).length} field(s) at 2:30 PM, ${Object.keys(atEarly.patch).length} at 1:00 PM`,
+  Object.keys(atLate.patch).includes(shiftFieldId(ADD_LIVE)) &&
+    !Object.keys(atEarly.patch).includes(shiftFieldId(ADD_LIVE)),
+);
+
+/** ⚠️ A driver's own drop-off survives; without one, the estimate fills it. */
+check(
+  "the proposed drop-off follows the pick-up when the driver has not set one",
+  `${minutesToClock(planned.proposedDropoff!)}`,
+  planned.proposedDropoff === timeInputToMinutes("14:30")! + estimate19,
+);
+const overridden = addLegPlan(leg19a, {
+  ...planValues,
+  [ADD_DROPOFF_TIME_FIELD]: "16:00",
+});
+check(
+  "⛔ ...and a drop-off the driver typed WINS over the estimate",
+  `${minutesToClock(overridden.dropoffMinutes!)} vs proposed ${minutesToClock(overridden.proposedDropoff!)}`,
+  overridden.dropoffMinutes === timeInputToMinutes("16:00") &&
+    overridden.dropoffMinutes !== overridden.proposedDropoff,
+);
+
+// ---- 16h · The "tagged critical" clause ----------------------------------
+/**
+ * ⛔⛔ The catalogue asks for *"tagged critical"*. The prototype states the
+ * CONDITION and never the verdict: "critical" is a promise about what Support
+ * does with the request and nobody has agreed one.
+ */
+check(
+  "⛔ no timing label promises a Support behaviour",
+  `${Object.values(TIMING_LABEL).join(" / ")}`,
+  !Object.values(TIMING_LABEL).some((t) =>
+    /critical|urgent|priorit|escalat|immediat/i.test(t),
+  ),
+);
+const TIMING_CASES: Array<[string, boolean, string]> = [
+  ["a finished leg today", true, "today-under-way"],
+  ["a trip on another day", false, "other-day"],
+];
+for (const [what, isToday, expected] of TIMING_CASES) {
+  check(
+    `timing for ${what}`,
+    `${addLegTiming(legs19, isToday)} (expected ${expected})`,
+    addLegTiming(legs19, isToday) === expected,
+  );
+}
+check(
+  "a same-day trip with nothing started is 'today', not 'under way'",
+  `${addLegTiming(legs19.map((l) => ({ ...l, activity: "pending" as const })), true)}`,
+  addLegTiming(
+    legs19.map((l) => ({ ...l, activity: "pending" as const })),
+    true,
+  ) === "today",
+);
+check(
+  "...so all three timing values are reachable",
+  `${new Set([...TIMING_CASES.map(([, , e]) => e), "today"]).size} of ${Object.keys(TIMING_LABEL).length}`,
+  new Set([...TIMING_CASES.map(([, , e]) => e), "today"]).size ===
+    Object.keys(TIMING_LABEL).length,
+);
+check(
+  "the seeded trips are read against MOCK_TODAY, not the real clock",
+  `19a ${isTripToday(leg19a)} · 19c ${isTripToday(leg19c)}`,
+  isTripToday(leg19a) && isTripToday(leg19c),
+);
+
+// ---- 16i · Entry points and copy -----------------------------------------
+/**
+ * ⭐ The completed state is included — user direction 1.1 — and it is the only
+ * state in this app that offers a support action from a finished ride.
+ * ⛔ Row 20 refuses `completed` for the opposite reason: that one would be
+ * CORRECTING a finished leg, which is row 03's case.
+ */
+check(
+  "⭐ row 19 accepts a COMPLETED ride and row 20 refuses one",
+  `add-leg ${canRequestAddLeg("completed", false)} · trip-change ${tripChangeRefusal(change20a, "completed", false) === null}`,
+  canRequestAddLeg("completed", false) === true &&
+    tripChangeRefusal(change20a, "completed", false) !== null,
+);
+check(
+  "⛔ an offer the driver has not accepted is refused",
+  `${addLegRefusal("before-taken", false)?.slice(0, 40)}…`,
+  addLegRefusal("before-taken", false) === ADD_LEG_REFUSAL.state,
+);
+check(
+  "a group that already has a request is refused, with its own reason",
+  `${addLegRefusal("completed", true)?.slice(0, 40)}…`,
+  addLegRefusal("completed", true) === ADD_LEG_REFUSAL.pending,
+);
+/** ⛔ Keyed by GROUP, so the sibling leg shows it too. */
+check(
+  "⛔ the request is keyed by GROUP, so both legs resolve to one key",
+  `19a ${groupKey(leg19a)} · 19b ${groupKey(leg19b)} · 19c ${groupKey(leg19c)}`,
+  groupKey(leg19a) === groupKey(leg19b) && groupKey(leg19c) !== groupKey(leg19a),
+);
+/** ⛔⛔ A proposal belongs to its own build — row 19's THIRD surface. */
+const ADD_ENTRY_SCOPE: Array<[string | null, boolean]> = [
+  [null, true],
+  ["add-leg-request", true],
+  ["change-pickup-dropoff", false],
+  ["rider-no-show", false],
+];
+for (const [focus, expected] of ADD_ENTRY_SCOPE) {
+  check(
+    `the completed ride's button ${expected ? "shows" : "is withheld"} with ${focus ?? "nothing"} focused`,
+    `${showsAddLegEntry(focus)}`,
+    showsAddLegEntry(focus) === expected,
+  );
+}
+/** ⛔ Four options, not row 20's five — nobody notices a leg that does not exist. */
+check(
+  "⛔ 'who asked' is its OWN field, with its own shorter list",
+  `add-leg ${ADD_SOURCE_OPTIONS.length} vs trip-change ${CHANGE_SOURCE_OPTIONS.length}; ids ${ADD_SOURCE_FIELD} / ${CHANGE_SOURCE_FIELD}`,
+  // ⚠️ Widened for the same reason as the help-string compare above.
+  (ADD_SOURCE_FIELD as string) !== (CHANGE_SOURCE_FIELD as string) &&
+    ADD_SOURCE_OPTIONS.length === 4 &&
+    CHANGE_SOURCE_OPTIONS.length === 5,
+);
+const ADD_DRIVER_FACING = [
+  ADD_LEG_LABEL,
+  ADD_LEG_REQUESTED_TITLE,
+  ADD_LEG_REQUESTED_DETAIL,
+  ADD_LEG_SUBMIT_TOAST,
+  OVERNIGHT_WARNING,
+  ...Object.values(ADD_LEG_REFUSAL),
+  ...Object.values(SLOT_BLOCKED_REASON),
+  ...Object.values(TIMING_LABEL),
+  ...Object.values(ESTIMATE_HELP),
+  ...ADD_SOURCE_OPTIONS.map((o) => o.label),
+  ...built19.supportCase.fields
+    .filter((f) => f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST))
+    .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
+];
+check(
+  "no internal marker reaches row 19's driver-facing copy",
+  `${ADD_DRIVER_FACING.filter((t) => /⛔|⭐/.test(t)).length} leak(s) of ${ADD_DRIVER_FACING.length} string(s)`,
+  ADD_DRIVER_FACING.every((t) => !/⛔|⭐/.test(t)),
+);
+check(
+  "no row 19 copy claims where another field sits",
+  `${ADD_DRIVER_FACING.filter((t) => /\b(above|below)\b/i.test(t)).length} of ${ADD_DRIVER_FACING.length} string(s)`,
+  !ADD_DRIVER_FACING.some((t) => /\b(above|below)\b/i.test(t)),
+);
+check(
+  "row 19 does NOT claim to track what happens next",
+  `ADD_LEG_TRACKED_BY_APP=${ADD_LEG_TRACKED_BY_APP}`,
+  ADD_LEG_TRACKED_BY_APP === false,
+);
+/** ⛔ A notice would block Submit forever — the row 20 lesson, re-asserted. */
+check(
+  "no notice field on this case either",
+  `${built19.supportCase.fields.filter((f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST)).length} of ${ids19.length}`,
+  !built19.supportCase.fields.some(
+    (f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST),
+  ),
+);
+/**
+ * ⛔⛔ The slot and the pick-up time are two separate answers and can contradict
+ * each other. Walk-found: the new leg could be dropped LAST with a 1:00 PM
+ * pick-up, behind a leg starting at 3:00 PM, and nothing said so —
+ * `getTimeOrderWarnings` compares FIELDS and the leg in front has none unless
+ * the insertion happened to shift it.
+ */
+const outOfOrder = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "2",
+  [ADD_PICKUP_TIME_FIELD]: "13:00",
+}).fields.find((f) => f.id === SLOT_FIELD)!;
+check(
+  "⛔ a new leg placed behind a later one warns on the SLOT",
+  `${outOfOrder.warning ? outOfOrder.warning.slice(0, 64) + "…" : "no warning"}`,
+  Boolean(outOfOrder.warning) &&
+    outOfOrder.warning!.includes("3:00 PM") &&
+    outOfOrder.warning!.includes("1:00 PM"),
+);
+const slotInOrder = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "2",
+  [ADD_PICKUP_TIME_FIELD]: "16:00",
+}).fields.find((f) => f.id === SLOT_FIELD)!;
+check(
+  "...and a consistent placement does not",
+  `slot 2 at 4:00 PM → ${slotInOrder.warning ?? "no warning"}`,
+  slotInOrder.warning === undefined,
+);
+check(
+  "...and it WARNS rather than blocking, like every other time rule here",
+  `canSubmitCase with the warning showing = ${canSubmitCase(
+    buildAddLegCase(leg19a, { [SLOT_FIELD]: "2", [ADD_PICKUP_TIME_FIELD]: "13:00" }).fields,
+    {
+      ...built19.initialValues,
+      [SLOT_FIELD]: "2",
+      [ADD_PICKUP_TIME_FIELD]: "13:00",
+      [ADD_PICKUP_ADDRESS_FIELD]: "x",
+      [ADD_DROPOFF_ADDRESS_FIELD]: "y",
+      [ADD_SOURCE_FIELD]: "member",
+    },
+  )}`,
+  canSubmitCase(
+    buildAddLegCase(leg19a, { [SLOT_FIELD]: "2", [ADD_PICKUP_TIME_FIELD]: "13:00" }).fields,
+    {
+      ...built19.initialValues,
+      [SLOT_FIELD]: "2",
+      [ADD_PICKUP_TIME_FIELD]: "13:00",
+      [ADD_PICKUP_ADDRESS_FIELD]: "x",
+      [ADD_DROPOFF_ADDRESS_FIELD]: "y",
+      [ADD_SOURCE_FIELD]: "member",
+    },
+  ) === true,
+);
+
+/**
+ * ⭐ The overnight notice, which is the ONE place a `notice` is the right answer
+ * rather than row 20's trap. It blocks Submit, and here that is the behaviour
+ * wanted: a schedule crossing midnight is one the app genuinely cannot work out.
+ */
+const overnightCase = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "2",
+  [ADD_PICKUP_TIME_FIELD]: "23:30",
+});
+const overnightNotice = overnightCase.fields.find(
+  (f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST),
+);
+check(
+  "⭐ a midnight-crossing schedule raises a notice...",
+  `${overnightNotice ? overnightNotice.helpText : "none"}`,
+  overnightNotice?.helpText === OVERNIGHT_WARNING,
+);
+check(
+  "...which BLOCKS Submit, which is the point",
+  `canSubmitCase=${canSubmitCase(overnightCase.fields, { ...built19.initialValues, [ADD_PICKUP_TIME_FIELD]: "23:30", [ADD_PICKUP_ADDRESS_FIELD]: "x", [ADD_DROPOFF_ADDRESS_FIELD]: "y", [ADD_SOURCE_FIELD]: "member" })}`,
+  canSubmitCase(overnightCase.fields, {
+    ...built19.initialValues,
+    [ADD_PICKUP_TIME_FIELD]: "23:30",
+    [ADD_PICKUP_ADDRESS_FIELD]: "x",
+    [ADD_DROPOFF_ADDRESS_FIELD]: "y",
+    [ADD_SOURCE_FIELD]: "member",
+  }) === false,
+);
+check(
+  "⚠️ ...and an ordinary schedule raises no notice, so the form still submits",
+  `${pushedCase.fields.filter((f) => f.type === "notice").length} notice(s) at 2:30 PM`,
+  !pushedCase.fields.some((f) => f.type === "notice"),
+);
+
+/** ⛔ No diff gate here — an added leg has no baseline to differ from. */
+check(
+  "⛔ row 19 declares NO diff gate — row 20's rule does not transfer",
+  `requireChangedFrom=${built19.supportCase.requireChangedFrom ?? "undefined"}`,
+  built19.supportCase.requireChangedFrom === undefined,
 );
 
 // ---------------------------------------------------------------------------

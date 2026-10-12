@@ -65,6 +65,7 @@ export function SupportFormSheet({
   open,
   onOpenChange,
   onSubmit,
+  recompute,
 }: {
   supportCase: SupportCaseDefinition;
   callout?: SupportCallout;
@@ -73,6 +74,37 @@ export function SupportFormSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: Record<string, string>) => void;
+  /**
+   * For a case whose FIELD SET follows the answers — catalogue row 19, so far
+   * the only one.
+   *
+   * ⛔⛔ Every other case is a fixed schema the caller builds once. Add Leg to
+   * Trip is not: which existing legs the insertion pushes later depends on the
+   * pick-up time the driver is still typing, so the field set has to be rebuilt
+   * as they type, and the proposed times that follow have to be written back
+   * into the answers.
+   *
+   * ⚠️ One prop with two halves rather than two props, because passing only one
+   * of them produces a form that either renders fields nobody filled or fills
+   * fields nobody renders.
+   */
+  recompute?: {
+    /** Rebuild the case from the current answers. */
+    case: (values: Record<string, string>) => SupportCaseDefinition;
+    /**
+     * Values that FOLLOW from the answers, plus the key that decides when to
+     * rewrite them.
+     *
+     * ⛔⛔ The key must not change when the patch is applied, or the effect
+     * below writes, re-keys and writes again — forever. It is built from the
+     * driver's own inputs and the patch touches only derived fields, so the two
+     * sets are disjoint by construction. A check pins that.
+     */
+    derive: (values: Record<string, string>) => {
+      key: string;
+      patch: Record<string, string>;
+    };
+  };
 }) {
   const blank = () => ({
     ...emptyValues(supportCase.fields),
@@ -98,13 +130,38 @@ export function SupportFormSheet({
     suppliedIds(initialValues ?? {})
   );
 
+  /**
+   * The case as it stands for these answers.
+   *
+   * ⚠️ Everything below reads `activeCase`, never the `supportCase` prop — the
+   * visible fields, the submit gate and the time-order warnings all have to
+   * agree about which fields exist, and a mix of the two would warn about a
+   * field that is no longer rendered.
+   */
+  const activeCase = recompute ? recompute.case(values) : supportCase;
+
+  const derived = recompute?.derive(values);
+  useEffect(() => {
+    if (!derived) return;
+    setValues((previous) => {
+      // ⛔ Only write when something actually differs. An unconditional
+      // `setValues` on every render is a re-render on every render.
+      const changed = Object.entries(derived.patch).some(
+        ([id, next]) => (previous[id] ?? "") !== next
+      );
+      return changed ? { ...previous, ...derived.patch } : previous;
+    });
+    // Keyed on the driver's own inputs, which the patch never touches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [derived?.key]);
+
   // The leg the driver picked drives the summary banner and every timestamp we
   // can fill. Re-derive on change rather than only at mount.
   //
   // Read from whichever leg picker is currently VISIBLE rather than a fixed field
   // id, because more than one issue owns a leg picker now and each needs its own
   // (one locked to the ride it came from, one freely re-pickable).
-  const legField = supportCase.fields.find(
+  const legField = activeCase.fields.find(
     (field) => field.type === "leg-picker" && isFieldVisible(field, values)
   );
   const legValue = legField ? (values[legField.id] ?? "") : "";
@@ -112,13 +169,13 @@ export function SupportFormSheet({
 
   useEffect(() => {
     if (!selectedLeg) return;
-    const derived = deriveFromLeg(supportCase, selectedLeg.trip, selectedLeg.leg);
-    setValues((previous) => ({ ...previous, ...derived }));
+    const fromLeg = deriveFromLeg(activeCase, selectedLeg.trip, selectedLeg.leg);
+    setValues((previous) => ({ ...previous, ...fromLeg }));
     // A timestamp the newly picked leg has is app-supplied; one it doesn't have
     // stops being, so the driver can fill it in.
     setAppSupplied((previous) => {
       const next = new Set(previous);
-      for (const [id, value] of Object.entries(derived)) {
+      for (const [id, value] of Object.entries(fromLeg)) {
         if (value.trim()) next.add(id);
         else next.delete(id);
       }
@@ -131,8 +188,8 @@ export function SupportFormSheet({
   // what determines which form the driver is actually filling in.
   const description =
     (values.issue ? getIssueDescription(values.issue) : undefined) ??
-    supportCase.description ??
-    supportCase.summary;
+    activeCase.description ??
+    activeCase.summary;
 
   /**
    * When the issue was chosen for the driver, the sheet takes that issue's name.
@@ -144,9 +201,9 @@ export function SupportFormSheet({
   const title =
     (appSupplied.has("issue") && values.issue
       ? getIssueLabel(values.issue)
-      : undefined) ?? supportCase.title;
+      : undefined) ?? activeCase.title;
 
-  const visibleFields = supportCase.fields.filter((field) =>
+  const visibleFields = activeCase.fields.filter((field) =>
     isFieldVisible(field, values)
   );
 
@@ -162,9 +219,9 @@ export function SupportFormSheet({
    * property of what is being collected, not of the sheet.
    */
   const warnings = getTimeOrderWarnings(
-    supportCase.fields,
+    activeCase.fields,
     values,
-    supportCase.timeSequence ?? []
+    activeCase.timeSequence ?? []
   );
   // Per `s-02a`, the primary action sits disabled (muted green) until every
   // required field has a value — and stays disabled for an issue whose field set
@@ -174,9 +231,9 @@ export function SupportFormSheet({
   // filled in. `canSubmitCase` cannot see a baseline and must not — it is shared
   // by every case, and only this one has something to compare against.
   const canSubmit =
-    canSubmitCase(supportCase.fields, values) &&
+    canSubmitCase(activeCase.fields, values) &&
     hasRequiredChange(
-      supportCase.requireChangedFrom,
+      activeCase.requireChangedFrom,
       values,
       initialValues ?? {}
     );
@@ -283,7 +340,10 @@ export function SupportFormSheet({
                     Boolean(field.lockWhenPrefilled) &&
                     appSupplied.has(field.id)
                   }
-                  warning={warnings[field.id]}
+                  // ⚠️ The computed time-order warning first, then one the
+                  // case raised itself. Two cautions on one field would stack
+                  // into noise, and the time-order one is the more specific.
+                  warning={warnings[field.id] ?? field.warning}
                   onChange={(value) => setValue(field.id, value)}
                   values={values}
                   setValue={setValue}
@@ -303,7 +363,7 @@ export function SupportFormSheet({
               onClick={handleClose}
               className="h-14 rounded-xl border-gray-300 text-base font-bold text-gray-900"
             >
-              {supportCase.cancelLabel ?? "Cancel"}
+              {activeCase.cancelLabel ?? "Cancel"}
             </Button>
             <Button
               type="button"
@@ -311,7 +371,7 @@ export function SupportFormSheet({
               disabled={!canSubmit}
               className="h-14 rounded-xl bg-[#10B981] text-base font-bold text-white hover:bg-[#059669] disabled:bg-[#6EE7B7] disabled:opacity-100"
             >
-              {supportCase.submitLabel}
+              {activeCase.submitLabel}
             </Button>
           </div>
         </div>

@@ -47,6 +47,16 @@ export type SupportFieldType =
    */
   | "leg-checklist"
   /**
+   * Place a new leg among the trip's existing ones — drag, or tap a slot.
+   *
+   * ⚠️ Its payload is `legOrder`, NOT `options`. Every other list-shaped field
+   * encodes its rows as `{value,label}` strings; this one needs a letter, two
+   * clock faces, an address and whether the row is blocked, per row. Packing
+   * five fields into a label and splitting them in the renderer is how a label
+   * becomes a data format nobody declared.
+   */
+  | "leg-order"
+  /**
    * A repeating row group, e.g. one row per expected leg.
    *
    * Its columns come from `rowFields`. The runtime's only composite type — every
@@ -112,6 +122,42 @@ export interface SupportFieldOption {
   label: string;
 }
 
+/** One existing leg, as the `leg-order` control draws it. */
+export interface LegOrderRow {
+  /** Position in the group. The field's VALUE is an insertion index like these. */
+  index: number;
+  letter: string;
+  pickupLabel: string;
+  dropoffLabel: string;
+  address: string;
+  /**
+   * Why nothing may be inserted before this leg — absent when it may.
+   *
+   * ⛔ The REASON, not a boolean. A driver told "you can't put it there" learns
+   * nothing; "you have already started this leg" tells them why and what would
+   * have to change.
+   */
+  blockedReason?: string;
+}
+
+/**
+ * Everything the `leg-order` control draws, assembled by the case builder.
+ *
+ * ⛔ The control works nothing out. Which slots are allowed, what the letters
+ * are and which rows are blocked are rules, and they live in
+ * `lib/driver-data/add-leg-request.ts` where a check can reach them.
+ */
+export interface LegOrderConfig {
+  rows: LegOrderRow[];
+  /** Insertion indices the new leg may take. Never empty. */
+  allowedSlots: number[];
+  /** What the new row is called while it is being placed. */
+  newLegLabel: string;
+  /** Field ids the new row's times are read from, so it previews live. */
+  pickupTimeField: string;
+  dropoffTimeField: string;
+}
+
 /** Which of the driver's legs a leg picker offers. */
 export type LegScope = "all" | "in-progress";
 
@@ -132,6 +178,18 @@ export interface SupportField {
   placeholder?: string;
   /** Helper copy under the control. */
   helpText?: string;
+  /**
+   * A caution the CASE itself raises, styled like a time-order warning.
+   *
+   * ⚠️ Distinct from `helpText`, which is always-on guidance. This appears only
+   * when something about the current answers is suspect — and like every warning
+   * in this runtime it never blocks Submit.
+   *
+   * ⛔ For a contradiction `getTimeOrderWarnings` structurally cannot see: it
+   * compares FIELDS, so it is blind to anything that conflicts with a value the
+   * form is not collecting. Row 19's slot-versus-pick-up is exactly that.
+   */
+  warning?: string;
   required?: boolean;
   /**
    * Required in the real flow, but not enforced here.
@@ -145,6 +203,8 @@ export interface SupportField {
   requiredNotEnforced?: boolean;
   /** For `select`. */
   options?: SupportFieldOption[];
+  /** For `leg-order` — the group it places the new leg into. */
+  legOrder?: LegOrderConfig;
   /** Max length for free-text types. */
   maxLength?: number;
   /**

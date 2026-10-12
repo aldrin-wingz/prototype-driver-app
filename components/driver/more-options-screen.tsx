@@ -11,6 +11,7 @@ import {
   Mail,
   Calendar,
   CalendarClock,
+  CalendarPlus,
   X,
   Reply,
 } from "lucide-react";
@@ -56,6 +57,14 @@ import {
   TRIP_CHANGE_SOLUTION,
 } from "@/lib/driver-data/trip-change-request";
 import { TripChangeForm } from "@/components/support/trip-change-form";
+import {
+  addLegRefusal,
+  canRequestAddLeg,
+  groupKey,
+  ADD_LEG_LABEL,
+  ADD_LEG_SOLUTION,
+} from "@/lib/driver-data/add-leg-request";
+import { AddLegForm } from "@/components/support/add-leg-form";
 import { SendBackReasonForm } from "@/components/support/send-back-reason-form";
 import { SendBackPenaltyDialog } from "@/components/driver/send-back-penalty-dialog";
 import { SendBackConfirmDialog } from "@/components/driver/send-back-confirm-dialog";
@@ -274,6 +283,30 @@ const TRIP_CHANGE_TILE: OptionTile = {
 };
 
 /**
+ * Catalogue row **19** — ask Support to add another leg to this trip.
+ *
+ * ⚠️ Navy and `filled`, like the Update Trip Details tile beside it: both are
+ * ordinary administrative asks about the shape of a trip, and rose stays
+ * reserved for the two tiles that report something going wrong.
+ *
+ * ⚠️ Ahead of `trip-change` in `PROPOSED_TILES`, because that array is in
+ * CATALOGUE order and row 19 precedes row 20 — not in the order they were built.
+ * The two Trip / Ride Modification rows end up adjacent either way.
+ * ⛔ Anchored to the production tile `calendar` like its neighbour, because
+ * `after` names a PRODUCTION tile — anchoring a proposal to another proposal
+ * would break the moment one of them is filtered out by focus.
+ */
+const ADD_LEG_TILE: OptionTile = {
+  id: "add-leg",
+  label: ADD_LEG_LABEL,
+  icon: CalendarPlus,
+  variant: "filled",
+  color: DRIVER_NAVY,
+  solutions: [ADD_LEG_SOLUTION],
+  after: "calendar",
+};
+
+/**
  * The proposed tiles, in catalogue order, newest LAST.
  *
  * ⚠️ Order is the catalogue's, not the order they were built in — a driver
@@ -284,6 +317,7 @@ const TRIP_CHANGE_TILE: OptionTile = {
 const PROPOSED_TILES: OptionTile[] = [
   CANNOT_REACH_TILE,
   AUTO_ASSIGN_TILE,
+  ADD_LEG_TILE,
   TRIP_CHANGE_TILE,
 ];
 
@@ -464,8 +498,13 @@ export function MoreOptionsScreen({
   // whether the driver already filed — which the app does know — not about what
   // Support did with it, which for a no-show it never learns. Using the pending
   // lookup here would let the same claim be filed twice over.
-  const { submittedForms, submitForm, sendBackTrip, tripChangeRequest } =
-    useRideFlow();
+  const {
+    submittedForms,
+    submitForm,
+    sendBackTrip,
+    tripChangeRequest,
+    addLegRequest,
+  } = useRideFlow();
   const { active } = useSolution();
   const pending = submittedForms.some((record) => record.tripId === trip.id);
 
@@ -481,6 +520,8 @@ export function MoreOptionsScreen({
   // door and they have three different next steps — a shared "you can't do that"
   // would teach the driver nothing about which one they hit.
   const [tripChangeRefused, setTripChangeRefused] = useState<string | null>(null);
+  const [addLegOpen, setAddLegOpen] = useState(false);
+  const [addLegRefused, setAddLegRefused] = useState<string | null>(null);
   const [sendBackConfirmOpen, setSendBackConfirmOpen] = useState(false);
   const [sendBackReasonOpen, setSendBackReasonOpen] = useState(false);
   const [standingOrderOpen, setStandingOrderOpen] = useState(false);
@@ -655,6 +696,17 @@ export function MoreOptionsScreen({
       setTripChangeOpen(true);
       return;
     }
+    if (id === "add-leg") {
+      // ⛔ Scoped to this case, like the trip-change tile — the screen-wide
+      // `pending` flag is true for any form filed against this ride.
+      const already = Boolean(addLegRequest(groupKey(trip)));
+      if (!canRequestAddLeg(trip.status, already)) {
+        setAddLegRefused(addLegRefusal(trip.status, already));
+        return;
+      }
+      setAddLegOpen(true);
+      return;
+    }
     if (id === "no-show") {
       // Guardrail 1 only — the ride's status, which needs no location check.
       if (!activeLeg || !canFileNoShow(trip, activeLeg)) {
@@ -741,6 +793,25 @@ export function MoreOptionsScreen({
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={addLegRefused !== null}
+        onOpenChange={(open) => !open && setAddLegRefused(null)}
+      >
+        <AlertDialogContent className="max-w-[20rem] rounded-2xl">
+          <AlertDialogTitle className="sr-only">
+            {ADD_LEG_LABEL} unavailable
+          </AlertDialogTitle>
+          <AlertDialogDescription className="py-2 text-base text-gray-900">
+            {addLegRefused}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogAction className="bg-transparent text-base font-bold text-[#00B090] shadow-none hover:bg-transparent">
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="grid grid-cols-2 border-t border-[#F0F0F0]">
         {gridTiles.map((tile, index) => (
           <div
@@ -813,6 +884,17 @@ export function MoreOptionsScreen({
           if (!next) setSendBackValues(null);
         }}
         onConfirm={completeSendBack}
+      />
+
+      {/* ⭐ Returns the driver to the ride, like the trip-change form and for
+          the same reason: the banner it produces is the point of filing, and a
+          driver left on the grid would never see it. */}
+      <AddLegForm
+        trip={trip}
+        leg={activeLeg}
+        open={addLegOpen}
+        onOpenChange={setAddLegOpen}
+        onSubmitted={() => router.push(backHref)}
       />
 
       <TripChangeForm

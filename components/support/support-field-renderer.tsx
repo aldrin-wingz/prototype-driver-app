@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Paperclip, Search, Check, Trash2, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LegOrderField } from "./leg-order-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/ui/signature-pad";
@@ -563,6 +564,20 @@ export function SupportFieldRenderer({
 
       {field.type === "leg-checklist" && (
         <LegChecklist field={field} value={value} onChange={onChange} />
+      )}
+
+      {/* ⚠️ Needs `values`, like `leg-repeater` does — the new row previews the
+          times the driver is typing into two OTHER fields, so it cannot be
+          rendered from its own value alone. ⛔ Nothing renders at all without a
+          `legOrder` payload: a silent fallback would show an empty box where the
+          whole control should be. */}
+      {field.type === "leg-order" && field.legOrder && values && (
+        <LegOrderField
+          config={field.legOrder}
+          value={value}
+          values={values}
+          onChange={onChange}
+        />
       )}
 
       {field.type === "member-picker" && (

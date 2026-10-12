@@ -8,6 +8,7 @@ import {
   ISSUE_RIDER_DECLINED,
   ISSUE_SEND_BACK_REASON,
   ISSUE_TRIP_CHANGE_REQUEST,
+  ISSUE_ADD_LEG_REQUEST,
 } from "./issue-types";
 import {
   DECLINE_CHANNELS,
@@ -29,6 +30,21 @@ import {
   REACH_OUTCOMES,
 } from "@/lib/driver-data/reach-attempt";
 import {
+  ADD_NOTES_FIELD,
+  ADD_DROPOFF_ADDRESS_FIELD,
+  ADD_DROPOFF_TIME_FIELD,
+  ADD_PICKUP_ADDRESS_FIELD,
+  ADD_PICKUP_TIME_FIELD,
+  ADD_SOURCE_FIELD,
+  ADD_SOURCE_OPTIONS,
+  ADD_TIMING_FIELD,
+  ESTIMATE_HELP,
+  OVERNIGHT_WARNING,
+  SLOT_FIELD,
+  shiftFieldId,
+  type LegShift,
+} from "@/lib/driver-data/add-leg-request";
+import {
   CHANGE_NOTES_FIELD,
   CHANGE_SOURCE_FIELD,
   CHANGE_SOURCE_OPTIONS,
@@ -46,6 +62,7 @@ import {
   SPOKE_WITH_OPTIONS,
 } from "@/lib/driver-data/no-show-rules";
 import type {
+  LegOrderConfig,
   SupportCaseDefinition,
   SupportFieldOption,
 } from "@/types/support";
@@ -91,6 +108,10 @@ const ONLY_RIDER_DECLINED = {
 const ONLY_TRIP_CHANGE = {
   field: "issue",
   equals: [ISSUE_TRIP_CHANGE_REQUEST],
+};
+const ONLY_ADD_LEG = {
+  field: "issue",
+  equals: [ISSUE_ADD_LEG_REQUEST],
 };
 
 /**
@@ -198,6 +219,7 @@ export function buildSupportFormCase({
   sendBack = false,
   riderDeclined,
   tripChange,
+  addLeg,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -290,6 +312,27 @@ export function buildSupportFormCase({
    * that found none has a bug rather than a case to render.
    */
   tripChange?: { anchors: ChangeAnchor[] };
+  /**
+   * Build the Add Leg to Trip case — catalogue row 19.
+   *
+   * ⚠️ Carries the whole placement picture, because every part of it is a rule
+   * this builder has no way to work out: which slots are legal, what each leg's
+   * letter is, how long the new leg is estimated to take and where that estimate
+   * came from. All of it is decided in `lib/driver-data/add-leg-request.ts`.
+   *
+   * ⛔ `shifts` is the field set's own shape — one editable time per existing leg
+   * the insertion would push later — so it changes as the driver types. The
+   * caller rebuilds the case on every render, exactly as row 20's anchors do.
+   */
+  addLeg?: {
+    legOrder: LegOrderConfig;
+    estimateSource: "group" | "default";
+    shifts: LegShift[];
+    timingLabel: string;
+    overnight: boolean;
+    /** Set when the chosen slot contradicts the pick-up time. */
+    slotWarning?: string;
+  };
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -328,7 +371,9 @@ export function buildSupportFormCase({
       : undefined,
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: tripChange
+    zendeskEquivalent: addLeg
+      ? "Add a leg to a trip"
+      : tripChange
       ? "Trip change request"
       : riderDeclined
       ? "Rider declined the trip"
@@ -359,7 +404,18 @@ export function buildSupportFormCase({
        * sequence: a pick-up that already happened at 11:10 is the hardest bound
        * there is on a drop-off being asked for at 10:30.
        */
-      tripChange
+      /**
+       * ⭐ Derived, like row 20's — the new leg's two ends, then every leg the
+       * insertion pushes, in the order they would happen. A driver who edits a
+       * proposed time backwards gets the same warning row 01 already built.
+       */
+      addLeg
+        ? [
+            ADD_PICKUP_TIME_FIELD,
+            ADD_DROPOFF_TIME_FIELD,
+            ...addLeg.shifts.map((shift) => shiftFieldId(shift.tripId)),
+          ]
+        : tripChange
         ? tripChange.anchors.map((anchor) => changeTimeFieldId(anchor.index))
         : cannotReach || autoAssign || sendBack || riderDeclined
         ? undefined
@@ -1038,6 +1094,164 @@ export function buildSupportFormCase({
               // cannot proceed without.
               maxLength: 300,
               showIf: ONLY_TRIP_CHANGE,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Add Leg to Trip -----------------------------------------------
+      //
+      // Catalogue row 19 — `Trip / Ride Modification`, 364 calls, and the LAST
+      // of the ten form rows. The member needs one more ride on the same trip,
+      // most often said at the door seconds after the drop-off swipe.
+      //
+      // ⛔⛔ "Leg" here is a `Trip` in a `tripGroup`, not an anchor on one
+      // trip's timeline — the opposite of row 20's sense of the same word. See
+      // `lib/driver-data/trip-groups.ts`, which names both and says why only one
+      // of them can carry a new leg's id, revenue and swipes.
+      ...(addLeg
+        ? ([
+            {
+              id: SLOT_FIELD,
+              type: "leg-order",
+              label: "Where does the new leg go?",
+              shortLabel: "the new leg's position",
+              required: true,
+              legOrder: addLeg.legOrder,
+              // ⛔ The slot and the pick-up time are two separate answers and
+              // can contradict each other — see `slotOrderWarning`.
+              warning: addLeg.slotWarning,
+              helpText:
+                "Drag it, or tap a gap. A leg you have already started or finished cannot have anything put in front of it.",
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: ADD_PICKUP_TIME_FIELD,
+              type: "time",
+              // ⭐ The ONE time the driver has to supply. Everything below is
+              // worked out from it and shown back for checking.
+              label: "New leg pick-up time",
+              shortLabel: "the new leg's pick-up time",
+              required: true,
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: ADD_PICKUP_ADDRESS_FIELD,
+              type: "text",
+              label: "New leg pick-up address",
+              shortLabel: "the new leg's pick-up address",
+              required: true,
+              maxLength: 160,
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: ADD_DROPOFF_ADDRESS_FIELD,
+              type: "text",
+              label: "New leg drop-off address",
+              shortLabel: "the new leg's drop-off address",
+              required: true,
+              maxLength: 160,
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: ADD_DROPOFF_TIME_FIELD,
+              type: "time",
+              label: "New leg drop-off time",
+              shortLabel: "the new leg's drop-off time",
+              /**
+               * ⚠️ **Computed and shown, not asked** — user direction is that
+               * the driver only types the pick-up. It stays EDITABLE anyway,
+               * because an estimate the driver knows is wrong is worse than no
+               * estimate, and ⛔ it is not `required`: a figure the app supplied
+               * cannot be something the driver failed to provide.
+               */
+              helpText: ESTIMATE_HELP[addLeg.estimateSource],
+              showIf: ONLY_ADD_LEG,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+      /**
+       * One editable time per existing leg the insertion would push later.
+       *
+       * ⭐ **A leg with slack is not here at all**, and its absence is the
+       * feature: a driver inserting a morning leg into an afternoon round trip
+       * must not be shown the return as "changed". `cascadeShifts` decides.
+       */
+      ...(addLeg
+        ? (addLeg.shifts.map((shift) => ({
+            id: shiftFieldId(shift.tripId),
+            type: "time" as const,
+            label: `Leg ${shift.letter} pick-up moves to`,
+            shortLabel: `leg ${shift.letter}'s new pick-up time`,
+            helpText: `Leg ${shift.letter} is scheduled for ${shift.fromLabel}, which no longer fits. Change this if the member can manage something else.`,
+            showIf: ONLY_ADD_LEG,
+          })) as SupportCaseDefinition["fields"])
+        : []),
+      /**
+       * ⭐ The one place a `notice` is the RIGHT answer rather than a trap.
+       *
+       * ⛔⛔ Row 20 learned that a visible notice blocks Submit outright, and
+       * treated that as a hazard. Here it is exactly the behaviour wanted: the
+       * values map holds no date beside a time, so a schedule running past
+       * midnight is one the app genuinely cannot work out. Refusing and saying
+       * to call Support is honest; printing a time on the wrong day is not.
+       *
+       * ⚠️ Rendered only when the cascade actually crosses midnight, so the
+       * form is submittable in every case the app CAN compute.
+       */
+      ...(addLeg && addLeg.overnight
+        ? ([
+            {
+              id: "addLegOvernight",
+              type: "notice",
+              label: "These times cross midnight",
+              helpText: OVERNIGHT_WARNING,
+              showIf: ONLY_ADD_LEG,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+      ...(addLeg
+        ? ([
+            {
+              id: ADD_TIMING_FIELD,
+              type: "text",
+              /**
+               * The catalogue's *"tagged critical when it is same-day or the
+               * driver has already started"*.
+               *
+               * ⛔⛔ The field states the CONDITION, never the verdict. The word
+               * "critical" is a promise about what Support does with the
+               * request and nobody has agreed one; what the app can say without
+               * inventing anything is the date and whether a leg is under way.
+               * Locked, because it is a fact about the trip rather than an
+               * answer — and `lockedBadge: null` since a badge explaining why
+               * a never-editable field is locked states the obvious.
+               */
+              label: "Timing",
+              lockWhenPrefilled: true,
+              lockedBadge: null,
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: ADD_SOURCE_FIELD,
+              type: "select",
+              label: "Who asked for this leg?",
+              shortLabel: "who asked",
+              placeholder: "Select:",
+              required: true,
+              // ⛔ FOUR options, not row 20's five. A driver can notice a wrong
+              // address; nobody notices a leg that does not exist.
+              options: [...ADD_SOURCE_OPTIONS],
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: ADD_NOTES_FIELD,
+              type: "textarea",
+              label: "Anything else Support should know?",
+              shortLabel: "notes",
+              placeholder:
+                "Optional — where they need to go, or anything about the timing",
+              maxLength: 300,
+              showIf: ONLY_ADD_LEG,
             },
           ] as SupportCaseDefinition["fields"])
         : []),
