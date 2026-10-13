@@ -323,7 +323,7 @@ for (const type of NO_SHOW_TYPES) {
   check(`${type} — signature label matches the capture`,
     got.signatureLabel === want.signature, got.signatureLabel);
   check(`${type} — waiver matches the proposal`,
-    waivesPresenceWait(type) === want.waives, `${waivesPresenceWait(type)}`);
+    waivesPresenceWait(type, PLAIN_MIRROR) === want.waives, `${waivesPresenceWait(type, PLAIN_MIRROR)}`);
 }
 
 /**
@@ -335,7 +335,7 @@ const withExtra = NO_SHOW_TYPES.filter((t) => noShowFormFor(t).extraField);
 const withHelper = NO_SHOW_TYPES.filter((t) => noShowFormFor(t).helper);
 const memberSigned = NO_SHOW_TYPES.filter(
   (t) => noShowFormFor(t).signatureLabel === "Member Signature");
-const waiving = NO_SHOW_TYPES.filter((t) => waivesPresenceWait(t));
+const waiving = NO_SHOW_TYPES.filter((t) => waivesPresenceWait(t, PLAIN_MIRROR));
 check("exactly one type adds a field", withExtra.length === 1,
   `${withExtra.length} of ${NO_SHOW_TYPES.length}: ${withExtra.join(",") || "none"}`);
 check("exactly one type carries a helper line", withHelper.length === 1,
@@ -353,8 +353,8 @@ check("the pre-selection default is the captured empty state",
     noShowFormFor("").extraField === null && noShowFormFor("").helper === null,
   noShowFormFor("").signatureLabel);
 // ⚠️ The waiver must not be reachable by an unknown string.
-check("an unrecognised type waives nothing", !waivesPresenceWait("Cancelled At Door"));
-check("and neither does an empty one", !waivesPresenceWait(""));
+check("an unrecognised type waives nothing", !waivesPresenceWait("Cancelled At Door", PLAIN_MIRROR));
+check("and neither does an empty one", !waivesPresenceWait("", PLAIN_MIRROR));
 
 // ── The waiver: what it DOES ───────────────────────────────────────────────
 if (timerRide) {
@@ -523,7 +523,7 @@ check("and an unknown answer earns nothing", !answerEarnsWaiver("the dispatcher"
  * routes the driver to the questions; the answer decides the outcome.
  */
 check("the route and the verdict are independent rules",
-  waivesPresenceWait("Cancel At Door") && !answerEarnsWaiver(SPOKE_WITH_NOBODY));
+  waivesPresenceWait("Cancel At Door", PLAIN_MIRROR) && !answerEarnsWaiver(SPOKE_WITH_NOBODY));
 
 check("the relation options are a real list", CONTACT_RELATION_OPTIONS.length >= 4,
   `${CONTACT_RELATION_OPTIONS.length}`);
@@ -815,6 +815,82 @@ if (untagged) {
       NOW
     ) === NO_SHOW_POST_PICKUP_MINUTES,
     `${postPickupThresholdMinutes({ ...untagged, client: "WellTrans", market: "IN" as const }, NOW)}`
+  );
+}
+
+// ── 9e2 · \u2b50\u2b50 Cancel At Door waits in Now, exactly like every other type ──
+/**
+ * \u26d4\u26d4 **Reported by the user, 2026-10-14: Now let a Cancel At Door through
+ * to the form.** The ten-minute waiver is row 02's whole proposal, and it was
+ * ungated \u2014 so the prototype was demonstrating its own proposal as the status
+ * quo, on the one row whose argument IS that waiver.
+ *
+ * \u26a0\ufe0f The lesson is narrower than "a missing gate". `resolveNoShow` had already
+ * been given the focus; this rung simply never read it. **Threading a parameter
+ * is not the same as using it**, and a signature change that typechecks proves
+ * only that the value arrived.
+ *
+ * So this sweeps the OUTCOME over every type, rather than asserting the
+ * predicate: production has one message for all of them, and the check says so
+ * in those terms.
+ */
+const CAD_RIDE = tagged.find((t) => t.noShowDemo === "3.1");
+check(
+  "the short-of-ten-minutes ride is seeded, so the sweep below is not empty",
+  CAD_RIDE !== undefined,
+  CAD_RIDE ? `${CAD_RIDE.id} (${CAD_RIDE.noShowDemo})` : "MISSING"
+);
+if (CAD_RIDE) {
+  const cadLeg = activeLeg(CAD_RIDE)!;
+  const NOW_02_OWNER: DemoFocus = demoFocus("cancel-at-door", "now");
+  const FIXED_02: DemoFocus = demoFocus("cancel-at-door", "fixed");
+
+  /** \u26d4 Every type, one message. That is what production does. */
+  const nowOutcomes = NO_SHOW_TYPES.map((type) => ({
+    type,
+    kind: resolveNoShow(CAD_RIDE, cadLeg, NOW_02_OWNER, 0, type).kind,
+  }));
+  const slipped = nowOutcomes.filter((o) => o.kind !== "timer");
+  check(
+    "in Now every no-show type gets the same ten-minute refusal",
+    slipped.length === 0,
+    `${nowOutcomes.length - slipped.length} of ${nowOutcomes.length} refuse${slipped.length ? " \u2014 through: " + slipped.map((o) => `${o.type}=${o.kind}`).join(", ") : ""}`
+  );
+  check(
+    "...and that sweep covered every seeded type",
+    nowOutcomes.length === NO_SHOW_TYPES.length && NO_SHOW_TYPES.length >= 3,
+    `${NO_SHOW_TYPES.length} type(s): ${NO_SHOW_TYPES.join(", ")}`
+  );
+
+  /** \u26d4 The other half: the waiver must still WORK, or this is a deletion. */
+  check(
+    "...while Proposed lets Cancel At Door through, which is row 02's argument",
+    resolveNoShow(CAD_RIDE, cadLeg, FIXED_02, 0, "Cancel At Door").kind === "files",
+    resolveNoShow(CAD_RIDE, cadLeg, FIXED_02, 0, "Cancel At Door").kind
+  );
+  check(
+    "...and the other types still wait on the Proposed side too",
+    NO_SHOW_TYPES.filter((t) => t !== "Cancel At Door").every(
+      (t) => resolveNoShow(CAD_RIDE, cadLeg, FIXED_02, 0, t).kind === "timer"
+    ),
+    NO_SHOW_TYPES.filter((t) => t !== "Cancel At Door")
+      .map((t) => `${t}=${resolveNoShow(CAD_RIDE, cadLeg, FIXED_02, 0, t).kind}`).join(", ")
+  );
+
+  /**
+   * \u26d4 Row 01's focus does not carry row 02's waiver. The two rows share a
+   * screen and a refusal matrix; they do not share each other's proposals.
+   */
+  check(
+    "row 01's focus does not hand out row 02's waiver",
+    resolveNoShow(CAD_RIDE, cadLeg, demoFocus("rider-no-show", "fixed"), 0, "Cancel At Door").kind === "timer",
+    resolveNoShow(CAD_RIDE, cadLeg, demoFocus("rider-no-show", "fixed"), 0, "Cancel At Door").kind
+  );
+  /** \u26a0\ufe0f ...and the plain mirror still does, because it shows every proposal. */
+  check(
+    "...while the plain mirror still shows it, unchanged from before",
+    resolveNoShow(CAD_RIDE, cadLeg, PLAIN_MIRROR, 0, "Cancel At Door").kind === "files",
+    resolveNoShow(CAD_RIDE, cadLeg, PLAIN_MIRROR, 0, "Cancel At Door").kind
   );
 }
 

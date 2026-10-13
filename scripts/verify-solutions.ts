@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   CATEGORIZED_CALLS,
+  CLEAR_FOCUS_LABEL,
   COVERED_CALLS,
   findSolution,
   SOLUTION_HOME,
@@ -6370,6 +6371,55 @@ check(
   !/disabled/.test(TOGGLE_CODE),
 );
 
+
+/* --- 21e. The third state's control names where it lands ---------------- */
+/**
+ * ⭐⭐ The toggle created a third state, and leaving a focus was the only one
+ * whose name did not say where you would land. "Clear the focus" reads as
+ * "reset to reality" — but with no focus the app shows EVERY proposal at once,
+ * so it moves you to the state with the most features on screen. A reviewer who
+ * had just looked at Now and tapped it got four proposed tiles.
+ *
+ * ⛔ Named once in `catalogue.ts` because TWO affordances say it — the strip's
+ * `×` below the breakpoint and the table's button above it — and two copies of
+ * a label are two chances to disagree about what the control does.
+ */
+check(
+  "leaving a focus names the state it lands in",
+  `CLEAR_FOCUS_LABEL = "${CLEAR_FOCUS_LABEL}"`,
+  /proposal/i.test(CLEAR_FOCUS_LABEL) && !/^clear/i.test(CLEAR_FOCUS_LABEL),
+);
+const CLEAR_AFFORDANCES: Array<[string, string]> = [
+  ["the briefing strip (every width)", STRIP_SRC],
+  ["the focused table row (desktop)", TABLE_SRC],
+];
+/**
+ * ⛔ The MARKUP, not the file. The first version grepped the whole source, so
+ * swapping the strip's `aria-label` for a hand-written "Dismiss" passed — the
+ * import line was still there, satisfying the check on its own.
+ */
+const withoutImports = (src: string) =>
+  src.replace(/^import[\s\S]*?from\s+["'][^"']+["'];?$/gm, "");
+const handWritten = CLEAR_AFFORDANCES.filter(
+  ([, src]) => !withoutImports(src).includes("CLEAR_FOCUS_LABEL"),
+);
+check(
+  "...and both affordances read that one name",
+  handWritten.length
+    ? `HAND-WRITTEN: ${handWritten.map(([n]) => n).join(", ")}`
+    : `${CLEAR_AFFORDANCES.length} of ${CLEAR_AFFORDANCES.length} — ${CLEAR_AFFORDANCES.map(([n]) => n).join("; ")}`,
+  handWritten.length === 0,
+);
+/** ⛔ And the superseded wording is gone from the surfaces, not merely unused. */
+const BANNED_CLEAR = /Clear the focus|Clear the focused/;
+const stillBanned = CLEAR_AFFORDANCES.filter(([, src]) => BANNED_CLEAR.test(src));
+check(
+  "...and the superseded wording survives nowhere on either surface",
+  stillBanned.length
+    ? `STILL THERE: ${stillBanned.map(([n]) => n).join(", ")}`
+    : `0 of ${CLEAR_AFFORDANCES.length} carry it`,
+  stillBanned.length === 0,
+);
 
 // ---------------------------------------------------------------------------
 console.log("\n22. Nothing invisible in the source");

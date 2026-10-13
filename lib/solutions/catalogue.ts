@@ -685,6 +685,28 @@ export function buildStateLabel(state: BuildState): string {
   return state === "in-prototype" ? "In prototype" : "⚠️ Not in prototype yet";
 }
 
+/**
+ * What leaving a focus actually does — named once, because two affordances say
+ * it and they must not disagree.
+ *
+ * ⭐⭐ It is "Show all proposals", not "Clear the focus", and the difference is
+ * the whole point. Once the Now / Proposed toggle existed there were THREE
+ * states, and this was the only one whose name did not say where you would
+ * land:
+ *
+ * | state            | what the app shows                    |
+ * |------------------|---------------------------------------|
+ * | no focus         | **every** proposal, nothing filtered   |
+ * | focus + Now      | that row's production dead end        |
+ * | focus + Proposed | that row's proposal, and no other's    |
+ *
+ * ⛔ So leaving a focus moves you to the state with the MOST features on
+ * screen. "Clear" reads as "reset to reality" — a reviewer who has just looked
+ * at Now and taps it expecting production gets the opposite, four proposed
+ * tiles at once. Naming the destination costs nothing and removes the trap.
+ */
+export const CLEAR_FOCUS_LABEL = "Show all proposals";
+
 export const CLASS_LABEL: Record<SolutionClass, string> = {
   form: "In-app form",
   surface: "App surface",

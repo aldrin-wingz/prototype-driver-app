@@ -322,7 +322,7 @@ export function resolveNoShow(
        * before the not-at-pick-up branch — so a Cancel At Door driver who is not
        * actually there still falls through to the form, as they must.
        */
-      if (waivesPresenceWait(noShowType)) {
+      if (waivesPresenceWait(noShowType, focus)) {
         waivedQualifyingMinutes = walk.nearRunOldestAge;
       } else {
         return {
@@ -426,6 +426,18 @@ export const NO_SHOW_SOLUTIONS: readonly string[] = [
   "rider-no-show",
   "cancel-at-door",
 ];
+
+/**
+ * Row **02**'s own proposal, and ONLY row 02's: *let Cancel at Door skip the
+ * ten-minute wait*.
+ *
+ * ⛔⛔ A narrower owner list than `NO_SHOW_SOLUTIONS` on purpose. The two rows
+ * share a screen and a refusal matrix, which is why `treatmentFor` is gated on
+ * both — but the waiver is one row's feature, and a proposal belongs to its own
+ * build. Focus row 01 and a Cancel At Door still waits, because waiving the
+ * wait is not row 01's argument.
+ */
+export const CANCEL_AT_DOOR_SOLUTIONS: readonly string[] = ["cancel-at-door"];
 
 export type NoShowDemoRow =
   | "3" | "3.1"
@@ -864,8 +876,23 @@ export function noShowFormFor(type: string): NoShowTypeForm {
  * It tells the Member Not Ready driver to wait ten minutes and tells the Cancel
  * At Door driver nothing — then `canNoshow` enforces the wait on both at Submit.
  * The app implies the wait does not apply here, and then applies it.
+ *
+ * ⛔⛔ **So the waiver is the PROPOSAL, and production refuses both alike.**
+ * That sentence above is the production behaviour, written down before there
+ * was a Now side to show it on: today a Cancel At Door driver gets the same
+ * *"Please wait at least 10 minutes at the pick up location"* as everyone else.
+ *
+ * Found by the user, 2026-10-14: the waiver was ungated, so Now let a Cancel At
+ * Door through to the form — the prototype demonstrating its own proposal as
+ * though it were the status quo, which is the exact failure this slice exists
+ * to prevent. ⚠️ `resolveNoShow` had been given the focus and this rung had not
+ * been told to read it; threading the parameter is not the same as using it.
  */
-export function waivesPresenceWait(type: string | null | undefined): boolean {
+export function waivesPresenceWait(
+  type: string | null | undefined,
+  focus: DemoFocus
+): boolean {
+  if (!showsProposal(focus, CANCEL_AT_DOOR_SOLUTIONS)) return false;
   return Boolean(type && noShowFormFor(type).presenceWaitWaivedBy);
 }
 

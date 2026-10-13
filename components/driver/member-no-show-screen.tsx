@@ -175,7 +175,7 @@ export function MemberNoShowScreen({
      * plain filing stands.
      */
     const usingWaiver =
-      waivesPresenceWait(noShowType) &&
+      waivesPresenceWait(noShowType, demo) &&
       ((outcome.kind === "files" && outcome.presenceWaitWaived) ||
         outcome.kind === "form");
     if (usingWaiver) {

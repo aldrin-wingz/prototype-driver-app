@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import {
   CLASS_LABEL,
+  CLEAR_FOCUS_LABEL,
   COVERED_CALLS,
   SOLUTIONS,
   buildStateLabel,
@@ -210,7 +211,7 @@ export function SolutionTable() {
                           className="mt-1.5 inline-flex items-center gap-1 rounded text-[11px] font-medium text-gray-500 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00B090]"
                         >
                           <X className="h-3 w-3" />
-                          Clear the focus
+                          {CLEAR_FOCUS_LABEL}
                         </button>
                       </span>
                     )}

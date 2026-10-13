@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import {
   CLASS_LABEL,
+  CLEAR_FOCUS_LABEL,
   buildStateLabel,
   formatShare,
   SOLUTIONS,
@@ -120,7 +121,7 @@ export function SolutionStrip() {
             <button
               type="button"
               onClick={clear}
-              aria-label="Clear the focused solution"
+              aria-label={CLEAR_FOCUS_LABEL}
               className="shrink-0 rounded-md p-1 text-[#7D9A92] hover:bg-[#1B2C28] hover:text-[#E6EFEC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4FD1AE]"
             >
               <X className="h-4 w-4" />
