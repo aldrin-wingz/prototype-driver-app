@@ -226,10 +226,14 @@ import {
 import { solutionHref } from "../lib/solutions/solution-context";
 import {
   DEFAULT_DEMO_MODE,
+  DEMO_MODE_DESCRIPTION,
+  DEMO_MODE_LABEL,
   DEMO_MODE_PARAM,
   DEMO_MODES,
   demoFocus,
+  hasNowState,
   modeFromParam,
+  ROWS_AWAITING_NOW,
   showsProposal,
   type DemoFocus,
   type DemoMode,
@@ -6156,6 +6160,278 @@ check(
   `${modeReads} place(s) read the mode param into state; ` +
     `${adoptBranch.includes("setModeState(modeFromParam(") ? "inside" : "OUTSIDE"} the adopt branch`,
   modeReads === 1 && adoptBranch.includes("setModeState(modeFromParam("),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n21. The toggle — the one control the whole slice turns on");
+// ---------------------------------------------------------------------------
+/**
+ * B4. Without this control the production side is reachable only by hand-
+ * editing a query string, which is not a thing anyone does in front of an
+ * audience.
+ *
+ * ⛔⛔ The failure mode worth guarding is a toggle that LOOKS like it works.
+ * Four of the twelve built rows have no production screen yet; a switch that
+ * silently does nothing on a third of the catalogue would be demonstrated as an
+ * answer. So the gap is named on screen, and these checks assert the naming is
+ * honest in both directions.
+ */
+const TOGGLE_SRC = readFileSync(join(ROOT, "components/solutions-dev/demo-mode-toggle.tsx"), "utf8");
+const TOGGLE_CODE = codeOnly(TOGGLE_SRC);
+const STRIP_SRC = readFileSync(join(ROOT, "components/solutions-dev/solution-strip.tsx"), "utf8");
+const TABLE_SRC = readFileSync(join(ROOT, "components/solutions-dev/solution-table.tsx"), "utf8");
+
+/* --- 21a. It is one component, mounted in both places -------------------- */
+/**
+ * ⚠️ Two mounts are fine — both read the same `mode` and call the same
+ * `setMode`, so they cannot disagree. Two COPIES of the markup could, which is
+ * the thing this asserts against.
+ */
+const MOUNTS: Array<[string, string]> = [
+  ["the briefing strip (every width)", STRIP_SRC],
+  ["the focused table row (desktop)", TABLE_SRC],
+];
+const missingMount = MOUNTS.filter(([, src]) => !src.includes("<DemoModeToggle"));
+check(
+  "the toggle is mounted everywhere a focus is shown",
+  missingMount.length
+    ? `MISSING: ${missingMount.map(([name]) => name).join(", ")}`
+    : `${MOUNTS.length} of ${MOUNTS.length} — ${MOUNTS.map(([n]) => n).join("; ")}`,
+  missingMount.length === 0,
+);
+check(
+  "...and neither place hand-rolls a second copy of it",
+  `setMode outside the component: ${MOUNTS.filter(([, src]) => codeOnly(src).includes("setMode")).length}`,
+  MOUNTS.every(([, src]) => !codeOnly(src).includes("setMode")),
+);
+
+/* --- 21b. No focus, no side ---------------------------------------------- */
+/**
+ * ⛔ The plain mirror shows every proposal at once, so it is not on either
+ * side. A control offering to pick one would describe a state the app cannot be
+ * in — and would be the one place a reviewer could set a mode that then applies
+ * to nothing.
+ */
+check(
+  "the toggle refuses to render without a focus",
+  /if \(!active\) return null;/.test(TOGGLE_CODE)
+    ? "if (!active) return null"
+    : "NOT FOUND — a mode control would render over the plain mirror",
+  /if \(!active\) return null;/.test(TOGGLE_CODE),
+);
+/**
+ * ⛔⛔ Both ancestors are clickable. Without `stopPropagation` the tap
+ * re-focuses the row, `focus()` resets the mode to "now", and "Proposed" would
+ * visibly fail to stick — on the one control the demo turns on.
+ */
+check(
+  "...and a tap on it does not re-focus the row underneath",
+  TOGGLE_CODE.includes("event.stopPropagation()") ? "stopPropagation()" : "MISSING",
+  TOGGLE_CODE.includes("event.stopPropagation()"),
+);
+/**
+ * ⛔ It must not navigate either — see `setMode`.
+ *
+ * ⚠️ Case-INSENSITIVE, and covering every way out of a page. A break test
+ * adding `import { useRouter }` sailed past an `includes("router")`, because
+ * the only spelling in the file was the capital `R` in `useRouter`.
+ */
+const NAVIGATES = /\buseRouter\b|\brouter\s*\.|\bredirect\b|location\s*\.\s*(href|assign|replace)/i;
+check(
+  "...and it never navigates",
+  NAVIGATES.test(TOGGLE_CODE)
+    ? `NAVIGATES (${TOGGLE_CODE.match(NAVIGATES)?.[0]}) — the ride under the toggle would remount`
+    : "state only",
+  !NAVIGATES.test(TOGGLE_CODE),
+);
+
+/* --- 21c. One segment per mode, both labelled ---------------------------- */
+const labelled = DEMO_MODES.filter(
+  (m) => DEMO_MODE_LABEL[m]?.length > 0 && DEMO_MODE_DESCRIPTION[m]?.length > 0,
+);
+check(
+  "every mode has a segment label and an accessible description",
+  `${labelled.length} of ${DEMO_MODES.length} — ${DEMO_MODES.map((m) => `${m}=${DEMO_MODE_LABEL[m]}`).join(", ")}`,
+  labelled.length === DEMO_MODES.length,
+);
+/** ⚠️ Built from `DEMO_MODES`, so a third mode could never be unreachable. */
+check(
+  "...and the segments are built from the mode list, not written out twice",
+  /DEMO_MODES\.map/.test(TOGGLE_CODE) ? "DEMO_MODES.map" : "HARD-CODED",
+  /DEMO_MODES\.map/.test(TOGGLE_CODE),
+);
+/** ⛔ The two labels must differ, or the control is a single button twice. */
+check(
+  "...and the two sides are not called the same thing",
+  `${DEMO_MODE_LABEL.now} / ${DEMO_MODE_LABEL.fixed}`,
+  DEMO_MODE_LABEL.now !== DEMO_MODE_LABEL.fixed &&
+    DEMO_MODE_DESCRIPTION.now !== DEMO_MODE_DESCRIPTION.fixed,
+);
+
+/* --- 21d. The gap is named, and named honestly --------------------------- */
+/**
+ * ⛔⛔ `ROWS_AWAITING_NOW` is the SHRINKING list — rows whose production screen
+ * is still to be built. Declared that way on purpose: a list of rows that work
+ * is wrong by omission and silently, while this one is wrong by commission and
+ * stays on screen until someone deletes the line.
+ *
+ * ⚠️ These checks assert it is well-formed. **B5's check 12 is what measures
+ * the running app against it** — that is the one that can prove the toggle is
+ * not decorative, and it is deliberately not claimed here.
+ */
+const awaitingRows = ROWS_AWAITING_NOW.map((id) => SOLUTIONS.find((s) => s.id === id));
+check(
+  "every row awaiting a production screen is a real catalogue row",
+  `${awaitingRows.filter(Boolean).length} of ${ROWS_AWAITING_NOW.length} resolve — ${ROWS_AWAITING_NOW.join(", ")}`,
+  awaitingRows.every(Boolean),
+);
+/**
+ * ⛔ And a BUILT one. A row with no proposal has no second side to compare
+ * against, so listing it here would be claiming a gap that cannot exist — and
+ * would quietly inflate the list that B5 measures against.
+ */
+const awaitingNotBuilt = awaitingRows.filter((row) => row && row.buildState !== "in-prototype");
+check(
+  "...and every one of them is a row with a proposal to compare against",
+  awaitingNotBuilt.length
+    ? `NOT BUILT: ${awaitingNotBuilt.map((r) => r!.id).join(", ")}`
+    : `${awaitingRows.length} of ${awaitingRows.length} are in prototype`,
+  awaitingNotBuilt.length === 0,
+);
+/**
+ * ⛔⛔ **Declared membership, not a count against itself.** The first version
+ * compared `builtRows.filter(hasNowState).length` with `ROWS_AWAITING_NOW.length`
+ * — and `hasNowState` is derived from that very list, so the two could never
+ * disagree. A break test deleting row 16 from the list passed cleanly: the app
+ * would have claimed a production screen it does not have, and said so on
+ * screen, with the gate green.
+ *
+ * ⚠️ These four ids are written out HERE. Finishing a row means deleting it
+ * from `demo-mode.ts` and from this line, and the second edit is the one that
+ * makes a reviewer look at whether the first was true.
+ */
+const EXPECTED_AWAITING = [
+  "missed-swipe",
+  "request-feed-member-filter",
+  "send-back-reason-form",
+  "rider-initiated-cancellation",
+];
+const awaitingDrift = [
+  ...EXPECTED_AWAITING.filter((id) => !ROWS_AWAITING_NOW.includes(id)).map((id) => `-${id}`),
+  ...ROWS_AWAITING_NOW.filter((id) => !EXPECTED_AWAITING.includes(id)).map((id) => `+${id}`),
+];
+check(
+  "...and the rows awaiting a production screen are exactly the declared four",
+  awaitingDrift.length
+    ? `DRIFT: ${awaitingDrift.join(" ")}`
+    : `${ROWS_AWAITING_NOW.length} of ${EXPECTED_AWAITING.length} — ${ROWS_AWAITING_NOW.join(", ")}`,
+  awaitingDrift.length === 0,
+);
+/** ⛔ Non-vacuity: the list has to actually split the built rows in two. */
+const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
+check(
+  "...and that list splits the built rows rather than covering none or all",
+  `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
+  builtWithNow.length === 8 && builtRows.length === 12,
+);
+/** ⚠️ `hasNowState(null)` is false — the plain mirror is on no side at all. */
+check(
+  "...and the plain mirror is never claimed to have a production screen",
+  `hasNowState(null) = ${hasNowState(null)}`,
+  hasNowState(null) === false,
+);
+/**
+ * ⛔ The note has to use the project's own not-built wording, and must say the
+ * two sides look the same — a reviewer who reads "not in prototype yet" and
+ * still sees the toggle move would reasonably assume it worked.
+ */
+/**
+ * ⚠️ The wording AND the guard. A break test switching the block off with
+ * `{false && awaiting && (` left both strings in the file, so a check that only
+ * grepped for the copy went on passing over a note that never rendered.
+ */
+const NOTE_RENDERED = /\{awaiting && \(/;
+check(
+  "the gap is named on screen in the locked vocabulary",
+  TOGGLE_SRC.includes("⚠️ Not in prototype yet") &&
+    /look the same/.test(TOGGLE_SRC) &&
+    NOTE_RENDERED.test(TOGGLE_CODE)
+    ? "⚠️ Not in prototype yet … look the same here — rendered on {awaiting}"
+    : "MISSING, off-vocabulary, or behind another condition",
+  TOGGLE_SRC.includes("⚠️ Not in prototype yet") &&
+    /look the same/.test(TOGGLE_SRC) &&
+    NOTE_RENDERED.test(TOGGLE_CODE),
+);
+/** ⛔ Named, not disabled — all four rows HAVE production behaviour. */
+check(
+  "...and the awaiting rows are told about, not greyed out",
+  /disabled/.test(TOGGLE_CODE) ? "DISABLED — reads as 'no production behaviour'" : "the control stays live",
+  !/disabled/.test(TOGGLE_CODE),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n22. Nothing invisible in the source");
+// ---------------------------------------------------------------------------
+/**
+ * \u26d4\u26d4 **Twice now, a control character has reached a TypeScript file from a
+ * generated edit, and both times it made a check pass while testing nothing.**
+ *
+ * 2026-10-14, the first: a string-joined merge key whose separator became a
+ * real **NUL** (`\\x00`). Invisible in every editor, unmatched by every search,
+ * and the reason a break test patched nothing and reported success.
+ *
+ * 2026-10-14, the second: `\\b` written inside a non-raw Python string became a
+ * real **backspace** (`\\x08`), so `/\\buseRouter\\b/` shipped as `/<BS>useRouter<BS>/`
+ * and the check that was supposed to prove the toggle never navigates matched
+ * nothing. It printed `ok` with a `useRouter` import sitting in the file.
+ *
+ * Neither was findable by reading. So the gate reads the bytes.
+ *
+ * \u26a0\ufe0f Tab and the two newline characters are legal; everything else below 0x20
+ * is not, and nor is a lone 0x7F.
+ */
+const SOURCE_DIRS = ["lib", "components", "app", "scripts"];
+const LEGAL_CONTROLS = new Set([0x09, 0x0a, 0x0d]);
+function sourceFiles(dir: string): string[] {
+  return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory()
+      ? sourceFiles(join(dir, e.name))
+      : /\.tsx?$/.test(e.name)
+        ? [join(dir, e.name)]
+        : [],
+  );
+}
+const SCANNED = SOURCE_DIRS.flatMap(sourceFiles);
+const invisible: string[] = [];
+for (const file of SCANNED) {
+  const bytes = readFileSync(join(ROOT, file));
+  const found = new Map<number, number>();
+  for (const byte of bytes) {
+    if ((byte < 0x20 && !LEGAL_CONTROLS.has(byte)) || byte === 0x7f) {
+      found.set(byte, (found.get(byte) ?? 0) + 1);
+    }
+  }
+  if (found.size) {
+    invisible.push(
+      `${file}: ${[...found].map(([b, n]) => `0x${b.toString(16)}x${n}`).join(" ")}`,
+    );
+  }
+}
+check(
+  "no control character has slipped into a TypeScript source file",
+  invisible.length
+    ? `FOUND in ${invisible.length}: ${invisible.slice(0, 4).join("; ")}`
+    : `0 of ${SCANNED.length} file(s) carry one`,
+  invisible.length === 0,
+);
+/** \u26d4 Non-vacuity: a scan that read no files would also report zero. */
+check(
+  "...and the scan actually read the source tree",
+  `${SCANNED.length} file(s) across ${SOURCE_DIRS.join(", ")}`,
+  SCANNED.length > 150 &&
+    SOURCE_DIRS.every((dir) => SCANNED.some((f) => f.startsWith(dir + "/"))),
 );
 
 // ---------------------------------------------------------------------------

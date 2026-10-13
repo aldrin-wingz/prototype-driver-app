@@ -15,6 +15,7 @@ import {
 import { tableRows } from "@/lib/solutions/table-shape";
 import { solutionHref, useSolution } from "@/lib/solutions/solution-context";
 import { cn } from "@/lib/utils";
+import { DemoModeToggle } from "./demo-mode-toggle";
 import { UseCaseFlow } from "./use-case-flow";
 
 /**
@@ -164,6 +165,12 @@ export function SolutionTable() {
                     */}
                     {isActive && (
                       <span className="mt-2 block border-t border-[#E5E7EB] pt-2">
+                        {/* ⛔ In the last cell with everything else, never in a
+                            detail <tr> — an extra row inside a rowspan run
+                            breaks every span above it. */}
+                        <span className="mb-1.5 block">
+                          <DemoModeToggle tone="light" />
+                        </span>
                         {solution.noSurfaceReason && (
                           <span className="block text-[11px] leading-snug text-[#92400E]">
                             {solution.noSurfaceReason}

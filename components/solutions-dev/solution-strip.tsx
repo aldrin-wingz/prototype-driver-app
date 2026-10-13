@@ -13,6 +13,7 @@ import {
 import { useSolution, solutionHref } from "@/lib/solutions/solution-context";
 import { UseCaseFlow } from "./use-case-flow";
 import { cn } from "@/lib/utils";
+import { DemoModeToggle } from "./demo-mode-toggle";
 
 /**
  * The prototype selector's always-visible half.
@@ -130,6 +131,10 @@ export function SolutionStrip() {
         {active ? (
           <>
             <div className="mt-1.5 flex flex-wrap items-center gap-2 px-2">
+              {/* ⭐ First, because it is the control the demo turns on — and in
+                  the strip rather than inside the phone, because the driver app
+                  has no opinion about which side it is showing. */}
+              <DemoModeToggle tone="dark" />
               <span className="rounded-full bg-[#1B2C28] px-2 py-0.5 text-[10px] font-semibold text-[#9FC3B8]">
                 {CLASS_LABEL[active.klass]}
               </span>

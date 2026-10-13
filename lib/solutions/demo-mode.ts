@@ -103,6 +103,49 @@ export function showsProposal(
   return focus.mode === "fixed";
 }
 
+/** What the toggle's two segments say. ⚠️ Tooling copy, not driver-facing. */
+export const DEMO_MODE_LABEL: Record<DemoMode, string> = {
+  now: "Now",
+  fixed: "Proposed",
+};
+
+/** The longer form, for the control's accessible name. */
+export const DEMO_MODE_DESCRIPTION: Record<DemoMode, string> = {
+  now: "Show what a driver hits today",
+  fixed: "Show the proposed feature",
+};
+
+/**
+ * Built rows whose production side is **not built yet**.
+ *
+ * ⛔⛔ Declared as the SHRINKING list rather than the growing one, deliberately.
+ * A list of "rows that work" grows with every commit and is wrong by omission —
+ * forget to add a row and the app silently claims it has no Now. This list is
+ * wrong by COMMISSION: a row stays on it until someone deletes the line, and
+ * deleting a line is the thing you cannot forget to do when the note is still
+ * on screen in front of you.
+ *
+ * ⚠️ Row 10 is here for a reason worth stating. Focusing it in `"now"` does
+ * hide the More Options tile it shares with row 09 — so something changes — but
+ * its headline feature, the Request Feed member filter, is not gated yet. A
+ * toggle that moves a tile while the filter it is really about stays put is the
+ * kind of half-truth that is worse than an empty state.
+ *
+ * ⭐ B5's check 12 measures the running app and asserts this list is exactly
+ * right, in both directions.
+ */
+export const ROWS_AWAITING_NOW: readonly string[] = [
+  "missed-swipe",                   // 03 — ⛔ the pick-up refusal is uncaptured
+  "request-feed-member-filter",     // 10 — the filter itself is not gated
+  "send-back-reason-form",          // 13 — ⛔ the Standing Order denial is uncaptured
+  "rider-initiated-cancellation",   // 16 — five surfaces, none gated yet
+];
+
+/** Whether the focused row can actually show production today. */
+export function hasNowState(solutionId: string | null): boolean {
+  return solutionId !== null && !ROWS_AWAITING_NOW.includes(solutionId);
+}
+
 /**
  * ⛔ No default for `mode`. A default would let a converted call site compile
  * while silently answering the wrong question, which is the one failure
