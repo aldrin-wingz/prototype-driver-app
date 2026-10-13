@@ -13,7 +13,7 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~148.5 MB of binaries into a branch that every future prototype clones — and
+~149.2 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
@@ -63,10 +63,10 @@ and predates the build in any case. It is not a source.
 | **06 Chat** | 15 | 7.0 | Sep-2026×10, MRV-B2×4, DAB-2026-10-13×1 | 🕐 mostly stale — 5 of 15 current — shipped surfaces only |
 | **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ 31 of 37 from a current shoot — captured, not built (by decision) |
 | **_annotated** | 64 | 16.4 | derived×64 | — derivatives, not captures |
-| **_out-of-scope** | 14 | 3.3 | Apr-2026×10, DAB-2026-10-09×3, DAB-2026-10-13×1 | — excluded feature |
+| **_out-of-scope** | 15 | 4.0 | Apr-2026×10, DAB-2026-10-09×3, DAB-2026-10-13×2 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
 | **_unregistered** | 89 | 44.4 | MRV-B1-raw×32, unknown×18, unknown (undated shoot folder)×7, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **339** | **148.5** | | 473 files on disk, 339 unique |
+| **TOTAL** | **340** | **149.2** | | 475 files on disk, 340 unique |
 
 ---
 
@@ -658,6 +658,7 @@ Rider no-show and support-form captures — real production captures of a featur
 | CAP-233 | `s-06e - Member No-Show - Member Not Home Selected.png` | DAB-2026-10-09 | `2802cd780d3aab9c` | 0 |  |
 | CAP-234 | `s-06f - Member No-Show - Member Not Ready Selected.png` | DAB-2026-10-09 | `11c71a6748acce45` | 0 |  |
 | CAP-328 | `s-06g - Member No-Show - Wait 10 Minutes Refusal.png` | DAB-2026-10-13 | `379d31e2efd93c8a` | 0 |  |
+| CAP-340 | `Screenshot 2026-10-14 at 2.55.44 AM.png` | DAB-2026-10-13 | `c2a5e3a24a227756` | 1 |  |
 
 <details><summary>Source paths</summary>
 
@@ -675,6 +676,7 @@ Rider no-show and support-form captures — real production captures of a featur
 - `CAP-233` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-09/s-06e - Member No-Show - Member Not Home Selected.png`
 - `CAP-234` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-09/s-06f - Member No-Show - Member Not Ready Selected.png`
 - `CAP-328` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-13/s-06g - Member No-Show - Wait 10 Minutes Refusal.png`
+- `CAP-340` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-13/Screenshot 2026-10-14 at 2.55.44 AM.png`
 
 </details>
 
