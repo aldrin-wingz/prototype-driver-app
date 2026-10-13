@@ -66,7 +66,7 @@ and predates the build in any case. It is not a source.
 | **_out-of-scope** | 13 | 2.7 | Apr-2026×10, DAB-2026-10-09×3 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
 | **_unregistered** | 85 | 42.2 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (undated shoot folder)×3, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **319** | **137.9** | | 425 files on disk, 319 unique |
+| **TOTAL** | **319** | **137.9** | | 453 files on disk, 319 unique |
 
 ---
 
@@ -81,9 +81,9 @@ Weekly view, wallet, payouts, payout detail, help sheet. ⛔ **Home INCENTIVES h
 | CAP-003 | `01-03 - Home - State 3 Balance No Scheduled.png` | BAL-B1 | `e19090dd9ec2a626` | 0 |  |
 | CAP-004 | `01-04 - Home - State 2 No Balance With Scheduled.png` | BAL-B1 | `11f4561763b13a3a` | 0 |  |
 | CAP-005 | `01-05 - Home - State 4 Balance With Scheduled.png` | BAL-B1 | `d8eec6d0bdf282af` | 0 |  |
-| CAP-006 | `01a - Dashboard - This Month.png` | Apr-2026 | `09a0738a14960908` | 1 |  |
-| CAP-007 | `01b - Dashboard - Last Month.png` | Apr-2026 | `5fd1f6a27de48755` | 1 |  |
-| CAP-008 | `01c - Dashboard - Scrolled.png` | Apr-2026 | `3534fd122b88de48` | 1 |  |
+| CAP-006 | `01a - Dashboard - This Month.png` | Apr-2026 | `09a0738a14960908` | 2 |  |
+| CAP-007 | `01b - Dashboard - Last Month.png` | Apr-2026 | `5fd1f6a27de48755` | 2 |  |
+| CAP-008 | `01c - Dashboard - Scrolled.png` | Apr-2026 | `3534fd122b88de48` | 2 |  |
 | CAP-009 | `02-01 - Wallet - Default.png` | BAL-B1 | `ea30cb11b8fd8c2c` | 0 |  |
 | CAP-010 | `02-02 - Wallet - State 1 No Balance No Scheduled.png` | BAL-B1 | `cbd16f05a1da7a88` | 0 |  |
 | CAP-011 | `02-03 - Wallet - State 3 Balance No Bank Account.png` | BAL-B1 | `c9d06d79c8d3bb01` | 0 |  |
@@ -146,8 +146,8 @@ Map View, list view, filters, drop-off filter, empty state, Special Offers. The 
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-030 | `02a - Requests - Single Legs Allowed Pill.png` | Apr-2026 | `3efb9f7f1cddbc55` | 1 |  |
-| CAP-031 | `02b - Requests - Will-Call Pill.png` | Apr-2026 | `aa89a513ea2a061e` | 1 |  |
+| CAP-030 | `02a - Requests - Single Legs Allowed Pill.png` | Apr-2026 | `3efb9f7f1cddbc55` | 2 |  |
+| CAP-031 | `02b - Requests - Will-Call Pill.png` | Apr-2026 | `aa89a513ea2a061e` | 2 |  |
 | CAP-032 | `03-07 - Map - Count Zoomed Out.jpg` | MRV-B1 | `98916673c21bc881` | 0 | Zoomed out, count highlighted + magnified strip: '175 of 281 trips shown' |
 | CAP-033 | `03-08 - Map - Count Zoomed In.jpg` | MRV-B1 | `98d5f05061b64b06` | 0 | Zoomed in, count highlighted + magnified strip: '15 of 281 trips shown' |
 | CAP-034 | `03-09 - Before - Tap A Pin.jpg` | MRV-B1 | `0df8e0c5fc3ab8a6` | 0 | BEFORE: red box on a $67.59 fare pin |
@@ -178,7 +178,7 @@ Map View, list view, filters, drop-off filter, empty state, Special Offers. The 
 | CAP-059 | `10-03 - B2 Special Offers - Route View.png` | MRV-B2 | `9236a3aae50da2c9` | 0 | Special Offer route view — SELECTED TRIP card carrying the same "Needs approval" banner |
 | CAP-060 | `10-04 - B2 Special Offers - Ride Details Request.png` | MRV-B2 | `41db57bdd99d238b` | 0 | ⭐⭐ Special Offer **Ride Details**: purple **Special Offer** pill, a **"Confirmation required — a coordinator must confirm availability before this ride is assigned"** callout, and the action reads … |
 | CAP-061 | `10-05 - B2 Special Offers - Tab Selected Alt.png` | MRV-B2 | `f10f60f56fb782ad` | 0 | Special Offers tab with the **Needs approval · Manual review** banner. Alternate framing of `10-02`, used because the banner sits clear of the wrapped chip row. Source for `DG-12` |
-| CAP-062 | `11 - Filter Requests Modal.png` | Apr-2026 | `72ea241819695f05` | 1 |  |
+| CAP-062 | `11 - Filter Requests Modal.png` | Apr-2026 | `72ea241819695f05` | 2 |  |
 
 <details><summary>Source paths</summary>
 
@@ -252,20 +252,20 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-071 | `03a - My Rides - Needs Action Tab.png` | Apr-2026 | `ba310c0b8e97c2b3` | 1 |  |
+| CAP-071 | `03a - My Rides - Needs Action Tab.png` | Apr-2026 | `ba310c0b8e97c2b3` | 2 |  |
 | CAP-072 | `04-01 - Ride History - List.png` | DAB-2026-10-01 | `a4f24bafca041f98` | 0 |  |
 | CAP-073 | `04-02 - Ride History - Filter Sheet.png` | DAB-2026-10-01 | `e2e3a87bf433fda1` | 0 |  |
 | CAP-074 | `04-03 - Ride History - Filter Options Open.png` | DAB-2026-10-01 | `3217717b762eefec` | 0 |  |
 | CAP-075 | `04-04 - Ride Details - Completed From History.png` | DAB-2026-10-01 | `fa8e467764d48a10` | 0 |  |
-| CAP-076 | `04a - Ride Details - Before Taken - Top.png` | Apr-2026 | `aba024b50b98b74f` | 1 |  |
-| CAP-077 | `04b - Ride Details - Before Taken - Scrolled.png` | Apr-2026 | `4bf7c543bc94d87b` | 1 |  |
-| CAP-078 | `05a - Ride Details - Needs Action - Top.png` | Apr-2026 | `f366065f4b78530a` | 1 |  |
-| CAP-079 | `05b - Ride Details - Needs Action - Scrolled.png` | Apr-2026 | `dcdbe83178ae3125` | 1 |  |
-| CAP-080 | `07 - Ride History.png` | Apr-2026 | `ccfe36e86cb1a7eb` | 1 |  |
+| CAP-076 | `04a - Ride Details - Before Taken - Top.png` | Apr-2026 | `aba024b50b98b74f` | 2 |  |
+| CAP-077 | `04b - Ride Details - Before Taken - Scrolled.png` | Apr-2026 | `4bf7c543bc94d87b` | 2 |  |
+| CAP-078 | `05a - Ride Details - Needs Action - Top.png` | Apr-2026 | `f366065f4b78530a` | 2 |  |
+| CAP-079 | `05b - Ride Details - Needs Action - Scrolled.png` | Apr-2026 | `dcdbe83178ae3125` | 2 |  |
+| CAP-080 | `07 - Ride History.png` | Apr-2026 | `ccfe36e86cb1a7eb` | 2 |  |
 | CAP-081 | `08-02 - B2 Claim - Ride Details Swipe.png` | MRV-B2 | `0269294834e32c33` | 0 | Ride Details with the reject / accept swipe bar. Source for `DG-07`. ⚠️ The first annotation pass boxed the trip-detail paragraph instead of the control — re-boxed on the bar itself |
-| CAP-082 | `s-03a - More Options - Grid.jpg` | Apr-2026 | `0638d9819621afc9` | 1 |  |
-| CAP-083 | `s-06d - More Options - Ready To Start Or En-Route Refusal.jpg` | Apr-2026 | `26a4e0759da1981e` | 1 |  |
-| CAP-084 | `s-06e - More Options - Call Member Or Support Sheet.jpg` | Apr-2026 | `3d4a0807453fa36a` | 1 |  |
+| CAP-082 | `s-03a - More Options - Grid.jpg` | Apr-2026 | `0638d9819621afc9` | 2 |  |
+| CAP-083 | `s-06d - More Options - Ready To Start Or En-Route Refusal.jpg` | Apr-2026 | `26a4e0759da1981e` | 2 |  |
+| CAP-084 | `s-06e - More Options - Call Member Or Support Sheet.jpg` | Apr-2026 | `3d4a0807453fa36a` | 2 |  |
 | CAP-085 | `Stage 01 - Member Confirmation - Accepted Ride screen.webp` | Apr-2026 | `89c9a26dc78ece69` | 0 |  |
 | CAP-086 | `Stage 01 - Member Confirmation - More Options menu.png` | Apr-2026 | `fc790608d4206010` | 0 |  |
 | CAP-087 | `Stage 01 - Member Confirmation - Phone options popup.png` | Apr-2026 | `175341a87bc679bf` | 0 |  |
@@ -273,12 +273,12 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 | CAP-089 | `Stage 01 - Member Confirmation - Reach Rider modal (standard).webp` | Apr-2026 | `4440996c9cb4b7e2` | 0 |  |
 | CAP-090 | `Stage 01 - Member Confirmation - Rider Declined popup.webp` | Apr-2026 | `fd821ede09cda48d` | 0 |  |
 | CAP-091 | `Stage 01 - Member Confirmation - SMS templates popup.png` | Apr-2026 | `b5fe2a582ad16ee7` | 0 |  |
-| CAP-092 | `Stage 02 - Start Trip - Confirmed Accepted Ride screen.webp` | Apr-2026 | `166648f866203bc0` | 2 |  |
+| CAP-092 | `Stage 02 - Start Trip - Confirmed Accepted Ride screen.webp` | Apr-2026 | `166648f866203bc0` | 3 |  |
 | CAP-093 | `Stage 02 - Start Trip - Pre-Check Confirmation popup.webp` | Apr-2026 | `904cbef61e73e2d1` | 0 |  |
-| CAP-094 | `Stage 03 - Pick Up Member - Active Ride screen.webp` | Apr-2026 | `1fc81fe3c273c34c` | 2 |  |
+| CAP-094 | `Stage 03 - Pick Up Member - Active Ride screen.webp` | Apr-2026 | `1fc81fe3c273c34c` | 3 |  |
 | CAP-095 | `Stage 03 - Pick Up Member - Pickup Odometer Reading popup.webp` | Apr-2026 | `028ff700a0e369fa` | 0 |  |
 | CAP-096 | `Stage 03 - Pick Up Member - Seatbelt Check popup.webp` | Apr-2026 | `4fb536beba927cea` | 0 |  |
-| CAP-097 | `Stage 04 - Drop Off Member - Drop Off CTA screen.webp` | Apr-2026 | `160271ffb9b47175` | 2 |  |
+| CAP-097 | `Stage 04 - Drop Off Member - Drop Off CTA screen.webp` | Apr-2026 | `160271ffb9b47175` | 3 |  |
 | CAP-098 | `Stage 05 - Ride Signature - Signature capture screen.webp` | Apr-2026 | `ee2017527e4580f9` | 0 |  |
 | CAP-099 | `Stage 06 - Completed Ride - Completion screen.webp` | Apr-2026 | `9951b700ed36e45b` | 0 |  |
 
@@ -614,16 +614,16 @@ Rider no-show and support-form captures — real production captures of a featur
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-222 | `s-02a - Form Request - Late Pickup Reason.png` | Apr-2026 | `859d0c2ef4456468` | 1 |  |
-| CAP-223 | `s-04a - Confirm Flow - Were You Able To Reach The Rider.jpg` | Apr-2026 | `4407ec2f952e6aff` | 1 |  |
-| CAP-224 | `s-04b - Confirm Flow - Rider Declined The Trip.jpg` | Apr-2026 | `dd7473fb649a2564` | 1 |  |
-| CAP-225 | `s-04c - Support Chat - Decline Template Message.jpg` | Apr-2026 | `bf1cac2b7f119fdf` | 1 |  |
-| CAP-226 | `s-05a - Web Form - Trip Data Update - Top.png` | Apr-2026 | `b9fdb14a5a97af8d` | 1 |  |
-| CAP-227 | `s-05b - Web Form - Trip Data Update - Times.png` | Apr-2026 | `eb09c2246f0339e9` | 1 |  |
-| CAP-228 | `s-05c - Web Form - Trip Data Update - Reason And Submit.png` | Apr-2026 | `25d4a3046a5097aa` | 1 |  |
-| CAP-229 | `s-06a - Member No-Show - Empty.jpg` | Apr-2026 | `f3ba4f10fe68c788` | 1 |  |
-| CAP-230 | `s-06b - Member No-Show - No-Show Type Picker.jpg` | Apr-2026 | `6c750c86466c1a53` | 1 |  |
-| CAP-231 | `s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg` | Apr-2026 | `c20673e8bc83a759` | 1 |  |
+| CAP-222 | `s-02a - Form Request - Late Pickup Reason.png` | Apr-2026 | `859d0c2ef4456468` | 2 |  |
+| CAP-223 | `s-04a - Confirm Flow - Were You Able To Reach The Rider.jpg` | Apr-2026 | `4407ec2f952e6aff` | 2 |  |
+| CAP-224 | `s-04b - Confirm Flow - Rider Declined The Trip.jpg` | Apr-2026 | `dd7473fb649a2564` | 2 |  |
+| CAP-225 | `s-04c - Support Chat - Decline Template Message.jpg` | Apr-2026 | `bf1cac2b7f119fdf` | 2 |  |
+| CAP-226 | `s-05a - Web Form - Trip Data Update - Top.png` | Apr-2026 | `b9fdb14a5a97af8d` | 2 |  |
+| CAP-227 | `s-05b - Web Form - Trip Data Update - Times.png` | Apr-2026 | `eb09c2246f0339e9` | 2 |  |
+| CAP-228 | `s-05c - Web Form - Trip Data Update - Reason And Submit.png` | Apr-2026 | `25d4a3046a5097aa` | 2 |  |
+| CAP-229 | `s-06a - Member No-Show - Empty.jpg` | Apr-2026 | `f3ba4f10fe68c788` | 2 |  |
+| CAP-230 | `s-06b - Member No-Show - No-Show Type Picker.jpg` | Apr-2026 | `6c750c86466c1a53` | 2 |  |
+| CAP-231 | `s-06c - Member No-Show - Wait 10 Minutes Refusal.jpg` | Apr-2026 | `c20673e8bc83a759` | 2 |  |
 | CAP-232 | `s-06d - Member No-Show - Cancel At Door Selected.png` | DAB-2026-10-09 | `d4c37b910e01bcb0` | 0 |  |
 | CAP-233 | `s-06e - Member No-Show - Member Not Home Selected.png` | DAB-2026-10-09 | `2802cd780d3aab9c` | 0 |  |
 | CAP-234 | `s-06f - Member No-Show - Member Not Ready Selected.png` | DAB-2026-10-09 | `11c71a6748acce45` | 0 |  |

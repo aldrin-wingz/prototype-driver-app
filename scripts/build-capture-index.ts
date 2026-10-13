@@ -31,6 +31,14 @@ const SOURCES = [
   "Other/NEMT Driver App/Flow Reference",
   "Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical",
   "Project - In-App Support Requests/prototype-driver-app-support/references/screenshots/canonical",
+  // ⛔ THIS repo's own canonical folder. It was missing, so anything dropped
+  // here was invisible to the index AND to the reverse-direction check — the
+  // one place a capture can sit in the repo and nothing reports the gap. It
+  // read as covered only because this folder is byte-identical to the sibling
+  // above, so every SHA already had a row.
+  // ⚠️ Listed AFTER the sibling on purpose: `rel` is `locs[0]`, so the sibling
+  // stays each row's printed path and no CAP id moves. CAP ids are positional.
+  "Project - In-App Support Requests/prototype-driver-app-support-solutions/references/screenshots/canonical",
 ];
 
 const SECTIONS = ["01 Home", "02 Requests", "03 Planner", "04 My Rides", "05 Options",
