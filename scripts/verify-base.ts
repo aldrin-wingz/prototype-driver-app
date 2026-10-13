@@ -36,6 +36,12 @@ import {
   isWillCall, pinPosition, sortTrips, visibleTrips,
 } from "../lib/driver-data/map-view";
 import {
+  DECLINED_BODY, DECLINED_CHAT_SUPPORT, DECLINED_TITLE, DECLINED_WALK_BACK,
+  ZENDESK_COMPOSER_PLACEHOLDER, ZENDESK_DECLINE_INTRO, ZENDESK_DECLINE_LABELS,
+  ZENDESK_SENT_STATUS, declinableLegIds, zendeskDeclineMessage,
+} from "../lib/driver-data/rider-declined";
+import { reachOptionsFor } from "../components/driver/reach-rider-modal";
+import {
   SEND_BACK_CONFIRM_BODY, SEND_BACK_CONFIRM_NO, SEND_BACK_CONFIRM_YES,
   SEND_BACK_DENIED_BODY, SEND_BACK_DENIED_DISMISS, SEND_BACK_DENIED_TITLE,
   sendBackOutcome,
@@ -43,6 +49,8 @@ import {
 import {
   getLegStage,
   getNextSwipe,
+  isSameDayPickup,
+  tripDateParses,
   mockRequestTrips,
   mockNeedsActionTrips,
   mockUpcomingTrips,
@@ -643,6 +651,192 @@ check(
     ? dangling.slice(0, 5).map((c) => `${c.file}:${c.cap}`).join(", ")
     : `${citations.length} of ${citations.length} resolve against ${indexedCaps.size} indexed rows`,
   dangling.length === 0,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n9. The rider-declined dead end (CAP-323 / CAP-327)");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐⭐ The flow this section guards does not END anywhere in the app: the driver
+ * reports a decline, a ticket is auto-filed on their behalf, and the ride is
+ * unchanged. Every check below is about keeping that honest — the copy, the
+ * silence, and the fact that the driver typed nothing.
+ */
+
+/** Transcribed from `CAP-323` / `CAP-325` at fold-in. ⛔ Never re-derive. */
+const CAP_323 = {
+  title: "Rider declined the trip",
+  body: "Please chat with support to remove it from your manifest.",
+  primary: "Chat with Support",
+  walkBack: "Rider Needs Transportation",
+};
+check(
+  "the declined sheet is CAP-323 verbatim",
+  `"${DECLINED_TITLE}" / "${DECLINED_CHAT_SUPPORT}" / "${DECLINED_WALK_BACK}", body ${DECLINED_BODY.length} chars`,
+  DECLINED_TITLE === CAP_323.title &&
+    DECLINED_BODY === CAP_323.body &&
+    DECLINED_CHAT_SUPPORT === CAP_323.primary &&
+    DECLINED_WALK_BACK === CAP_323.walkBack,
+);
+
+/**
+ * ⛔⛔ **The 2021 sheet must not come back.** `CAP-090` is an iOS capture of a
+ * 2021 ride offering one button, `Call Support`; the sibling prototype
+ * replicated it for months and was arguing against a flow production had
+ * already changed. Anyone reaching for an old screenshot reintroduces it, so
+ * the words themselves are banned from the source.
+ */
+const SHEET_2021 = [
+  "This is NOT a confirmation for the trip cancellation",
+  "Call Support",
+];
+const revived = SHEET_2021.filter((phrase) =>
+  files.some((f) => readFileSync(f, "utf8").includes(`"${phrase}`) || readFileSync(f, "utf8").includes(`>${phrase}<`)),
+);
+check(
+  "the retired 2021 declined sheet has not come back",
+  revived.length ? revived.join(" | ") : `0 of ${SHEET_2021.length} retired phrases across ${files.length} files`,
+  revived.length === 0,
+);
+
+/**
+ * Both captured variants of the Reach Rider sheet.
+ *
+ * ⛔ The same-day third option ADVANCES the trip; the standard one closes and
+ * changes nothing. Two behaviours, so two lists — a single list with a swapped
+ * label would make them look like one. Asserted as a DIFF rather than two
+ * literals, because the first two options genuinely are identical and two
+ * copies of them would be two chances to drift.
+ */
+const standard = reachOptionsFor(false);
+const sameDayOpts = reachOptionsFor(true);
+check(
+  "both Reach Rider variants offer production's three options",
+  `standard ${standard.length}, same-day ${sameDayOpts.length}`,
+  standard.length === 3 && sameDayOpts.length === 3,
+);
+check(
+  "the variants differ in the third option and nowhere else",
+  `[0]/[1] same: ${standard[0].label === sameDayOpts[0].label && standard[1].label === sameDayOpts[1].label}; [2] "${standard[2].label}" vs "${sameDayOpts[2].label}"`,
+  standard[0].label === sameDayOpts[0].label &&
+    standard[1].label === sameDayOpts[1].label &&
+    standard[2].label !== sameDayOpts[2].label,
+);
+check(
+  "only the same-day variant carries the helper note",
+  `standard notes ${standard.filter((o) => o.note).length}, same-day notes ${sameDayOpts.filter((o) => o.note).length}`,
+  standard.filter((o) => o.note).length === 0 &&
+    sameDayOpts.filter((o) => o.note).length === 1,
+);
+check(
+  "the sheet names the decline exactly as production does",
+  `"${standard[1].label}"`,
+  standard[1].label === "Rider declined the trip",
+);
+
+/**
+ * ⛔ The derived same-day rule, over the whole seed — and the parse it rests on.
+ * A date that failed to parse would make every trip "not today" in silence, and
+ * the app would quietly show the wrong variant of a captured screen.
+ */
+const unparsed = all.filter((t) => !tripDateParses(t));
+check(
+  "every seeded trip date parses",
+  unparsed.length ? unparsed.map((t) => `${t.id}: ${t.date}`).join(", ") : `${all.length} of ${all.length}`,
+  unparsed.length === 0,
+);
+const sameDayTrips = all.filter(isSameDayPickup);
+check(
+  "same-day is a real distinction in the seed, not everything or nothing",
+  `${sameDayTrips.length} of ${all.length} trips are same-day`,
+  sameDayTrips.length > 0 && sameDayTrips.length < all.length,
+);
+/**
+ * ⚠️ The base seeds ONE unconfirmed ride and it is a same-day one, so tapping
+ * through only ever reaches the same-day variant. Said here rather than left to
+ * be discovered — and asserted, so a reseed that silently flipped it would have
+ * to come and change this line.
+ */
+check(
+  "the one unconfirmed ride is same-day, so that is the variant the app shows",
+  `${mockNeedsActionTrips.length} unconfirmed ride(s), ${mockNeedsActionTrips.filter(isSameDayPickup).length} same-day`,
+  mockNeedsActionTrips.length === 1 && mockNeedsActionTrips.every(isSameDayPickup),
+);
+
+/**
+ * The auto-sent ticket, over every seeded trip.
+ *
+ * ⛔ **The Appointment Time row is a destination, not a leg.** Listing its id
+ * would put a reference in front of Support that does not name a ride.
+ */
+check(
+  "the ticket's intro and labels are CAP-327 / CAP-225 verbatim",
+  `${ZENDESK_DECLINE_LABELS.join(" / ")} · "${ZENDESK_SENT_STATUS}" · "${ZENDESK_COMPOSER_PLACEHOLDER}"`,
+  ZENDESK_DECLINE_INTRO ===
+    "My member no longer needs transportation. I need help in removing the following rides from my manifest." &&
+    ZENDESK_DECLINE_LABELS.join("|") === "Member Name|Trip Date|Trip ID|Leg IDs" &&
+    ZENDESK_SENT_STATUS === "Sent · Just now" &&
+    ZENDESK_COMPOSER_PLACEHOLDER === "Type a message",
+);
+/**
+ * ⛔⛔ **Compared PER TRIP, and the first version of this check was not.** It
+ * built one set of appointment-leg ids across the whole seed and asked whether
+ * a ticket contained any of them — which failed three completed trips, because
+ * **leg ids are not unique across trips**: `leg-2` is an appointment row on one
+ * ride and an ordinary leg on another. The code was right and the check was
+ * wrong, and a global id set is the shape that made it wrong.
+ */
+const apptRows = all.flatMap((t) => t.legs.filter((l) => l.type === "appointment"));
+const ticketedAppts = all.filter((t) => {
+  const listed = new Set(declinableLegIds(t));
+  return t.legs.some((l) => l.type === "appointment" && listed.has(l.id));
+});
+check(
+  "no ticket lists an appointment row as a leg",
+  ticketedAppts.length
+    ? ticketedAppts.slice(0, 3).map((t) => t.id).join(", ")
+    : `0 of ${all.length} trips, over ${apptRows.length} appointment rows in the seed`,
+  ticketedAppts.length === 0 && apptRows.length > 0,
+);
+const emptyTickets = all.filter((t) => declinableLegIds(t).length === 0);
+check(
+  "every trip still has a leg to name",
+  emptyTickets.length ? emptyTickets.map((t) => t.id).join(", ") : `${all.length} of ${all.length} name at least one leg`,
+  emptyTickets.length === 0,
+);
+const sampleTicket = zendeskDeclineMessage(mockNeedsActionTrips[0]);
+check(
+  "the ticket names the real trip",
+  sampleTicket.lines.map((l) => `${l.label}=${l.value}`).join(" · "),
+  sampleTicket.lines.length === ZENDESK_DECLINE_LABELS.length &&
+    sampleTicket.lines.every((l) => l.value.length > 0),
+);
+
+/**
+ * ⛔ **Read-only, and that IS the finding.** Nobody has captured what Support
+ * says back. A composer that accepted text, or a thread that answered itself,
+ * would be this mirror arguing the dead end is fine.
+ */
+const chatSrc = readFileSync(join(ROOT, "components/driver/zendesk-chat-screen.tsx"), "utf8");
+const liveInputs = (chatSrc.match(/<(input|textarea|form)[\s/>]/g) ?? []).length;
+check(
+  "the support chat is read-only",
+  `${liveInputs} input/textarea/form element(s) in the chat screen`,
+  liveInputs === 0,
+);
+
+/**
+ * ⛔ The sheet NAVIGATES to a route. A dangling push is the exact failure this
+ * flow invites, and nothing else in the app would notice it.
+ */
+const modalSrc = readFileSync(join(ROOT, "components/driver/reach-rider-modal.tsx"), "utf8");
+const pushed = [...modalSrc.matchAll(/router\.push\(`([^`$]*)\$/g)].map(([, prefix]) => prefix);
+check(
+  "the declined sheet pushes to a route that exists",
+  `${pushed.length} push target(s): ${pushed.join(", ") || "none"}`,
+  pushed.length === 1 &&
+    pushed[0] === "/support-chat/" &&
+    existsSync(join(ROOT, "app/support-chat/[id]/page.tsx")),
 );
 
 // ---------------------------------------------------------------------------

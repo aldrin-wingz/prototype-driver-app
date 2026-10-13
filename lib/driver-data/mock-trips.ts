@@ -126,6 +126,38 @@ export function getLegStatusLabel(leg: TripLeg): string {
   }
 }
 
+/**
+ * Whether this trip's pick-up is TODAY, by the seed's own fixed calendar.
+ *
+ * ⛔⛔ **Derived, not seeded, and the choice matters.** The obvious version is a
+ * `Trip.sameDay` flag — which is what the sibling branch carries, where ONE
+ * flag answers two unrelated questions (is the pick-up today? is this send-back
+ * short-notice?). Here a seeded flag could contradict the date printed two
+ * inches above it on the same screen, and nothing would catch it.
+ *
+ * ⚠️ There is no real clock involved: `MOCK_TODAY` is a constant, so this does
+ * not flip on one real-world day the way a `Date.now()` version would.
+ *
+ * ⛔ The parse is the risk — a date that failed to parse would silently make
+ * every trip "not today". `verify-base` asserts every seeded date parses, with
+ * a denominator, so a format change fails the gate instead.
+ */
+export function isSameDayPickup(trip: Trip): boolean {
+  const [y, m, d] = MOCK_TODAY.split("-").map(Number);
+  const parsed = new Date(trip.date);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return (
+    parsed.getFullYear() === y &&
+    parsed.getMonth() + 1 === m &&
+    parsed.getDate() === d
+  );
+}
+
+/** Whether a seeded trip's date string can be read at all. ⛔ See above. */
+export function tripDateParses(trip: Trip): boolean {
+  return !Number.isNaN(new Date(trip.date).getTime());
+}
+
 export interface Trip {
   id: string;
   date: string;

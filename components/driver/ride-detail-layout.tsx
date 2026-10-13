@@ -29,12 +29,14 @@ import { cn } from "@/lib/utils";
 import {
   getLegStage,
   getNextSwipe,
+  isSameDayPickup,
   type Trip,
   type TripLeg,
   type TimeAnchorType,
   type LegSwipeProgress,
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
+import { ReachRiderModal } from "@/components/driver/reach-rider-modal";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
@@ -262,6 +264,20 @@ export function RideDetailLayout({
 }: RideDetailLayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
+
+  /** Stage 01 Step 2 — production's own confirmation sheet. */
+  const [reachOpen, setReachOpen] = useState(false);
+
+  /**
+   * Say that a production action is not stood in for, rather than leaving a
+   * dead tap. The same wording every unwired More Options tile uses.
+   */
+  function unwired(what: string) {
+    toast({
+      title: what,
+      description: "Not wired in the prototype — this is the production action.",
+    });
+  }
 
   // The leg the driver is working, and the swipe expected next on it. Only legs
   // that carry a `progress` object take part in the swipe sequence — the
@@ -608,16 +624,10 @@ export function RideDetailLayout({
             {(
               <button
                 type="button"
-                // A production action v1 does not cover. Saying so beats a dead
-                // tap that reads as a bug — the same treatment the More Options
-                // tiles give every unwired action.
-                onClick={() =>
-                  toast({
-                    title: "I Reached Out to Confirm",
-                    description:
-                      "Not wired in the prototype — this is the production action.",
-                  })
-                }
+                // ⭐ Opens production's own Reach Rider sheet. Until this landed
+                // it raised a "not wired" toast, so the app could enter the
+                // unconfirmed phase and never leave it.
+                onClick={() => setReachOpen(true)}
                 className="flex w-full items-center justify-center gap-3 rounded-full bg-[#F97316] py-4 text-white shadow-lg"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
@@ -635,6 +645,17 @@ export function RideDetailLayout({
         </div>
       ) : null}
 
+      {/* ⚠️ Mounted for the unconfirmed state only — it is the only state whose
+          footer offers the CTA that opens it. */}
+      {state === "needs-action" && (
+        <ReachRiderModal
+          trip={trip}
+          sameDay={isSameDayPickup(trip)}
+          open={reachOpen}
+          onOpenChange={setReachOpen}
+          onUnwired={unwired}
+        />
+      )}
     </div>
   );
 }
