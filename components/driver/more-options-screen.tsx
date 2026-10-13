@@ -391,7 +391,14 @@ export function refusalCopyFor(
   /** The leg, so the availability time can come off its own pick-up. */
   leg?: TripLeg,
   /** The trip, which is what decides the threshold — 15 in Indiana, 0 elsewhere. */
-  trip?: Trip
+  trip?: Trip,
+  /**
+   * ⛔ A PARAMETER. The threshold is now a function of which side is showing —
+   * production has no pick-up-time rule outside Indiana — so this helper cannot
+   * answer without being told, and reading context inside it would stop any
+   * check from building the real copy for each side.
+   */
+  focus?: DemoFocus
 ): string {
   if (!outcome) return "";
   if (outcome.kind === "timer") {
@@ -399,7 +406,7 @@ export function refusalCopyFor(
     // ⚠️ The threshold has to come from the TRIP, not from the constant. Reading
     // `NO_SHOW_POST_PICKUP_MINUTES` here would print "wait at least 15 minutes"
     // to a Georgia driver whose actual boundary is the pick-up time itself.
-    const threshold = (trip && postPickupThresholdMinutes(trip)) ?? 0;
+    const threshold = (trip && focus && postPickupThresholdMinutes(trip, focus)) ?? 0;
     return postPickupRefusalCopy({
       copy: treatment.copy,
       remainingMinutes: outcome.minutesRemaining,

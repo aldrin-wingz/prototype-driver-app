@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSolution } from "@/lib/solutions/solution-context";
 import { ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SignaturePad } from "@/components/ui/signature-pad";
@@ -76,6 +77,9 @@ export function MemberNoShowScreen({
   backHref: string;
 }) {
   const router = useRouter();
+  // ⛔ Which side of rows 01/02 this screen is showing. Production refuses and
+  // stops; the proposal adds the countdown and the way forward.
+  const { demo } = useSolution();
   const { toast } = useToast();
 
   const [noShowType, setNoShowType] = useState("");
@@ -100,7 +104,7 @@ export function MemberNoShowScreen({
    * More Options tile now, so a driver who reaches this screen is one whose
    * no-show will succeed — the countdown belongs where the refusal is.
    */
-  const treatment = treatmentFor(trip);
+  const treatment = treatmentFor(trip, demo);
   /** The captured form contract for whatever is selected right now. */
   const typeForm = noShowFormFor(noShowType);
   /**
@@ -109,9 +113,9 @@ export function MemberNoShowScreen({
    * to `files`, not `timer` — so selecting it here also stops the clock below,
    * and that is correct: there is no longer a wait to count down.
    */
-  const outcomeNow = resolveNoShow(trip, activeLeg, 0, noShowType);
+  const outcomeNow = resolveNoShow(trip, activeLeg, demo, 0, noShowType);
   const elapsed = useNoShowClock(outcomeNow.kind === "timer");
-  const outcome = resolveNoShow(trip, activeLeg, elapsed, noShowType);
+  const outcome = resolveNoShow(trip, activeLeg, demo, elapsed, noShowType);
 
   function handleSubmit() {
     // Light validation first, and deliberately NOT the refusal dialog — an
@@ -202,7 +206,7 @@ export function MemberNoShowScreen({
   }
 
   /** What the refusal dialog says — production's wording, or the revised copy. */
-  const refusalCopy = refusalCopyFor(refusal, treatment, activeLeg);
+  const refusalCopy = refusalCopyFor(refusal, treatment, activeLeg, trip, demo);
   /**
    * ⚠️ Two independent reasons this can be false.
    *
@@ -399,7 +403,7 @@ export function MemberNoShowScreen({
              * happened — the driver needs the countdown they would have had if
              * they had never claimed a refusal at the door.
              */
-            setRefusal(resolveNoShow(trip, activeLeg, elapsed, null));
+            setRefusal(resolveNoShow(trip, activeLeg, demo, elapsed, null));
             return;
           }
           router.push(backHref);

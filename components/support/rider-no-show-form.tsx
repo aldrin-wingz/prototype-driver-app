@@ -1,6 +1,8 @@
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
+import type { DemoFocus } from "@/lib/solutions/demo-mode";
+import { useSolution } from "@/lib/solutions/solution-context";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_RIDER_NO_SHOW } from "@/lib/support-data/issue-types";
@@ -61,11 +63,14 @@ export function buildRiderNoShow(
 function buildCallout(
   trip: Trip,
   leg: TripLeg | undefined,
-  noShowType: string
+  noShowType: string,
+  // ⚠️ A PARAMETER, not a hook read inside — this is a plain function, and
+  // keeping it pure is what lets a check build the real callout for each side.
+  focus: DemoFocus
 ): SupportCallout | undefined {
   // ⚠️ The type travels here too, so this form cannot disagree with the screen
   // that opened it about whether the ride was fileable.
-  const outcome = resolveNoShow(trip, leg, 0, noShowType);
+  const outcome = resolveNoShow(trip, leg, focus, 0, noShowType);
 
   // Only the form outcomes reach this sheet, and only they have
   // something to explain. Anything else means the sheet was opened by a path
@@ -108,12 +113,13 @@ export function RiderNoShowForm({
 }) {
   const { toast } = useToast();
   const { submitForm } = useRideFlow();
+  const { demo } = useSolution();
   const { supportCase, initialValues } = buildRiderNoShow(trip, leg, noShowType);
 
   return (
     <SupportFormSheet
       supportCase={supportCase}
-      callout={buildCallout(trip, leg, noShowType ?? "")}
+      callout={buildCallout(trip, leg, noShowType ?? "", demo)}
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}

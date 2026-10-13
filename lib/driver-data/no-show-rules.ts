@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import {
   getNextSwipe,
   type LocationRecord,
@@ -177,7 +178,7 @@ export function isInSwipeWindow(leg: TripLeg): boolean {
  * comparison. A boolean would have meant "Indiana does this, others do not",
  * which is exactly the shape that stops being true — and did.
  */
-export function postPickupThresholdMinutes(trip: Trip): number | null {
+export function postPickupThresholdMinutes(trip: Trip, focus: DemoFocus): number | null {
   // Indiana's fifteen minutes is production today and always applies.
   if (trip.client === "WellTrans" && trip.market === "IN") {
     return NO_SHOW_POST_PICKUP_MINUTES;
@@ -186,14 +187,14 @@ export function postPickupThresholdMinutes(trip: Trip): number | null {
   // has to remain reachable, because the matrix's as-is row for this rule is a
   // driver who files BEFORE the pick-up and succeeds. If the gate were
   // unconditional in code, that row could not demonstrate the before.
-  return treatmentFor(trip).pickupTimeGate
+  return treatmentFor(trip, focus).pickupTimeGate
     ? NO_SHOW_PICKUP_TIME_MINUTES
     : null;
 }
 
 /** ⚠️ Kept only to name the Indiana case; the rule itself is universal now. */
-export function requiresExtendedPostPickupDelay(trip: Trip): boolean {
-  return (postPickupThresholdMinutes(trip) ?? 0) > NO_SHOW_PICKUP_TIME_MINUTES;
+export function requiresExtendedPostPickupDelay(trip: Trip, focus: DemoFocus): boolean {
+  return (postPickupThresholdMinutes(trip, focus) ?? 0) > NO_SHOW_PICKUP_TIME_MINUTES;
 }
 
 /** "11:40 AM" → minutes since midnight, or `null` if it cannot be read. */
@@ -265,6 +266,12 @@ export type NoShowOutcome =
 export function resolveNoShow(
   trip: Trip,
   leg: TripLeg | undefined,
+  /**
+   * ⛔ Third and REQUIRED, ahead of the two optional tails. Making it optional
+   * would let a call site compile while silently asking about the proposal on a
+   * screen that is meant to be showing production.
+   */
+  focus: DemoFocus,
   elapsedMinutes = 0,
   /**
    * ⚠️ Defaults to `null`, which means "no type chosen yet" and takes the
@@ -342,7 +349,7 @@ export function resolveNoShow(
     }
   }
 
-  const threshold = postPickupThresholdMinutes(trip);
+  const threshold = postPickupThresholdMinutes(trip, focus);
   if (threshold !== null) {
     const since = (leg.minutesSinceScheduledPickup ?? 0) + elapsedMinutes;
     if (since < threshold) {
@@ -409,6 +416,17 @@ export function inferNearWindow(
  * so. No amount of seeded location data can distinguish them, so the treatment
  * has to be declared per ride.
  */
+/**
+ * ⭐ Catalogue rows **01** (Rider no-show) and **02** (Cancel at Door) are ONE
+ * build: the same screen, the same matrix, the same refusals. Declared here
+ * where the rule reads it, so the two cannot drift into disagreeing about which
+ * prototype they are part of.
+ */
+export const NO_SHOW_SOLUTIONS: readonly string[] = [
+  "rider-no-show",
+  "cancel-at-door",
+];
+
 export type NoShowDemoRow =
   | "3" | "3.1"
   | "4" | "4.1"
@@ -551,19 +569,93 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
   },
 };
 
-/** The treatment for a ride, defaulting to today's behaviour. */
-export function treatmentFor(trip: Trip): NoShowTreatment {
-  return (
-    (trip.noShowDemo && NO_SHOW_TREATMENTS[trip.noShowDemo]) || {
-      copy: "production",
-      showTimer: false,
-      offerForm: false,
-      // ⚠️ The default is the FINALISED behaviour, not production's. An untagged
-      // ride is an ordinary ride in the shipped app; only the tagged as-is rows
-      // reproduce what production does today.
-      pickupTimeGate: true,
-    }
-  );
+/**
+ * An ordinary ride in the SHIPPED app — the finalised behaviour, which is what
+ * an untagged ride has always meant here.
+ *
+ * ⚠️ It is a hybrid, and that is deliberate rather than sloppy: production's
+ * wording and production's dead end, but the pick-up-time guardrail, which is
+ * ours. Only the last of the three is finalised; the other two are simply what
+ * we have not changed.
+ */
+export const FINALISED_TREATMENT: NoShowTreatment = {
+  copy: "production",
+  showTimer: false,
+  offerForm: false,
+  pickupTimeGate: true,
+};
+
+/**
+ * An ordinary ride in PRODUCTION, today.
+ *
+ * ⛔⛔ One flag apart from `FINALISED_TREATMENT`, and it is the flag that
+ * changes the OUTCOME rather than the wording: **production has no
+ * pick-up-time rule outside Indiana**, so a driver who arrived early, waited
+ * their ten minutes and files before the ride is due gets through. Matrix row
+ * `"6"` is the standing evidence for that, and this is the same fact applied to
+ * every untagged ride.
+ *
+ * ⚠️ So "Now" is not simply "the proposal with the new copy removed". For this
+ * slice it is also a ride that SUCCEEDS where the shipped app refuses.
+ */
+export const PRODUCTION_TREATMENT: NoShowTreatment = {
+  copy: "production",
+  showTimer: false,
+  offerForm: false,
+  pickupTimeGate: false,
+};
+
+/**
+ * Which row of the matrix shows what production does today, for each row.
+ *
+ * ⛔⛔ **Declared, never parsed from the id.** Stripping `".1"` off a row name
+ * would work for four of the nine and quietly invent an answer for the rest —
+ * `"5"` has no as-is row at all, and `"WV1.1"` is not `"WV1"` by any string rule
+ * that does not also claim `"WV1"` has a proposal called `"WV"`. A map is nine
+ * lines and cannot be wrong by accident.
+ *
+ * ⚠️ As-is rows map to themselves: asking "what does production do on a ride
+ * that already shows production" has to be answerable, and the answer is the
+ * ride itself.
+ */
+export const NO_SHOW_AS_IS_PAIR: Record<NoShowDemoRow, NoShowDemoRow> = {
+  "3": "3",
+  "3.1": "3",
+  "4": "4",
+  "4.1": "4",
+  /**
+   * ⛔ Row 5 is its OWN as-is row, and that is not a shortcut. Production's
+   * message for "no location points at all" is unreachable — the app inserts a
+   * location row before it queries — so a driver with no fix is told to wait ten
+   * minutes today. There is no production screen to show, so the honest Now for
+   * this row is the row itself, flagged as the one place the comparison cannot
+   * be made.
+   */
+  "5": "5",
+  "6": "6",
+  "6.1": "6",
+  WV1: "WV1",
+  "WV1.1": "WV1",
+};
+
+/**
+ * The treatment for a ride, on the side of the comparison being shown.
+ *
+ * ⭐ The whole of catalogue rows 01 and 02 in one function. `"fixed"` is what
+ * the app has always done: the ride's own matrix row, or the finalised default.
+ * `"now"` walks to that row's as-is twin, or — for a ride with no tag — to
+ * `PRODUCTION_TREATMENT`.
+ *
+ * ⛔ The focus gate is `showsProposal`, so a ride visited while ANOTHER row is
+ * focused also shows production. A reviewer walking row 19 who wanders into
+ * Member No-Show must not meet rows 01/02's proposal on the way past — the same
+ * rule the More Options grid and the Reach Rider modal follow.
+ */
+export function treatmentFor(trip: Trip, focus: DemoFocus): NoShowTreatment {
+  const tagged = trip.noShowDemo ? NO_SHOW_TREATMENTS[trip.noShowDemo] : null;
+  if (showsProposal(focus, NO_SHOW_SOLUTIONS)) return tagged ?? FINALISED_TREATMENT;
+  if (!trip.noShowDemo) return PRODUCTION_TREATMENT;
+  return NO_SHOW_TREATMENTS[NO_SHOW_AS_IS_PAIR[trip.noShowDemo]];
 }
 
 /** Whether Member No-Show is offered without a refusal. Kept for the tile's own check. */

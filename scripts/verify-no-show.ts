@@ -10,9 +10,15 @@
  */
 import { readFileSync } from "node:fs";
 import {
+  DEFAULT_DEMO_MODE,
+  demoFocus,
+  type DemoFocus,
+} from "../lib/solutions/demo-mode";
+import {
   NO_SHOW_PICKUP_TIME_MINUTES,
   NO_SHOW_POST_PICKUP_MINUTES,
   NO_SHOW_RADIUS_MILES,
+  NO_SHOW_AS_IS_PAIR,
   NO_SHOW_TREATMENTS,
   NO_SHOW_TYPES,
   NO_SHOW_WAIT_MINUTES,
@@ -49,6 +55,16 @@ function check(label: string, condition: boolean, detail = "") {
   else failures.push(`${label}${detail ? ` — ${detail}` : ""}`);
 }
 
+/**
+ * The plain mirror — no focus, so no side, and `treatmentFor` returns the
+ * ride's own matrix row exactly as it did before B3a.
+ *
+ * ⛔ Every check written before the Now/Fixed split uses this, and that is the
+ * claim: they go on asserting what the seeded demo has always asserted. §9 is
+ * the only place that drives the production side.
+ */
+const PLAIN_MIRROR: DemoFocus = demoFocus(null, DEFAULT_DEMO_MODE);
+
 const activeLeg = (trip: (typeof mockInProgressTrips)[number]) =>
   trip.legs.find((leg) => leg.type === "est-pickup");
 const tagged = mockInProgressTrips.filter((trip) => trip.noShowDemo);
@@ -83,7 +99,7 @@ check("the demo seeds no as-is rows", asIs.length === 0,
   asIs.map((t) => t.noShowDemo).join(","));
 for (const trip of asIs) {
   if (AS_IS_EXEMPT.has(String(trip.noShowDemo))) continue;
-  const t = treatmentFor(trip);
+  const t = treatmentFor(trip, PLAIN_MIRROR);
   check(`${trip.noShowDemo} never offers the form`, !t.offerForm);
   check(`${trip.noShowDemo} uses production copy`, t.copy === "production");
 }
@@ -131,7 +147,7 @@ let exempted = 0;
 for (const trip of mockInProgressTrips) {
   const leg = activeLeg(trip);
   if (!leg) continue;
-  const outcome = resolveNoShow(trip, leg, 0);
+  const outcome = resolveNoShow(trip, leg, PLAIN_MIRROR, 0);
   if (outcome.kind === "timer" || outcome.kind === "form") {
     if (OTHER_SLICE_RIDES.has(trip.id)) {
       exempted += 1;
@@ -165,14 +181,14 @@ if (timerRide) {
   check("3.1 does not pass the presence walk", !walk.ok);
   check("3.1 is still near the pick-up now", walk.ok === false && walk.nearRunOldestAge !== null,
     `nearRunOldestAge=${walk.ok === false ? walk.nearRunOldestAge : "n/a"}`);
-  const out = resolveNoShow(timerRide, leg, 0);
+  const out = resolveNoShow(timerRide, leg, PLAIN_MIRROR, 0);
   check("3.1 refuses with a timer", out.kind === "timer", out.kind);
   check("3.1 refuses on presence, not the pick-up time",
     out.kind === "timer" && out.reason === "presence",
     out.kind === "timer" ? out.reason : out.kind);
-  check("3.1 shows a countdown", treatmentFor(timerRide).showTimer);
+  check("3.1 shows a countdown", treatmentFor(timerRide, PLAIN_MIRROR).showTimer);
   // ⚠️ The invariant that matters most: a form here would be a way to skip the wait.
-  check("3.1 offers NO form", !treatmentFor(timerRide).offerForm);
+  check("3.1 offers NO form", !treatmentFor(timerRide, PLAIN_MIRROR).offerForm);
 }
 
 if (formRide) {
@@ -182,18 +198,18 @@ if (formRide) {
   check("4.1 has no near run — the driver has left",
     walk.ok === false && walk.nearRunOldestAge === null,
     `nearRunOldestAge=${walk.ok === false ? walk.nearRunOldestAge : "n/a"}`);
-  const out = resolveNoShow(formRide, leg, 0);
+  const out = resolveNoShow(formRide, leg, PLAIN_MIRROR, 0);
   check("4.1 opens the form", out.kind === "form", out.kind);
   check("4.1 opens it because the driver is not at the pick-up",
     out.kind === "form" && out.gap === "not_at_pickup",
     out.kind === "form" ? out.gap : out.kind);
-  check("4.1 actually offers the form", treatmentFor(formRide).offerForm);
+  check("4.1 actually offers the form", treatmentFor(formRide, PLAIN_MIRROR).offerForm);
 }
 
 // ⚠️ The two rides must genuinely DIVERGE, or the pair proves nothing.
 if (timerRide && formRide) {
-  const a = resolveNoShow(timerRide, activeLeg(timerRide)!, 0);
-  const b = resolveNoShow(formRide, activeLeg(formRide)!, 0);
+  const a = resolveNoShow(timerRide, activeLeg(timerRide)!, PLAIN_MIRROR, 0);
+  const b = resolveNoShow(formRide, activeLeg(formRide)!, PLAIN_MIRROR, 0);
   check("the two demo rides reach different outcomes", a.kind !== b.kind,
     `${a.kind} vs ${b.kind}`);
 }
@@ -211,8 +227,8 @@ if (anyTrip) {
   const indiana = { ...anyTrip, client: "WellTrans", market: "IN" as const, noShowDemo: undefined };
   const elsewhere = { ...anyTrip, client: "Verida", market: "GA" as const, noShowDemo: undefined };
   check("WellTrans Indiana still waits 15 minutes",
-    postPickupThresholdMinutes(indiana) === NO_SHOW_POST_PICKUP_MINUTES,
-    `${postPickupThresholdMinutes(indiana)}`);
+    postPickupThresholdMinutes(indiana, PLAIN_MIRROR) === NO_SHOW_POST_PICKUP_MINUTES,
+    `${postPickupThresholdMinutes(indiana, PLAIN_MIRROR)}`);
   // ⚠️⚠️ A DECLARED DIVERGENCE, not an assertion of intent.
   // `PRD - Rider No-Show.md` withdrew the universal pick-up-time gate on 2026-09-09:
   // only WellTrans Indiana has a wait, and no other market gains one. The CODE has not
@@ -225,8 +241,8 @@ if (anyTrip) {
   // so the divergence cannot be forgotten: when the default is flipped to `false`, this
   // fails, and whoever flips it will read this note and know the PRD already expects it.
   check("⚠️ untagged non-Indiana still carries the WITHDRAWN universal gate",
-    postPickupThresholdMinutes(elsewhere) === NO_SHOW_PICKUP_TIME_MINUTES,
-    `${postPickupThresholdMinutes(elsewhere)} — PRD says this should be null`);
+    postPickupThresholdMinutes(elsewhere, PLAIN_MIRROR) === NO_SHOW_PICKUP_TIME_MINUTES,
+    `${postPickupThresholdMinutes(elsewhere, PLAIN_MIRROR)} — PRD says this should be null`);
 
   const anyLeg = activeLeg(anyTrip);
   check("the fixture trip has a leg", Boolean(anyLeg));
@@ -345,11 +361,11 @@ if (timerRide) {
   const leg = activeLeg(timerRide)!;
   // Positive control: this ride is a timer, which is the whole premise.
   check("3.1 with no type chosen is still a timer",
-    resolveNoShow(timerRide, leg, 0, null).kind === "timer",
-    resolveNoShow(timerRide, leg, 0, null).kind);
+    resolveNoShow(timerRide, leg, PLAIN_MIRROR, 0, null).kind === "timer",
+    resolveNoShow(timerRide, leg, PLAIN_MIRROR, 0, null).kind);
 
   const byType = NO_SHOW_TYPES.map(
-    (t) => ({ t, out: resolveNoShow(timerRide, leg, 0, t) }));
+    (t) => ({ t, out: resolveNoShow(timerRide, leg, PLAIN_MIRROR, 0, t) }));
   const files = byType.filter((r) => r.out.kind === "files");
   check("exactly one type gets past the ten-minute wait here",
     files.length === 1,
@@ -357,7 +373,7 @@ if (timerRide) {
   check("and it is Cancel At Door",
     files.length === 1 && files[0].t === "Cancel At Door", files[0]?.t ?? "none");
 
-  const cad = resolveNoShow(timerRide, leg, 0, "Cancel At Door");
+  const cad = resolveNoShow(timerRide, leg, PLAIN_MIRROR, 0, "Cancel At Door");
   check("the waived filing is FLAGGED as waived",
     cad.kind === "files" && cad.presenceWaitWaived,
     cad.kind === "files" ? `${cad.presenceWaitWaived}` : cad.kind);
@@ -378,7 +394,7 @@ if (timerRide) {
  */
 if (formRide) {
   const leg = activeLeg(formRide)!;
-  const cad = resolveNoShow(formRide, leg, 0, "Cancel At Door");
+  const cad = resolveNoShow(formRide, leg, PLAIN_MIRROR, 0, "Cancel At Door");
   check("a driver who has LEFT still cannot file a Cancel At Door",
     cad.kind === "form", cad.kind);
   check("and is told the real reason", cad.kind === "form" && cad.gap === "not_at_pickup",
@@ -386,7 +402,7 @@ if (formRide) {
 }
 if (timerRide) {
   const leg = activeLeg(timerRide)!;
-  const noFix = resolveNoShow(timerRide, { ...leg, locationRecords: [] }, 0, "Cancel At Door");
+  const noFix = resolveNoShow(timerRide, { ...leg, locationRecords: [] }, PLAIN_MIRROR, 0, "Cancel At Door");
   check("a phone with no location still cannot file a Cancel At Door",
     noFix.kind === "form" && noFix.gap === "no_location_data",
     noFix.kind === "form" ? noFix.gap : noFix.kind);
@@ -394,7 +410,7 @@ if (timerRide) {
   // The pick-up-time gate is a DIFFERENT rung and the waiver does not reach it.
   const indiana = { ...timerRide, client: "WellTrans", market: "IN" as const, noShowDemo: undefined };
   const notDueYet = { ...leg, minutesSinceScheduledPickup: 0 };
-  const gated = resolveNoShow(indiana, notDueYet, 0, "Cancel At Door");
+  const gated = resolveNoShow(indiana, notDueYet, PLAIN_MIRROR, 0, "Cancel At Door");
   check("a Cancel At Door on a ride that is not due yet is still refused",
     gated.kind === "timer" && gated.reason === "post-pickup",
     gated.kind === "timer" ? gated.reason : gated.kind);
@@ -429,7 +445,7 @@ check("the screen reads the signature label from the contract",
 check("the screen does not hardcode a signature heading",
   !/>\s*(Driver|Member) Signature\s*</.test(SCREEN), "hardcoded heading");
 check("the screen passes the type to the guardrail",
-  /resolveNoShow\(trip, activeLeg, elapsed, noShowType\)/.test(SCREEN), "not wired");
+  /resolveNoShow\(trip, activeLeg, demo, elapsed, noShowType\)/.test(SCREEN), "not wired");
 // ⚠️ The waiver paths must END in the questions, not in a filing or a dialog.
 check("Submit opens the Cancel at Door form on the waiver paths",
   /usingWaiver[\s\S]{0,200}setCancelAtDoorOpen\(true\)/.test(SCREEN), "not wired");
@@ -443,7 +459,7 @@ check("the form variant is computed, not hardcoded",
 check("and it is computed from whether the app placed the driver there",
   /setCancelAtDoorAtPickup\(outcome\.kind === "files"\)/.test(SCREEN), "not derived");
 check("⛔ a refused waiver re-resolves WITHOUT the type",
-  /waiver-refused[\s\S]{0,400}resolveNoShow\(trip, activeLeg, elapsed, null\)/.test(SCREEN),
+  /waiver-refused[\s\S]{0,400}resolveNoShow\(trip, activeLeg, demo, elapsed, null\)/.test(SCREEN),
   "would show the waived outcome back to a driver who just lost the waiver");
 
 // ── The form asks four questions and no attachment ─────────────────────────
@@ -637,6 +653,186 @@ check(
   !/appTracksStatus:\s*true/.test(FORM_SRC),
   "rider-no-show-form.tsx sets appTracksStatus true — that restores Pending"
 );
+
+// ═════════════════════════════════════════════════════════════════════════
+// What happens NOW — catalogue rows 01 and 02, production's side
+// ═════════════════════════════════════════════════════════════════════════
+/**
+ * ⭐ The point of the slice: the same ride, on the same screen, showing what a
+ * driver hits today instead of what we propose. Everything above this line runs
+ * through `PLAIN_MIRROR` and is unchanged by it.
+ *
+ * ⛔⛔ The failure this section exists to catch is the quiet one: a "Now" that
+ * is really the proposal with its new copy deleted. Production refuses AND
+ * stops, and it has no pick-up-time rule outside Indiana — so Now has to differ
+ * in OUTCOME, not only in wording.
+ */
+const NOW: DemoFocus = demoFocus("rider-no-show", "now");
+const FIXED_01: DemoFocus = demoFocus("rider-no-show", "fixed");
+const NOW_02: DemoFocus = demoFocus("cancel-at-door", "now");
+/** A row that owns neither — a reviewer who wandered in from somewhere else. */
+const STRANGER: DemoFocus = demoFocus("add-leg-request", "now");
+
+// ── 9a · the pairing map is total, and points only at production rows ────
+const ALL_ROWS = Object.keys(NO_SHOW_TREATMENTS) as NoShowDemoRow[];
+const DECLARED_ROWS = 9;
+check(
+  `the matrix has the declared ${DECLARED_ROWS} rows`,
+  ALL_ROWS.length === DECLARED_ROWS,
+  `${ALL_ROWS.length}`
+);
+const unpaired = ALL_ROWS.filter((row) => !NO_SHOW_AS_IS_PAIR[row]);
+check(
+  "every row knows what production does in its place",
+  unpaired.length === 0,
+  `${ALL_ROWS.length - unpaired.length} of ${ALL_ROWS.length} paired${unpaired.length ? " — missing " + unpaired.join(",") : ""}`
+);
+/**
+ * ⛔ Every target must be an as-is row. ⚠️ Row 5 is the ONE exemption and it is
+ * declared, not inferred: production's "no location points" message is
+ * unreachable, so there is no production screen to point at.
+ */
+const PAIR_EXEMPT = new Set<NoShowDemoRow>(["5"]);
+const pointsAtProposal = ALL_ROWS.filter((row) => {
+  const target = NO_SHOW_AS_IS_PAIR[row];
+  return !PAIR_EXEMPT.has(target) && String(target).includes(".");
+});
+check(
+  "...and every one of them points at a production row",
+  pointsAtProposal.length === 0,
+  `${ALL_ROWS.length - pointsAtProposal.length} of ${ALL_ROWS.length}${pointsAtProposal.length ? " — " + pointsAtProposal.join(",") : ""}`
+);
+/** ⛔ Non-vacuity: the map must actually MOVE something, or it is an identity. */
+const moved = ALL_ROWS.filter((row) => NO_SHOW_AS_IS_PAIR[row] !== row);
+check(
+  "...and the map moves the proposal rows rather than being an identity",
+  moved.length === 4,
+  `${moved.length} of ${ALL_ROWS.length} move — ${moved.join(",")}`
+);
+
+// ── 9b · Now never speaks in our voice ───────────────────────────────────
+/**
+ * ⛔⛔ `not_at_pickup` and `no_location_data` are flagged in `no-show-rules.ts`
+ * as OURS — corrections production has never shown anyone. One sweep over every
+ * seeded ride and both owning rows, rather than four greps for four strings.
+ */
+let voiceSwept = 0;
+const spokeOurVoice: string[] = [];
+for (const trip of mockInProgressTrips) {
+  for (const focus of [NOW, NOW_02, STRANGER]) {
+    voiceSwept += 1;
+    const t = treatmentFor(trip, focus);
+    if (t.copy !== "production") spokeOurVoice.push(`${trip.id}/${focus.solutionId}: copy=${t.copy}`);
+    if (t.offerForm) spokeOurVoice.push(`${trip.id}/${focus.solutionId}: offers the form`);
+  }
+}
+check(
+  "Now uses production's wording and offers no way forward",
+  spokeOurVoice.length === 0,
+  `${spokeOurVoice.length} wrong of ${voiceSwept} (ride x focus)${spokeOurVoice.length ? " — " + spokeOurVoice.slice(0, 4).join("; ") : ""}`
+);
+check(
+  "...and that sweep saw more than a handful of rides",
+  voiceSwept === mockInProgressTrips.length * 3 && mockInProgressTrips.length > 5,
+  `${mockInProgressTrips.length} ride(s) x 3 focus(es)`
+);
+
+// ── 9c · the toggle is not decorative on these two rows ──────────────────
+/**
+ * ⛔ A fingerprint across all four flags, per seeded ride. Without this the
+ * slice could ship with Now and Fixed identical on both demo rides and every
+ * other check here would still pass.
+ */
+const fingerprint = (t: ReturnType<typeof treatmentFor>) =>
+  `${t.copy}/${t.showTimer}/${t.offerForm}/${t.pickupTimeGate}`;
+for (const trip of tagged) {
+  const now = treatmentFor(trip, NOW);
+  const fixed = treatmentFor(trip, FIXED_01);
+  check(
+    `${trip.noShowDemo} shows something different on each side`,
+    fingerprint(now) !== fingerprint(fixed),
+    `now=${fingerprint(now)} fixed=${fingerprint(fixed)}`
+  );
+  check(
+    `...and ${trip.noShowDemo}'s Now is its declared as-is row`,
+    fingerprint(now) === fingerprint(NO_SHOW_TREATMENTS[NO_SHOW_AS_IS_PAIR[trip.noShowDemo!]]),
+    `${trip.noShowDemo} -> ${NO_SHOW_AS_IS_PAIR[trip.noShowDemo!]}`
+  );
+}
+check(
+  "the two demo rides are both actually present for that pair",
+  tagged.length === 2,
+  `${tagged.length} tagged ride(s): ${tagged.map((t) => t.noShowDemo).join(",")}`
+);
+
+// ── 9d · Fixed and the plain mirror are untouched ────────────────────────
+/**
+ * ⛔ The other half of the claim. Every seeded ride's Fixed side, and the plain
+ * mirror, must still be the ride's own matrix row — which is what the 170
+ * checks above assert, stated here once as a sweep so a regression names itself.
+ */
+const driftedFixed = tagged.filter(
+  (trip) =>
+    fingerprint(treatmentFor(trip, FIXED_01)) !==
+      fingerprint(NO_SHOW_TREATMENTS[trip.noShowDemo!]) ||
+    fingerprint(treatmentFor(trip, PLAIN_MIRROR)) !==
+      fingerprint(NO_SHOW_TREATMENTS[trip.noShowDemo!])
+);
+check(
+  "Fixed and the plain mirror still show the ride's own row",
+  driftedFixed.length === 0,
+  `${tagged.length - driftedFixed.length} of ${tagged.length} ride(s) unchanged`
+);
+
+// ── 9e · ⭐ Now differs in OUTCOME, not only in wording ──────────────────
+/**
+ * ⛔⛔ The flag that makes this more than a copy swap. Production has no
+ * pick-up-time rule outside Indiana, so an UNTAGGED Georgia ride files before
+ * the ride is due today and is refused in the shipped app. Matrix row `"6"` is
+ * the standing evidence; this applies it to every untagged ride.
+ */
+const untagged = mockInProgressTrips.find((t) => !t.noShowDemo && t.market !== "IN");
+check(
+  "an untagged ride outside Indiana exists to test the gate on",
+  untagged !== undefined,
+  untagged ? `${untagged.id} (${untagged.market})` : "NONE — the check below is vacuous"
+);
+if (untagged) {
+  check(
+    "Now has no pick-up-time gate — production's early filing goes through",
+    postPickupThresholdMinutes(untagged, NOW) === null,
+    `${postPickupThresholdMinutes(untagged, NOW)}`
+  );
+  check(
+    "...while Fixed enforces it, which is the new guardrail",
+    postPickupThresholdMinutes(untagged, FIXED_01) === NO_SHOW_PICKUP_TIME_MINUTES,
+    `${postPickupThresholdMinutes(untagged, FIXED_01)}`
+  );
+  check(
+    "...and Indiana's fifteen minutes is production, so it survives Now",
+    postPickupThresholdMinutes(
+      { ...untagged, client: "WellTrans", market: "IN" as const },
+      NOW
+    ) === NO_SHOW_POST_PICKUP_MINUTES,
+    `${postPickupThresholdMinutes({ ...untagged, client: "WellTrans", market: "IN" as const }, NOW)}`
+  );
+}
+
+// ── 9f · a stranger's focus shows production too ─────────────────────────
+/**
+ * ⚠️ "A proposal belongs to its own build", applied here. A reviewer walking
+ * row 19 who wanders into Member No-Show must not meet rows 01/02's proposal on
+ * the way past.
+ */
+const leakedToStranger = tagged.filter(
+  (trip) => fingerprint(treatmentFor(trip, STRANGER)) !== fingerprint(treatmentFor(trip, NOW))
+);
+check(
+  "another row's focus shows production, not rows 01/02's proposal",
+  leakedToStranger.length === 0,
+  `${tagged.length - leakedToStranger.length} of ${tagged.length} ride(s) show production`
+);
+
 
 console.log(
   failures.length === 0
