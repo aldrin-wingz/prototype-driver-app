@@ -14,6 +14,22 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-dm-sans)", "system-ui", "sans-serif"],
       },
+      /**
+       * ⛔ `screen` means "the phone's screen" when the app is running inside
+       * the desktop phone frame, and the window otherwise.
+       *
+       * 18 app screens use `min-h-screen`, two use `h-screen` — including the
+       * Requests Map View shell, where a DEFINITE viewport height overflows an
+       * 844px frame by a whole window. The base contract forbids editing
+       * mirrored screens to suit tooling, so this is solved once here instead
+       * of twenty times in `app/`.
+       *
+       * `--app-h` is set only on `.phone-shell` (see globals.css). Everywhere
+       * else the fallback keeps these utilities exactly what Tailwind ships.
+       */
+      height: { screen: "var(--app-h, 100vh)" },
+      minHeight: { screen: "var(--app-h, 100vh)" },
+      maxHeight: { screen: "var(--app-h, 100vh)" },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

@@ -250,3 +250,80 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
 .driver-app-bg {
   background-color: #F9FAFB;
 }
+
+/* ── Desktop two-pane shell ───────────────────────────────────
+   TOOLING, not the app. Below the breakpoint every class here is
+   unstyled, so the markup collapses to plain divs in normal flow and
+   the mobile layout is byte-for-byte what it was.
+
+   ⚠️ 1280px is also declared as DESKTOP_SHELL_MIN_PX in
+   components/solutions-dev/phone-shell.tsx. A check compares them —
+   the pane and the portal target must never disagree about whether
+   the shell is on screen. */
+@media (min-width: 1280px) {
+  .solution-split {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .solution-table-col {
+    flex: 1 1 0%;
+    min-width: 0;
+  }
+
+  .phone-col {
+    position: sticky;
+    top: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  /* The frame. Three properties carry the whole containment trick:
+
+     ⛔ `transform` makes this the containing block for every
+     `position: fixed` DESCENDANT — the bottom nav and the three Ride
+     Details action rows stop spanning the window and pin to the phone.
+     It MUST stay an identity transform. A scale() is the obvious way to
+     fit a short window and it breaks vaul: vaul's drag maths compares
+     getBoundingClientRect() deltas against raw event.pageY, and under a
+     scale those disagree by the scale factor, so every sheet drags at
+     the wrong speed and closes at the wrong threshold. If the window is
+     shorter than the phone, scroll the column.
+
+     ⛔ Not `filter: blur(0)`, which is the other common way to make a
+     containing block. `filter` creates a backdrop root, which would
+     break backdrop-blur for every descendant.
+
+     ⛔ And NOT data-vaul-drawer-wrapper. shouldScaleBackground defaults
+     to true in our Drawer; it is a no-op today only because no such
+     element exists. Adding one makes every drawer scale the page and
+     paint the body black.
+
+     `overflow: hidden` then clips the now-contained fixed children to
+     the frame, which is what stops a drawer bleeding past the bezel. */
+  .phone-shell {
+    --app-h: 844px;
+    width: 390px;
+    height: 844px;
+    transform: translateZ(0);
+    overflow: hidden;
+    border-radius: 2.25rem;
+    background-color: #f9fafb;
+    box-shadow: 0 12px 40px rgba(15, 26, 24, 0.22);
+  }
+
+  .phone-viewport {
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  /* `--app-h` redefines h-screen / min-h-screen / max-h-screen inside
+     the frame, via the three theme keys in tailwind.config.ts. Those
+     cannot reach an ARBITRARY value, so the two h-[100dvh] sites are
+     overridden here instead. Specificity 0,2,0 beats the utility's
+     0,1,0, so source order does not matter. */
+  .phone-shell .h-\[100dvh\] {
+    height: var(--app-h, 100dvh);
+  }
+}

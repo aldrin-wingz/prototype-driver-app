@@ -3,12 +3,10 @@ import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/toaster";
 import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
-import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup";
 import { RideFlowProvider } from "@/lib/support-data/ride-flow-context";
 import { SolutionProvider } from "@/lib/solutions/solution-context";
-import { SolutionStrip } from "@/components/solutions-dev/solution-strip";
+import { SolutionShell } from "@/components/solutions-dev/solution-shell";
 import { SolutionPickerSheet } from "@/components/solutions-dev/solution-picker-sheet";
 
 const dmSans = DM_Sans({
@@ -55,15 +53,20 @@ export default function RootLayout({
                   `next build` would ever tell us. */}
               <Suspense fallback={null}>
                 <SolutionProvider>
-                  <SolutionStrip />
-                  {children}
+                  {/* ⚠️ `Toaster` and `IncentiveEarnedPopup` used to sit out
+                      here, beside the app. They are now inside `SolutionShell`
+                      — both are `position: fixed`, and as SIBLINGS of
+                      `{children}` no ancestor transform could ever contain
+                      them, so on a wide screen they escaped the phone frame.
+                      See the comment in solution-shell.tsx. */}
+                  <SolutionShell>{children}</SolutionShell>
+                  {/* ⛔ Stays OUTSIDE the shell. The picker is tooling — it
+                      belongs to the page, not to the phone. */}
                   <SolutionPickerSheet />
                 </SolutionProvider>
               </Suspense>
-              <IncentiveEarnedPopup />
             </RideFlowProvider>
           </IncentiveEarnedProvider>
-          <Toaster />
         </ThemeProvider>
       </body>
     </html>
