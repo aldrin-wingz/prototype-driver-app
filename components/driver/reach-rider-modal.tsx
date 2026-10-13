@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, FilePlus, X } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,7 @@ import {
   declinedSheetFor,
   SHEET_SWAP_MS,
 } from "@/lib/driver-data/rider-declined";
-import { ZendeskChatSheet } from "./zendesk-chat-sheet";
+
 import {
   DRIVER_SPRING,
   DRIVER_SPRING_MUTED,
@@ -121,9 +122,8 @@ export function ReachRiderModal({
   const [declined, setDeclined] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [declineFormOpen, setDeclineFormOpen] = useState(false);
-  /** Production's destination — see `declinedSheetFor`. */
-  const [zendeskOpen, setZendeskOpen] = useState(false);
 
+  const router = useRouter();
   const { demo } = useSolution();
   const sameDay = Boolean(trip.sameDay);
   // ⚠️ `demo.solutionId` is `null` for the plain mirror, which the rule reads
@@ -337,8 +337,18 @@ export function ReachRiderModal({
               // ⚠️ Deferred — the next screen is a third sheet either way, and
               // the same handover applies. See `SHEET_SWAP_MS`.
               setTimeout(() => {
-                if (declinedSheet.primaryGoesTo === "zendesk") setZendeskOpen(true);
-                else setDeclineFormOpen(true);
+                /**
+                 * ⛔ Production NAVIGATES. The driver leaves the ride for the
+                 * Zendesk chat, and that departure is the dead end — an overlay
+                 * would leave the ride visible behind it and read as a detour.
+                 * ⚠️ `router.push`, so `RideFlowProvider` survives: the ride is
+                 * still there when they come back, which is also true today.
+                 */
+                if (declinedSheet.primaryGoesTo === "zendesk") {
+                  router.push(`/support-chat/${trip.id}`);
+                } else {
+                  setDeclineFormOpen(true);
+                }
               }, SHEET_SWAP_MS);
             }}
             className="mt-8 w-full rounded-full py-4 text-lg font-semibold text-white"
@@ -364,11 +374,6 @@ export function ReachRiderModal({
           </button>
         </DrawerContent>
       </Drawer>
-
-      {/* ⭐ Production's dead end: the template is auto-sent and the driver
-          waits. Mounted beside the form, never instead of it — which side opens
-          is the comparison. */}
-      <ZendeskChatSheet trip={trip} open={zendeskOpen} onOpenChange={setZendeskOpen} />
 
       <RiderDeclinedForm
         trip={trip}

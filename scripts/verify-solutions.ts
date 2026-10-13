@@ -6513,7 +6513,8 @@ console.log("\n23. Row 16 — what happens when the rider declines");
  * that opened the form would read as production and behave as the proposal.
  */
 const DECLINED_SRC = readFileSync(join(ROOT, "components/driver/reach-rider-modal.tsx"), "utf8");
-const ZENDESK_SRC = readFileSync(join(ROOT, "components/driver/zendesk-chat-sheet.tsx"), "utf8");
+const ZENDESK_SRC = readFileSync(join(ROOT, "components/driver/zendesk-chat-screen.tsx"), "utf8");
+const ZENDESK_ROUTE_SRC = readFileSync(join(ROOT, "app/support-chat/[id]/page.tsx"), "utf8");
 const ZENDESK_CODE = codeOnly(ZENDESK_SRC);
 
 /* --- 23a. The sheet, on both sides, as declared literals ----------------- */
@@ -6614,24 +6615,58 @@ check(
     : "NOT FOUND — the button could open the form on both sides",
   /declinedSheet\.primaryGoesTo === "zendesk"/.test(codeOnly(DECLINED_SRC)),
 );
-/** ⚠️ Both sheets mounted, so which one opens is the comparison. */
-check(
-  "...and both destinations are mounted, never swapped at the mount",
-  `${/<ZendeskChatSheet/.test(DECLINED_SRC) ? "Zendesk" : "—"} + ${/<RiderDeclinedForm/.test(DECLINED_SRC) ? "form" : "—"}`,
-  /<ZendeskChatSheet/.test(DECLINED_SRC) && /<RiderDeclinedForm/.test(DECLINED_SRC),
-);
 /**
- * ⛔ The handover delay applies to BOTH. Two vaul drawers in one frame do not
- * hand over — see `SHEET_SWAP_MS`. The Zendesk path is a third sheet exactly
- * like the form, and a path that skipped the delay would stack them.
+ * ⛔⛔ **Production NAVIGATES; the proposal opens a sheet.** The Zendesk chat was
+ * first built as a third drawer and that was wrong — user-corrected. A sheet
+ * leaves the ride visible behind it, which reads as *"you are still on your
+ * trip, just talking to someone"*. Production takes the driver off the ride
+ * entirely, and that departure IS the dead end.
+ *
+ * So the two destinations are not the same KIND of thing, and the check says so:
+ * one is a `router.push` to a route, the other is a mounted sheet.
  */
 check(
-  "...and the Zendesk sheet waits for the handover like the form does",
-  /setZendeskOpen\(true\)[\s\S]{0,120}SHEET_SWAP_MS|SHEET_SWAP_MS[\s\S]{0,200}setZendeskOpen\(true\)/.test(codeOnly(DECLINED_SRC))
+  "...and production navigates to a route while the proposal opens a sheet",
+  `${/router\.push\(`\/support-chat\//.test(codeOnly(DECLINED_SRC)) ? "push(/support-chat/…)" : "NO NAVIGATION"} + ${/<RiderDeclinedForm/.test(DECLINED_SRC) ? "form sheet" : "—"}`,
+  /router\.push\(`\/support-chat\//.test(codeOnly(DECLINED_SRC)) &&
+    /<RiderDeclinedForm/.test(DECLINED_SRC) &&
+    // ⛔ And the Zendesk screen is NOT mounted here — a sheet left behind would
+    // render the dead end over the ride after all.
+    !/<ZendeskChat/.test(DECLINED_SRC),
+);
+/**
+ * ⛔ The handover delay still applies to BOTH. Two vaul drawers in one frame do
+ * not hand over (see `SHEET_SWAP_MS`), and a navigation fired while the sheet is
+ * still on screen leaves it mid-exit over the new route.
+ */
+check(
+  "...and both destinations wait for the sheet handover",
+  /setTimeout\(\(\) => \{[\s\S]{0,400}\}, SHEET_SWAP_MS\)/.test(codeOnly(DECLINED_SRC))
     ? `inside the ${SHEET_SWAP_MS}ms handover`
-    : "NOT DEFERRED — two drawers would stack",
-  /setZendeskOpen\(true\)/.test(codeOnly(DECLINED_SRC)) &&
-    /setTimeout\(\(\) => \{[\s\S]{0,200}setZendeskOpen\(true\)[\s\S]{0,200}\}, SHEET_SWAP_MS\)/.test(codeOnly(DECLINED_SRC)),
+    : "NOT DEFERRED",
+  /setTimeout\(\(\) => \{[\s\S]{0,400}router\.push\(`\/support-chat\/[\s\S]{0,300}\}, SHEET_SWAP_MS\)/.test(codeOnly(DECLINED_SRC)),
+);
+/** ⚠️ The route has to resolve the trip, or the ticket opens blank. */
+check(
+  "...and the route names the trip in its path",
+  /params: Promise<\{ id: string \}>/.test(ZENDESK_ROUTE_SRC) && /notFound\(\)/.test(ZENDESK_ROUTE_SRC)
+    ? "/support-chat/[id], 404 on an unknown trip"
+    : "MISSING",
+  /params: Promise<\{ id: string \}>/.test(ZENDESK_ROUTE_SRC) &&
+    /notFound\(\)/.test(ZENDESK_ROUTE_SRC) &&
+    /<ZendeskChatScreen trip=/.test(ZENDESK_ROUTE_SRC),
+);
+/**
+ * ⛔ A SCREEN, not a sheet. Asserted on the component itself, because the whole
+ * correction is that this is a page the driver lands on rather than an overlay
+ * over the ride they are still on.
+ */
+check(
+  "...and the chat is a screen, with no drawer left in it",
+  /<Drawer\b|DrawerContent/.test(ZENDESK_SRC) ? "STILL A DRAWER" : "min-h-screen + Header",
+  !/<Drawer\b/.test(ZENDESK_SRC) &&
+    /min-h-screen/.test(ZENDESK_SRC) &&
+    /<Header\b/.test(ZENDESK_SRC),
 );
 
 /* --- 23c. The auto-sent template ----------------------------------------- */
