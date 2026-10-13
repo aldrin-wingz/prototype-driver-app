@@ -70,9 +70,11 @@ import { SendBackReasonForm } from "@/components/support/send-back-reason-form";
 import { SendBackPenaltyDialog } from "@/components/driver/send-back-penalty-dialog";
 import { SendBackConfirmDialog } from "@/components/driver/send-back-confirm-dialog";
 import { StandingOrderWarningDialog } from "@/components/driver/standing-order-warning-dialog";
+import { SendBackDeniedDialog } from "@/components/driver/send-back-denied-dialog";
 import {
   isShortNoticeSendBack,
   isStandingOrder,
+  sendBackSteps,
   SEND_BACK_PENALTY_USD,
 } from "@/lib/driver-data/send-back-reasons";
 import { ISSUE_SEND_BACK_REASON } from "@/lib/support-data/issue-types";
@@ -535,6 +537,8 @@ export function MoreOptionsScreen({
   const [sendBackReasonOpen, setSendBackReasonOpen] = useState(false);
   const [standingOrderOpen, setStandingOrderOpen] = useState(false);
   const [sendBackPenaltyOpen, setSendBackPenaltyOpen] = useState(false);
+  /** ⛔ Production's refusal — terminal. See `SendBackDeniedDialog`. */
+  const [sendBackDeniedOpen, setSendBackDeniedOpen] = useState(false);
   // Held between the reason step and the penalty step — see `completeSendBack`.
   const [sendBackValues, setSendBackValues] = useState<Record<string, string> | null>(null);
 
@@ -567,6 +571,11 @@ export function MoreOptionsScreen({
    * proposals".
    */
   const gridTiles: GridTile[] = buildGridTiles(demo);
+  /**
+   * ⛔ The send-back path for the side being shown. Production has no reason
+   * form and, for a standing order, no way to finish at all.
+   */
+  const sendBackPath = sendBackSteps(trip, demo);
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
@@ -600,6 +609,16 @@ export function MoreOptionsScreen({
    */
   function handleSendBackConfirmed() {
     setSendBackConfirmOpen(false);
+    /**
+     * ⛔⛔ **Production refuses here and the flow ENDS.** `CAP-330`: a standing
+     * order cannot be sent back from the app at all. The warning below is OURS
+     * — production warns about nothing, it just says no — so on the Now side
+     * the driver meets the refusal instead.
+     */
+    if (sendBackPath.includes("denied")) {
+      setTimeout(() => setSendBackDeniedOpen(true), 0);
+      return;
+    }
     if (isStandingOrder(trip)) {
       setTimeout(() => setStandingOrderOpen(true), 0);
       return;
@@ -680,7 +699,21 @@ export function MoreOptionsScreen({
        * thing no artifact in the vault quotes. `sendBackSteps` names it so the
        * gap is visible rather than implied away.
        */
-      setSendBackReasonOpen(true);
+      /**
+       * ⛔⛔ **The ENTRY is gated too, not just the handler below.** The reason
+       * form is row 13's whole proposal, so production's path never opens it —
+       * it goes straight to the confirmation, and for a standing order that
+       * confirmation is followed by a refusal.
+       *
+       * ⚠️ Found by walking: gating `handleSendBackConfirmed` alone left Now
+       * opening the reason form from the tile. The first step of a sequence is
+       * part of the sequence.
+       */
+      if (sendBackPath[0] === "reason") {
+        setSendBackReasonOpen(true);
+      } else {
+        setTimeout(() => setSendBackConfirmOpen(true), 0);
+      }
       return;
     }
     if (id === "auto-assign") {
@@ -873,6 +906,12 @@ export function MoreOptionsScreen({
         onOpenChange={setSendBackReasonOpen}
         onCollected={handleReasonCollected}
       />
+      {/* ⭐ Production's refusal — terminal, and the end of the Now path. */}
+      <SendBackDeniedDialog
+        open={sendBackDeniedOpen}
+        onOpenChange={setSendBackDeniedOpen}
+      />
+
       <StandingOrderWarningDialog
         open={standingOrderOpen}
         onOpenChange={(next) => {

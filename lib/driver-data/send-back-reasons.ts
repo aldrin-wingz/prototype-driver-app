@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import type { SupportFieldOption } from "@/types/support";
 import type { Trip } from "./mock-trips";
 
@@ -213,15 +214,69 @@ export type SendBackStep =
   | "reason"
   | "confirm"
   | "standing-order"
-  | "penalty";
+  | "penalty"
+  | "denied";
+
+/** Catalogue row **13**, which owns the reason form. */
+export const SEND_BACK_SOLUTIONS: readonly string[] = ["send-back-reason-form"];
+
+/**
+ * ⭐⭐ **Production refuses a Standing Order send-back outright** — `CAP-330`,
+ * verbatim, a native alert raised over the More Options grid:
+ *
+ * > **Send-back request failed**
+ * > Standing Order Trips cannot be sent back via the Driver App. To send back
+ * > this trip, please call into support for assistance.
+ *
+ * ⛔ It is TERMINAL. Nothing is sent back, the trip stays on the manifest, and
+ * the sentence ends at *call into support* — which is the support call row 13
+ * exists to absorb.
+ *
+ * ⚠️ Per the user, it arrives **after** an earlier pop-up, so the driver is at
+ * least two taps in before the app says no.
+ */
+export const SEND_BACK_DENIED_TITLE = "Send-back request failed";
+export const SEND_BACK_DENIED_BODY =
+  "Standing Order Trips cannot be sent back via the Driver App. To send back this trip, please call into support for assistance.";
+export const SEND_BACK_DENIED_DISMISS = "OK";
 
 /** Production's own popup is built — see `SendBackConfirmDialog`. */
 export const SEND_BACK_CONFIRM_BUILT = true;
 
-export function sendBackSteps(trip: Trip): SendBackStep[] {
+export function sendBackSteps(trip: Trip, focus: DemoFocus): SendBackStep[] {
+  /**
+   * ⛔⛔ **Production's path, and it is shorter in both directions.**
+   *
+   * It has no reason form — that is the whole of row 13's proposal — and for a
+   * standing order it does not finish at all: `CAP-330` refuses and the trip
+   * stays. So Now is not "the proposal minus one screen"; for a standing order
+   * it is a flow that cannot succeed.
+   *
+   * ⚠️ The standing-order WARNING is ours, not production's — see
+   * `StandingOrderWarningDialog`. Production warns about nothing; it simply
+   * says no, later than it could have.
+   */
+  if (!showsProposal(focus, SEND_BACK_SOLUTIONS)) {
+    const now: SendBackStep[] = [];
+    if (SEND_BACK_CONFIRM_BUILT) now.push("confirm");
+    if (isStandingOrder(trip)) {
+      now.push("denied");
+      // ⛔ Terminal. No penalty screen after it, because nothing is being sent
+      // back to be penalised for.
+      return now;
+    }
+    if (isShortNoticeSendBack(trip)) now.push("penalty");
+    return now;
+  }
+
   const steps: SendBackStep[] = ["reason"];
   if (SEND_BACK_CONFIRM_BUILT) steps.push("confirm");
   if (isStandingOrder(trip)) steps.push("standing-order");
   if (isShortNoticeSendBack(trip)) steps.push("penalty");
   return steps;
+}
+
+/** Whether this path can finish at all. ⛔ A denied path never files anything. */
+export function sendBackCompletes(steps: readonly SendBackStep[]): boolean {
+  return !steps.includes("denied");
 }

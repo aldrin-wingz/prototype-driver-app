@@ -125,6 +125,10 @@ import {
   dedupedDriverInitiatedReasons,
   DRIVER_ANSWERABLE_REASONS,
   isShortNoticeSendBack,
+  SEND_BACK_DENIED_BODY,
+  SEND_BACK_DENIED_DISMISS,
+  SEND_BACK_DENIED_TITLE,
+  sendBackCompletes,
   MAX_SEND_BACK_LABEL_CHARS,
   isStandingOrder,
   SEND_BACK_CONFIRM_BUILT,
@@ -275,6 +279,12 @@ function check(label: string, detail: string, ok: boolean) {
  * being tested and every sweep over it passes vacuously.
  */
 const FIXED = (solutionId: string | null): DemoFocus => ({ solutionId, mode: "fixed" });
+/**
+ * The plain mirror — no focus, so every proposal is visible. Pre-existing
+ * send-back checks use this, because that is the path they were written to
+ * describe.
+ */
+const PLAIN: DemoFocus = { solutionId: null, mode: "now" };
 
 // ── Declared expectations ────────────────────────────────────────────────
 const EXPECTED_ROWS = 26;
@@ -2831,14 +2841,14 @@ check(
  */
 check(
   "a short-notice send-back reaches the penalty step; an advance one does not",
-  `${sendBackSteps(SHORT).join(" → ")} | ${sendBackSteps(ADVANCE).join(" → ")}`,
-  sendBackSteps(SHORT).includes("penalty") &&
-    !sendBackSteps(ADVANCE).includes("penalty"),
+  `${sendBackSteps(SHORT, PLAIN).join(" → ")} | ${sendBackSteps(ADVANCE, PLAIN).join(" → ")}`,
+  sendBackSteps(SHORT, PLAIN).includes("penalty") &&
+    !sendBackSteps(ADVANCE, PLAIN).includes("penalty"),
 );
 check(
   "the reason step sits BEFORE the penalty step, not after it",
-  sendBackSteps(SHORT).join(" → "),
-  sendBackSteps(SHORT).indexOf("reason") < sendBackSteps(SHORT).indexOf("penalty"),
+  sendBackSteps(SHORT, PLAIN).join(" → "),
+  sendBackSteps(SHORT, PLAIN).indexOf("reason") < sendBackSteps(SHORT, PLAIN).indexOf("penalty"),
 );
 /**
  * ⭐ Production's own popup is built from the screenshot the user supplied on
@@ -2851,7 +2861,7 @@ check(
   "production's popup is built and raised on EVERY send-back",
   `SEND_BACK_CONFIRM_BUILT=${SEND_BACK_CONFIRM_BUILT}`,
   SEND_BACK_CONFIRM_BUILT === true &&
-    [SHORT, ADVANCE, SO_RIDE].every((t) => sendBackSteps(t).includes("confirm")),
+    [SHORT, ADVANCE, SO_RIDE].every((t) => sendBackSteps(t, PLAIN).includes("confirm")),
 );
 
 /**
@@ -2891,7 +2901,7 @@ const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = 
   },
 ];
 for (const row of STEP_MATRIX) {
-  const actual = sendBackSteps(row.trip);
+  const actual = sendBackSteps(row.trip, PLAIN);
   check(
     `send-back steps — ${row.name}: ${row.steps.join(" → ")}`,
     actual.join(" → "),
@@ -2915,10 +2925,10 @@ check(
  */
 check(
   "the reason is the first step on every trip",
-  STEP_MATRIX.map((r) => `${r.name}:${sendBackSteps(r.trip)[0]}`).join(" "),
-  STEP_MATRIX.every((r) => sendBackSteps(r.trip)[0] === "reason"),
+  STEP_MATRIX.map((r) => `${r.name}:${sendBackSteps(r.trip, PLAIN)[0]}`).join(" "),
+  STEP_MATRIX.every((r) => sendBackSteps(r.trip, PLAIN)[0] === "reason"),
 );
-const both = sendBackSteps({ ...SO_RIDE, sameDay: true });
+const both = sendBackSteps({ ...SO_RIDE, sameDay: true }, PLAIN);
 /**
  * ⛔⛔ **General before specific.** Production's own "are you sure" — raised on
  * every send-back — comes before the warnings a trip has to EARN. A driver
@@ -2942,20 +2952,20 @@ check(
  */
 check(
   "every trip starts with the same two screens, whatever else follows",
-  STEP_MATRIX.map((r) => sendBackSteps(r.trip).slice(0, 2).join("+")).join(" "),
+  STEP_MATRIX.map((r) => sendBackSteps(r.trip, PLAIN).slice(0, 2).join("+")).join(" "),
   STEP_MATRIX.every(
     (r) =>
-      sendBackSteps(r.trip)[0] === "reason" &&
-      sendBackSteps(r.trip)[1] === "confirm",
+      sendBackSteps(r.trip, PLAIN)[0] === "reason" &&
+      sendBackSteps(r.trip, PLAIN)[1] === "confirm",
   ),
 );
 check(
   "...and the penalty warning is always last when it appears",
-  STEP_MATRIX.filter((r) => sendBackSteps(r.trip).includes("penalty"))
-    .map((r) => sendBackSteps(r.trip).join(" → "))
+  STEP_MATRIX.filter((r) => sendBackSteps(r.trip, PLAIN).includes("penalty"))
+    .map((r) => sendBackSteps(r.trip, PLAIN).join(" → "))
     .join(" | "),
-  STEP_MATRIX.filter((r) => sendBackSteps(r.trip).includes("penalty")).every(
-    (r) => sendBackSteps(r.trip).at(-1) === "penalty",
+  STEP_MATRIX.filter((r) => sendBackSteps(r.trip, PLAIN).includes("penalty")).every(
+    (r) => sendBackSteps(r.trip, PLAIN).at(-1) === "penalty",
   ),
 );
 
@@ -3121,12 +3131,21 @@ const gridHandler = SB_SOURCES.more.slice(
     ? SB_SOURCES.more.indexOf("function handleProductionTile")
     : SB_SOURCES.more.length,
 );
+/**
+ * ⚠️ Updated in B3b. It used to require `setSendBackReasonOpen(true)` directly
+ * inside the branch — the proposal's first step, hard-wired. Production's path
+ * does not collect a reason at all, so the branch now opens whichever step the
+ * computed path starts with. The interception itself is what this asserts; §24
+ * runs the two sequences.
+ */
 check(
   "Send Back Trip is intercepted in the grid handler, and returns",
-  `branch present: ${gridHandler.includes('if (id === "send-back")')}`,
-  /if \(id === "send-back"\)[\s\S]{0,900}setSendBackReasonOpen\(true\);[\s\S]{0,60}return;/.test(
+  `branch present: ${gridHandler.includes('if (id === "send-back")')}; keyed on the path: ${/sendBackPath\[0\] === "reason"/.test(gridHandler)}`,
+  /if \(id === "send-back"\)[\s\S]{0,1400}sendBackPath\[0\] === "reason"[\s\S]{0,400}return;/.test(
     gridHandler,
-  ),
+  ) &&
+    /setSendBackReasonOpen\(true\)/.test(gridHandler) &&
+    /setSendBackConfirmOpen\(true\)/.test(gridHandler),
 );
 check(
   "the send-back is recorded for Support but tracks no status",
@@ -6329,7 +6348,6 @@ check(
 const EXPECTED_AWAITING = [
   "missed-swipe",
   "request-feed-member-filter",
-  "send-back-reason-form",
 ];
 const awaitingDrift = [
   ...EXPECTED_AWAITING.filter((id) => !ROWS_AWAITING_NOW.includes(id)).map((id) => `-${id}`),
@@ -6347,7 +6365,7 @@ const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
 check(
   "...and that list splits the built rows rather than covering none or all",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
-  builtWithNow.length === 9 && builtRows.length === 12,
+  builtWithNow.length === 10 && builtRows.length === 12,
 );
 /** ⚠️ `hasNowState(null)` is false — the plain mirror is on no side at all. */
 check(
@@ -6768,6 +6786,186 @@ check(
   formReachable.length === 1 &&
     formReachable[0].row === "rider-initiated-cancellation" &&
     formReachable[0].mode === "fixed",
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n24. Row 13 — production refuses a Standing Order send-back");
+// ---------------------------------------------------------------------------
+/**
+ * B3b, unblocked by `CAP-330`.
+ *
+ * ⭐⭐ Now is not "the proposal minus the reason form". For a standing order it
+ * is a flow that **cannot succeed**: production refuses outright and the trip
+ * stays on the manifest. The sentence ends at *call into support*, which is the
+ * support call row 13 exists to absorb.
+ *
+ * ⚠️ The standing-order WARNING beside it is ours, not production's — the
+ * component says so. Production warns about nothing; it says no, two taps in.
+ */
+const DENIED_SRC = readFileSync(join(ROOT, "components/driver/send-back-denied-dialog.tsx"), "utf8");
+const MORE_SRC = readFileSync(join(ROOT, "components/driver/more-options-screen.tsx"), "utf8");
+const NOW_13: DemoFocus = demoFocus("send-back-reason-form", "now");
+const FIXED_13: DemoFocus = demoFocus("send-back-reason-form", "fixed");
+
+/* --- 24a. The copy is production's, verbatim ---------------------------- */
+check(
+  "the refusal is CAP-330 word for word",
+  `"${SEND_BACK_DENIED_TITLE}" / "${SEND_BACK_DENIED_BODY.slice(0, 40)}…"`,
+  SEND_BACK_DENIED_TITLE === "Send-back request failed" &&
+    SEND_BACK_DENIED_BODY ===
+      "Standing Order Trips cannot be sent back via the Driver App. To send back this trip, please call into support for assistance.",
+);
+/** ⛔ One action, and no invented way forward. */
+check(
+  "...and it offers one dismissal and no way forward",
+  `${SEND_BACK_DENIED_DISMISS} — ${(codeOnly(DENIED_SRC).match(/<AlertDialogAction/g) ?? []).length} action(s), ${(codeOnly(DENIED_SRC).match(/<AlertDialogCancel/g) ?? []).length} cancel(s)`,
+  SEND_BACK_DENIED_DISMISS === "OK" &&
+    (codeOnly(DENIED_SRC).match(/<AlertDialogAction/g) ?? []).length === 1 &&
+    !/<AlertDialogCancel/.test(codeOnly(DENIED_SRC)),
+);
+/**
+ * ⛔⛔ Production does not soften it, so neither may we. A "we can help" line
+ * would be the prototype arguing with its own evidence on the screen that IS
+ * the evidence.
+ */
+const SOFTENED = /we can help|don't worry|sorry|instead, try|alternatively/i;
+check(
+  "...and nothing is softened or added",
+  SOFTENED.test(codeOnly(DENIED_SRC)) ? `SOFTENED: ${codeOnly(DENIED_SRC).match(SOFTENED)?.[0]}` : "production's words only",
+  !SOFTENED.test(codeOnly(DENIED_SRC)),
+);
+
+/* --- 24b. The two paths, as declared literals --------------------------- */
+/**
+ * ⛔ Written out here, never read back from `sendBackSteps`. The whole claim is
+ * that the two sides run DIFFERENT sequences, and a table derived from the
+ * function would agree with whatever it produced.
+ */
+const STANDING = mockInProgressTrips.find(isStandingOrder)
+  ?? mockNeedsActionTrips.find(isStandingOrder)
+  ?? mockUpcomingTrips.find(isStandingOrder);
+const PLAIN_SEND_BACK = [...mockInProgressTrips, ...mockNeedsActionTrips, ...mockUpcomingTrips]
+  .find((t) => !isStandingOrder(t) && !isShortNoticeSendBack(t));
+check(
+  "a standing-order ride and an ordinary ride are both seeded",
+  `standing=${STANDING?.scenario?.code ?? STANDING?.id ?? "NONE"} ordinary=${PLAIN_SEND_BACK?.id ?? "NONE"}`,
+  STANDING !== undefined && PLAIN_SEND_BACK !== undefined,
+);
+if (STANDING && PLAIN_SEND_BACK) {
+  const PATHS: Array<{ why: string; trip: Trip; focus: DemoFocus; want: string[] }> = [
+    { why: "standing order, Now", trip: STANDING, focus: NOW_13, want: ["confirm", "denied"] },
+    { why: "standing order, Proposed", trip: STANDING, focus: FIXED_13, want: ["reason", "confirm", "standing-order"] },
+    { why: "ordinary ride, Now", trip: PLAIN_SEND_BACK, focus: NOW_13, want: ["confirm"] },
+    { why: "ordinary ride, Proposed", trip: PLAIN_SEND_BACK, focus: FIXED_13, want: ["reason", "confirm"] },
+    // ⚠️ The plain mirror shows every proposal, so it keeps the reason form.
+    { why: "standing order, plain mirror", trip: STANDING, focus: PLAIN, want: ["reason", "confirm", "standing-order"] },
+  ];
+  const pathWrong = PATHS.filter(
+    (c) => sendBackSteps(c.trip, c.focus).join(" → ") !== c.want.join(" → "),
+  );
+  check(
+    "each side runs its declared sequence",
+    pathWrong.length
+      ? `WRONG: ${pathWrong.map((c) => `${c.why} = ${sendBackSteps(c.trip, c.focus).join("→")}`).join("; ")}`
+      : `${PATHS.length} of ${PATHS.length} path(s) correct`,
+    pathWrong.length === 0,
+  );
+  /**
+   * ⛔⛔ **The refusal is terminal.** Nothing follows it — no penalty screen for
+   * a send-back that is not happening — and the path cannot complete.
+   */
+  /**
+   * ⛔⛔ Asserted on a trip that is BOTH a standing order AND short-notice —
+   * the combination `sendBackSteps` says is real but is deliberately not
+   * seeded, because a ride raising two warnings reads as one screen.
+   *
+   * ⚠️ A break test appending the penalty after the refusal PASSED when this
+   * ran on the seeded `13c`, which is not short-notice: there was nothing for
+   * the break to append, so the terminal claim was never exercised. The
+   * synthesised trip is the only way to put a step after `denied` at all.
+   */
+  const STANDING_AND_SHORT: Trip = { ...STANDING, sameDay: true };
+  check(
+    "a standing order that is ALSO short-notice can be built, so 'terminal' is testable",
+    `standingOrder=${isStandingOrder(STANDING_AND_SHORT)} shortNotice=${isShortNoticeSendBack(STANDING_AND_SHORT)}`,
+    isStandingOrder(STANDING_AND_SHORT) && isShortNoticeSendBack(STANDING_AND_SHORT),
+  );
+  const nowStanding = sendBackSteps(STANDING_AND_SHORT, NOW_13);
+  check(
+    "...and the refusal ends the path, with nothing after it",
+    `${nowStanding.join(" → ")}; completes=${sendBackCompletes(nowStanding)}`,
+    nowStanding[nowStanding.length - 1] === "denied" &&
+      nowStanding.length === 2 &&
+      sendBackCompletes(nowStanding) === false,
+  );
+  /** ⚠️ ...while the PROPOSED path on that same trip raises all four screens. */
+  check(
+    "...and the proposal still raises both warnings on that same trip",
+    `${sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ")}`,
+    sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ") ===
+      "reason → confirm → standing-order → penalty",
+  );
+  /** ⛔ And every other path still completes, or this is a block not a gate. */
+  const blocked = PATHS.filter((c) => !sendBackCompletes(sendBackSteps(c.trip, c.focus)));
+  check(
+    "...while every other path still finishes",
+    `${blocked.length} of ${PATHS.length} blocked — ${blocked.map((c) => c.why).join(", ")}`,
+    blocked.length === 1 && blocked[0].why === "standing order, Now",
+  );
+  /**
+   * ⛔ The reason form is row 13's entire proposal, so it must appear on exactly
+   * the sides that show proposals — and nowhere in production's path.
+   */
+  const reasonInNow = [STANDING, PLAIN_SEND_BACK].filter((t) =>
+    sendBackSteps(t, NOW_13).includes("reason"),
+  );
+  check(
+    "...and production's path never collects a reason",
+    `${reasonInNow.length} of 2 ride(s) ask for one in Now`,
+    reasonInNow.length === 0 &&
+      sendBackSteps(STANDING, FIXED_13).includes("reason") &&
+      sendBackSteps(PLAIN_SEND_BACK, FIXED_13).includes("reason"),
+  );
+  /**
+   * ⚠️ **Our standing-order warning never shows in Now.** It is flagged in its
+   * own component as proposed copy, and production warns about nothing — it
+   * refuses. Showing it beside the refusal would read as production's.
+   */
+  check(
+    "...and our standing-order warning stays out of production's path",
+    `Now: ${sendBackSteps(STANDING, NOW_13).join(" → ")}`,
+    !sendBackSteps(STANDING, NOW_13).includes("standing-order") &&
+      sendBackSteps(STANDING, FIXED_13).includes("standing-order"),
+  );
+}
+
+/* --- 24c. The screen reads the path, not the trip ----------------------- */
+/**
+ * ⛔ The handler must branch on the computed PATH. Branching on
+ * `isStandingOrder(trip)` alone would show the refusal on both sides — the
+ * proposal would stop working — or neither, depending which way it was written.
+ */
+check(
+  "the send-back handler branches on the path, not on the trip",
+  /sendBackPath\.includes\("denied"\)/.test(codeOnly(MORE_SRC))
+    ? "sendBackPath.includes(\"denied\")"
+    : "NOT FOUND — the refusal would key off the trip and ignore the side",
+  /sendBackPath\.includes\("denied"\)/.test(codeOnly(MORE_SRC)) &&
+    /sendBackSteps\(trip, demo\)/.test(codeOnly(MORE_SRC)),
+);
+/** ⛔ And the refusal is checked BEFORE our warning, or the warning wins. */
+check(
+  "...and it checks the refusal before reaching our warning",
+  `denied at ${codeOnly(MORE_SRC).indexOf('sendBackPath.includes("denied")')}, warning at ${codeOnly(MORE_SRC).indexOf("setStandingOrderOpen(true)")}`,
+  codeOnly(MORE_SRC).indexOf('sendBackPath.includes("denied")') > 0 &&
+    codeOnly(MORE_SRC).indexOf('sendBackPath.includes("denied")') <
+      codeOnly(MORE_SRC).indexOf("setStandingOrderOpen(true)"),
+);
+check(
+  "...and the refusal dialog is mounted",
+  /<SendBackDeniedDialog/.test(MORE_SRC) ? "mounted" : "MISSING",
+  /<SendBackDeniedDialog/.test(MORE_SRC),
 );
 
 // ---------------------------------------------------------------------------
