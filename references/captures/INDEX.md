@@ -13,7 +13,7 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~146.9 MB of binaries into a branch that every future prototype clones — and
+~148.5 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
@@ -59,14 +59,14 @@ and predates the build in any case. It is not a source.
 | **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
 | **03 Planner** | 8 | 4.0 | DAB-2026-10-01×8 | ✅ 8 of 8 from a current shoot — multi-trip day and past days still unshot |
 | **04 My Rides** | 39 | 16.5 | Apr-2026×24, DAB-2026-10-13×7, DAB-2026-10-01×4, DAB-2026-10-14×3, MRV-B2×1 | 🕐 mostly stale — 15 of 39 current |
-| **05 Options** | 11 | 5.5 | DAB-2026-10-01×7, DAB-2026-10-14×4 | ✅ 11 of 11 from a current shoot — menu captured; most destinations behind its rows are not |
+| **05 Options** | 10 | 4.9 | DAB-2026-10-01×7, DAB-2026-10-14×3 | ✅ 10 of 10 from a current shoot — menu captured; most destinations behind its rows are not |
 | **06 Chat** | 15 | 7.0 | Sep-2026×10, MRV-B2×4, DAB-2026-10-13×1 | 🕐 mostly stale — 5 of 15 current — shipped surfaces only |
 | **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ 31 of 37 from a current shoot — captured, not built (by decision) |
 | **_annotated** | 64 | 16.4 | derived×64 | — derivatives, not captures |
 | **_out-of-scope** | 14 | 3.3 | Apr-2026×10, DAB-2026-10-09×3, DAB-2026-10-13×1 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
-| **_unregistered** | 85 | 42.2 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (undated shoot folder)×3, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **336** | **146.9** | | 470 files on disk, 336 unique |
+| **_unregistered** | 89 | 44.4 | MRV-B1-raw×32, unknown×18, unknown (undated shoot folder)×7, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
+| **TOTAL** | **339** | **148.5** | | 473 files on disk, 339 unique |
 
 ---
 
@@ -344,13 +344,12 @@ The Options menu and the screens behind its rows. The menu itself is captured (`
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
-| CAP-333 | `05-01 - Options - Menu Top With Profile.png` | DAB-2026-10-14 | `dd02a5ef93d779de` | 0 |  |
+| CAP-337 | `05-01 - Options - Menu Top With Profile.png` | DAB-2026-10-14 | `a442e9eea4ad5a66` | 0 |  |
 | CAP-100 | `05-01 - Options - Menu Top.png` | DAB-2026-10-01 | `075d9c3e31e121f6` | 0 |  |
-| CAP-334 | `05-02 - Options - Menu Middle.png` | DAB-2026-10-14 | `520c6c34fc79993d` | 0 |  |
+| CAP-338 | `05-02 - Options - Menu Middle With Privacy Policy.png` | DAB-2026-10-14 | `e9bc7c4eabf4a78d` | 0 |  |
 | CAP-101 | `05-02 - Options - Menu Scrolled.png` | DAB-2026-10-01 | `51bcfd0129726272` | 0 |  |
+| CAP-339 | `05-03 - Options - Menu Bottom With Version.png` | DAB-2026-10-14 | `dd43c23b9656cfeb` | 0 |  |
 | CAP-102 | `05-03 - Options - Menu Lower.png` | DAB-2026-10-01 | `4960b96fc319b86a` | 0 |  |
-| CAP-335 | `05-03 - Options - Telematics Debug Section.png` | DAB-2026-10-14 | `29ee13aca36b3987` | 0 |  |
-| CAP-336 | `05-04 - Options - Menu Bottom With Version.png` | DAB-2026-10-14 | `a8af287cfa8c2bfe` | 0 |  |
 | CAP-103 | `05-04 - Options - Menu Bottom With Version.png` | DAB-2026-10-01 | `475a7de3c8dc0c6f` | 0 |  |
 | CAP-104 | `05-05 - Driver Notes - Empty Modal.png` | DAB-2026-10-01 | `f851ca8d5b3d194a` | 0 |  |
 | CAP-105 | `05-06 - ID Badge - Top.png` | DAB-2026-10-01 | `064444aae88ecbc5` | 0 |  |
@@ -358,13 +357,12 @@ The Options menu and the screens behind its rows. The menu itself is captured (`
 
 <details><summary>Source paths</summary>
 
-- `CAP-333` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-01 - Options - Menu Top With Profile.png`
+- `CAP-337` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-01 - Options - Menu Top With Profile.png`
 - `CAP-100` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-01 - Options - Menu Top.png`
-- `CAP-334` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-02 - Options - Menu Middle.png`
+- `CAP-338` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-02 - Options - Menu Middle With Privacy Policy.png`
 - `CAP-101` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-02 - Options - Menu Scrolled.png`
+- `CAP-339` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-03 - Options - Menu Bottom With Version.png`
 - `CAP-102` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-03 - Options - Menu Lower.png`
-- `CAP-335` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-03 - Options - Telematics Debug Section.png`
-- `CAP-336` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-04 - Options - Menu Bottom With Version.png`
 - `CAP-103` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-04 - Options - Menu Bottom With Version.png`
 - `CAP-104` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-05 - Driver Notes - Empty Modal.png`
 - `CAP-105` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-06 - ID Badge - Top.png`
@@ -697,6 +695,10 @@ Raw camera rolls, unprocessed `_inbox` dumps and Slack release crops. No canonic
 | CAP-237 | `03 - Profile - SMS only.jpg` | slack | `4c046924f78ac24c` | 1 |  |
 | CAP-238 | `04 - Profile - has in-app chat.jpg` | slack | `e4d904e060570905` | 1 |  |
 | CAP-239 | `04 - Sign up or sign in, in the app.jpg` | slack | `3b19cb6fa7f74fb7` | 1 |  |
+| CAP-333 | `05-01 - Options - Menu Top With Profile.png` | unknown (undated shoot folder) | `dd02a5ef93d779de` | 0 |  |
+| CAP-334 | `05-02 - Options - Menu Middle.png` | unknown (undated shoot folder) | `520c6c34fc79993d` | 0 |  |
+| CAP-335 | `05-03 - Options - Telematics Debug Section.png` | unknown (undated shoot folder) | `29ee13aca36b3987` | 0 |  |
+| CAP-336 | `05-04 - Options - Menu Bottom With Version.png` | unknown (undated shoot folder) | `a8af287cfa8c2bfe` | 0 |  |
 | CAP-240 | `1000155769.jpg` | MRV-B1-raw | `a5c54ca729a2637c` | 2 |  |
 | CAP-241 | `1000155770.jpg` | MRV-B1-raw | `ed1b8adf6e9e744e` | 2 |  |
 | CAP-242 | `1000155771.jpg` | MRV-B1-raw | `80b5ad7b821ad420` | 2 |  |
@@ -785,6 +787,10 @@ Raw camera rolls, unprocessed `_inbox` dumps and Slack release crops. No canonic
 - `CAP-237` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/03 - Profile - SMS only.jpg`
 - `CAP-238` — `Project - Map Request View/Release Info - Screenshots for Slack/4 - Onboarding Tool Updates/04 - Profile - has in-app chat.jpg`
 - `CAP-239` — `Project - Map Request View/Release Info - Screenshots for Slack/3 - In-App Onboarding and Chat/04 - Sign up or sign in, in the app.jpg`
+- `CAP-333` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-14 - staging v6.0.542 Options/05-01 - Options - Menu Top With Profile.png`
+- `CAP-334` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-14 - staging v6.0.542 Options/05-02 - Options - Menu Middle.png`
+- `CAP-335` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-14 - staging v6.0.542 Options/05-03 - Options - Telematics Debug Section.png`
+- `CAP-336` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-14 - staging v6.0.542 Options/05-04 - Options - Menu Bottom With Version.png`
 - `CAP-240` — `Project - Map Request View/References/1000155769.jpg`
 - `CAP-241` — `Project - Map Request View/References/1000155770.jpg`
 - `CAP-242` — `Project - Map Request View/References/1000155771.jpg`
