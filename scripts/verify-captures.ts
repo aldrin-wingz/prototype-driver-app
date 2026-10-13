@@ -32,6 +32,11 @@ const SOURCES = [
   "Other/NEMT Driver App/Flow Reference",
   "Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical",
   "Project - In-App Support Requests/prototype-driver-app-support/references/screenshots/canonical",
+  // ⛔ Must stay in lockstep with `build-capture-index.ts`. A source listed in
+  // one script and not the other is the documented failure mode: the verifier
+  // cannot see it in either direction, so nothing reports the gap. The
+  // `-support-solutions` clone is excluded from BOTH, for the reason given
+  // there — measured, not assumed: regenerating minted 0 new ids.
 ];
 const EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 

@@ -31,6 +31,11 @@ const SOURCES = [
   "Other/NEMT Driver App/Flow Reference",
   "Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical",
   "Project - In-App Support Requests/prototype-driver-app-support/references/screenshots/canonical",
+  // ⚠️ `prototype-driver-app-support-solutions` — the OTHER support clone — is
+  // deliberately NOT listed. Its canonical folder is byte-identical to the
+  // sibling above, so every SHA there already has a row, and the index is
+  // keyed on bytes. That repo lists it because it is its OWN folder, which is
+  // the case this index cannot cover from here.
 ];
 
 const SECTIONS = ["01 Home", "02 Requests", "03 Planner", "04 My Rides", "05 Options",
@@ -136,6 +141,40 @@ for (const src of SOURCES) {
   })(root);
 }
 
+/**
+ * ⛔⛔ **CAP ids are assigned from a LEDGER, not from sort position.**
+ *
+ * They used to be positional — `i++` down the rendered table — while the index's
+ * own field table called them a "stable id". Those two claims cannot both hold,
+ * and on 2026-10-13 the contradiction bit: nine new captures filed into
+ * `04 My Rides` and `06 Chat` moved **248 of 328 ids**, which silently
+ * invalidated **all 23** `CAP-###` citations in the source. `CAP-224`, cited in
+ * `rider-declined.ts` as the declined sheet, came to mean a sign-up intro
+ * screen. Nothing errored; the comments simply began lying.
+ *
+ * So an id now belongs to the BYTES. A capture keeps its id for life, a new one
+ * takes the next free number, and re-filing or renaming moves nothing. The
+ * ledger is checked in beside the index.
+ *
+ * ⚠️ The consequence is that ids are NOT contiguous within a section, and the
+ * table is still ordered by name. That is the point — reading order and
+ * identity are different things.
+ */
+const LEDGER = join(REPO, "references/captures/cap-ids.json");
+const ledger: Record<string, string> = existsSync(LEDGER)
+  ? JSON.parse(readFileSync(LEDGER, "utf8"))
+  : {};
+let nextCap = Object.values(ledger).reduce((max, id) => Math.max(max, Number(id.slice(4))), 0);
+let mintedCaps = 0;
+function capIdFor(sha: string): string {
+  const known = ledger[sha];
+  if (known) return known;
+  nextCap++; mintedCaps++;
+  const id = `CAP-${String(nextCap).padStart(3, "0")}`;
+  ledger[sha] = id;
+  return id;
+}
+
 const shows = harvestShows();
 const rows: Row[] = [...byHash].map(([sha, locs]) => {
   const rel = locs[0];
@@ -226,7 +265,7 @@ w("without that cost growing with every shoot. Paths are relative to the vault r
 w("");
 w("| Field | Meaning |");
 w("| --- | --- |");
-w("| `CAP-###` | stable id within this index |");
+w("| `CAP-###` | **stable id, owned by the bytes.** Assigned once from `cap-ids.json` and never reassigned, so a capture keeps its id through re-filing, renaming and later shoots. Ids are therefore NOT contiguous within a section. ⛔ Cite this, not a row number. |");
 w("| `Build` | **which shoot it came from** — the fidelity stamp. Never mix builds in one artifact |");
 w("| `SHA-256` | first 16 hex of the file's hash; the identity of the bytes |");
 w("| `Shows` | literal on-screen content, harvested from the Map Request View registry where one exists |");
@@ -275,7 +314,6 @@ w(`| **TOTAL** | **${rows.length}** | **${mb(rows.reduce((a, r) => a + r.bytes, 
 w("");
 w("---");
 w("");
-let i = 0;
 for (const s of SECTIONS) {
   w(`## ${s}`); w(""); w(NOTE[s]); w("");
   const rs = rows.filter((r) => r.section === s);
@@ -283,10 +321,11 @@ for (const s of SECTIONS) {
   w("| CAP | Name | Build | SHA-256 | Dup | Shows |");
   w("| --- | --- | --- | --- | ---: | --- |");
   for (const r of rs) {
-    i++; (r as Row & { cap: string }).cap = `CAP-${String(i).padStart(3, "0")}`;
+    const cap = capIdFor(r.sha);
+    (r as Row & { cap: string }).cap = cap;
     let sh = r.shows.replace(/\|/g, "\\|");
     if (sh.length > 200) sh = sh.slice(0, 197) + "…";
-    w(`| CAP-${String(i).padStart(3, "0")} | \`${r.name}\` | ${r.build} | \`${r.sha}\` | ${r.dupes.length} | ${sh} |`);
+    w(`| ${cap} | \`${r.name}\` | ${r.build} | \`${r.sha}\` | ${r.dupes.length} | ${sh} |`);
   }
   w("");
   w("<details><summary>Source paths</summary>"); w("");
@@ -296,4 +335,15 @@ for (const s of SECTIONS) {
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, L.join("\n"));
+// ⛔ Written AFTER the index, and sorted by id so the diff of a new shoot is the
+// handful of lines it actually added rather than a reshuffle.
+writeFileSync(
+  LEDGER,
+  JSON.stringify(
+    Object.fromEntries(Object.entries(ledger).sort((a, b) => a[1].localeCompare(b[1]))),
+    null,
+    0,
+  ),
+);
 console.log(`INDEX.md written — ${scanned} files scanned, ${rows.length} unique, ${mb(rows.reduce((a, r) => a + r.bytes, 0))} MB indexed`);
+console.log(`CAP ids — ${Object.keys(ledger).length} in the ledger, ${mintedCaps} newly minted this run, highest ${`CAP-${String(nextCap).padStart(3, "0")}`}`);
