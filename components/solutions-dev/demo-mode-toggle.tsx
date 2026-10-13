@@ -7,6 +7,7 @@ import {
   hasNowState,
   type DemoMode,
 } from "@/lib/solutions/demo-mode";
+import { hasProposedSide } from "@/lib/solutions/catalogue";
 import { useSolution } from "@/lib/solutions/solution-context";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,16 @@ export function DemoModeToggle({ tone }: { tone: "dark" | "light" }) {
 
   // ⛔ No focus, no side. See above.
   if (!active) return null;
+  /**
+   * ⛔⛔ **No proposal, no second side either.** Rows 11, 12 and 25 are
+   * `no-app-surface` — a data cleanse, a backend path, and a subject area with
+   * no single cause to design against. There is nothing to compare production
+   * with, so a segmented control offering "Proposed" would move and change
+   * nothing, which is the one failure this control exists to avoid. Rows 11
+   * and 12 still have a production screen to show; they reach it through
+   * `nowEntry`, with one side and no switch.
+   */
+  if (!hasProposedSide(active)) return null;
 
   const awaiting = !hasNowState(active.id);
 

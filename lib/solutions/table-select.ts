@@ -43,6 +43,28 @@ export const COLUMN_MODE: Record<SelectingColumn, DemoMode> = {
 };
 
 /**
+ * The side a click on this column selects, **for this row**.
+ *
+ * ⛔⛔ **A row with no proposal has ONE side, and both columns select it.**
+ * Rows 11, 12 and 25 are `no-app-surface`; rows 11 and 12 still have a
+ * production screen worth landing on. If their Proposed Feature cell selected
+ * `"fixed"` the table would offer a side that does not exist — and if it
+ * selected NOTHING, row 12 would become unreachable, because its Use Case cell
+ * is merged into row 11's. That is the B3d bug again, from the other end.
+ *
+ * ⚠️ Only the SELECTION is overridden, never the highlight: `cellSelected`
+ * goes on reading `COLUMN_MODE`, so the Use Case cell is the one that lights
+ * and the Proposed Feature cell focuses without ever claiming to be the side
+ * on screen.
+ */
+export function columnModeFor(
+  column: SelectingColumn,
+  hasProposal: boolean,
+): DemoMode {
+  return hasProposal ? COLUMN_MODE[column] : "now";
+}
+
+/**
  * ⛔ The four that do nothing on click (user, 2026-10-14).
  *
  * Declared rather than left implicit, because "this cell is not a control" is
@@ -84,10 +106,17 @@ export interface SelectInput {
   column: SelectingColumn;
   activeId: string | null;
   activeMode: DemoMode;
+  /**
+   * Whether the clicked row has a proposed side at all — `hasProposedSide`.
+   *
+   * ⚠️ Passed in rather than read from the catalogue here, so this module
+   * stays a rule about clicks and does not have to know what a `Solution` is.
+   */
+  hasProposal: boolean;
 }
 
 export function selectAction(input: SelectInput): SelectAction {
-  const wanted = COLUMN_MODE[input.column];
+  const wanted = columnModeFor(input.column, input.hasProposal);
   // Not the focused row's cell — or nothing is focused at all. `focus()` moves
   // the app to the row's entry point and sets the side in one go.
   if (!coversFocus(input.runIds, input.activeId)) return "focus";

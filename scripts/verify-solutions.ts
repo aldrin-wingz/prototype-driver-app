@@ -24,7 +24,10 @@ import {
   CATEGORIZED_CALLS,
   CLEAR_FOCUS_LABEL,
   COVERED_CALLS,
+  entryRouteFor,
   findSolution,
+  hasProposedSide,
+  modeFor,
   SOLUTION_HOME,
   SOLUTIONS,
   subjectAreaGroups,
@@ -33,7 +36,18 @@ import {
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import { mergedRunCounts, tableRows } from "../lib/solutions/table-shape";
 import {
+  OVER_CAPACITY_DISPATCH_PHONE,
+  OVER_CAPACITY_PREFIX,
+  OVER_CAPACITY_PROVENANCE,
+  OVER_CAPACITY_SOLUTIONS,
+  OVER_CAPACITY_SWIPE_LABEL,
+  dispatchDialHref,
+  isOverCapacity,
+  overCapacityHeadline,
+} from "../lib/driver-data/over-capacity";
+import {
   COLUMN_MODE,
+  columnModeFor,
   INERT_COLUMNS,
   SELECTING_COLUMNS,
   cellSelected,
@@ -702,7 +716,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 20;
+const EXPECTED_SCENARIO_RIDES = 21;  // ⭐ +1 in B3f: rows 11/12's over-capacity request
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -7158,16 +7172,17 @@ const SELECT_CASES: Array<{
   column: SelectingColumn;
   activeId: string | null;
   activeMode: DemoMode;
+  hasProposal: boolean;
   want: SelectAction;
 }> = [
-  { why: "nothing focused, use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: null, activeMode: "now", want: "focus" },
-  { why: "nothing focused, proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", want: "focus" },
-  { why: "another row's use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", want: "focus" },
-  { why: "another row's proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", want: "focus" },
-  { why: "⭐ the focused row's use case, while showing the proposal", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", want: "set-mode" },
-  { why: "⭐ the focused row's proposed feature, while showing today", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", want: "set-mode" },
-  { why: "⛔ the lit use-case cell, clicked again", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", want: "nothing" },
-  { why: "⛔ the lit proposed-feature cell, clicked again", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", want: "nothing" },
+  { why: "nothing focused, use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: null, activeMode: "now", hasProposal: true, want: "focus" },
+  { why: "nothing focused, proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", hasProposal: true, want: "focus" },
+  { why: "another row's use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", hasProposal: true, want: "focus" },
+  { why: "another row's proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", hasProposal: true, want: "focus" },
+  { why: "⭐ the focused row's use case, while showing the proposal", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", hasProposal: true, want: "set-mode" },
+  { why: "⭐ the focused row's proposed feature, while showing today", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", hasProposal: true, want: "set-mode" },
+  { why: "⛔ the lit use-case cell, clicked again", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", hasProposal: true, want: "nothing" },
+  { why: "⛔ the lit proposed-feature cell, clicked again", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", hasProposal: true, want: "nothing" },
   /*
     ⛔⛔ The four that caught a shipped bug, 2026-10-14. A MERGED use-case cell
     is drawn by the first row of its run but speaks for all of them. Row 10's
@@ -7177,12 +7192,21 @@ const SELECT_CASES: Array<{
     all. The highlight was already lighting that cell, because IT compared
     against the run. Found by a walk; these are what would have found it here.
   */
-  { why: "⭐⭐ a merged use case, clicked by the SECOND row of its run", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "fixed", want: "set-mode" },
-  { why: "⭐⭐ ...and clicked again once it is lit", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", want: "nothing" },
-  { why: "a merged use case with its FIRST row focused still flips", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", want: "set-mode" },
-  { why: "a merged use case with a stranger focused takes the focus", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "z", activeMode: "now", want: "focus" },
+  { why: "⭐⭐ a merged use case, clicked by the SECOND row of its run", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "fixed", hasProposal: true, want: "set-mode" },
+  { why: "⭐⭐ ...and clicked again once it is lit", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", hasProposal: true, want: "nothing" },
+  { why: "a merged use case with its FIRST row focused still flips", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", hasProposal: true, want: "set-mode" },
+  { why: "a merged use case with a stranger focused takes the focus", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "z", activeMode: "now", hasProposal: true, want: "focus" },
   /* ⛔ And the run does NOT widen the proposed-feature column, which never merges. */
-  { why: "the second row's own proposed feature is its own", runIds: ["b"], clickedId: "b", column: "proposed-feature", activeId: "a", activeMode: "fixed", want: "focus" },
+  { why: "the second row's own proposed feature is its own", runIds: ["b"], clickedId: "b", column: "proposed-feature", activeId: "a", activeMode: "fixed", hasProposal: true, want: "focus" },
+  /*
+    ⛔⛔ B3f. A `no-app-surface` row has ONE side and both columns select it.
+    Selecting `"fixed"` would offer a side that does not exist; selecting
+    NOTHING would make row 12 unreachable, because its Use Case cell is merged
+    into row 11's. That is the B3d bug again, from the other end.
+  */
+  { why: "⭐⭐ no proposal: the proposed-feature cell still focuses the row", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", hasProposal: false, want: "focus" },
+  { why: "⭐⭐ ...landing on the one side it has, so clicking again is a no-op", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", hasProposal: false, want: "nothing" },
+  { why: "⭐ ...and its use-case cell means that same one side", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", hasProposal: false, want: "nothing" },
 ];
 
 const selectWrong = SELECT_CASES.filter(
@@ -7193,6 +7217,7 @@ const selectWrong = SELECT_CASES.filter(
       column: c.column,
       activeId: c.activeId,
       activeMode: c.activeMode,
+      hasProposal: c.hasProposal,
     }) !== c.want,
 );
 check(
@@ -7395,15 +7420,19 @@ function clickCell(
   mode: DemoMode,
   cell: SelectCellModel,
 ): [string | null, DemoMode] {
+  // ⛔ A `no-app-surface` row has one side, and both columns select it.
+  const hasProposal = hasProposedSide(findSolution(cell.clickedId)!);
   const action = selectAction({
     runIds: cell.runIds,
     clickedId: cell.clickedId,
     column: cell.column,
     activeId,
     activeMode: mode,
+    hasProposal,
   });
-  if (action === "focus") return [cell.clickedId, COLUMN_MODE[cell.column]];
-  if (action === "set-mode") return [activeId, COLUMN_MODE[cell.column]];
+  const side = columnModeFor(cell.column, hasProposal);
+  if (action === "focus") return [cell.clickedId, side];
+  if (action === "set-mode") return [activeId, side];
   return [activeId, mode];
 }
 const START: [string | null, DemoMode] = [null, DEFAULT_DEMO_MODE];
@@ -7419,17 +7448,66 @@ while (queue.length) {
     queue.push(next);
   }
 }
-const WANTED_STATES = tRows.flatMap((r) => DEMO_MODES.map((m) => `${r.solution.id}/${m}`));
+/**
+ * ⚠️ **Every row on every side IT HAS.** Three rows are `no-app-surface` — a
+ * data cleanse, a backend path, and a subject area with no single cause — so
+ * the comparison has one side for them, not two. They are named here as
+ * literals, because "this row has only one side" is a claim worth making
+ * explicitly rather than subtracting from a total.
+ *
+ * ⛔ Rows 11 and 12 still have a production SCREEN, reached through `nowEntry`.
+ * One side is not no sides.
+ */
+const SINGLE_SIDED = [
+  "vehicle-capacity-cleanse",
+  "vehicle-capacity-backend",
+  "technical-issues",
+];
+const sidedDrift = [
+  ...SINGLE_SIDED.filter((id) => hasProposedSide(findSolution(id)!)).map((id) => `+${id}`),
+  ...SOLUTIONS.filter((row) => !hasProposedSide(row) && !SINGLE_SIDED.includes(row.id)).map(
+    (row) => `-${row.id}`,
+  ),
+];
+const WANTED_STATES = tRows.flatMap((r) =>
+  (SINGLE_SIDED.includes(r.solution.id) ? [DEFAULT_DEMO_MODE] : DEMO_MODES).map(
+    (m) => `${r.solution.id}/${m}`,
+  ),
+);
+const EXPECTED_STATES = EXPECTED_TABLE_ROWS * DEMO_MODES.length - SINGLE_SIDED.length;
 const unreachableStates = WANTED_STATES.filter((k) => !seen.has(k));
 check(
-  "every row is reachable on BOTH sides, using nothing but the table",
+  "every row is reachable on every side it has, using nothing but the table",
   unreachableStates.length
     ? `UNREACHABLE: ${unreachableStates.slice(0, 6).join(", ")}${unreachableStates.length > 6 ? ` (+${unreachableStates.length - 6})` : ""}`
-    : `${WANTED_STATES.length} of ${EXPECTED_TABLE_ROWS * DEMO_MODES.length} (row x side) reachable from the plain mirror`,
+    : `${WANTED_STATES.length} of ${EXPECTED_STATES} (row x side) reachable from the plain mirror; ${SINGLE_SIDED.length} row(s) have one side`,
   unreachableStates.length === 0 &&
-    WANTED_STATES.length === EXPECTED_TABLE_ROWS * DEMO_MODES.length &&
+    WANTED_STATES.length === EXPECTED_STATES &&
+    // ⛔ The single-sided list is the catalogue's own, not a convenient subset.
+    sidedDrift.length === 0 &&
     // ⛔ Non-vacuity: the search must really have had to walk, not start done.
     TABLE_CELLS.length === EXPECTED_TABLE_ROWS + tRows.filter((r) => r.useCaseSpan > 0).length,
+);
+/**
+ * ⛔⛔ And the side they do NOT have is genuinely unreachable — not merely
+ * unvisited by this search. `modeFor` normalises it away wherever the focus is
+ * assembled, so a hand-edited `?mode=fixed` on one of these rows lands on the
+ * one side it has.
+ */
+const forcedWrong = SINGLE_SIDED.filter(
+  (id) => DEMO_MODES.some((m) => modeFor(findSolution(id), m) !== DEFAULT_DEMO_MODE),
+);
+check(
+  "...and nothing can put a one-sided row on the side it does not have",
+  forcedWrong.length
+    ? `REACHABLE: ${forcedWrong.join(", ")}`
+    : `${SINGLE_SIDED.length} row(s) pinned to ${DEFAULT_DEMO_MODE}; ` +
+      `a two-sided row still moves: ${DEMO_MODES.map((m) => modeFor(findSolution("rider-no-show"), m)).join("/")}`,
+  forcedWrong.length === 0 &&
+    // ⚠️ Non-vacuity: `modeFor` must not simply pin EVERY row.
+    DEMO_MODES.every((m) => modeFor(findSolution("rider-no-show"), m) === m) &&
+    // ...and the plain mirror keeps whatever it was given, because it is inert.
+    DEMO_MODES.every((m) => modeFor(undefined, m) === m),
 );
 /**
  * ⛔⛔ **And the two rules agree about whose cell it is.** The bug was not that
@@ -7438,10 +7516,17 @@ check(
  * click would not act on. Swept over every cell and every focus.
  */
 let agreementSweep = 0;
-const disagreements: string[] = [];
+/** ⛔⛔ The dangerous direction: lit, and clicking it MOVES you. */
+const litButMoves: string[] = [];
+/** ⚠️ The harmless one: a no-op that is not the lit cell. Declared below. */
+const quietButUnlit: string[] = [];
 for (const cell of TABLE_CELLS) {
   for (const row of tRows) {
-    for (const mode of DEMO_MODES) {
+    // ⚠️ Only the sides this row can be on — `modeFor` is what the provider
+    // applies, so sweeping past it would test states the app cannot enter.
+    for (const wanted of DEMO_MODES) {
+      const mode = modeFor(row.solution, wanted);
+      if (mode !== wanted) continue;
       agreementSweep += 1;
       const lit = cellSelected({
         runIds: cell.runIds,
@@ -7455,23 +7540,50 @@ for (const cell of TABLE_CELLS) {
         column: cell.column,
         activeId: row.solution.id,
         activeMode: mode,
+        hasProposal: hasProposedSide(findSolution(cell.clickedId)!),
       });
-      // A LIT cell is the focused row's own, on the side already showing — so
-      // clicking it must be the no-op. A cell that is lit and would move the
-      // focus elsewhere is a control pointing at the wrong thing.
-      if (lit !== (action === "nothing")) {
-        disagreements.push(`${cell.column}:${cell.clickedId}@${row.solution.id}/${mode}`);
-      }
+      const key = `${cell.column}:${cell.clickedId}@${row.solution.id}/${mode}`;
+      if (lit && action !== "nothing") litButMoves.push(key);
+      if (!lit && action === "nothing") quietButUnlit.push(key);
     }
   }
 }
+/**
+ * ⛔⛔ **No lit cell ever moves you.** This is the direction the B3d bug broke
+ * — the highlight pointed at a control that jumped the focus elsewhere — and
+ * it admits no exceptions.
+ */
 check(
-  "...and a lit cell is exactly the one whose click does nothing",
-  disagreements.length
-    ? `DISAGREE: ${disagreements.slice(0, 5).join(", ")} (${disagreements.length} of ${agreementSweep})`
-    : `0 of ${agreementSweep} (cell x focus x side) disagree`,
-  disagreements.length === 0 &&
-    agreementSweep === TABLE_CELLS.length * EXPECTED_TABLE_ROWS * DEMO_MODES.length,
+  "...and no lit cell is one whose click moves the focus",
+  litButMoves.length
+    ? `LIT BUT MOVES: ${litButMoves.slice(0, 5).join(", ")} (${litButMoves.length} of ${agreementSweep})`
+    : `0 of ${agreementSweep} (cell x focus x side) lit cells move`,
+  litButMoves.length === 0 && agreementSweep > 0,
+);
+/**
+ * ⚠️ The other direction has exactly three exceptions, and they are the
+ * single-sided rows' own Proposed Feature cells. That cell focuses its row but
+ * never lights — the Use Case cell is the lit one, because `cellSelected` reads
+ * `COLUMN_MODE` while the CLICK reads `columnModeFor`. So on a row already
+ * focused, it is a no-op that is not highlighted: harmless, and the price of
+ * keeping row 12 reachable at all.
+ *
+ * ⛔ Declared as literals. If a fourth appears, a two-sided row has quietly
+ * lost its second side.
+ */
+const EXPECTED_QUIET = SINGLE_SIDED.map(
+  (id) => `proposed-feature:${id}@${id}/${DEFAULT_DEMO_MODE}`,
+).sort();
+const quietDrift = [
+  ...EXPECTED_QUIET.filter((k) => !quietButUnlit.includes(k)).map((k) => `-${k}`),
+  ...quietButUnlit.filter((k) => !EXPECTED_QUIET.includes(k)).map((k) => `+${k}`),
+];
+check(
+  "...and the only unlit no-ops are the one-sided rows' own proposed-feature cells",
+  quietDrift.length
+    ? `DRIFT: ${quietDrift.slice(0, 5).join(" ")}`
+    : `${quietButUnlit.length} of ${agreementSweep} — ${SINGLE_SIDED.length} one-sided row(s)`,
+  quietDrift.length === 0 && quietButUnlit.length === SINGLE_SIDED.length,
 );
 
 /** ⛔ `useCaseRunIds` must describe the same merge the rowspan draws. */
@@ -8033,6 +8145,276 @@ check(
   "...and the two sides of row 10 really do differ, which is what the list claims",
   `now ${feedSize(ROW_10_ID, "now")} trips, fixed ${feedSize(ROW_10_ID, "fixed")} trips`,
   hasNowState(ROW_10_ID) === (feedSize(ROW_10_ID, "now") !== feedSize(ROW_10_ID, "fixed")),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n27. Rows 11 and 12 — over capacity is not a block, it is a phone number");
+// ---------------------------------------------------------------------------
+/**
+ * B3f. D7 and the capture list both described this as *"trying to accept a trip
+ * that exceeds vehicle capacity — the over-capacity block"*, i.e. an attempt met
+ * with a refusal. `CAP-340` shows there is no attempt: the Request Details
+ * screen simply **has no accept control**. Where `SWIPE TO ACCEPT` would be
+ * there is a pink swipe reading `Over Capacity Trip # …` / `SWIPE TO CALL
+ * DISPATCH`, and completing it dials.
+ *
+ * ⭐ A stronger finding than a block. A block at least says what went wrong;
+ * this says only *over capacity* and a reference number, and hands the driver a
+ * telephone. That call IS what rows 11 and 12 exist to remove.
+ *
+ * ⛔⛔ **Now-only.** Both rows are `no-app-surface`, so there is no proposed
+ * side, no toggle and nothing to gate — which is why this is reached through
+ * `nowEntry` rather than by weakening what `entry` means.
+ */
+const OC_LAYOUT = readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8");
+const OC_CODE = codeOnly(OC_LAYOUT);
+const OC_ROWS = ["vehicle-capacity-cleanse", "vehicle-capacity-backend"];
+const OC_TRIP = mockRequestTrips.find((t) => t.id === "REQ-OVERCAP-001");
+
+/* --- 27a. The two rows keep every claim they made before ---------------- */
+/**
+ * ⛔⛔ `nowEntry` was added rather than letting `entry` mean "wherever this row
+ * is demonstrated". Weakening `entry` would have made *"⚠️ Not in prototype
+ * yet"* false for two rows whose proposal genuinely is not built — a data
+ * cleanse and a backend path are not in this prototype and never will be.
+ */
+const ocRows = OC_ROWS.map((id) => findSolution(id));
+check(
+  "rows 11 and 12 still say their proposal is not in the prototype",
+  ocRows.every(
+    (row) =>
+      row &&
+      row.klass === "no-app-surface" &&
+      row.buildState === "not-yet" &&
+      row.entry === null &&
+      Boolean(row.noSurfaceReason),
+  )
+    ? `${ocRows.length} of 2 — no-app-surface, not-yet, entry null, reason given`
+    : "a row changed its build claim to gain a production screen",
+  ocRows.length === 2 &&
+    ocRows.every(
+      (row) =>
+        row &&
+        row.klass === "no-app-surface" &&
+        row.buildState === "not-yet" &&
+        row.entry === null &&
+        Boolean(row.noSurfaceReason),
+    ),
+);
+/** ⛔ ...and they BOTH gained a nowEntry, because they are one dead end. */
+check(
+  "...and both gained a production screen to land on",
+  `${ocRows.filter((r) => r?.nowEntry).length} of 2 — ${ocRows.map((r) => r?.nowEntry?.route).join(", ")}`,
+  ocRows.every((row) => row?.nowEntry?.route === "/requests/REQ-OVERCAP-001"),
+);
+/**
+ * ⛔⛔ **Declared count.** `nowEntry` must stay rare and deliberate — it is the
+ * field that says "production has a screen here and we propose nothing". A
+ * third appearing silently would mean a row had been given a Now without anyone
+ * deciding it should have one.
+ */
+const nowEntryRows = SOLUTIONS.filter((row) => row.nowEntry);
+const EXPECTED_NOW_ENTRIES = 2;
+check(
+  "...and exactly the declared rows carry one",
+  `${nowEntryRows.length} of ${EXPECTED_NOW_ENTRIES} — ${nowEntryRows.map((r) => r.order).join(", ")}`,
+  nowEntryRows.length === EXPECTED_NOW_ENTRIES &&
+    nowEntryRows.every((row) => OC_ROWS.includes(row.id)),
+);
+/**
+ * ⛔ `entryRouteFor` must not have moved the other 24 rows. A rule that changed
+ * every row while adding two would be a refactor wearing a feature's clothes.
+ */
+const movedRoutes = SOLUTIONS.filter(
+  (row) =>
+    !row.nowEntry &&
+    DEMO_MODES.some(
+      (m) => entryRouteFor(row, m) !== (row.entry?.route ?? SOLUTION_HOME),
+    ),
+);
+check(
+  "the new routing rule leaves every row without a nowEntry exactly where it was",
+  movedRoutes.length
+    ? `MOVED: ${movedRoutes.map((r) => r.id).join(", ")}`
+    : `${SOLUTIONS.length - nowEntryRows.length} of ${SOLUTIONS.length} row(s) unchanged on both sides`,
+  movedRoutes.length === 0,
+);
+/** ⭐ ...and the two that DO carry one land on it, on the side that has it. */
+check(
+  "...and rows 11 and 12 land on their production screen",
+  ocRows.map((r) => entryRouteFor(r!, "now")).join(", "),
+  ocRows.every((row) => entryRouteFor(row!, "now") === "/requests/REQ-OVERCAP-001") &&
+    // ⛔ ...and never on SOLUTION_HOME, which is where they went before B3f.
+    ocRows.every((row) => entryRouteFor(row!, "now") !== SOLUTION_HOME),
+);
+
+/* --- 27b. The screen, against the capture ------------------------------ */
+check(
+  "an over-capacity request is seeded, and only one",
+  `${mockRequestTrips.filter(isOverCapacity).length} of ${mockRequestTrips.length} request(s)`,
+  Boolean(OC_TRIP) &&
+    isOverCapacity(OC_TRIP!) &&
+    mockRequestTrips.filter(isOverCapacity).length === 1,
+);
+/**
+ * ⛔ `CAP-340`'s own number is TEST data (`RiderFirst RiderLast`, `4567 Test
+ * Dr`, `8552.7 mi away`). The shape is copied; the value is invented — the
+ * same rule that keeps real members' names out of the seed.
+ */
+check(
+  "...carrying a dispatch reference of the captured shape, not its value",
+  `#${OC_TRIP?.overCapacityTripNumber}`,
+  /^[0-9]{7}$/.test(OC_TRIP?.overCapacityTripNumber ?? "") &&
+    OC_TRIP?.overCapacityTripNumber !== "2156877",
+);
+/**
+ * ⚠️ The finding the capture carries, preserved: the number the driver reads
+ * down the phone appears NOWHERE ELSE on the screen. Three identifiers, and the
+ * one the call turns on is its own.
+ */
+check(
+  "...and that reference is not the trip's own id, as the capture has it",
+  `trip ${OC_TRIP?.id} vs dispatch #${OC_TRIP?.overCapacityTripNumber}`,
+  OC_TRIP !== undefined &&
+    !OC_TRIP.id.includes(OC_TRIP.overCapacityTripNumber ?? "x") &&
+    !OC_TRIP.legs.some((leg) => leg.id.includes(OC_TRIP.overCapacityTripNumber ?? "x")),
+);
+check(
+  "the swipe reads CAP-340's two lines, verbatim",
+  `"${overCapacityHeadline(OC_TRIP!)}" / "${OVER_CAPACITY_SWIPE_LABEL}"`,
+  OVER_CAPACITY_PREFIX === "Over Capacity Trip #" &&
+    OVER_CAPACITY_SWIPE_LABEL === "SWIPE TO CALL DISPATCH" &&
+    overCapacityHeadline(OC_TRIP!) === `Over Capacity Trip # ${OC_TRIP!.overCapacityTripNumber}`,
+);
+/**
+ * ⛔⛔ **The accept control is ABSENT, not disabled.** That is the whole
+ * finding: there is no attempt to refuse. A greyed-out SWIPE TO ACCEPT would
+ * say the driver tried and was told no, which is not what happens.
+ */
+check(
+  "an over-capacity request shows the dial swipe INSTEAD of the accept control",
+  /state === "before-taken" && isOverCapacity\(trip\) \?/.test(OC_CODE)
+    ? "the branch replaces the CTA"
+    : "NOT FOUND — the accept control may still render",
+  /state === "before-taken" && isOverCapacity\(trip\) \?/.test(OC_CODE) &&
+    OC_CODE.includes("OVER_CAPACITY_SWIPE_LABEL") &&
+    OC_CODE.includes("overCapacityHeadline(trip)") &&
+    // ⛔ ...and the words are not hand-written beside the rule that names them.
+    !/Over Capacity Trip/.test(OC_CODE) &&
+    !/SWIPE TO CALL DISPATCH/.test(OC_CODE),
+);
+/** ⭐ And completing it dials — a real href, not a handler that says it would. */
+check(
+  "...and it dials, rather than describing dialling",
+  `${dispatchDialHref()}`,
+  /^tel:[0-9]+$/.test(dispatchDialHref()) &&
+    OC_CODE.includes("href={dispatchDialHref()}"),
+);
+/**
+ * ⛔⛔ The number is OURS — `CAP-340` shows the swipe, not the dial. Seeded
+ * fiction in the reserved 555-01xx range, like every other number here, and
+ * flagged so it is never presented as production's dispatch line.
+ */
+const SEEDED_PHONES = readdirSync(join(ROOT, "lib/driver-data"))
+  .filter((f) => f.endsWith(".ts") && f !== "over-capacity.ts")
+  .flatMap(
+    (f) =>
+      readFileSync(join(ROOT, "lib/driver-data", f), "utf8").match(
+        /\(\d{3}\)\s?\d{3}-?\d{4}|\(555\)\s?\d{4}/g,
+      ) ?? [],
+  );
+check(
+  "the dialled number is seeded fiction, and says so",
+  `${OVER_CAPACITY_DISPATCH_PHONE} — ${OVER_CAPACITY_PROVENANCE.dispatchNumber}`,
+  /^\(\d{3}\) 555-01\d{2}$/.test(OVER_CAPACITY_DISPATCH_PHONE) &&
+    OVER_CAPACITY_PROVENANCE.dispatchNumber === "ours",
+);
+/**
+ * ⛔⛔ **And it is DISPATCH's number, not someone else's.** The first version
+ * was `(555) 0142`, copied from `ACCOUNT_ON_FILE.phone` — the DRIVER's own
+ * number on the Account screen. The swipe would have dialled the person holding
+ * the phone, and nothing on screen would have looked wrong. Swept against every
+ * number seeded anywhere else in `lib/driver-data`.
+ */
+check(
+  "...and it belongs to nobody else in the seed",
+  SEEDED_PHONES.includes(OVER_CAPACITY_DISPATCH_PHONE)
+    ? `COLLIDES — ${OVER_CAPACITY_DISPATCH_PHONE} is already somebody's`
+    : `0 collisions across ${SEEDED_PHONES.length} seeded number(s)`,
+  !SEEDED_PHONES.includes(OVER_CAPACITY_DISPATCH_PHONE) && SEEDED_PHONES.length > 8,
+);
+/**
+ * ⛔⛔ **And none of this folds into `driver-app-base` yet.** D2 admits
+ * capture-backed or user-confirmed PRODUCTION only. `CAP-340` is full of
+ * `Test Dr` with no footer version in frame, so it establishes the SHAPE of the
+ * screen and not the build it came from. The flag is what keeps that honest
+ * when someone later runs the fold-in audit.
+ */
+check(
+  "the capture's environment is recorded as unestablished, so nothing folds yet",
+  Object.entries(OVER_CAPACITY_PROVENANCE).map(([k, v]) => `${k}=${v}`).join(" "),
+  OVER_CAPACITY_PROVENANCE.environment === "unestablished" &&
+    OVER_CAPACITY_PROVENANCE.copy === "captured" &&
+    OVER_CAPACITY_PROVENANCE.behaviour === "user-confirmed",
+);
+
+/* --- 27c. One side, and no control offering a second ------------------- */
+/**
+ * ⛔⛔ The toggle must not render for a row with no proposal. It would move and
+ * change nothing — the "switch that does nothing" this project has shipped
+ * twice and spent two slices removing.
+ */
+check(
+  "the toggle refuses to render for a row with no proposed side",
+  /if \(!hasProposedSide\(active\)\) return null;/.test(codeOnly(TOGGLE_SRC))
+    ? "if (!hasProposedSide(active)) return null"
+    : "NOT FOUND — a segmented control would offer a side that does not exist",
+  /if \(!hasProposedSide\(active\)\) return null;/.test(codeOnly(TOGGLE_SRC)),
+);
+/** ⛔ And `hasProposedSide` reads `klass`, not `entry` — 14 rows have no entry. */
+const sidedByEntry = SOLUTIONS.filter(
+  (row) => hasProposedSide(row) !== (row.entry !== null),
+);
+check(
+  "...and having a proposed side is about the proposal, not about being built",
+  `${SOLUTIONS.filter(hasProposedSide).length} of ${SOLUTIONS.length} have one; ` +
+    `${sidedByEntry.length} of them differ from "has an entry point"`,
+  SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - SINGLE_SIDED.length &&
+    // ⭐ The two readings must genuinely differ, or this is reading `entry`
+    // under another name: 14 rows have no entry and most DO have a proposal.
+    sidedByEntry.length > 10,
+);
+/**
+ * ⛔ The over-capacity screen is NOT gated on a mode, because there is nothing
+ * to gate. A `showsProposal` call reaching it would be a gate on a proposal
+ * that does not exist, and would hide production's own screen on one side.
+ */
+/**
+ * ⚠️ The whole file, not `codeOnly` — this asserts an ABSENCE, and the
+ * comments here are about why there is no gate, so stripping them would be
+ * stripping the thing most likely to mention one. It costs a false positive if
+ * someone writes `showsProposal(` in prose; that is the right way round.
+ */
+const OC_RULES_SRC = readFileSync(join(ROOT, "lib/driver-data/over-capacity.ts"), "utf8");
+const OC_GATE = /showsProposal\(|\bDemoFocus\b|\bDemoMode\b/;
+check(
+  "the over-capacity surface consults no proposal gate",
+  OC_GATE.test(OC_RULES_SRC)
+    ? `GATED (${OC_RULES_SRC.match(OC_GATE)?.[0]}) — a proposal that does not exist is being switched on`
+    : "ungated, because there is no proposal",
+  !OC_GATE.test(OC_RULES_SRC) &&
+    // ⛔ Positive control: the file really was read, and really does hold the
+    // surface. An empty string passes every absence test ever written.
+    OC_RULES_SRC.includes("OVER_CAPACITY_SWIPE_LABEL"),
+);
+/** ⚠️ ...but the rows are still named, so the scenario ride can claim them. */
+check(
+  "...while the rows it belongs to are still declared, for the scenario ride",
+  `${OVER_CAPACITY_SOLUTIONS.join(", ")}`,
+  OVER_CAPACITY_SOLUTIONS.length === 2 &&
+    OC_ROWS.every((id) => OVER_CAPACITY_SOLUTIONS.includes(id)) &&
+    OC_TRIP?.scenario?.solutions.join(",") === OVER_CAPACITY_SOLUTIONS.join(","),
 );
 
 

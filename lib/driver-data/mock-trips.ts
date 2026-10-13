@@ -353,6 +353,25 @@ export interface Trip {
    */
   standingOrderId?: string;
   /**
+   * The dispatch reference a driver reads down the phone when this request is
+   * over the vehicle's capacity — catalogue rows 11 and 12.
+   *
+   * ⛔⛔ **Presence is the predicate** — see `isOverCapacity`. The screen
+   * cannot render the swipe without the number, because it is in the first
+   * line, so a trip flagged over-capacity without one would show a CTA with a
+   * blank where its reference should be. One field, carrying the thing the
+   * driver actually says out loud.
+   *
+   * ⚠️ `CAP-340` shows a THIRD identifier here: the header and `Leg:` both
+   * read `202610131450161`, and the swipe says `Trip # 2156877`. The one number
+   * the call turns on appears nowhere else on the screen.
+   *
+   * ⚠️ **SEEDED, and the shape is copied, not the value.** The capture's own
+   * number belongs to a test trip; this is a seven-digit invention, like every
+   * other identifier in this file.
+   */
+  overCapacityTripNumber?: string;
+  /**
    * Pills a SCREEN adds at render time, e.g. "Waiting on Support".
    *
    * ⚠️ Separate from `pills` because those are seed decoration and a scenario
@@ -395,6 +414,55 @@ export const mockRequestTrips: Trip[] = [
   // reproduces the canonical capture's count line — "16 of 16 trips shown ·
   // Thu, Sep 24" (CAP row for `03-10 - B2 Map - Collapsed Loaded`) — so a
   // render can be held against that capture directly. Only the dates moved.
+  /**
+   * ⭐⭐ Catalogue rows 11 and 12's scenario request — the one with no accept
+   * control. See `lib/driver-data/over-capacity.ts`.
+   *
+   * ⚠️ `passengerCount: 4` against a vehicle that cannot take four is the
+   * whole case, and the prototype has no vehicle record to compare it to — so
+   * the over-capacity state is SEEDED rather than derived. Deriving it would
+   * mean inventing a vehicle table to make one screen reachable.
+   */
+  {
+    id: "REQ-OVERCAP-001",
+    date: "Thu, Sep 24, 2026",
+    rider: "MARISOL ANDRADE",
+    client: "Verida",
+    passengerCount: 4,
+    distance: "6.4 mi away",
+    totalRevenue: 26.53,
+    notes: "Wheelchair plus three accompanying passengers",
+    overCapacityTripNumber: "2149503",
+    scenario: {
+      code: "11a",
+      label: "Over capacity — no way to accept, only a number to call",
+      solutions: ["vehicle-capacity-cleanse", "vehicle-capacity-backend"],
+    },
+    legs: [
+      {
+        id: "leg-oc-a",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:05 AM",
+        address: "2210 Pineview Terrace, Lonoke, AR 72086",
+        county: "Lonoke County",
+        revenue: 26.53,
+      },
+      {
+        id: "leg-oc-b",
+        type: "appointment",
+        label: "Est Drop-off Time",
+        time: "9:54 AM",
+        address: "640 E South St, Cave City, AR 72521",
+        county: "Sharp County",
+        revenue: 0,
+      },
+    ],
+    status: "request",
+    pills: [{ label: "Expires in 6 days", variant: "neutral" }],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
   // ===== WEEKEND WARRIOR (3 trips) =====
   {
     id: "REQ-WW-001",

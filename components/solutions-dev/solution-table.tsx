@@ -10,6 +10,7 @@ import {
   SOLUTIONS,
   buildStateLabel,
   formatShare,
+  hasProposedSide,
   subjectAreaGroups,
   type Solution,
 } from "@/lib/solutions/catalogue";
@@ -22,6 +23,7 @@ import { tableRows } from "@/lib/solutions/table-shape";
 import {
   COLUMN_MODE,
   cellSelected,
+  columnModeFor,
   selectAction,
   type SelectingColumn,
 } from "@/lib/solutions/table-select";
@@ -209,15 +211,21 @@ export function SolutionTable() {
    * the app back to the entry route for no change of state.
    */
   function select(solution: Solution, column: SelectingColumn, runIds: readonly string[]) {
+    // ⛔ A row with no proposal has ONE side, and both columns select it —
+    // see `columnModeFor`. Reading `COLUMN_MODE` directly here would offer
+    // rows 11, 12 and 25 a side that does not exist.
+    const hasProposal = hasProposedSide(solution);
     const action = selectAction({
       runIds,
       clickedId: solution.id,
       column,
       activeId,
       activeMode: mode,
+      hasProposal,
     });
-    if (action === "focus") focus(solution, COLUMN_MODE[column]);
-    else if (action === "set-mode") setMode(COLUMN_MODE[column]);
+    const side = columnModeFor(column, hasProposal);
+    if (action === "focus") focus(solution, side);
+    else if (action === "set-mode") setMode(side);
   }
 
   return (

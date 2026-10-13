@@ -1,3 +1,5 @@
+import { DEFAULT_DEMO_MODE, type DemoMode } from "./demo-mode";
+
 /**
  * The 26 proposed features from the support call analysis, made executable.
  *
@@ -119,6 +121,21 @@ export interface Solution {
   buildState: BuildState;
   /** `null` until the slice is in the prototype. */
   entry: SolutionEntry | null;
+  /**
+   * Where TODAY's behaviour is demonstrated, when that is not where the fix is.
+   *
+   * ⛔⛔ **Distinct from `entry`, which means "where the FIX is demonstrated"**
+   * and is `null` for every row with no fix. A row may have one, both, or
+   * neither. Rows 11 and 12 have a `nowEntry` and no `entry`: production's
+   * over-capacity screen is real and reachable, and there is nothing proposed
+   * to compare it against — so they stay `not-yet` with a null `entry`, and
+   * every existing check about entries passes untouched.
+   *
+   * ⚠️ Added rather than weakening `entry`, deliberately. Letting `entry`
+   * mean "wherever this row is demonstrated" would have made *"⚠️ Not in
+   * prototype yet"* false for two rows whose proposal genuinely is not built.
+   */
+  nowEntry?: SolutionEntry;
   /** Several rows can point at one build — the requests tray serves two. */
   sharedBuildWith?: string;
   /** Required when `klass` is `no-app-surface`; forbidden otherwise. */
@@ -418,6 +435,11 @@ export const SOLUTIONS: Solution[] = [
     klass: "no-app-surface",
     buildState: "not-yet",
     entry: null,
+    nowEntry: {
+      route: "/requests/REQ-OVERCAP-001",
+      label:
+        "Open the over-capacity request. Production offers no way to accept it — where SWIPE TO ACCEPT would be there is a pink swipe that dials dispatch, and a reference number that appears nowhere else on the screen. ⚠️ Now only: rows 11 and 12 propose a data fix and a backend path, so there is no second side to compare.",
+    },
     noSurfaceReason:
       "A one-off cleanse of stored vehicle-capacity data. Nothing for the driver app to show.",
   },
@@ -434,6 +456,11 @@ export const SOLUTIONS: Solution[] = [
     klass: "no-app-surface",
     buildState: "not-yet",
     entry: null,
+    nowEntry: {
+      route: "/requests/REQ-OVERCAP-001",
+      label:
+        "Open the over-capacity request. Production offers no way to accept it — where SWIPE TO ACCEPT would be there is a pink swipe that dials dispatch, and a reference number that appears nowhere else on the screen. ⚠️ Now only: rows 11 and 12 propose a data fix and a backend path, so there is no second side to compare.",
+    },
     noSurfaceReason:
       "A backend path that keeps stored capacity correct when a vehicle changes. No driver-facing surface.",
   },
@@ -751,6 +778,59 @@ export const SOLUTIONS: Solution[] = [
     entry: null,
   },
 ];
+
+/**
+ * Does this row have a PROPOSED side at all?
+ *
+ * ⛔⛔ `no-app-surface` means exactly this: backend, data or policy, with
+ * nothing to build in the driver app. Three rows say so — 11, 12 and 25 — and
+ * for them the comparison has one side, not two. Offering a "Proposed" segment
+ * that shows the same screen is the "toggle that does nothing" this project has
+ * already shipped twice, so the control is not offered at all.
+ *
+ * ⚠️ Read off `klass`, not off `entry`. Fourteen rows have no entry point and
+ * most of them DO have a proposal — it is simply not built yet, which is a
+ * different claim and is what `buildState` carries.
+ */
+export function hasProposedSide(solution: Solution): boolean {
+  return solution.klass !== "no-app-surface";
+}
+
+/**
+ * The side this row can actually be on.
+ *
+ * ⛔⛔ **A row with no proposal has ONE side, and nothing may put it on the
+ * other** — not a cell, not the toggle, not a hand-edited URL. Without this,
+ * `?solution=vehicle-capacity-cleanse&mode=fixed` is a reachable state in which
+ * the Proposed Feature cell LIGHTS and clicking it moves you: a lit cell that
+ * is not the side on screen, which is precisely the disagreement B3d was spent
+ * fixing. Normalising once, where the focus is assembled, means no surface has
+ * to remember.
+ *
+ * ⚠️ `undefined` is the plain mirror, whose mode is inert — `showsProposal`
+ * returns on the `null` branch before reading it — so it is left alone.
+ */
+export function modeFor(solution: Solution | undefined, wanted: DemoMode): DemoMode {
+  if (!solution) return wanted;
+  return hasProposedSide(solution) ? wanted : DEFAULT_DEMO_MODE;
+}
+
+/**
+ * Where focusing this row should land, for the side being shown.
+ *
+ * ⛔ `nowEntry` wins on `"now"` and `entry` wins on `"fixed"`, each falling
+ * back to the other before `SOLUTION_HOME`. No row carries both today, so this
+ * is identical to the old `entry?.route ?? SOLUTION_HOME` for all 24 of them —
+ * and a check asserts that, because a rule that changed 24 rows while adding
+ * two would be a refactor wearing a feature's clothes.
+ */
+export function entryRouteFor(solution: Solution, mode: DemoMode): string {
+  const preferred =
+    mode === "now"
+      ? solution.nowEntry ?? solution.entry
+      : solution.entry ?? solution.nowEntry;
+  return preferred?.route ?? SOLUTION_HOME;
+}
 
 /** Share of categorised calls this entry's subject area accounts for. */
 export function shareOfCategorized(solution: Solution): number {

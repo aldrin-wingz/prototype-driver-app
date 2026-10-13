@@ -11,7 +11,12 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { findSolution, SOLUTION_HOME, type Solution } from "./catalogue";
+import {
+  entryRouteFor,
+  findSolution,
+  modeFor,
+  type Solution,
+} from "./catalogue";
 import { adoptDecision, keepClearedMemory } from "./adopt-rules";
 import {
   DEFAULT_DEMO_MODE,
@@ -140,10 +145,21 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
    * no focus, so this is inert until one is picked — `showsProposal` returns on
    * the `null` branch before the mode is read at all.
    */
-  const [mode, setModeState] = useState<DemoMode>(DEFAULT_DEMO_MODE);
+  const [rawMode, setModeState] = useState<DemoMode>(DEFAULT_DEMO_MODE);
 
   const paramId = searchParams.get(SOLUTION_PARAM);
   const paramMode = searchParams.get(DEMO_MODE_PARAM);
+
+  const active = findSolution(activeId);
+  /**
+   * ⛔⛔ **The mode, normalised for the row it applies to — one line, one
+   * place.** Rows 11, 12 and 25 are `no-app-surface` and have no proposed side,
+   * so nothing may put them on it: not a cell, not a deep link. State goes on
+   * holding whatever was asked for; every consumer reads THIS, including the
+   * URL mirror — which quietly rewrites `?mode=fixed` off a row that cannot be
+   * on that side, instead of leaving a URL that describes an impossible state.
+   */
+  const mode = modeFor(active, rawMode);
 
   /**
    * ⛔⛔ **The path a `focus()` navigation is heading for, while it is in
@@ -245,7 +261,6 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
     if (activeId && !urlAgrees) writeParams({ solutionId: activeId, mode });
   }, [activeId, mode, paramId, paramMode, pathname]);
 
-  const active = findSolution(activeId);
   // ⛔ Built through `demoFocus`, never as a bare object literal — a check
   // asserts this is the ONLY construction in the app, which is what keeps B2 a
   // one-line change instead of a hunt through the screens.
@@ -290,7 +305,14 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
        * with that ride filtered out of its own list. Deep screens are where a
        * demo actually happens, so that was the common case, not the edge.
        */
-      const target = solution.entry?.route ?? SOLUTION_HOME;
+      /**
+       * ⛔ `entryRouteFor`, not `entry?.route`. Rows 11 and 12 have no `entry`
+       * at all — their proposal is a data cleanse and a backend path — but they
+       * DO have a production screen worth landing on, carried by `nowEntry`.
+       * Named in the catalogue so the preference between the two is a rule a
+       * check can run, not a `??` chain in a callback.
+       */
+      const target = entryRouteFor(solution, mode);
       // Claimed BEFORE the push, so the mirror effect's very first render after
       // `setActiveId` already knows to stay out of the way.
       pendingFocus.current = target.split("?")[0];

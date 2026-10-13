@@ -54,6 +54,12 @@ import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import {
+  OVER_CAPACITY_SWIPE_LABEL,
+  dispatchDialHref,
+  isOverCapacity,
+  overCapacityHeadline,
+} from "@/lib/driver-data/over-capacity";
+import {
   CANCELLATION_REQUESTED_DETAIL,
   CANCELLATION_REQUESTED_PILL,
   CANCELLATION_REQUESTED_TITLE,
@@ -1029,7 +1035,41 @@ export function RideDetailLayout({
       </div>
 
       {/* Bottom region — varies by state */}
-      {state === "before-taken" ? (
+      {state === "before-taken" && isOverCapacity(trip) ? (
+        /*
+          ⭐⭐ Catalogue rows 11 and 12 — production's over-capacity screen, and
+          it is NOT a block. `CAP-340`: the accept control is simply absent, and
+          where SWIPE TO ACCEPT would be there is a pink swipe that dials
+          dispatch. A block at least says what went wrong; this says only *over
+          capacity* and a reference number, and hands the driver a telephone.
+          That call IS what rows 11 and 12 exist to remove.
+
+          ⛔ Now-only. Both rows are `no-app-surface`, so there is no proposed
+          side, no toggle, and `showsProposal` is never consulted here — there
+          is nothing to gate.
+
+          ⚠️ A real `tel:` href, because a prototype that only SAYS it would
+          dial cannot be told apart from one that does nothing.
+        */
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+          <a
+            href={dispatchDialHref()}
+            className="relative flex h-14 items-center justify-center gap-3 overflow-hidden rounded-full bg-[#DB6A8F] pl-2 pr-6 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DB6A8F]"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white">
+              <Phone className="h-5 w-5 fill-[#303068] text-[#303068]" />
+            </span>
+            <span className="min-w-0 text-center">
+              <span className="block text-sm leading-tight">
+                {overCapacityHeadline(trip)}
+              </span>
+              <span className="block text-base font-bold uppercase leading-tight">
+                {OVER_CAPACITY_SWIPE_LABEL}
+              </span>
+            </span>
+          </a>
+        </div>
+      ) : state === "before-taken" ? (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <div className="relative flex h-14 items-center justify-center overflow-hidden rounded-full">
             <div className="absolute inset-y-0 left-0 w-1/2 bg-[#F472B6]" />
