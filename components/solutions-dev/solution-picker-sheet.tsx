@@ -116,7 +116,16 @@ export function SolutionPickerSheet() {
   }
 
   return (
-    <Drawer open={pickerOpen} onOpenChange={setPickerOpen}>
+    /**
+     * ⛔ The ONE drawer in the repo that stays on the page.
+     *
+     * Every other drawer is the driver's and belongs inside the phone frame.
+     * This one is the prototype selector — tooling, listing all 26 proposed
+     * features. Containing it would shrink the catalogue to 390px and park it
+     * on top of the app it exists to navigate. A check asserts there is exactly
+     * one of these and that it lives in `components/solutions-dev/`.
+     */
+    <Drawer open={pickerOpen} onOpenChange={setPickerOpen} portalTarget="viewport">
       <DrawerContent className="flex max-h-[88vh] flex-col rounded-t-3xl border-0 px-4 pb-6">
         <div className="pb-3 pt-5">
           <DrawerTitle className="text-xl font-bold text-gray-900">

@@ -4,6 +4,8 @@ import * as React from 'react'
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog'
 
 import { cn } from '@/lib/utils'
+// ⚠️ SHARED-FILE DIVERGENCE — see the phone-frame note below. Remove at fold-in.
+import { usePhoneShell } from '@/components/solutions-dev/phone-shell'
 import { buttonVariants } from '@/components/ui/button'
 
 const AlertDialog = AlertDialogPrimitive.Root
@@ -30,8 +32,18 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <AlertDialogPortal>
+>(({ className, ...props }, ref) => {
+  /**
+   * ⚠️ SHARED-FILE DIVERGENCE — contains this surface in the desktop phone
+   * frame. A portal escapes every ancestor, including the transform that makes
+   * the frame a containing block, so without it this renders across the whole
+   * window beside the app rather than inside it. `null` below the breakpoint,
+   * which is `document.body` — exactly the behaviour before this existed.
+   * ⛔ Remove at fold-in; the base has no phone frame.
+   */
+  const shell = usePhoneShell()
+  return (
+  <AlertDialogPortal container={shell}>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
       ref={ref}
@@ -42,7 +54,8 @@ const AlertDialogContent = React.forwardRef<
       {...props}
     />
   </AlertDialogPortal>
-))
+  )
+})
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName
 
 const AlertDialogHeader = ({

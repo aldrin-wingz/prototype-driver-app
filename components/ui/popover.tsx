@@ -4,6 +4,8 @@ import * as React from 'react'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 
 import { cn } from '@/lib/utils'
+// ⚠️ SHARED-FILE DIVERGENCE — see the phone-frame note below. Remove at fold-in.
+import { usePhoneShell } from '@/components/solutions-dev/phone-shell'
 
 const Popover = PopoverPrimitive.Root
 
@@ -12,8 +14,18 @@ const PopoverTrigger = PopoverPrimitive.Trigger
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'center', sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
+>(({ className, align = 'center', sideOffset = 4, ...props }, ref) => {
+  /**
+   * ⚠️ SHARED-FILE DIVERGENCE — contains this surface in the desktop phone
+   * frame. A portal escapes every ancestor, including the transform that makes
+   * the frame a containing block, so without it this renders across the whole
+   * window beside the app rather than inside it. `null` below the breakpoint,
+   * which is `document.body` — exactly the behaviour before this existed.
+   * ⛔ Remove at fold-in; the base has no phone frame.
+   */
+  const shell = usePhoneShell()
+  return (
+  <PopoverPrimitive.Portal container={shell}>
     <PopoverPrimitive.Content
       ref={ref}
       align={align}
@@ -25,7 +37,8 @@ const PopoverContent = React.forwardRef<
       {...props}
     />
   </PopoverPrimitive.Portal>
-))
+  )
+})
 PopoverContent.displayName = PopoverPrimitive.Content.displayName
 
 export { Popover, PopoverTrigger, PopoverContent }

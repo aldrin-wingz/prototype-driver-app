@@ -5,6 +5,8 @@ import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+// ⚠️ SHARED-FILE DIVERGENCE — see the phone-frame note below. Remove at fold-in.
+import { usePhoneShell } from '@/components/solutions-dev/phone-shell'
 
 const Select = SelectPrimitive.Root
 
@@ -70,8 +72,18 @@ SelectScrollDownButton.displayName =
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', ...props }, ref) => (
-  <SelectPrimitive.Portal>
+>(({ className, children, position = 'popper', ...props }, ref) => {
+  /**
+   * ⚠️ SHARED-FILE DIVERGENCE — contains this surface in the desktop phone
+   * frame. A portal escapes every ancestor, including the transform that makes
+   * the frame a containing block, so without it this renders across the whole
+   * window beside the app rather than inside it. `null` below the breakpoint,
+   * which is `document.body` — exactly the behaviour before this existed.
+   * ⛔ Remove at fold-in; the base has no phone frame.
+   */
+  const shell = usePhoneShell()
+  return (
+  <SelectPrimitive.Portal container={shell}>
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
@@ -96,7 +108,8 @@ const SelectContent = React.forwardRef<
       <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
-))
+  )
+})
 SelectContent.displayName = SelectPrimitive.Content.displayName
 
 const SelectLabel = React.forwardRef<

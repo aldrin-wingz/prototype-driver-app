@@ -5354,6 +5354,104 @@ check(
   built19.supportCase.requireChangedFrom === undefined,
 );
 
+
+// ---------------------------------------------------------------------------
+console.log("\n12. The desktop phone frame contains the app, and only the app");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ A portal escapes every ancestor, including the transform that makes the
+ * phone frame a containing block. Measured before the fix: a support form
+ * opened at `[0, 900, 1440, 792]` parented to `document.body` — the full window
+ * width, lying across the feature table beside the app it belongs to.
+ *
+ * Five mirrored `components/ui/*` files now pass a container. That is a SHARED
+ * FILE divergence to hand-reconcile at fold-in, so it is counted here with a
+ * declared literal: fold-in greps the marker and the number says how many it
+ * should find.
+ */
+const CONTAINED_UI = [
+  "components/ui/drawer.tsx",
+  "components/ui/alert-dialog.tsx",
+  "components/ui/select.tsx",
+  "components/ui/sheet.tsx",
+  "components/ui/popover.tsx",
+] as const;
+const EXPECTED_CONTAINED = 5;
+
+const uiMissing = CONTAINED_UI.filter((rel) => {
+  const text = readFileSync(join(ROOT, rel), "utf8");
+  return !(text.includes("usePhoneShell") && /container=\{shell\}|container=\{container\}/.test(text));
+});
+check(
+  "every portalled UI surface is handed the phone frame",
+  uiMissing.length ? `MISSING: ${uiMissing.join(", ")}` : `${CONTAINED_UI.length} of ${EXPECTED_CONTAINED} wired`,
+  uiMissing.length === 0 && CONTAINED_UI.length === EXPECTED_CONTAINED,
+);
+
+/**
+ * ⛔ Exactly ONE opt-out, and it must be tooling.
+ *
+ * The prototype selector lists all 26 proposed features and belongs to the
+ * page, not to the phone — containing it would shrink the catalogue to 390px
+ * and drop it on top of the app it exists to navigate. Every OTHER drawer is
+ * the driver's. A second opt-out is almost certainly a driver surface escaping
+ * by accident, which is the exact bug this section exists to stop.
+ */
+function walkSource(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(join(ROOT, dir))) {
+    if (entry === "node_modules" || entry.startsWith(".")) continue;
+    const rel = `${dir}/${entry}`;
+    try {
+      if (readdirSync(join(ROOT, rel)).length >= 0) walkSource(rel, out);
+    } catch {
+      if (/\.tsx?$/.test(entry)) out.push(rel);
+    }
+  }
+  return out;
+}
+const sourceRels = ["app", "components", "lib"].flatMap((d) => walkSource(d));
+const optOuts = sourceRels.filter((rel) =>
+  readFileSync(join(ROOT, rel), "utf8").includes('portalTarget="viewport"'),
+);
+check(
+  "exactly one surface opts out of the phone frame",
+  `${optOuts.length} of ${sourceRels.length} source files — ${optOuts.join(", ") || "none"}`,
+  optOuts.length === 1,
+);
+check(
+  "...and the one that opts out is tooling, not a driver surface",
+  optOuts[0] ?? "(none)",
+  optOuts.length === 1 && optOuts[0].startsWith("components/solutions-dev/"),
+);
+
+/**
+ * ⛔ Safari, and only Safari. vaul's `usePositionFixed` short-circuits
+ * everywhere else, but on Safari it pins `document.body` while a drawer is
+ * open — which in a two-pane layout yanks the page out from under the feature
+ * table. The frame owns its own scroll, so the body never needed locking.
+ * ⚠️ Tied to the container, not set unconditionally: below the breakpoint there
+ * is no frame and the old behaviour is the correct one.
+ */
+const drawerSrc = readFileSync(join(ROOT, "components/ui/drawer.tsx"), "utf8");
+check(
+  "the body lock is disabled exactly when the drawer is contained",
+  drawerSrc.includes("noBodyStyles={Boolean(container)}")
+    ? "noBodyStyles={Boolean(container)}"
+    : "NOT FOUND — vaul will body-lock Safari inside the frame",
+  drawerSrc.includes("noBodyStyles={Boolean(container)}"),
+);
+
+/** ⭐ The breakpoint is written twice — in TS and in CSS. Prove they agree. */
+const shellSrc = readFileSync(join(ROOT, "components/solutions-dev/phone-shell.tsx"), "utf8");
+const cssSrc = readFileSync(join(ROOT, "app/globals.css"), "utf8");
+const tsPx = shellSrc.match(/DESKTOP_SHELL_MIN_PX = (\d+)/)?.[1];
+const cssPx = cssSrc.match(/@media \(min-width: (\d+)px\)[\s\S]*?\.phone-shell/)?.[1];
+check(
+  "the breakpoint in TS and the one in CSS are the same number",
+  `TS=${tsPx ?? "?"} CSS=${cssPx ?? "?"}`,
+  Boolean(tsPx) && tsPx === cssPx,
+);
+
 // ---------------------------------------------------------------------------
 console.log(
   failures === 0

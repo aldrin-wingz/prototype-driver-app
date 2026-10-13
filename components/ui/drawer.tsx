@@ -4,16 +4,53 @@ import * as React from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
 import { cn } from '@/lib/utils'
+// ⚠️ SHARED-FILE DIVERGENCE — see `portalTarget` below. Remove at fold-in.
+import { usePhoneShell } from '@/components/solutions-dev/phone-shell'
+
+/**
+ * Where a drawer renders.
+ *
+ * ⛔⛔ A drawer is `position: fixed` inside a portal, and a portal escapes every
+ * ancestor — including the transform that makes the desktop phone frame a
+ * containing block. So on a wide screen an untreated support form opened at
+ * **1440px across the whole window** instead of inside the phone. Measured:
+ * `[0, 900, 1440, 792]`, parented to `document.body`.
+ *
+ * `"phone"` is the default because almost every drawer here is the DRIVER's.
+ * `"viewport"` is for tooling that belongs to the page rather than the app —
+ * there is exactly one, and a check asserts that.
+ *
+ * ⚠️ Below the breakpoint `usePhoneShell()` is `null`, which vaul reads as
+ * `document.body`. Identical to the behaviour before any of this existed.
+ */
+type DrawerPortalTarget = 'phone' | 'viewport'
 
 const Drawer = ({
   shouldScaleBackground = true,
+  portalTarget = 'phone',
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    {...props}
-  />
-)
+}: React.ComponentProps<typeof DrawerPrimitive.Root> & {
+  portalTarget?: DrawerPortalTarget
+}) => {
+  const shell = usePhoneShell()
+  const container = portalTarget === 'phone' ? shell : null
+  return (
+    <DrawerPrimitive.Root
+      shouldScaleBackground={shouldScaleBackground}
+      container={container}
+      /**
+       * ⛔ Safari only, and it does not fail quietly. vaul's `usePositionFixed`
+       * short-circuits on every other browser, but on Safari it sets
+       * `document.body { position: fixed; top: -scrollY }` while a drawer is
+       * open. In a two-pane desktop layout that yanks the whole page out from
+       * under the feature table. The body never needed locking here anyway —
+       * the frame owns its own scroll.
+       */
+      noBodyStyles={Boolean(container)}
+      {...props}
+    />
+  )
+}
 Drawer.displayName = 'Drawer'
 
 const DrawerTrigger = DrawerPrimitive.Trigger

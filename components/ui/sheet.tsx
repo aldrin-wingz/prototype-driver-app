@@ -6,6 +6,8 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+// ⚠️ SHARED-FILE DIVERGENCE — see the phone-frame note below. Remove at fold-in.
+import { usePhoneShell } from '@/components/solutions-dev/phone-shell'
 
 const Sheet = SheetPrimitive.Root
 
@@ -57,8 +59,18 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = 'right', className, children, ...props }, ref) => (
-  <SheetPortal>
+>(({ side = 'right', className, children, ...props }, ref) => {
+  /**
+   * ⚠️ SHARED-FILE DIVERGENCE — contains this surface in the desktop phone
+   * frame. A portal escapes every ancestor, including the transform that makes
+   * the frame a containing block, so without it this renders across the whole
+   * window beside the app rather than inside it. `null` below the breakpoint,
+   * which is `document.body` — exactly the behaviour before this existed.
+   * ⛔ Remove at fold-in; the base has no phone frame.
+   */
+  const shell = usePhoneShell()
+  return (
+  <SheetPortal container={shell}>
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}
@@ -72,7 +84,8 @@ const SheetContent = React.forwardRef<
       </SheetPrimitive.Close>
     </SheetPrimitive.Content>
   </SheetPortal>
-))
+  )
+})
 SheetContent.displayName = SheetPrimitive.Content.displayName
 
 const SheetHeader = ({
