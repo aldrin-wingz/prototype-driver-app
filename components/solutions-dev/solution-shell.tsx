@@ -6,6 +6,7 @@ import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup
 import { Toaster } from "@/components/ui/toaster";
 import { PhoneShellProvider } from "./phone-shell";
 import { SolutionStrip } from "./solution-strip";
+import { SolutionTable } from "./solution-table";
 
 /**
  * The page frame: briefing strip on top, and below it — on a wide screen — the
@@ -47,9 +48,11 @@ export function SolutionShell({ children }: { children: React.ReactNode }) {
     <>
       <SolutionStrip />
       <div className="solution-split">
-        {/* Filled by the feature table in the next slice. Empty, it has no
-            height and no effect at any width. */}
-        <div className="solution-table-col" />
+        {/* ⚠️ `hidden` below the breakpoint, where the picker drawer is the way
+            in. Rendering it there would stack 26 rows above the app. */}
+        <div className="solution-table-col">
+          <SolutionTable />
+        </div>
         <div className="phone-col">
           <div className="phone-shell" ref={setShell}>
             {/* ⛔ The scroller is INSIDE the transformed box, not the box

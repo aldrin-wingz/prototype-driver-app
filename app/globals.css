@@ -251,6 +251,10 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
   background-color: #F9FAFB;
 }
 
+/* The table is desktop-only; below the breakpoint the picker drawer is the
+   way in, and 26 rows stacked above the app would bury it. */
+.solution-table-col { display: none; }
+
 /* ── Desktop two-pane shell ───────────────────────────────────
    TOOLING, not the app. Below the breakpoint every class here is
    unstyled, so the markup collapses to plain divs in normal flow and
@@ -269,6 +273,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
   }
 
   .solution-table-col {
+    display: block;
     flex: 1 1 0%;
     min-width: 0;
   }

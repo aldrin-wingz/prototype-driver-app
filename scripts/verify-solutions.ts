@@ -30,6 +30,7 @@ import {
   type SolutionClass,
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
+import { mergedRunCounts, tableRows } from "../lib/solutions/table-shape";
 import {
   changeAnchors,
   editableAnchors,
@@ -5450,6 +5451,106 @@ check(
   "the breakpoint in TS and the one in CSS are the same number",
   `TS=${tsPx ?? "?"} CSS=${cssPx ?? "?"}`,
   Boolean(tsPx) && tsPx === cssPx,
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n13. The feature table reconstructs the spreadsheet's merged shape");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐ The source file merges cells; `catalogue.ts` stores a merged cell by
+ * REPEATING its text on every row it covered. So the merges are recoverable by
+ * grouping adjacent rows on string equality — and these checks prove the
+ * reconstruction is faithful, not merely plausible.
+ *
+ * ⛔ Expectations are declared HERE as literals, never imported from the module
+ * under test. A count exported beside the computation is a restatement of it,
+ * and two restatements agreeing has already passed two break tests in this
+ * repo while the code was wrong.
+ */
+const EXPECTED_MERGED_AREA = 7;
+const EXPECTED_MERGED_PROBLEM = 4;
+const EXPECTED_MERGED_USECASE = 2;
+const EXPECTED_TABLE_ROWS = 26;
+
+const tRows = tableRows();
+check(
+  "one table row per catalogue entry",
+  `${tRows.length} of ${EXPECTED_TABLE_ROWS}`,
+  tRows.length === EXPECTED_TABLE_ROWS,
+);
+
+const merged = mergedRunCounts(tRows);
+check(
+  "merged runs match the spreadsheet, column by column",
+  `area ${merged.area}/${EXPECTED_MERGED_AREA} · problem ${merged.problem}/${EXPECTED_MERGED_PROBLEM} · use case ${merged.useCase}/${EXPECTED_MERGED_USECASE}`,
+  merged.area === EXPECTED_MERGED_AREA &&
+    merged.problem === EXPECTED_MERGED_PROBLEM &&
+    merged.useCase === EXPECTED_MERGED_USECASE,
+);
+
+/**
+ * ⛔ Every row is covered exactly once per column. A span that overshoots
+ * pushes a cell into the run below; one that undershoots leaves a row with a
+ * missing <td>, which silently shifts every cell after it one column left.
+ * Neither throws, and both look like a styling bug.
+ */
+for (const [label, key] of [
+  ["subject area", "areaSpan"],
+  ["problem", "problemSpan"],
+  ["use case", "useCaseSpan"],
+] as const) {
+  const total = tRows.reduce((sum, r) => sum + r[key], 0);
+  check(
+    `${label} spans cover every row exactly once`,
+    `${total} of ${EXPECTED_TABLE_ROWS} rows covered`,
+    total === EXPECTED_TABLE_ROWS,
+  );
+}
+
+/**
+ * ⭐ The one that proves the merge is CORRECT rather than merely well-shaped: a
+ * covered row (span 0) must carry the same text as the row that covers it. If
+ * it does not, the table is printing one row's Problem against another row's
+ * Use Case — a wrong table that renders perfectly.
+ */
+let coveredRows = 0;
+const mismatched: string[] = [];
+for (let i = 1; i < tRows.length; i++) {
+  for (const [key, field] of [
+    ["areaSpan", "subjectArea"],
+    ["problemSpan", "problem"],
+    ["useCaseSpan", "useCase"],
+  ] as const) {
+    if (tRows[i][key] !== 0) continue;
+    coveredRows++;
+    if (tRows[i].solution[field] !== tRows[i - 1].solution[field]) {
+      mismatched.push(`${tRows[i].solution.id}.${field}`);
+    }
+  }
+}
+check(
+  "every covered cell repeats the value above it",
+  mismatched.length ? `MISMATCH: ${mismatched.join(", ")}` : `0 wrong of ${coveredRows} covered cells`,
+  mismatched.length === 0 && coveredRows > 0,
+);
+
+/**
+ * ⛔⛔ No run may cross a subject-area boundary. Two areas can hold the same
+ * Problem text, and keying on the problem alone would merge straight through
+ * the boundary — a rowspan reaching into the next area, which the spreadsheet
+ * never does.
+ */
+const crossings = tRows.filter(
+  (r, i) =>
+    i > 0 &&
+    r.areaSpan > 0 && // a new area starts here...
+    (r.problemSpan === 0 || r.useCaseSpan === 0), // ...but a run continues into it
+);
+check(
+  "no problem or use-case run crosses a subject-area boundary",
+  crossings.length ? `CROSSES: ${crossings.map((r) => r.solution.id).join(", ")}` : `0 crossings of ${merged.area} area runs`,
+  crossings.length === 0,
 );
 
 // ---------------------------------------------------------------------------
