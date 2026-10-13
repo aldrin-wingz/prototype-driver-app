@@ -143,7 +143,11 @@ function SelectCell({
   className?: string;
   activeId: string | null;
   activeMode: DemoMode;
-  onSelect: (solution: Solution, column: SelectingColumn) => void;
+  onSelect: (
+    solution: Solution,
+    column: SelectingColumn,
+    runIds: readonly string[],
+  ) => void;
   children: React.ReactNode;
 }) {
   const on = cellSelected({ runIds, column, activeId, activeMode });
@@ -155,11 +159,11 @@ function SelectCell({
       tabIndex={0}
       aria-pressed={on}
       aria-label={DEMO_MODE_DESCRIPTION[COLUMN_MODE[column]]}
-      onClick={() => onSelect(solution, column)}
+      onClick={() => onSelect(solution, column, runIds)}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
-        onSelect(solution, column);
+        onSelect(solution, column, runIds);
       }}
       className={cn(
         CELL,
@@ -189,8 +193,9 @@ export function SolutionTable() {
    * screens into a demo, clicking the cell that is already lit must not yank
    * the app back to the entry route for no change of state.
    */
-  function select(solution: Solution, column: SelectingColumn) {
+  function select(solution: Solution, column: SelectingColumn, runIds: readonly string[]) {
     const action = selectAction({
+      runIds,
       clickedId: solution.id,
       column,
       activeId,

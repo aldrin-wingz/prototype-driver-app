@@ -9,7 +9,12 @@ import { RequestMap } from "@/components/driver/request-map";
 import { RequestListSheet } from "@/components/driver/request-list-sheet";
 import { FilterRequestsModal, type RequestFilters } from "@/components/driver/filter-requests-modal";
 import { mockRequestTrips } from "@/lib/driver-data/mock-trips";
-import { filterRequestsByMember } from "@/lib/driver-data/member-assignment";
+import {
+  applicableFilters,
+  filterRequestsByMember,
+  showsMemberFilter,
+} from "@/lib/driver-data/member-assignment";
+import { useSolution } from "@/lib/solutions/solution-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -49,6 +54,12 @@ function RequestsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  /**
+   * ⛔ Catalogue row 10's gate, read HERE and passed down. The filter sheet is
+   * production's own screen and is told whether to offer the Member row; it
+   * does not ask. See `showsMemberFilter`.
+   */
+  const { demo } = useSolution();
 
   const incentiveParam = searchParams.get("incentive") as IncentiveType | null;
   /**
@@ -82,16 +93,32 @@ function RequestsPageContent() {
    *
    * `member` is catalogue row 10 and does filter. `incentiveType` predates it.
    */
+  /**
+   * ⛔⛔ **The filters as they actually apply**, which is not the same object
+   * as the ones the driver has set. In `"now"` the member filter does not
+   * exist, so a deep link carrying one lands on the UNFILTERED feed — twenty
+   * trips and a name to hunt for, which is row 10's dead end.
+   *
+   * ⚠️ Everything downstream reads THIS and never `appliedFilters`: the feed,
+   * the badge on the filter icon, the sheet's initial values and the empty
+   * state. Three of those reading the raw object would each show a filter the
+   * driver has no control for.
+   */
+  const applied = useMemo(
+    () => applicableFilters(appliedFilters, demo),
+    [appliedFilters, demo],
+  );
+
   const filtered = useMemo(() => {
     let result = mockRequestTrips;
-    if (appliedFilters.incentiveType) {
-      result = result.filter((t) => t.incentiveTypes.includes(appliedFilters.incentiveType as IncentiveType));
+    if (applied.incentiveType) {
+      result = result.filter((t) => t.incentiveTypes.includes(applied.incentiveType as IncentiveType));
     }
-    if (appliedFilters.member) {
-      result = filterRequestsByMember(result, appliedFilters.member);
+    if (applied.member) {
+      result = filterRequestsByMember(result, applied.member);
     }
     return result;
-  }, [appliedFilters]);
+  }, [applied]);
 
   // Grouped by pickup day — a day with no trips is ABSENT, not greyed out.
   const groups = useMemo(() => groupByPickupDay(filtered), [filtered]);
@@ -124,8 +151,15 @@ function RequestsPageContent() {
     [dayTrips, detent, zoom],
   );
 
-  // Count of filters BEYOND day and time — that is what the badge counts.
-  const extraFilterCount = Object.values(appliedFilters).filter(Boolean).length;
+  /**
+   * Count of filters BEYOND day and time — that is what the badge counts.
+   *
+   * ⛔ From `applied`, not `appliedFilters`. In `"now"` a member deep link
+   * would otherwise put a `1` on the filter icon for a filter that is not
+   * narrowing the feed and has no control in the sheet — a badge the driver
+   * can see, cannot explain and cannot clear.
+   */
+  const extraFilterCount = Object.values(applied).filter(Boolean).length;
 
   function clearFilters() {
     setAppliedFilters({});
@@ -216,7 +250,8 @@ function RequestsPageContent() {
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         onUpdate={(f) => { setAppliedFilters(f); router.replace("/requests", { scroll: false }); }}
-        initialFilters={appliedFilters}
+        initialFilters={applied}
+        showMemberFilter={showsMemberFilter(demo)}
       />
 
       {/* Map with the sheet over it.

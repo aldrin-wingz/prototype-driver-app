@@ -17,6 +17,22 @@ interface FilterRequestsModalProps {
   onClose: () => void;
   onUpdate: (filters: RequestFilters) => void;
   initialFilters?: RequestFilters;
+  /**
+   * Whether to offer the **Member** row — catalogue row 10's proposal.
+   *
+   * ⛔⛔ **A prop, not a `useSolution()` call.** This sheet is production's,
+   * replicated from a capture; it has no business knowing which catalogue row
+   * the selector is focused on. Reading the focus here would make a mirrored
+   * screen depend on the tooling that frames it, which the base contract
+   * forbids — and would put the decision in the one place a check cannot run
+   * a truth table over. `app/requests/page.tsx` asks `showsMemberFilter`; this
+   * sheet is told.
+   *
+   * ⚠️ Required, with no default. A default would let the one call site be
+   * converted wrongly and still compile, showing a proposed control in
+   * production's own sheet.
+   */
+  showMemberFilter: boolean;
 }
 
 export interface RequestFilters {
@@ -47,6 +63,7 @@ export function FilterRequestsModal({
   onClose,
   onUpdate,
   initialFilters,
+  showMemberFilter,
 }: FilterRequestsModalProps) {
   const [filters, setFilters] = useState<RequestFilters>({
     pickupLocation: undefined,
@@ -180,24 +197,32 @@ export function FilterRequestsModal({
               It can legitimately come up empty: that member simply has no trips
               posted right now, which is a real answer and the one the Clear
               Filters empty state already handles.
+
+              ⛔⛔ B3d gated it. Production's sheet has THREE rows under
+              "Filter by:" — Pickup Location, Day, Client — and this is the
+              fourth. In `"now"` it is not rendered at all, rather than rendered
+              and ignored: a dropdown that lists the right names and then
+              changes nothing is a worse lie than its absence.
             */}
-            <Select
-              value={filters.member || ""}
-              onValueChange={(value) =>
-                setFilters({ ...filters, member: value || undefined })
-              }
-            >
-              <SelectTrigger className="h-12 border-[#10B981] bg-white px-4 py-3 text-left text-gray-900">
-                <SelectValue placeholder="Member" />
-              </SelectTrigger>
-              <SelectContent>
-                {memberFilterOptions().map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {showMemberFilter && (
+              <Select
+                value={filters.member || ""}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, member: value || undefined })
+                }
+              >
+                <SelectTrigger className="h-12 border-[#10B981] bg-white px-4 py-3 text-left text-gray-900">
+                  <SelectValue placeholder="Member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {memberFilterOptions().map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 

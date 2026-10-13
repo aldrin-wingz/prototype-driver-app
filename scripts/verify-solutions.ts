@@ -125,6 +125,8 @@ import {
   SCOPES_NEEDING_SCHEDULE,
   MAX_TILE_LABEL_CHARS,
   memberFilterOptions,
+  showsMemberFilter,
+  applicableFilters,
   PREFERRED_DRIVER_SOLUTIONS,
   shouldAskPreferredDriver,
 } from "../lib/driver-data/member-assignment";
@@ -2256,10 +2258,18 @@ check(
   ASSIGN_SOURCES.sheet.includes('placeholder="Member"') &&
     ASSIGN_SOURCES.sheet.includes("memberFilterOptions()"),
 );
+/**
+ * ⛔ **The feed applies the GATED filters, not the raw ones.** B3d made the
+ * member filter row 10's proposal, so the object the feed narrows by is
+ * `applied` — `appliedFilters` run through `applicableFilters`. Reading the raw
+ * object here would narrow the feed in `"now"` by a control that is not on
+ * screen. §26 runs the rule itself; this asserts the feed is wired to it.
+ */
 check(
-  "...and the feed actually applies it",
-  "filterRequestsByMember",
-  ASSIGN_SOURCES.feed.includes("filterRequestsByMember(result, appliedFilters.member)"),
+  "...and the feed actually applies it, through the gate",
+  `filterRequestsByMember(result, applied.member): ${ASSIGN_SOURCES.feed.includes("filterRequestsByMember(result, applied.member)")}`,
+  ASSIGN_SOURCES.feed.includes("filterRequestsByMember(result, applied.member)") &&
+    ASSIGN_SOURCES.feed.includes("applicableFilters(appliedFilters, demo)"),
 );
 /**
  * ⛔ Both halves of the scenario read ONE member list. The form picks from
@@ -5937,6 +5947,13 @@ const GATES: Array<{
     // ride, member not opted out — leaving the focus gate as the only variable.
     shown: (f) => shouldAskPreferredDriver({ trip: ASK_TRIP, focus: f, suppressedMembers: [] }),
   },
+  /**
+   * ⭐ Added in B3d. Owned by BOTH rows 09 and 10 — one build, one owner list,
+   * the same one `shouldAskPreferredDriver` above reads. The owners are written
+   * out here as literals rather than imported, so this compares the gate to the
+   * declaration and not to itself.
+   */
+  { name: "showsMemberFilter", owners: ["auto-assign-request", "request-feed-member-filter"], shown: (f) => showsMemberFilter(f) },
   { name: "buildOptionsRows", owners: ["account-self-service"], inPlainMirror: false, shown: (f) => buildOptionsRows(f).some((r) => r.proposed) },
   { name: "reachOptionsFor/standard", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(false, f).some((o) => o.proposed) },
   { name: "reachOptionsFor/same-day", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(true, f).some((o) => o.proposed) },
@@ -5972,7 +5989,7 @@ check(
   `${GATES.length} gate(s) x ${FOCUS_IDS.length} focus(es) x ${DEMO_MODES.length} mode(s)`,
   gateSweep === GATES.length * FOCUS_IDS.length * DEMO_MODES.length &&
     FOCUS_IDS.length === EXPECTED_ROWS + 1 &&
-    GATES.length === 12,
+    GATES.length === 13,
 );
 /**
  * ⛔ Non-vacuity: a sweep where every gate said `false` everywhere would agree
@@ -6031,12 +6048,27 @@ for (const want of PRE_B1) {
     if (got[key] !== want[key]) movedBehaviour.push(`${want.gate}.${key}: ${got[key]} (was ${want[key]})`);
   }
 }
+/**
+ * ⛔⛔ **Gates added AFTER B1 have no "before", and must not be given a
+ * fabricated one.** `showsMemberFilter` did not exist at B1 — the Request Feed
+ * filter was ungated, so the honest "before" for it is *true everywhere*, which
+ * is not a baseline worth asserting. Naming it here keeps the denominator
+ * honest: `PRE_B1` covers the gates it can speak for, this list covers the
+ * rest, and together they have to account for every gate. A gate in NEITHER is
+ * a gate whose behaviour nothing here describes.
+ */
+const ADDED_AFTER_B1 = ["showsMemberFilter"];
 check(
   "with the mode pinned to fixed, every gate answers what it answered before B1",
   movedBehaviour.length
     ? `MOVED: ${movedBehaviour.join("; ")}`
-    : `${PRE_B1.length * 3} of ${PRE_B1.length * 3} declared answer(s) unchanged`,
-  movedBehaviour.length === 0 && PRE_B1.length === GATES.length,
+    : `${PRE_B1.length * 3} of ${PRE_B1.length * 3} declared answer(s) unchanged; ` +
+      `${ADDED_AFTER_B1.length} gate(s) added since — ${ADDED_AFTER_B1.join(", ")}`,
+  movedBehaviour.length === 0 &&
+    PRE_B1.length + ADDED_AFTER_B1.length === GATES.length &&
+    // ⛔ Each named one must be a real gate, and must NOT also claim a baseline.
+    ADDED_AFTER_B1.every((n) => GATES.some((g) => g.name === n)) &&
+    ADDED_AFTER_B1.every((n) => !PRE_B1.some((b) => b.gate === n)),
 );
 /** ⚠️ The stranger must really be a stranger, or the third column is free. */
 check(
@@ -6432,20 +6464,19 @@ check(
  * would have claimed a production screen it does not have, and said so on
  * screen, with the gate green.
  *
- * ⚠️ These four ids are written out HERE. Finishing a row means deleting it
- * from `demo-mode.ts` and from this line, and the second edit is the one that
- * makes a reviewer look at whether the first was true.
+ * ⚠️ These ids are written out HERE. Finishing a row means deleting it from
+ * `demo-mode.ts` and from this line, and the second edit is the one that makes
+ * a reviewer look at whether the first was true. B3d deleted row 10 from both.
  */
 const EXPECTED_AWAITING = [
   "missed-swipe",
-  "request-feed-member-filter",
 ];
 const awaitingDrift = [
   ...EXPECTED_AWAITING.filter((id) => !ROWS_AWAITING_NOW.includes(id)).map((id) => `-${id}`),
   ...ROWS_AWAITING_NOW.filter((id) => !EXPECTED_AWAITING.includes(id)).map((id) => `+${id}`),
 ];
 check(
-  "...and the rows awaiting a production screen are exactly the declared four",
+  "...and the rows awaiting a production screen are exactly the ones declared here",
   awaitingDrift.length
     ? `DRIFT: ${awaitingDrift.join(" ")}`
     : `${ROWS_AWAITING_NOW.length} of ${EXPECTED_AWAITING.length} — ${ROWS_AWAITING_NOW.join(", ")}`,
@@ -6456,7 +6487,7 @@ const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
 check(
   "...and that list splits the built rows rather than covering none or all",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
-  builtWithNow.length === 10 && builtRows.length === 12,
+  builtWithNow.length === 11 && builtRows.length === 12,
 );
 /** ⚠️ `hasNowState(null)` is false — the plain mirror is on no side at all. */
 check(
@@ -7100,24 +7131,42 @@ const B6_TABLE_CODE = codeOnly(B6_TABLE);
  */
 const SELECT_CASES: Array<{
   why: string;
+  runIds: string[];
   clickedId: string;
   column: SelectingColumn;
   activeId: string | null;
   activeMode: DemoMode;
   want: SelectAction;
 }> = [
-  { why: "nothing focused, use case", clickedId: "a", column: "use-case", activeId: null, activeMode: "now", want: "focus" },
-  { why: "nothing focused, proposed feature", clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", want: "focus" },
-  { why: "another row's use case", clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", want: "focus" },
-  { why: "another row's proposed feature", clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", want: "focus" },
-  { why: "⭐ the focused row's use case, while showing the proposal", clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", want: "set-mode" },
-  { why: "⭐ the focused row's proposed feature, while showing today", clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", want: "set-mode" },
-  { why: "⛔ the lit use-case cell, clicked again", clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", want: "nothing" },
-  { why: "⛔ the lit proposed-feature cell, clicked again", clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", want: "nothing" },
+  { why: "nothing focused, use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: null, activeMode: "now", want: "focus" },
+  { why: "nothing focused, proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", want: "focus" },
+  { why: "another row's use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", want: "focus" },
+  { why: "another row's proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", want: "focus" },
+  { why: "⭐ the focused row's use case, while showing the proposal", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", want: "set-mode" },
+  { why: "⭐ the focused row's proposed feature, while showing today", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", want: "set-mode" },
+  { why: "⛔ the lit use-case cell, clicked again", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", want: "nothing" },
+  { why: "⛔ the lit proposed-feature cell, clicked again", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", want: "nothing" },
+  /*
+    ⛔⛔ The four that caught a shipped bug, 2026-10-14. A MERGED use-case cell
+    is drawn by the first row of its run but speaks for all of them. Row 10's
+    only use-case cell is the one row 09 draws — so while the cell compared
+    against `clickedId`, clicking it with row 10 focused jumped the focus to
+    row 09, and row 10's production side could not be reached from the table at
+    all. The highlight was already lighting that cell, because IT compared
+    against the run. Found by a walk; these are what would have found it here.
+  */
+  { why: "⭐⭐ a merged use case, clicked by the SECOND row of its run", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "fixed", want: "set-mode" },
+  { why: "⭐⭐ ...and clicked again once it is lit", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", want: "nothing" },
+  { why: "a merged use case with its FIRST row focused still flips", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", want: "set-mode" },
+  { why: "a merged use case with a stranger focused takes the focus", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "z", activeMode: "now", want: "focus" },
+  /* ⛔ And the run does NOT widen the proposed-feature column, which never merges. */
+  { why: "the second row's own proposed feature is its own", runIds: ["b"], clickedId: "b", column: "proposed-feature", activeId: "a", activeMode: "fixed", want: "focus" },
 ];
+
 const selectWrong = SELECT_CASES.filter(
   (c) =>
     selectAction({
+      runIds: c.runIds,
       clickedId: c.clickedId,
       column: c.column,
       activeId: c.activeId,
@@ -7262,9 +7311,15 @@ check(
     PROPOSED_CELL_TAG.length > 0 && !proposedMerges,
 );
 /**
- * ⛔ And the ones that depend on a single cell are named. These two are the
- * second row of each merged use-case run — rows 10 and 12 — and if that list
- * ever grows, a merge grew with it.
+ * ⛔ The rows that DRAW no Use Case cell of their own are named — rows 10 and
+ * 12, the second row of each merged run. If that list grows, a merge grew with
+ * it.
+ *
+ * ⚠️ This does NOT say they are reachable only one way. They share the cell
+ * above them and it speaks for them, which is what `coversFocus` settles and
+ * what the two checks below actually measure. Reading this line as a
+ * reachability claim is the mistake that let row 10's production side ship
+ * unreachable.
  */
 const PROPOSED_ONLY = ["request-feed-member-filter", "vehicle-capacity-backend"];
 const proposedOnly = [...reachableBy]
@@ -7276,7 +7331,7 @@ const reachDrift = [
   ...proposedOnly.filter((id) => !PROPOSED_ONLY.includes(id)).map((id) => `+${id}`),
 ];
 check(
-  "...and exactly the two rows under a merged use case rely on their own column",
+  "...and exactly the two rows under a merged use case draw no cell of their own",
   reachDrift.length
     ? `DRIFT: ${reachDrift.join(" ")}`
     : `${proposedOnly.length} of ${EXPECTED_TABLE_ROWS} — ${proposedOnly.join(", ")}`,
@@ -7286,6 +7341,117 @@ check(
     [...reachableBy].filter(([, cols]) => cols.size === 2).length ===
       EXPECTED_TABLE_ROWS - PROPOSED_ONLY.length,
 );
+/**
+ * ⛔⛔⛔ **Every row reachable on BOTH sides, by table clicks alone.**
+ *
+ * The check above asks whether a row can be FOCUSED. That is not the question
+ * — a row focused only ever on the proposal is a row whose production side the
+ * desktop selector cannot show, and the whole slice is the comparison. B3d made
+ * that live: row 10 gained a real Now (the unfiltered Request Feed) and there
+ * was no way to reach it, because its only Use Case cell is the merged one row
+ * 09 draws. Found by a walk, not by a check, which is why this one exists.
+ *
+ * ⭐ Modelled as a search over the state machine the table actually is: start
+ * from the plain mirror, apply every cell click, follow where `selectAction`
+ * says it goes, and see which of the 52 (row × side) states are ever entered.
+ */
+type SelectCellModel = {
+  runIds: readonly string[];
+  clickedId: string;
+  column: SelectingColumn;
+};
+const TABLE_CELLS: SelectCellModel[] = tRows.flatMap((r) => [
+  // Never merges, so it always stands for its own row alone.
+  { runIds: [r.solution.id], clickedId: r.solution.id, column: "proposed-feature" as SelectingColumn },
+  // Drawn only at the head of its run, and speaking for the whole of it.
+  ...(r.useCaseSpan > 0
+    ? [{ runIds: r.useCaseRunIds, clickedId: r.solution.id, column: "use-case" as SelectingColumn }]
+    : []),
+]);
+function clickCell(
+  activeId: string | null,
+  mode: DemoMode,
+  cell: SelectCellModel,
+): [string | null, DemoMode] {
+  const action = selectAction({
+    runIds: cell.runIds,
+    clickedId: cell.clickedId,
+    column: cell.column,
+    activeId,
+    activeMode: mode,
+  });
+  if (action === "focus") return [cell.clickedId, COLUMN_MODE[cell.column]];
+  if (action === "set-mode") return [activeId, COLUMN_MODE[cell.column]];
+  return [activeId, mode];
+}
+const START: [string | null, DemoMode] = [null, DEFAULT_DEMO_MODE];
+const seen = new Set<string>([`${START[0]}/${START[1]}`]);
+const queue: Array<[string | null, DemoMode]> = [START];
+while (queue.length) {
+  const [id, mode] = queue.shift()!;
+  for (const cell of TABLE_CELLS) {
+    const next = clickCell(id, mode, cell);
+    const key = `${next[0]}/${next[1]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    queue.push(next);
+  }
+}
+const WANTED_STATES = tRows.flatMap((r) => DEMO_MODES.map((m) => `${r.solution.id}/${m}`));
+const unreachableStates = WANTED_STATES.filter((k) => !seen.has(k));
+check(
+  "every row is reachable on BOTH sides, using nothing but the table",
+  unreachableStates.length
+    ? `UNREACHABLE: ${unreachableStates.slice(0, 6).join(", ")}${unreachableStates.length > 6 ? ` (+${unreachableStates.length - 6})` : ""}`
+    : `${WANTED_STATES.length} of ${EXPECTED_TABLE_ROWS * DEMO_MODES.length} (row x side) reachable from the plain mirror`,
+  unreachableStates.length === 0 &&
+    WANTED_STATES.length === EXPECTED_TABLE_ROWS * DEMO_MODES.length &&
+    // ⛔ Non-vacuity: the search must really have had to walk, not start done.
+    TABLE_CELLS.length === EXPECTED_TABLE_ROWS + tRows.filter((r) => r.useCaseSpan > 0).length,
+);
+/**
+ * ⛔⛔ **And the two rules agree about whose cell it is.** The bug was not that
+ * either one was wrong on its own — it was that `cellSelected` compared the
+ * whole run and `selectAction` compared one id, so the highlight lit a cell the
+ * click would not act on. Swept over every cell and every focus.
+ */
+let agreementSweep = 0;
+const disagreements: string[] = [];
+for (const cell of TABLE_CELLS) {
+  for (const row of tRows) {
+    for (const mode of DEMO_MODES) {
+      agreementSweep += 1;
+      const lit = cellSelected({
+        runIds: cell.runIds,
+        column: cell.column,
+        activeId: row.solution.id,
+        activeMode: mode,
+      });
+      const action = selectAction({
+        runIds: cell.runIds,
+        clickedId: cell.clickedId,
+        column: cell.column,
+        activeId: row.solution.id,
+        activeMode: mode,
+      });
+      // A LIT cell is the focused row's own, on the side already showing — so
+      // clicking it must be the no-op. A cell that is lit and would move the
+      // focus elsewhere is a control pointing at the wrong thing.
+      if (lit !== (action === "nothing")) {
+        disagreements.push(`${cell.column}:${cell.clickedId}@${row.solution.id}/${mode}`);
+      }
+    }
+  }
+}
+check(
+  "...and a lit cell is exactly the one whose click does nothing",
+  disagreements.length
+    ? `DISAGREE: ${disagreements.slice(0, 5).join(", ")} (${disagreements.length} of ${agreementSweep})`
+    : `0 of ${agreementSweep} (cell x focus x side) disagree`,
+  disagreements.length === 0 &&
+    agreementSweep === TABLE_CELLS.length * EXPECTED_TABLE_ROWS * DEMO_MODES.length,
+);
+
 /** ⛔ `useCaseRunIds` must describe the same merge the rowspan draws. */
 const runIdDrift = tRows.filter(
   (r) =>
@@ -7541,6 +7707,274 @@ check(
     B6_TABLE_CODE.includes('event.key !== "Enter"') &&
     B6_TABLE_CODE.includes('event.key !== " "') &&
     B6_TABLE_CODE.includes("aria-pressed="),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n26. Row 10 — the Request Feed member filter is ours, not production's");
+// ---------------------------------------------------------------------------
+/**
+ * B3d. Until now row 10 sat in `ROWS_AWAITING_NOW`: focusing it on `"now"` hid
+ * the More Options tile it shares with row 09, so *something* changed — but the
+ * filter the row is actually about stayed put. A toggle that moves a tile while
+ * the headline feature carries on working is a half-truth, and it was on screen
+ * labelled as the gap it was.
+ *
+ * ⛔⛔ **Gating the dropdown would not have been enough**, and that is the whole
+ * shape of this slice. Three things read the filters — the feed, the badge on
+ * the filter icon, and the sheet's own initial values — so hiding the control
+ * alone would leave a deep link narrowing the feed to one member, with a badge
+ * counting a filter the driver cannot see, open or clear. One answer,
+ * `applicableFilters`, and everything downstream reads it.
+ */
+const FEED_SRC = readFileSync(join(ROOT, "app/requests/page.tsx"), "utf8");
+const FEED_CODE = codeOnly(FEED_SRC);
+const SHEET_SRC = readFileSync(join(ROOT, "components/driver/filter-requests-modal.tsx"), "utf8");
+const SHEET_CODE = codeOnly(SHEET_SRC);
+const ROW_10_ID = "request-feed-member-filter";
+const ROW_09_ID = "auto-assign-request";
+/** ⚠️ A member with trips in the feed — row 10's own entry route names her. */
+const FILTER_MEMBER = "AMARA OKONKWO";
+
+/* --- 26a. What the feed shows, on each side ------------------------------ */
+/**
+ * ⭐⭐ **The check this slice exists for.** Not "is the gate wired" — that is
+ * §20c — but *how many trips a driver is looking at*, driven end to end through
+ * the same two functions the page calls.
+ *
+ * ⛔ Expectations declared as literals, including which side filters. A table
+ * generated from the gate it tests is a restatement.
+ */
+const TOTAL_REQUESTS = mockRequestTrips.length;
+const AMARA_REQUESTS = filterRequestsByMember(mockRequestTrips, FILTER_MEMBER).length;
+function feedSize(id: string | null, mode: DemoMode): number {
+  const applied = applicableFilters({ member: FILTER_MEMBER }, demoFocus(id, mode));
+  return applied.member
+    ? filterRequestsByMember(mockRequestTrips, applied.member).length
+    : mockRequestTrips.length;
+}
+const FEED_CASES: Array<{ why: string; id: string | null; mode: DemoMode; narrowed: boolean }> = [
+  { why: "⭐ row 10, now — the dead end", id: ROW_10_ID, mode: "now", narrowed: false },
+  { why: "⭐ row 10, fixed — the proposal", id: ROW_10_ID, mode: "fixed", narrowed: true },
+  { why: "row 09, now — one build, same two sides", id: ROW_09_ID, mode: "now", narrowed: false },
+  { why: "row 09, fixed", id: ROW_09_ID, mode: "fixed", narrowed: true },
+  { why: "the plain mirror shows every proposal", id: null, mode: "now", narrowed: true },
+  { why: "...on either reading of the mode", id: null, mode: "fixed", narrowed: true },
+  { why: "a stranger's row never borrows it", id: "rider-no-show", mode: "fixed", narrowed: false },
+  { why: "...on either side", id: "rider-no-show", mode: "now", narrowed: false },
+];
+const feedWrong = FEED_CASES.filter(
+  (c) => feedSize(c.id, c.mode) !== (c.narrowed ? AMARA_REQUESTS : TOTAL_REQUESTS),
+);
+check(
+  "the same deep link lands on one member's trips, or on the whole feed",
+  feedWrong.length
+    ? `WRONG: ${feedWrong.map((c) => `${c.why} (${feedSize(c.id, c.mode)})`).join("; ")}`
+    : `${FEED_CASES.length} of ${FEED_CASES.length} case(s) — narrowed ${AMARA_REQUESTS}, unfiltered ${TOTAL_REQUESTS}`,
+  feedWrong.length === 0,
+);
+/**
+ * ⛔⛔ Non-vacuity, and it is not optional here. If the seed happened to hold
+ * only Amara's trips, "narrowed" and "unfiltered" would be the same number and
+ * every case above would pass over a gate that did nothing at all.
+ */
+check(
+  "...and those two are different feeds, so the comparison has something to show",
+  `${AMARA_REQUESTS} of ${TOTAL_REQUESTS} request(s) are hers`,
+  AMARA_REQUESTS > 0 && AMARA_REQUESTS < TOTAL_REQUESTS &&
+    FEED_CASES.some((c) => c.narrowed) && FEED_CASES.some((c) => !c.narrowed),
+);
+/** ⚠️ And `"now"` is the WHOLE feed, not merely a different one. */
+check(
+  "...and production's side is the feed with nothing taken out of it",
+  `now = ${feedSize(ROW_10_ID, "now")} of ${TOTAL_REQUESTS}`,
+  feedSize(ROW_10_ID, "now") === TOTAL_REQUESTS,
+);
+
+/* --- 26b. The gate touches the member filter and nothing else ------------ */
+/**
+ * ⛔ `applicableFilters` strips ONE key. A version that returned `{}` in `"now"`
+ * would also drop the incentive filter, which predates row 10 and is nobody's
+ * proposal — production has it, so taking it away would make the Now side
+ * wrong in the other direction.
+ */
+const ALL_FILTERS = {
+  pickupLocation: "atlanta",
+  day: "today",
+  client: "verida",
+  member: FILTER_MEMBER,
+  sortBy: "expiration-date",
+  mode: "full-trip",
+  incentiveType: "early-bird",
+};
+const strippedNow = applicableFilters(ALL_FILTERS, demoFocus(ROW_10_ID, "now"));
+const keptFixed = applicableFilters(ALL_FILTERS, demoFocus(ROW_10_ID, "fixed"));
+const collateral = Object.keys(ALL_FILTERS).filter(
+  (k) => k !== "member" && strippedNow[k as keyof typeof ALL_FILTERS] !== ALL_FILTERS[k as keyof typeof ALL_FILTERS],
+);
+check(
+  "the gate takes out the member filter and leaves production's own alone",
+  collateral.length
+    ? `ALSO DROPPED: ${collateral.join(", ")}`
+    : `member dropped; ${Object.keys(ALL_FILTERS).length - 1} of ${Object.keys(ALL_FILTERS).length} key(s) untouched`,
+  strippedNow.member === undefined &&
+    collateral.length === 0 &&
+    // ⛔ ...and on the proposal side it changes nothing at all.
+    keptFixed.member === FILTER_MEMBER &&
+    Object.keys(ALL_FILTERS).every(
+      (k) => keptFixed[k as keyof typeof ALL_FILTERS] === ALL_FILTERS[k as keyof typeof ALL_FILTERS],
+    ),
+);
+/**
+ * ⛔⛔ **The badge counts what is applied, not what was asked for.** In `"now"`
+ * a member deep link would otherwise put a `1` on the filter icon for a filter
+ * that is not narrowing anything and has no control in the sheet — visible,
+ * unexplainable and unclearable. This is the count the page computes, run over
+ * the same object.
+ */
+const badge = (id: string | null, mode: DemoMode) =>
+  Object.values(applicableFilters({ member: FILTER_MEMBER }, demoFocus(id, mode))).filter(Boolean).length;
+check(
+  "...and the filter badge counts nothing in production, one in the proposal",
+  `now ${badge(ROW_10_ID, "now")}, fixed ${badge(ROW_10_ID, "fixed")}`,
+  badge(ROW_10_ID, "now") === 0 && badge(ROW_10_ID, "fixed") === 1,
+);
+
+/* --- 26c. One answer, and every reader reads it -------------------------- */
+/**
+ * ⛔⛔ **The raw object must be read by almost nothing.** `appliedFilters` is
+ * the driver's intent; `applied` is what survives the gate. Every consumer that
+ * reaches past the gate to the raw object re-opens the bug this slice closes,
+ * and each one would look perfectly reasonable in a diff.
+ *
+ * ⚠️ Declared as a count with its sites named, not as "the string appears".
+ * The three legitimate READS are the `useState` declaration, the one call that
+ * builds `applied` from it, and that call's dependency array. Anything else
+ * reaching for the raw object is a consumer that has gone round the gate.
+ *
+ * ⛔ The WRITES are counted separately and deliberately left alone. Recording
+ * what the driver asked for is right, and all three writers — the initial
+ * state, the deep-link effect and the sheet's Update — go on doing it. The
+ * gate decides what is HONOURED, not what is stored.
+ */
+const RAW_READS = (FEED_CODE.match(/\bappliedFilters\b/g) ?? []).length;
+const RAW_WRITES = (FEED_CODE.match(/\bsetAppliedFilters\b/g) ?? []).length;
+const EXPECTED_RAW_READS = 3;
+/** ⚠️ The declaration plus its three setters. */
+const EXPECTED_RAW_WRITES = 4;
+check(
+  "the driver's raw filters are read only where they are declared and gated",
+  `${RAW_READS} of ${EXPECTED_RAW_READS} read(s), ${RAW_WRITES} of ${EXPECTED_RAW_WRITES} write(s)`,
+  RAW_READS === EXPECTED_RAW_READS &&
+    RAW_WRITES === EXPECTED_RAW_WRITES &&
+    FEED_CODE.includes("applicableFilters(appliedFilters, demo)"),
+);
+/** ⛔ And the three consumers each read the gated object. */
+const READERS: Array<[string, boolean]> = [
+  ["the feed narrows by it", FEED_CODE.includes("filterRequestsByMember(result, applied.member)")],
+  ["...and its incentive filter too", FEED_CODE.includes("applied.incentiveType")],
+  ["the badge counts it", FEED_CODE.includes("Object.values(applied)")],
+  ["the sheet is seeded from it", FEED_CODE.includes("initialFilters={applied}")],
+];
+const notReading = READERS.filter(([, ok]) => !ok).map(([label]) => label);
+check(
+  "...and every surface downstream reads the gated object instead",
+  notReading.length ? `READING THE RAW ONE: ${notReading.join("; ")}` : `${READERS.length} of ${READERS.length} readers`,
+  notReading.length === 0,
+);
+
+/* --- 26d. The sheet is told, it does not ask ----------------------------- */
+/**
+ * ⛔⛔ The filter sheet is PRODUCTION's screen, replicated from a capture. It
+ * has no business knowing which catalogue row the selector is focused on —
+ * reading the focus there would make a mirrored screen depend on the tooling
+ * that frames it, which the base contract forbids, and would put the decision
+ * where no truth table can reach it.
+ */
+const SHEET_ASKS = /useSolution|demo-mode|DemoFocus|showsProposal/;
+check(
+  "the production filter sheet never asks which solution is focused",
+  SHEET_ASKS.test(SHEET_CODE)
+    ? `ASKS (${SHEET_CODE.match(SHEET_ASKS)?.[0]}) — a mirrored screen reading the tooling`
+    : "told through a prop",
+  !SHEET_ASKS.test(SHEET_CODE) && SHEET_CODE.includes("showMemberFilter"),
+);
+/**
+ * ⛔ Required, with no default. A default would let the one call site be
+ * converted wrongly and still compile — rendering a proposed control inside
+ * production's own sheet, which is the single worst outcome available here.
+ */
+check(
+  "...and the prop is required, so the one call site cannot omit it",
+  /showMemberFilter\?:/.test(SHEET_CODE)
+    ? "OPTIONAL — an omitted prop would read as false, or a default as true"
+    : "showMemberFilter: boolean",
+  /showMemberFilter: boolean/.test(SHEET_CODE) && !/showMemberFilter\?:/.test(SHEET_CODE),
+);
+/**
+ * ⛔⛔ **Exactly ONE of the sheet's seven controls is gated.** Production
+ * carries six — Pickup Location, Day and Client under "Filter by:", plus Sort
+ * by, Incentive Filter and Mode. The Member row is the seventh, and ours.
+ * Gating a second would delete a production control in `"now"`;
+ * gating none would leave the proposal on screen in both modes. The count is
+ * what tells those apart — a grep for the guard cannot.
+ */
+const SHEET_SELECTS = (SHEET_CODE.match(/<Select\b/g) ?? []).length;
+const GATED_SELECTS = (SHEET_CODE.match(/\{showMemberFilter && \(\s*<Select\b/g) ?? []).length;
+const EXPECTED_SHEET_SELECTS = 7;
+check(
+  "exactly one of the sheet's controls is ours, and it is the Member row",
+  `${GATED_SELECTS} gated of ${SHEET_SELECTS} control(s), expected 1 of ${EXPECTED_SHEET_SELECTS}`,
+  SHEET_SELECTS === EXPECTED_SHEET_SELECTS &&
+    GATED_SELECTS === 1 &&
+    // ⭐ ...and it is the Member one, not whichever happens to be first.
+    /\{showMemberFilter && \(\s*<Select[\s\S]{0,400}?placeholder="Member"/.test(SHEET_CODE),
+);
+/** ⚠️ The page asks the gate by name, rather than re-deciding it. */
+check(
+  "...and the page asks the one rule, rather than deciding again",
+  FEED_CODE.includes("showMemberFilter={showsMemberFilter(demo)}")
+    ? "showMemberFilter={showsMemberFilter(demo)}"
+    : "NOT FOUND — the sheet and the feed could disagree about the same mode",
+  FEED_CODE.includes("showMemberFilter={showsMemberFilter(demo)}"),
+);
+
+/* --- 26e. The deep link still lands -------------------------------------- */
+/**
+ * ⭐ `applicableFilters` STRIPS, it does not refuse. Row 10's entry route and
+ * its alternate both carry `?member=`, and in `"now"` they still land — on the
+ * unfiltered feed, which is the dead end being demonstrated. A guard that
+ * redirected instead would answer "what happens now?" with a 404.
+ */
+const ROW_10_ROUTES = [ROW_10.entry!.route, ...(ROW_10.entry!.alternates ?? []).map((a) => a.route)];
+check(
+  "row 10's routes still name a member, on both sides",
+  `${ROW_10_ROUTES.filter((r) => r.includes("member=")).length} of ${ROW_10_ROUTES.length} carry ?member=`,
+  ROW_10_ROUTES.length === 2 && ROW_10_ROUTES.every((r) => r.startsWith("/requests?member=")),
+);
+
+/* --- 26f. Row 10 is off the awaiting list, and has earned it ------------- */
+/**
+ * ⛔⛔ The list is the SHRINKING one — a row stays on it until someone deletes
+ * the line. B3d deletes row 10's, so the claim this makes is that focusing row
+ * 10 on `"now"` really does change what a driver sees. §26a is the evidence;
+ * this is the bookkeeping that must agree with it.
+ */
+check(
+  "row 10 now claims a production screen",
+  `hasNowState(${ROW_10_ID}) = ${hasNowState(ROW_10_ID)}; on the awaiting list: ${ROWS_AWAITING_NOW.includes(ROW_10_ID)}`,
+  hasNowState(ROW_10_ID) === true && !ROWS_AWAITING_NOW.includes(ROW_10_ID),
+);
+/**
+ * ⛔ ...and the claim is backed by the feed, not by the deletion. These two
+ * facts are computed from different places on purpose: one reads the list, the
+ * other runs the rule over the seed. A row deleted from the list without being
+ * built would pass the first and fail this.
+ */
+check(
+  "...and the two sides of row 10 really do differ, which is what the list claims",
+  `now ${feedSize(ROW_10_ID, "now")} trips, fixed ${feedSize(ROW_10_ID, "fixed")} trips`,
+  hasNowState(ROW_10_ID) === (feedSize(ROW_10_ID, "now") !== feedSize(ROW_10_ID, "fixed")),
 );
 
 

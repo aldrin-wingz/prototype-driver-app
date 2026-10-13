@@ -150,6 +150,51 @@ export function filterRequestsByMember(trips: Trip[], member: string): Trip[] {
 
 
 /**
+ * Whether the Request Feed offers the **Member** filter — catalogue row 10.
+ *
+ * ⛔⛔ **This is the row's whole proposal, and until B3d it was ungated.** The
+ * sheet's Member dropdown is OURS; production's filter sheet has five controls
+ * and none of them is a member. So "what happens now" for row 10 is a driver
+ * who knows exactly whose trips they want and has no way to ask for them —
+ * they scroll the whole feed looking for a name. That scroll is the 610 calls.
+ *
+ * ⚠️ Owned by BOTH rows, via the same list the More Options tile uses. Rows
+ * 09 and 10 are one build — `sharedBuildWith` points each at the other and a
+ * check asserts it — and a second owner list for one build is two chances to
+ * disagree about which prototype a feature belongs to. Neither row's demo
+ * visits the other's surface, so nothing is over-claimed on screen.
+ */
+export function showsMemberFilter(focus: DemoFocus): boolean {
+  return showsProposal(focus, PREFERRED_DRIVER_SOLUTIONS);
+}
+
+/**
+ * The filters that actually apply, once a proposed one is taken back out.
+ *
+ * ⛔⛔ **ONE answer, read by everything downstream** — the feed, the badge on
+ * the filter icon, and the sheet's own initial values. The obvious build gates
+ * the dropdown and stops there, and that ships a feed still narrowed to one
+ * member by a deep link, with a badge claiming a filter the driver cannot see,
+ * open or clear. Production has no member filter, so in `"now"` there is
+ * nothing to show, nothing to count and nothing to undo.
+ *
+ * ⚠️ Generic over the filter shape rather than typed to `RequestFilters`,
+ * which is declared in the modal: a rule in `lib/` must not have to import a
+ * component to state itself.
+ *
+ * ⭐ It strips rather than refuses, so row 10's deep link still LANDS — on the
+ * unfiltered feed, which is exactly the dead end being demonstrated. A guard
+ * that redirected instead would answer "what happens now?" with a 404.
+ */
+export function applicableFilters<T extends { member?: string }>(
+  filters: T,
+  focus: DemoFocus,
+): T {
+  if (showsMemberFilter(focus)) return filters;
+  return { ...filters, member: undefined };
+}
+
+/**
  * Whether to ask, at the end of a leg, if this member requested the driver.
  *
  * ⛔⛔ **Three conditions, and all three are the point.**

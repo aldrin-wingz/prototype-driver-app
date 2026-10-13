@@ -125,18 +125,19 @@ export const DEMO_MODE_DESCRIPTION: Record<DemoMode, string> = {
  * deleting a line is the thing you cannot forget to do when the note is still
  * on screen in front of you.
  *
- * ⚠️ Row 10 is here for a reason worth stating. Focusing it in `"now"` does
- * hide the More Options tile it shares with row 09 — so something changes — but
- * its headline feature, the Request Feed member filter, is not gated yet. A
- * toggle that moves a tile while the filter it is really about stays put is the
- * kind of half-truth that is worse than an empty state.
+ * ⭐ **Row 10 came off this list in B3d** (2026-10-14), and what it took is
+ * worth recording: gating the dropdown alone would not have been enough. The
+ * feed, the badge on the filter icon and the sheet’s initial values all read
+ * the filters too, so three surfaces had to read ONE answer — `applicableFilters`
+ * — or `"now"` would have shown a feed narrowed by a control that was not on
+ * screen. A toggle that moves a tile while the filter it is really about stays
+ * put is the kind of half-truth that is worse than an empty state.
  *
  * ⭐ B5's check 12 measures the running app and asserts this list is exactly
  * right, in both directions.
  */
 export const ROWS_AWAITING_NOW: readonly string[] = [
   "missed-swipe",                   // 03 — ⛔ the pick-up refusal is uncaptured
-  "request-feed-member-filter",     // 10 — the filter itself is not gated
 ];
 
 /** Whether the focused row can actually show production today. */
