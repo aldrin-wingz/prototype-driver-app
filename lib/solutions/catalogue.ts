@@ -460,8 +460,25 @@ export const SOLUTIONS: Solution[] = [
       calls start.
     */
     entry: {
-      route: "/options/account",
-      label: "Signed in: change the email, password or phone",
+      /**
+       * ⭐⭐ **`/options`, not `/options/account`** — user direction,
+       * 2026-10-14.
+       *
+       * The comparison IS the `Account` row appearing in the menu. Now shows
+       * the captured eleven (`CAP-337`–`CAP-339`); Proposed shows a twelfth
+       * inserted after `Driver Dashboard`. Landing on the Account screen itself
+       * skips past the only thing this row is arguing for — and in Now it would
+       * land on a screen production does not have at all, with nothing on
+       * screen to say so.
+       */
+      route: "/options",
+      label: "Options: the Account row appears, or does not",
+      alternates: [
+        {
+          route: "/options/account",
+          label: "...and what it opens: change the email, password or phone",
+        },
+      ],
     },
   },
   {

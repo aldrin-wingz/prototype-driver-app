@@ -536,7 +536,7 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * below went back to 6 rather than being left at 7 with a row quietly failing
  * to supply its alternate.
  */
-const EXPECTED_ALTERNATES = 10;
+const EXPECTED_ALTERNATES = 11;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -804,7 +804,7 @@ check(
  */
 const EXPECTED_RIDE_ROUTES = 19;
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
-const EXPECTED_SURFACE_ROUTES = 3;
+const EXPECTED_SURFACE_ROUTES = 4;
 check(
   "...and the two kinds of route were counted as declared",
   `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
@@ -3264,10 +3264,24 @@ const ROW_15_ROUTES = [
   SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!.entry?.route,
   ...(SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!.entry?.alternates ?? []).map((a) => a.route),
 ];
+/**
+ * ⭐⭐ **The entry is `/options`, and the alternate is the Account screen** —
+ * user direction, 2026-10-14. The comparison IS the `Account` row appearing in
+ * the captured menu; landing on the Account screen skips past the only thing
+ * this row argues for, and in Now it would land on a screen production does
+ * not have.
+ *
+ * ⛔ `/login` still appears in neither. With the pre-auth proposal gone it
+ * carries nothing of row 15's — it exists because the captured Logout row lands
+ * on a sign-in screen in production.
+ */
 check(
-  "...and row 15 no longer claims the sign-in route as a demo",
+  "...and row 15 demonstrates the MENU, with the Account screen as its alternate",
   `${ROW_15_ROUTES.length} route(s): ${ROW_15_ROUTES.join(", ")}`,
-  ROW_15_ROUTES.length === 1 && ROW_15_ROUTES[0] === "/options/account",
+  ROW_15_ROUTES.length === 2 &&
+    ROW_15_ROUTES[0] === "/options" &&
+    ROW_15_ROUTES[1] === "/options/account" &&
+    !ROW_15_ROUTES.includes("/login"),
 );
 /** ⚠️ Every step left in the route is replicated. None is a proposal. */
 check(
@@ -3951,11 +3965,12 @@ check(
 
 const ROW_15 = SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!;
 check(
-  "row 15 is in the prototype, demonstrated from the signed-in half",
-  `${ROW_15.buildState} · ${ROW_15.entry?.route}`,
+  "row 15 is in the prototype, demonstrated from the Options menu",
+  `${ROW_15.buildState} · ${ROW_15.entry?.route} + ${(ROW_15.entry?.alternates ?? []).length} alternate(s)`,
   ROW_15.buildState === "in-prototype" &&
-    ROW_15.entry?.route === "/options/account" &&
-    (ROW_15.entry?.alternates ?? []).length === 0,
+    ROW_15.entry?.route === "/options" &&
+    (ROW_15.entry?.alternates ?? []).length === 1 &&
+    ROW_15.entry?.alternates?.[0].route === "/options/account",
 );
 /** ⛔ No ⛔ may reach anything a driver reads. Swept again for this slice. */
 const DRIVER_FACING = [
