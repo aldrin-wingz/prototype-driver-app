@@ -307,10 +307,13 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
     border-bottom-right-radius: 0.75rem;
   }
 
-  /* ⚠️ The header has a solid background rather than a border. Under
-     `border-collapse: collapse` a collapsed border belongs to the table, not
-     to the sticky cell, so it stays behind while the cell travels — a header
-     that loses its underline the moment you scroll. */
+  /* ⛔⛔ A sticky CELL travels; the ROW it sits in does not. Backgrounds and
+     collapsed borders are painted by the row and the table, so neither
+     follows the cell — a `<th>` coloured by `<tr>` goes transparent the
+     moment it sticks, and the body scrolls visibly under the header text.
+     Reported by the user 2026-10-14. The background is therefore set on each
+     `<th>` (`HEAD_CELL` in solution-table.tsx) and the underline is a solid
+     fill rather than a `border-collapse` border, for the same reason. */
   .solution-table-scroll thead th {
     position: sticky;
     top: 0;

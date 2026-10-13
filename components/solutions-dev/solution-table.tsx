@@ -64,6 +64,21 @@ import { UseCaseFlow } from "./use-case-flow";
 const CELL = "border-b border-[#E5E7EB] px-3 py-2.5 align-top text-left";
 
 /**
+ * Shared by every HEADER cell.
+ *
+ * ⛔⛔ **The background lives here, on the `<th>`, not on the `<tr>`.** A
+ * `position: sticky` cell travels; the row it sits in does not, and a row's
+ * background is painted by the row. So a sticky `<th>` that inherits its colour
+ * from `<tr>` is TRANSPARENT while it travels — measured `rgba(0, 0, 0, 0)` —
+ * and the body scrolls visibly underneath the header text. Reported by the user
+ * 2026-10-14, after B6 made the header sticky; nothing about it is visible at
+ * rest, which is the only state a screenshot catches.
+ *
+ * ⚠️ A literal string, never interpolated — see the file comment.
+ */
+const HEAD_CELL = "bg-[#0F3A33] px-3 py-2 font-semibold";
+
+/**
  * ⛔ Literal class strings in a declared map, never built by interpolation.
  * A Tailwind utility assembled from a variable compiles to nothing, with no
  * build error and no visible difference until someone looks for the colour.
@@ -98,7 +113,7 @@ function ClassBadge({ solution }: { solution: Solution }) {
 /** A column header that names the side its column selects. */
 function SideHeader({ title, column }: { title: string; column: SelectingColumn }) {
   return (
-    <th className="px-3 py-2 text-left font-semibold">
+    <th className={cn(HEAD_CELL, "text-left")}>
       {title}
       {/* ⭐ Read from DEMO_MODE_LABEL, the same names the strip's toggle uses,
           so the two controls can never call the two sides different things. */}
@@ -233,11 +248,13 @@ export function SolutionTable() {
       <div className="solution-table-scroll overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
-            <tr className="bg-[#0F3A33] text-[#E6EFEC]">
-              <th className="px-3 py-2 text-left font-semibold">Subject Area</th>
-              <th className="px-3 py-2 text-right font-semibold">Calls</th>
-              <th className="px-3 py-2 text-right font-semibold">% of Categorised</th>
-              <th className="px-3 py-2 text-left font-semibold">Problem</th>
+            {/* ⛔ No `bg-` on the row — see HEAD_CELL. The cells carry it, because
+                they are the ones that travel. */}
+            <tr className="text-[#E6EFEC]">
+              <th className={cn(HEAD_CELL, "text-left")}>Subject Area</th>
+              <th className={cn(HEAD_CELL, "text-right")}>Calls</th>
+              <th className={cn(HEAD_CELL, "text-right")}>% of Categorised</th>
+              <th className={cn(HEAD_CELL, "text-left")}>Problem</th>
               <SideHeader title="Use Case" column="use-case" />
               <SideHeader title="Proposed Feature" column="proposed-feature" />
             </tr>

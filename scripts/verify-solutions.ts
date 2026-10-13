@@ -7672,6 +7672,42 @@ check(
   scrollBroken.length ? `BROKEN: ${scrollBroken.join("; ")}` : `${SCROLL_RULES.length} of ${SCROLL_RULES.length} rules hold`,
   scrollBroken.length === 0,
 );
+/**
+ * ⛔⛔ **A sticky CELL travels; the ROW it sits in does not.**
+ *
+ * A row's background is painted by the row, so a `<th>` that takes its colour
+ * from `<tr class="bg-...">` is TRANSPARENT the moment it sticks — measured
+ * `rgba(0, 0, 0, 0)` — and the body scrolls visibly under the header text.
+ * Reported by the user 2026-10-14, after B6 made the header sticky.
+ *
+ * ⚠️ Invisible at rest, which is the one state a screenshot catches and the
+ * reason this needs a check rather than a look. Asserted on the MARKUP in both
+ * directions: the header cells carry a background, and the row does not, so
+ * nobody can "tidy" it back onto the row and reintroduce it.
+ */
+const HEAD_BG = /const HEAD_CELL = "[^"]*bg-\[#[0-9A-Fa-f]{6}\]/;
+const HEAD_ROW = B6_TABLE_CODE.match(/<tr className="[^"]*">\s*\n\s*<th/)?.[0] ?? "";
+const headCells = (B6_TABLE_CODE.match(/<th className=\{cn\(HEAD_CELL/g) ?? []).length;
+const EXPECTED_HEAD_CELLS = 5; // four written out here, plus SideHeader's one
+check(
+  "the sticky header cells carry their own background, not the row's",
+  `HEAD_CELL has a background: ${HEAD_BG.test(B6_TABLE_CODE)}; ` +
+    `${headCells} of ${EXPECTED_HEAD_CELLS} <th> use it; ` +
+    `header row background: ${/bg-\[#/.test(HEAD_ROW) ? "STILL ON THE ROW" : "none"}`,
+  HEAD_BG.test(B6_TABLE_CODE) &&
+    headCells === EXPECTED_HEAD_CELLS &&
+    HEAD_ROW.length > 0 &&
+    // ⛔ And NOT on the row, where it would not travel with the cell.
+    !/bg-\[#/.test(HEAD_ROW),
+);
+/** ⛔ Every header cell is one of them — none left behind with its own classes. */
+const plainHeadCells = (B6_TABLE_CODE.match(/<th className="/g) ?? []).length;
+check(
+  "...and no header cell was left painting itself",
+  `${plainHeadCells} hand-classed <th> of ${headCells + plainHeadCells}`,
+  plainHeadCells === 0,
+);
+
 /** ⛔ The scroller is desktop-only, like everything else in that block. */
 check(
   "...and none of it applies below the breakpoint, where there is no table",
