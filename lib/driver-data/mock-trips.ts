@@ -162,6 +162,18 @@ export interface Trip {
    * compare them against.
    */
   wasLate?: boolean;
+  /**
+   * The standing order this trip belongs to, when it belongs to one.
+   *
+   * ⚠️ **SEEDED**, and presence is the whole of it — the base does not resolve
+   * the order, know its pattern or list its other trips. It exists because
+   * production REFUSES a send-back on a standing order (`CAP-330`), and a
+   * refusal with nothing to refuse is a dead control. Same reasoning as
+   * `signatureCaptured` and `wasLate`.
+   *
+   * ⛔ The value is invented, like every id in this seed.
+   */
+  standingOrderId?: string;
 }
 
 export interface TripPill {
@@ -889,6 +901,8 @@ export const mockUpcomingTrips: Trip[] = [
     ],
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
+    // ⚠️ SEEDED. The one standing order in the seed — see `standingOrderId`.
+    standingOrderId: "SO-4417",
   },
   {
     id: "UP-FUTURE-001",

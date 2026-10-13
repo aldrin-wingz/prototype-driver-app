@@ -24,6 +24,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { type Trip } from "@/lib/driver-data/mock-trips";
+import { sendBackOutcome } from "@/lib/driver-data/send-back";
+import { SendBackConfirmDialog } from "@/components/driver/send-back-confirm-dialog";
+import { SendBackDeniedDialog } from "@/components/driver/send-back-denied-dialog";
 import {
   DRIVER_NAVY,
   DRIVER_TEAL,
@@ -207,16 +210,29 @@ export function MoreOptionsScreen({
   const router = useRouter();
   const { toast } = useToast();
 
+  /**
+   * ⛔ Production's send-back confirmation, and then — on a Standing Order —
+   * its refusal. Two pieces of state rather than one step cursor, because the
+   * second dialog is not a continuation of the first: `CAP-330` is terminal,
+   * and modelling it as "step 2 of 2" would invite a step 3.
+   */
+  const [confirmSendBack, setConfirmSendBack] = useState(false);
+  const [sendBackDenied, setSendBackDenied] = useState(false);
 
   /**
    * ⚠️ The grid never changes shape. All seven production tiles, always, with
    * `Send Back Trip` full-width as the odd one — exactly as captured.
+   *
+   * ⛔ Including on a Standing Order. Production shows the same tile and
+   * refuses two taps later; hiding or disabling it here would replace the dead
+   * end with a tidier app than the one drivers use, and the dead end is the
+   * thing worth seeing.
    */
   const gridTiles: OptionTile[] = PRODUCTION_TILES.map((tile) =>
     tile.id === "send-back" ? { ...tile, fullWidth: true } : tile
   );
 
-  function handleProductionTile(id: string) {
+  function unwired(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);
     // These are the real app's actions; none are wired in the prototype. Saying
     // so beats a dead tap that looks like a bug.
@@ -224,6 +240,32 @@ export function MoreOptionsScreen({
       title: tile?.label ?? "Action",
       description: "Not wired in the prototype — this is the production action.",
     });
+  }
+
+  function handleProductionTile(id: string) {
+    if (id === "send-back") {
+      setConfirmSendBack(true);
+      return;
+    }
+    unwired(id);
+  }
+
+  /**
+   * The driver answered `Yes`.
+   *
+   * ⛔ The branch is `sendBackOutcome`'s, not this component's — the rule lives
+   * in `lib/` so a check can run its truth table over every seeded trip instead
+   * of a browser running it once.
+   */
+  function handleSendBackConfirmed() {
+    setConfirmSendBack(false);
+    if (sendBackOutcome(trip) === "denied") {
+      setSendBackDenied(true);
+      return;
+    }
+    // Production carries on from here; the base does not replicate the
+    // continuation — see `SendBackOutcome`.
+    unwired("send-back");
   }
 
   return (
@@ -259,6 +301,15 @@ export function MoreOptionsScreen({
         ))}
       </div>
 
+      <SendBackConfirmDialog
+        open={confirmSendBack}
+        onOpenChange={setConfirmSendBack}
+        onConfirm={handleSendBackConfirmed}
+      />
+      <SendBackDeniedDialog
+        open={sendBackDenied}
+        onOpenChange={setSendBackDenied}
+      />
     </div>
   );
 }

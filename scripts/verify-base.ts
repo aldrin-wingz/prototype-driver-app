@@ -36,6 +36,11 @@ import {
   isWillCall, pinPosition, sortTrips, visibleTrips,
 } from "../lib/driver-data/map-view";
 import {
+  SEND_BACK_CONFIRM_BODY, SEND_BACK_CONFIRM_NO, SEND_BACK_CONFIRM_YES,
+  SEND_BACK_DENIED_BODY, SEND_BACK_DENIED_DISMISS, SEND_BACK_DENIED_TITLE,
+  sendBackOutcome,
+} from "../lib/driver-data/send-back";
+import {
   getLegStage,
   getNextSwipe,
   mockRequestTrips,
@@ -527,6 +532,117 @@ check(
   "no id is held by two files",
   doubled.length ? doubled.slice(0, 3).map(([cap]) => cap).join(", ") : `${byId.size} distinct ids over ${Object.keys(capLedger).length} files`,
   doubled.length === 0,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n7. Production's send-back refusal (CAP-330)");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐ The one place the base shows production REFUSING rather than simply not
+ * being wired. Three things have to stay true, and each is checked against a
+ * literal declared HERE rather than derived from the module — a validator that
+ * reads its expectation off its own subject proves only that the subject equals
+ * itself.
+ */
+
+/** Transcribed from `CAP-330` at fold-in. ⛔ Never re-derive this from the module. */
+const CAP_330_TITLE = "Send-back request failed";
+const CAP_330_BODY =
+  "Standing Order Trips cannot be sent back via the Driver App. To send back this trip, please call into support for assistance.";
+check(
+  "the refusal is CAP-330 verbatim",
+  `title ${SEND_BACK_DENIED_TITLE === CAP_330_TITLE ? "ok" : "DRIFTED"}, body ${SEND_BACK_DENIED_BODY.length} chars, dismiss "${SEND_BACK_DENIED_DISMISS}"`,
+  SEND_BACK_DENIED_TITLE === CAP_330_TITLE &&
+    SEND_BACK_DENIED_BODY === CAP_330_BODY &&
+    SEND_BACK_DENIED_DISMISS === "OK",
+);
+
+/**
+ * ⛔⛔ **`No` / `Yes`, not `Cancel` / `Continue`.** Production's two send-back
+ * popups disagree with each other and both are reproduced as they are. A later
+ * tidy-up that harmonised them would be this mirror redesigning production and
+ * presenting the result as a replica.
+ */
+check(
+  "the confirmation keeps production's own button names",
+  `"${SEND_BACK_CONFIRM_NO}" / "${SEND_BACK_CONFIRM_YES}", body ${SEND_BACK_CONFIRM_BODY.length} chars`,
+  SEND_BACK_CONFIRM_NO === "No" &&
+    SEND_BACK_CONFIRM_YES === "Yes" &&
+    SEND_BACK_CONFIRM_BODY.startsWith("Trip sendbacks are strongly discouraged"),
+);
+
+/**
+ * ⛔ **Terminal.** One action, no cancel. A second button here would be the
+ * mirror inventing a way out of a dead end that production does not offer — and
+ * the dead end is the whole reason this screen is in the base.
+ */
+const deniedSrc = readFileSync(join(ROOT, "components/driver/send-back-denied-dialog.tsx"), "utf8");
+const deniedActions = (deniedSrc.match(/<AlertDialogAction[\s/>]/g) ?? []).length;
+const deniedCancels = (deniedSrc.match(/<AlertDialogCancel[\s/>]/g) ?? []).length;
+check(
+  "the refusal offers exactly one way out, and it is a dismissal",
+  `${deniedActions} action(s), ${deniedCancels} cancel(s)`,
+  deniedActions === 1 && deniedCancels === 0,
+);
+
+/**
+ * The rule, over the whole seed.
+ *
+ * ⛔ **Both outcomes must be SEEN.** A rule that answered `proceeds` for every
+ * trip would pass a "no trip is wrongly denied" check vacuously, and the
+ * refusal would be unreachable in the app while every check stayed green. The
+ * expectations are literals: exactly one standing order is seeded, on purpose.
+ */
+const EXPECTED_STANDING_ORDERS = 1;
+const denied = all.filter((t) => sendBackOutcome(t) === "denied");
+const proceeds = all.filter((t) => sendBackOutcome(t) === "proceeds");
+check(
+  "exactly one seeded trip is a standing order",
+  `${denied.length} denied of ${all.length} trips (${denied.map((t) => t.id).join(", ") || "none"})`,
+  denied.length === EXPECTED_STANDING_ORDERS,
+);
+check(
+  "every other trip proceeds — both outcomes are reachable",
+  `${proceeds.length} proceed, ${denied.length} denied, ${proceeds.length + denied.length} of ${all.length} classified`,
+  proceeds.length === all.length - EXPECTED_STANDING_ORDERS && proceeds.length > 0,
+);
+check(
+  "the refusal is keyed on the standing order, not on the trip id",
+  `${denied.filter((t) => t.standingOrderId).length} of ${denied.length} denied trips carry a standing order id`,
+  denied.every((t) => Boolean(t.standingOrderId)) &&
+    proceeds.every((t) => !t.standingOrderId),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n8. Every CAP id cited in the source resolves");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ The base cites capture ids in its comments as of the fold-ins. A citation
+ * is evidence only while it resolves — and ids used to be positional, so they
+ * moved under the code that cited them. The ledger stopped that; this is what
+ * notices if it ever stops working.
+ */
+const indexedCaps = new Set(indexRows.map((r) => r.cap));
+const citations: Array<{ file: string; cap: string }> = [];
+for (const f of files) {
+  for (const [, cap] of readFileSync(f, "utf8").matchAll(/\b(CAP-\d{3})\b/g)) {
+    citations.push({ file: relative(ROOT, f), cap });
+  }
+}
+const CITING_FILES_MIN = 3;
+const citingFiles = new Set(citations.map((c) => c.file));
+check(
+  "the source actually cites captures",
+  `${citations.length} citations across ${citingFiles.size} files`,
+  citingFiles.size >= CITING_FILES_MIN,
+);
+const dangling = citations.filter((c) => !indexedCaps.has(c.cap));
+check(
+  "every cited CAP id resolves to an indexed capture",
+  dangling.length
+    ? dangling.slice(0, 5).map((c) => `${c.file}:${c.cap}`).join(", ")
+    : `${citations.length} of ${citations.length} resolve against ${indexedCaps.size} indexed rows`,
+  dangling.length === 0,
 );
 
 // ---------------------------------------------------------------------------
