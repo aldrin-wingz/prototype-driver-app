@@ -6468,9 +6468,17 @@ check(
  * `demo-mode.ts` and from this line, and the second edit is the one that makes
  * a reviewer look at whether the first was true. B3d deleted row 10 from both.
  */
-const EXPECTED_AWAITING = [
-  "missed-swipe",
-];
+/**
+ * ⭐⭐ **Empty as of B3e.** Every built row has a production side.
+ *
+ * ⛔⛔ An empty expectation makes three of the checks above VACUOUS — "every
+ * awaiting row resolves", "every one is built", and the drift comparison all
+ * pass over nothing. So the claim moves to the other side of the ledger below:
+ * all twelve built rows are measured as HAVING a Now, from `hasNowState`, and
+ * the two numbers are declared literals. A row silently re-added here would
+ * fail that, not this.
+ */
+const EXPECTED_AWAITING: string[] = [];
 const awaitingDrift = [
   ...EXPECTED_AWAITING.filter((id) => !ROWS_AWAITING_NOW.includes(id)).map((id) => `-${id}`),
   ...ROWS_AWAITING_NOW.filter((id) => !EXPECTED_AWAITING.includes(id)).map((id) => `+${id}`),
@@ -6482,12 +6490,26 @@ check(
     : `${ROWS_AWAITING_NOW.length} of ${EXPECTED_AWAITING.length} — ${ROWS_AWAITING_NOW.join(", ")}`,
   awaitingDrift.length === 0,
 );
-/** ⛔ Non-vacuity: the list has to actually split the built rows in two. */
+/**
+ * ⛔⛔ **The claim, now that the list is empty: all twelve built rows have a
+ * production side.** Measured through `hasNowState` over the catalogue rather
+ * than read off the list, and both numbers are declared literals — so a row
+ * quietly re-added to `ROWS_AWAITING_NOW` fails here, which is the check that
+ * stays meaningful when the expectation above has nothing left to say.
+ *
+ * ⚠️ When a row IS next built without its Now, this literal goes to 11 and the
+ * one above stops being empty. Both edits, or the pair disagrees.
+ */
 const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
+const EXPECTED_WITH_NOW = 12;
+const EXPECTED_BUILT = 12;
 check(
-  "...and that list splits the built rows rather than covering none or all",
+  "...and every built row has a production side to compare against",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
-  builtWithNow.length === 11 && builtRows.length === 12,
+  builtWithNow.length === EXPECTED_WITH_NOW &&
+    builtRows.length === EXPECTED_BUILT &&
+    // ⛔ ...and the two agree: nothing is awaiting, and nothing claims to be.
+    builtWithNow.length === builtRows.length - ROWS_AWAITING_NOW.length,
 );
 /** ⚠️ `hasNowState(null)` is false — the plain mirror is on no side at all. */
 check(

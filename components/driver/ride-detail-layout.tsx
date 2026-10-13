@@ -41,7 +41,7 @@ import {
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   getMissingAnchors,
-  routeDropOffSwipe,
+  routeSwipeTap,
   offeredSwipe,
   routeMissedSwipe,
   swipeNeedsConfirming,
@@ -52,6 +52,7 @@ import { PreferredDriverPrompt } from "@/components/driver/preferred-driver-prom
 import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
+import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import {
   CANCELLATION_REQUESTED_DETAIL,
   CANCELLATION_REQUESTED_PILL,
@@ -456,6 +457,12 @@ export function RideDetailLayout({
   // screen they were on a moment ago.
 
   const [promptOpen, setPromptOpen] = useState(false);
+  /**
+   * ⛔ Row 03's Now side. The ANCHOR is the open state — the dialog names the
+   * end of the leg in its sentence, so "open" and "which end" are one fact and
+   * a separate boolean could disagree with it.
+   */
+  const [tooFarAnchor, setTooFarAnchor] = useState<SwipeAnchor | null>(null);
   /** Stage 01 Step 2 — the Reach Rider modal behind the orange CTA. */
   const [reachOpen, setReachOpen] = useState(false);
   /**
@@ -486,9 +493,12 @@ export function RideDetailLayout({
   const pickupPostponed = activeLeg ? isPickupPostponed(activeLeg.id) : false;
   // ⚠️ The OFFERED swipe, not the next one in the sequence. A driver who told us
   // the member is in the car is offered the drop-off production would withhold.
+  // ⛔ The unblock is row 03's proposal, so it is gated. In `"now"` production
+  // still withholds DROP OFF MEMBER until the pick-up exists.
   const nextSwipe = offeredSwipe(
     activeLeg ? getNextSwipe(activeLeg) : null,
-    pickupPostponed
+    pickupPostponed,
+    demo
   );
 
   const cta = nextSwipe ? SWIPE_CTA[nextSwipe] : null;
@@ -510,39 +520,47 @@ export function RideDetailLayout({
   function handleSwipeTap() {
     if (!activeLeg) return;
 
-    if (nextSwipe === "pick-up" && swipeNeedsConfirming(activeLeg, "pickup")) {
-      setPromptOpen(true);
-      return;
-    }
-
     /**
-     * ⛔⛔ **The routing lives in `routeDropOffSwipe`, not here.**
+     * ⛔⛔ **Every branch lives in `routeSwipeTap`, including which SIDE we
+     * are on.** Until B3e this function decided for itself and production's
+     * answer did not exist at all — a swipe from outside the geofence opened
+     * our prompt in both modes, so row 03 demonstrated its own fix as the
+     * status quo. That is the mistake row 02 shipped and the user found.
      *
-     * Stage 05 takes the MEMBER's signature, so no path may reach it once they
-     * are out of the car — and until 2026-10-12 that was enforced by the shape
-     * of this function (only the postponed branch opened the steps) and
-     * asserted by counting call sites in this file's source. An ordinary
-     * drop-off now runs the steps too, because the signature screen was
-     * otherwise unreachable on every ordinary leg and row 09's end-of-leg
-     * prompt could never fire on its own demo ride. The guarantee is the same;
-     * it is a truth table now rather than a shape, and a check can run it.
+     * The member-signature guarantee is unchanged: `routeSwipeTap` calls
+     * `routeDropOffSwipe`, which still owns it, rather than restating it.
      */
-    if (nextSwipe === "drop-off") {
-      const route = routeDropOffSwipe({
-        pickupPostponed,
-        trailChallengesDropOff: swipeNeedsConfirming(activeLeg, "dropoff"),
-      });
-      if (route === "steps") setOdometerOpen(true);
-      else fileMissedSwipe(activeLeg, null);
-      return;
-    }
-
-    // Inside the geofence, or no location to argue with: production's own
-    // action, which this prototype does not stand in for.
-    toast({
-      title: cta?.name ?? "Swipe",
-      description: "Not wired in the prototype — this is the production action.",
+    const route = routeSwipeTap({
+      nextSwipe,
+      pickupPostponed,
+      trailChallengesPickup: swipeNeedsConfirming(activeLeg, "pickup"),
+      trailChallengesDropOff: swipeNeedsConfirming(activeLeg, "dropoff"),
+      focus: demo,
     });
+
+    switch (route.kind) {
+      // Production: the mark is NOT made, and the way forward is a phone number.
+      case "production-refusal":
+        setTooFarAnchor(route.anchor);
+        return;
+      case "ask-member-aboard":
+        setPromptOpen(true);
+        return;
+      case "missed-swipe-form":
+        fileMissedSwipe(activeLeg, null);
+        return;
+      case "drop-off-steps":
+        setOdometerOpen(true);
+        return;
+      case "production-action":
+        // Inside the geofence, or no location to argue with: production's own
+        // action, which this prototype does not stand in for.
+        toast({
+          title: cta?.name ?? "Swipe",
+          description: "Not wired in the prototype — this is the production action.",
+        });
+        return;
+    }
   }
 
   /**
@@ -1184,6 +1202,12 @@ export function RideDetailLayout({
         </div>
       ) : null}
 
+      {/* ⭐ Row 03's Now side, mounted beside the proposal's prompt — one tap,
+          two answers, and `routeSwipeTap` is what picks. */}
+      <SwipeTooFarDialog
+        anchor={tooFarAnchor}
+        onOpenChange={(open) => { if (!open) setTooFarAnchor(null); }}
+      />
       <MissedSwipePrompt
         open={promptOpen}
         onOpenChange={setPromptOpen}

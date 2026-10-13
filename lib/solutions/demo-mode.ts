@@ -137,7 +137,17 @@ export const DEMO_MODE_DESCRIPTION: Record<DemoMode, string> = {
  * right, in both directions.
  */
 export const ROWS_AWAITING_NOW: readonly string[] = [
-  "missed-swipe",                   // 03 — ⛔ the pick-up refusal is uncaptured
+  // ⭐⭐ **EMPTY as of B3e (2026-10-14). All twelve built rows have a Now.**
+  //
+  // ⚠️ The note below it stays, and so does `hasNowState` — this list is the
+  // mechanism, not a one-off. The next row built without its production screen
+  // goes here and says so on screen; deleting the machinery because the list is
+  // momentarily empty is how the next gap ships unnamed.
+  //
+  // ⛔ Row 03 came off even though its PICK-UP wording is inferred rather than
+  // captured. The two are different claims: this list says the prototype can
+  // SHOW a production side, and it can. Whether that wording may fold into
+  // `driver-app-base` is `SWIPE_TOO_FAR_PROVENANCE`, and it says no.
 ];
 
 /** Whether the focused row can actually show production today. */

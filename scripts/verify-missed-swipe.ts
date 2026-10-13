@@ -29,7 +29,18 @@ import {
   type SwipeAnchor,
   routeDropOffSwipe,
   type DropOffRoute,
+  MISSED_SWIPE_SOLUTIONS,
+  routeSwipeTap,
+  swipeTooFarBody,
+  SWIPE_TOO_FAR_DISMISS,
+  SWIPE_TOO_FAR_PHONE,
+  SWIPE_TOO_FAR_PLACE,
+  SWIPE_TOO_FAR_PROVENANCE,
+  SWIPE_TOO_FAR_TITLE,
+  type SwipeTapRoute,
 } from "../lib/driver-data/missed-swipe-rules";
+import { demoFocus, DEMO_MODES, type DemoMode } from "../lib/solutions/demo-mode";
+import { SOLUTIONS } from "../lib/solutions/catalogue";
 import {
   mockInProgressTrips,
   type Trip,
@@ -371,6 +382,13 @@ for (const scenario of SCENARIOS.filter((s) => s.asksDriverSignature)) {
 }
 
 // The unblock: it moves the BUTTON, never the record.
+/**
+ * ⚠️ Driven on row 03's PROPOSAL side. B3e gated this function — production
+ * fills the marks left to right and will not offer the drop-off until the
+ * pick-up exists, and lifting that block is the proposal. §12 drives the other
+ * side and asserts the unblock is gone there.
+ */
+const PROPOSING = demoFocus("missed-swipe", "fixed");
 const OFFERED: Array<[("start" | "pick-up" | "drop-off" | null), boolean, string | null]> = [
   ["pick-up", true, "drop-off"], ["pick-up", false, "pick-up"],
   ["drop-off", true, "drop-off"], ["drop-off", false, "drop-off"],
@@ -379,10 +397,10 @@ const OFFERED: Array<[("start" | "pick-up" | "drop-off" | null), boolean, string
 ];
 for (const [next, postponed, expected] of OFFERED) {
   check(`offeredSwipe(${next}, postponed=${postponed}) === ${expected}`,
-    offeredSwipe(next, postponed) === expected, `got ${offeredSwipe(next, postponed)}`);
+    offeredSwipe(next, postponed, PROPOSING) === expected, `got ${offeredSwipe(next, postponed, PROPOSING)}`);
 }
 check("postponement changes exactly one of the eight",
-  OFFERED.filter(([n, p]) => offeredSwipe(n, p) !== n).length === 1, "");
+  OFFERED.filter(([n, p]) => offeredSwipe(n, p, PROPOSING) !== n).length === 1, "");
 check("postponing invents no pick-up time",
   leg1.progress?.pickedUpAt === null, `seed holds ${String(leg1.progress?.pickedUpAt)}`);
 
@@ -754,11 +772,24 @@ check("Stage 05 is never reached with the member gone and nobody vouching",
     (r) => !r.pickupPostponed && r.trailChallengesDropOff && routeDropOffSwipe(r) === "steps",
   ),
   "a path reaches the member's signature pad after they have left");
-/** And the screen still goes through the rule rather than around it. */
-check("the ride detail routes drop-offs through the rule, not an inline branch",
-  CODE.includes("routeDropOffSwipe({") &&
-    !/nextSwipe === "drop-off" && swipeNeedsConfirming/.test(CODE),
-  "the branch is still inline");
+/**
+ * And the screen still goes through the rule rather than around it.
+ *
+ * ⚠️ **B3e moved the call one level in.** The screen now asks `routeSwipeTap`,
+ * which decides the SIDE as well, and that function calls `routeDropOffSwipe`
+ * rather than restating it — so the member-signature guarantee above is still
+ * what the screen reaches. Both links are asserted, because either one going
+ * missing would leave the guarantee true in `lib/` and unreached in the app.
+ */
+const RULES_SRC = readFileSync("lib/driver-data/missed-swipe-rules.ts", "utf8");
+check("the ride detail routes swipes through the rule, not an inline branch",
+  CODE.includes("routeSwipeTap({") &&
+    !/nextSwipe === "drop-off" && swipeNeedsConfirming/.test(CODE) &&
+    !CODE.includes("routeDropOffSwipe("),
+  "the branch is still inline, or the screen reaches past routeSwipeTap");
+check("...and that rule still defers to routeDropOffSwipe for the drop-off",
+  /routeDropOffSwipe\(\{ pickupPostponed, trailChallengesDropOff \}\)/.test(RULES_SRC),
+  "routeSwipeTap restates the member-signature rule instead of calling it");
 /** Element-level, straight off the captures. */
 check("the odometer popup carries production's own copy",
   ODO.includes("Odometer Reading") &&
@@ -816,6 +847,283 @@ check("Missed Swipe is the case that keeps Pending",
 check("the no-show form still is not",
   !readFileSync("components/support/rider-no-show-form.tsx", "utf8").includes("appTracksStatus: true"),
   "Pending leaked back into Rider No-Show");
+
+// ═══════════════════════════════════════════════════════════════════
+section("9. Row 03's Now — production refuses the swipe, and says so");
+// ═══════════════════════════════════════════════════════════════════
+/**
+ * B3e. Until now this slice showed its own proposal in BOTH modes: a swipe from
+ * outside the geofence opened our 1a/1b prompt whatever side was selected, so
+ * row 03 demonstrated its fix as the status quo. That is the mistake row 02
+ * shipped and the user found.
+ *
+ * ⛔⛔ **It is a BLOCK, not a warning, and the plan said otherwise.** The plan
+ * recorded `CAP-326` as "a warning, not a block — the driver can still swipe and
+ * is told the money is at risk", read off the body's "Trip payment may be
+ * denied". Reading the capture says no, three ways: the TITLE is *Unable to
+ * complete action*; this slice's own measured data has 2,521 legs a month
+ * ending with NEITHER mark after an en-route swipe; and the premise of the case
+ * — production cannot record a missed swipe, so the driver calls — only holds
+ * if the tap is refused. Corrected 2026-10-14.
+ */
+const TOO_FAR_SRC = readFileSync("components/driver/swipe-too-far-dialog.tsx", "utf8");
+/** ⚠️ Same stripping §8 uses — a grep for an ABSENT string otherwise matches
+    the comment explaining its absence, and this file documents its traps. */
+const TOO_FAR_CODE = TOO_FAR_SRC
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+check("the refusal dialog source was read, and stripping left code behind",
+  TOO_FAR_SRC.length > 800 &&
+    TOO_FAR_CODE.length > TOO_FAR_SRC.length * 0.2 &&
+    TOO_FAR_CODE.length < TOO_FAR_SRC.length,
+  `${TOO_FAR_CODE.length} of ${TOO_FAR_SRC.length} chars`);
+
+/**
+ * Every catalogue row's id, for the fingerprint sweep below.
+ *
+ * ⚠️ Read from the catalogue so the sweep cannot silently shrink, and its
+ * SIZE is asserted against a declared literal so the catalogue cannot shrink
+ * either without someone noticing here.
+ */
+const CATALOGUE_IDS = SOLUTIONS.map((row) => row.id);
+
+/* --- 9a. The copy, against the capture ---------------------------------- */
+/**
+ * ⛔ `CAP-326` word for word, declared HERE as a literal. Comparing the module
+ * to a constant the module exports would be comparing it to itself.
+ */
+const CAP_326_BODY =
+  "You are too far away from the scheduled drop-off location. " +
+  "Trip payment may be denied. Please contact support if assistance is required. " +
+  "+1 (888) 545-4309";
+check("the drop-off refusal is CAP-326 word for word",
+  swipeTooFarBody("dropoff") === CAP_326_BODY,
+  `got ${JSON.stringify(swipeTooFarBody("dropoff"))}`);
+check("...and the title says the action did NOT happen",
+  SWIPE_TOO_FAR_TITLE === "Unable to complete action",
+  `got ${JSON.stringify(SWIPE_TOO_FAR_TITLE)}`);
+check("...and it ends in production's own phone number",
+  SWIPE_TOO_FAR_PHONE === "+1 (888) 545-4309" &&
+    swipeTooFarBody("dropoff").endsWith(SWIPE_TOO_FAR_PHONE),
+  `got ${SWIPE_TOO_FAR_PHONE}`);
+/**
+ * ⛔⛔ The pick-up half is the same sentence with ONE word changed. Asserted as
+ * a diff rather than as two literals: two copies of a sentence are two chances
+ * to drift, and a second literal here would hide a reworded first.
+ */
+const pickupBody = swipeTooFarBody("pickup");
+const diffWords = CAP_326_BODY.split(" ").filter(
+  (word, i) => word !== pickupBody.split(" ")[i],
+);
+check("the pick-up refusal differs from the captured one by exactly one word",
+  diffWords.length === 1 &&
+    diffWords[0] === "drop-off" &&
+    pickupBody.split(" ").length === CAP_326_BODY.split(" ").length &&
+    pickupBody.includes("pick-up") &&
+    !pickupBody.includes("drop-off"),
+  `${diffWords.length} word(s) differ: ${diffWords.join(", ")}`);
+/**
+ * ⛔⛔ **And that word is INFERRED, not captured.** D2 admits capture-backed or
+ * user-confirmed PRODUCTION only; "the user agreed it is probably the same" is
+ * an assumption about wording, not a sighting of it. The flag is what stops the
+ * fold-in audit treating this like `CAP-326` itself.
+ */
+check("the inferred half is flagged as inferred, and the captured half as captured",
+  SWIPE_TOO_FAR_PROVENANCE.pickup === "inferred" &&
+    SWIPE_TOO_FAR_PROVENANCE.dropoff === "captured",
+  `pickup=${SWIPE_TOO_FAR_PROVENANCE.pickup} dropoff=${SWIPE_TOO_FAR_PROVENANCE.dropoff}`);
+check("...and exactly one of the two ends is still unshot",
+  Object.values(SWIPE_TOO_FAR_PROVENANCE).filter((p) => p === "inferred").length === 1 &&
+    Object.keys(SWIPE_TOO_FAR_PROVENANCE).length === 2,
+  `${Object.values(SWIPE_TOO_FAR_PROVENANCE).join("/")}`);
+/** ⛔ Nothing softened, nothing added — production offers no way forward. */
+const SOFTENING = /we can help|sorry|try again|contact us|support can/i;
+check("nothing is softened or added to production's sentence",
+  !SOFTENING.test(swipeTooFarBody("pickup")) &&
+    !SOFTENING.test(swipeTooFarBody("dropoff")) &&
+    SWIPE_TOO_FAR_DISMISS === "OK",
+  "our voice reached production's refusal");
+
+/* --- 9b. The route, both sides ------------------------------------------ */
+/**
+ * ⛔ Declared as literals, answers included, over row 03's own focus. The two
+ * production-refusal rows are the ones that did not exist before B3e.
+ */
+type TapCase = {
+  why: string;
+  nextSwipe: "start" | "pick-up" | "drop-off" | null;
+  pickupPostponed: boolean;
+  trailChallengesPickup: boolean;
+  trailChallengesDropOff: boolean;
+  mode: DemoMode;
+  want: SwipeTapRoute;
+};
+const TAP_CASES: TapCase[] = [
+  { why: "⭐ pick-up, outside the fence, today", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: false, mode: "now", want: { kind: "production-refusal", anchor: "pickup" } },
+  { why: "⭐ pick-up, outside the fence, proposed", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: false, mode: "fixed", want: { kind: "ask-member-aboard" } },
+  { why: "pick-up, inside the fence, today", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "now", want: { kind: "production-action" } },
+  { why: "pick-up, inside the fence, proposed", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "fixed", want: { kind: "production-action" } },
+  { why: "⭐ drop-off, outside the fence, today", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "now", want: { kind: "production-refusal", anchor: "dropoff" } },
+  { why: "⭐ drop-off, outside the fence, proposed", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "fixed", want: { kind: "missed-swipe-form" } },
+  { why: "an ordinary drop-off runs production's own steps, today", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "now", want: { kind: "drop-off-steps" } },
+  { why: "...and on the proposal side too", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "fixed", want: { kind: "drop-off-steps" } },
+  { why: "1a — a human vouched, so the trail does not matter", nextSwipe: "drop-off", pickupPostponed: true, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "fixed", want: { kind: "drop-off-steps" } },
+  { why: "the start swipe is production's, on both sides", nextSwipe: "start", pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: true, mode: "now", want: { kind: "production-action" } },
+  { why: "...and nothing offered is nothing to route", nextSwipe: null, pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: true, mode: "fixed", want: { kind: "production-action" } },
+];
+const tapWrong = TAP_CASES.filter((c) => {
+  const got = routeSwipeTap({
+    nextSwipe: c.nextSwipe,
+    pickupPostponed: c.pickupPostponed,
+    trailChallengesPickup: c.trailChallengesPickup,
+    trailChallengesDropOff: c.trailChallengesDropOff,
+    focus: demoFocus("missed-swipe", c.mode),
+  });
+  return JSON.stringify(got) !== JSON.stringify(c.want);
+});
+check("every swipe tap routes where it is declared to",
+  tapWrong.length === 0,
+  tapWrong.map((c) => c.why).join("; "));
+/**
+ * ⛔⛔ Non-vacuity. A table whose every row expected `production-action` would
+ * pass over a rule that had lost both of row 03's sides.
+ */
+const tapKinds = new Set(TAP_CASES.map((c) => c.want.kind));
+check("...and that table reaches every route, on both sides",
+  tapKinds.size === 5 &&
+    tapKinds.has("production-refusal") &&
+    tapKinds.has("ask-member-aboard") &&
+    tapKinds.has("missed-swipe-form") &&
+    tapKinds.has("drop-off-steps") &&
+    tapKinds.has("production-action") &&
+    new Set(TAP_CASES.map((c) => c.mode)).size === DEMO_MODES.length,
+  `${tapKinds.size} of 5 route(s): ${[...tapKinds].sort().join(", ")}`);
+/** ⛔ Both ends of the leg are refused, not just the captured one. */
+const refusedAnchors = new Set(
+  TAP_CASES.filter((c) => c.want.kind === "production-refusal").map(
+    (c) => (c.want as { anchor: SwipeAnchor }).anchor,
+  ),
+);
+check("...and production refuses BOTH ends, not only the captured one",
+  refusedAnchors.size === 2 && refusedAnchors.has("pickup") && refusedAnchors.has("dropoff"),
+  `${[...refusedAnchors].join(", ")}`);
+
+/* --- 9c. Nobody else's row borrows this -------------------------------- */
+/**
+ * ⛔⛔ The fingerprint sweep. Our two proposal routes must be reachable ONLY
+ * from row 03 on the proposal side, and from the plain mirror where every
+ * proposal shows. A gate that let row 01 open the missed-swipe prompt would
+ * make a no-show demo show a swipe feature.
+ */
+const OURS = new Set(["ask-member-aboard", "missed-swipe-form"]);
+let sweepCount = 0;
+const borrowed: string[] = [];
+const FOCUS_ROWS: Array<string | null> = [...CATALOGUE_IDS, null];
+for (const id of FOCUS_ROWS) {
+  for (const mode of DEMO_MODES) {
+    for (const nextSwipe of ["pick-up", "drop-off"] as const) {
+      sweepCount += 1;
+      const route = routeSwipeTap({
+        nextSwipe,
+        pickupPostponed: false,
+        trailChallengesPickup: true,
+        trailChallengesDropOff: true,
+        focus: demoFocus(id, mode),
+      });
+      const mayShow = id === null || (id === "missed-swipe" && mode === "fixed");
+      if (OURS.has(route.kind) !== mayShow) {
+        borrowed.push(`${id ?? "no focus"}/${mode}/${nextSwipe} -> ${route.kind}`);
+      }
+    }
+  }
+}
+check("the proposal is reachable only from row 03 and the plain mirror",
+  borrowed.length === 0,
+  `${borrowed.length} of ${sweepCount} wrong — ${borrowed.slice(0, 5).join(", ")}`);
+check("...and that sweep is the size it claims",
+  sweepCount === FOCUS_ROWS.length * DEMO_MODES.length * 2 && FOCUS_ROWS.length === 27,
+  `${FOCUS_ROWS.length} focus(es) x ${DEMO_MODES.length} mode(s) x 2 swipe(s) = ${sweepCount}`);
+/** ⛔ ...and every other row sees production's refusal, not nothing at all. */
+const strangerRoutes = new Set(
+  CATALOGUE_IDS.filter((id) => id !== "missed-swipe").flatMap((id) =>
+    DEMO_MODES.map(
+      (mode) =>
+        routeSwipeTap({
+          nextSwipe: "pick-up",
+          pickupPostponed: false,
+          trailChallengesPickup: true,
+          trailChallengesDropOff: false,
+          focus: demoFocus(id, mode),
+        }).kind,
+    ),
+  ),
+);
+check("...and a stranger's row gets production's refusal, not a dead tap",
+  strangerRoutes.size === 1 && strangerRoutes.has("production-refusal"),
+  `${[...strangerRoutes].join(", ")}`);
+
+/* --- 9d. The unblock is gated ------------------------------------------ */
+/**
+ * ⛔⛔ **`offeredSwipe` is the dead end in one function.** Production fills the
+ * marks left to right and will not offer DROP OFF MEMBER until the pick-up
+ * exists — that block is why missing the pick-up costs the drop-off too, and
+ * why 14 legs in a month miss only the pick-up. Lifting it is the proposal.
+ *
+ * Ungated, a demo that postponed a pick-up and then flipped to `"now"` would
+ * keep the unblocked button: row 03's fix, shown as the status quo.
+ */
+const UNBLOCK_CASES: Array<[string | null, DemoMode, string | null]> = [
+  ["missed-swipe", "fixed", "drop-off"],
+  ["missed-swipe", "now", "pick-up"],
+  ["rider-no-show", "fixed", "pick-up"],
+  ["rider-no-show", "now", "pick-up"],
+  [null, "now", "drop-off"],
+  [null, "fixed", "drop-off"],
+];
+const unblockWrong = UNBLOCK_CASES.filter(
+  ([id, mode, want]) => offeredSwipe("pick-up", true, demoFocus(id, mode)) !== want,
+);
+check("the unblock only lifts production's block on row 03's proposal side",
+  unblockWrong.length === 0,
+  unblockWrong.map(([id, mode]) => `${id ?? "no focus"}/${mode}`).join(", "));
+check("...and that table saw the button both moved and left alone",
+  UNBLOCK_CASES.some(([, , w]) => w === "drop-off") &&
+    UNBLOCK_CASES.some(([, , w]) => w === "pick-up"),
+  "every case expects the same answer");
+
+/* --- 9e. The dialog is production's, and terminal ---------------------- */
+check("the refusal dialog reads its words from lib, not its own copy",
+  TOO_FAR_CODE.includes("SWIPE_TOO_FAR_TITLE") &&
+    TOO_FAR_CODE.includes("swipeTooFarBody(") &&
+    TOO_FAR_CODE.includes("SWIPE_TOO_FAR_DISMISS") &&
+    !/You are too far away/.test(TOO_FAR_CODE),
+  "the dialog hand-writes production's sentence");
+check("...and it offers one dismissal and no way forward",
+  (TOO_FAR_CODE.match(/<AlertDialogAction/g) ?? []).length === 1 &&
+    !/AlertDialogCancel/.test(TOO_FAR_CODE),
+  "a second action reached a refusal production ends");
+/**
+ * ⚠️ The ANCHOR is the open state. A separate boolean could disagree with it —
+ * open with no anchor renders the sentence with a blank where the end of the
+ * leg should be, which reads as a copy bug rather than a state bug.
+ */
+check("...and the anchor is the open state, so the two cannot disagree",
+  /anchor:\s*SwipeAnchor \| null/.test(TOO_FAR_CODE) &&
+    /open=\{anchor !== null\}/.test(TOO_FAR_CODE),
+  "a separate open flag could disagree with the anchor");
+/**
+ * ⛔⛔ A TAG, not a prefix. `includes("<SwipeTooFarDialog")` also matches
+ * `<SwipeTooFarDialogUnmounted` — found by a break test 2026-10-14, which
+ * renamed the mount and watched the check stay green. The terminator is what
+ * makes it a mount rather than a string that starts like one.
+ */
+check("the ride detail mounts it, and the prompt beside it",
+  /<SwipeTooFarDialog[\s/>]/.test(CODE) && /<MissedSwipePrompt[\s/>]/.test(CODE),
+  "one of the two sides is not on screen");
+/** ⛔ And the screen does not decide the side for itself. */
+check("...and the screen asks the rule which side to show, rather than deciding",
+  CODE.includes("focus: demo") && !/showsProposal\(/.test(CODE),
+  "the screen re-decides the mode");
 
 console.log(
   failures.length === 0

@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import type { LocationRecord, TripLeg } from "./mock-trips";
 
 /**
@@ -266,11 +267,23 @@ export function asksMemberAboard(leg: TripLeg): boolean {
  * ⚠️ It moves the BUTTON, never the record. No pick-up time is invented — the
  * mark stays empty and is collected afterwards, from the driver, against a trail
  * that by then has a drop-off in it.
+ *
+ * ⛔⛔ **And therefore it is GATED (B3e).** Production fills the marks left to
+ * right and will not offer DROP OFF MEMBER until PICK UP MEMBER exists — that
+ * block is the dead end, and this function is what lifts it. Ungated, a demo
+ * that postponed a pick-up on the proposal side and then flipped to `"now"`
+ * would keep the unblocked button, showing row 03's own fix as the status quo.
+ * The same mistake row 02 shipped and the user found.
+ *
+ * ⚠️ `focus` is required, with no default: a call site converted wrongly must
+ * fail `typecheck` rather than quietly keep the unblock in both modes.
  */
 export function offeredSwipe(
   nextSwipe: "start" | "pick-up" | "drop-off" | null,
-  pickupPostponed: boolean
+  pickupPostponed: boolean,
+  focus: DemoFocus
 ): "start" | "pick-up" | "drop-off" | null {
+  if (!showsProposal(focus, MISSED_SWIPE_SOLUTIONS)) return nextSwipe;
   if (pickupPostponed && nextSwipe === "pick-up") return "drop-off";
   return nextSwipe;
 }
@@ -379,4 +392,149 @@ export function routeDropOffSwipe({
 }): DropOffRoute {
   if (pickupPostponed) return "steps";
   return trailChallengesDropOff ? "missed-swipe-form" : "steps";
+}
+
+/* ===========================================================================
+   Catalogue row 03's Now side — what production does with the same tap.
+   =========================================================================== */
+
+/**
+ * The catalogue row this slice belongs to.
+ *
+ * ⛔ Row 03 ALONE. Rows 01 and 02 use the same ride list and the same More
+ * Options screen, and a shared list would make the no-show rows demonstrate a
+ * swipe proposal they have nothing to do with.
+ */
+export const MISSED_SWIPE_SOLUTIONS: readonly string[] = ["missed-swipe"];
+
+/**
+ * ⭐⭐ **`CAP-326`, verbatim — and it is a BLOCK, not a warning.**
+ *
+ * ⛔⛔ The plan recorded this as *"a warning, not a block — the driver can still
+ * swipe and is told the money is at risk"*, read off the body's "Trip payment
+ * may be denied". Reading the capture itself says otherwise, three ways:
+ *
+ * 1. The TITLE is *Unable to complete action*. The action did not happen.
+ * 2. This module's own measured data: of 56,649 legs where the driver swiped
+ *    en-route, **2,521 (4.45%) end with NEITHER mark**. If the swipe went
+ *    through behind a warning those marks would exist.
+ * 3. The premise of the whole case — *production has no way to record a missed
+ *    swipe, so the driver calls Support* — is only true if the swipe is refused.
+ *
+ * "Trip payment may be denied" is about having driven to the wrong place, not
+ * about the tap succeeding. Corrected 2026-10-14; the user's direction was
+ * about the WORDING of the pick-up variant and is unaffected.
+ */
+export const SWIPE_TOO_FAR_TITLE = "Unable to complete action";
+
+/** The number in the dialog. ⚠️ Production's own, from the capture. */
+export const SWIPE_TOO_FAR_PHONE = "+1 (888) 545-4309";
+
+/** The single dismissal. There is no second button and no way forward. */
+export const SWIPE_TOO_FAR_DISMISS = "OK";
+
+/**
+ * How each end of the leg is named in production's sentence.
+ *
+ * ⛔⛔ **`dropoff` is CAPTURED; `pickup` is INFERRED.** `CAP-326` shows the
+ * drop-off half word for word. The pick-up half has never been shot — user
+ * direction 2026-10-14: *"you can assume it will be the same error but says
+ * pickup instead of drop off."*
+ *
+ * ⛔ So it does **not** fold into `driver-app-base`. D2 admits capture-backed or
+ * user-confirmed PRODUCTION only, and "the user agreed it is probably the same"
+ * is an assumption about wording, not a sighting of it. One capture later and
+ * it becomes foldable — until then the flag below is what keeps that honest.
+ */
+export const SWIPE_TOO_FAR_PLACE: Record<SwipeAnchor, string> = {
+  pickup: "pick-up",
+  dropoff: "drop-off",
+};
+
+/**
+ * Which half of this copy has actually been seen.
+ *
+ * ⚠️ Beside the copy rather than in a comment, so `verify-base` and the fold-in
+ * audit can both read it. The same shape `NO_SHOW_REFUSAL_COPY` uses to keep
+ * our invented wording out of the base.
+ */
+export const SWIPE_TOO_FAR_PROVENANCE: Record<SwipeAnchor, "captured" | "inferred"> = {
+  pickup: "inferred",
+  dropoff: "captured",
+};
+
+/**
+ * Production's refusal, for one end of the leg.
+ *
+ * ⚠️ Built from one template rather than two literals, because the two
+ * sentences differ by one word and two copies of a sentence are two chances to
+ * drift. The word itself is the only thing `SWIPE_TOO_FAR_PLACE` holds.
+ */
+export function swipeTooFarBody(anchor: SwipeAnchor): string {
+  return (
+    `You are too far away from the scheduled ${SWIPE_TOO_FAR_PLACE[anchor]} location. ` +
+    `Trip payment may be denied. Please contact support if assistance is required. ` +
+    SWIPE_TOO_FAR_PHONE
+  );
+}
+
+/**
+ * Where tapping the swipe CTA goes — **both sides of row 03, in one rule**.
+ *
+ * ⛔⛔ This is the seam. Until B3e the branching lived inside `handleSwipeTap`
+ * and production's side did not exist at all: a swipe from outside the geofence
+ * opened our prompt in every mode, so row 03 demonstrated its own proposal as
+ * the status quo. That is the mistake row 02 shipped and the user found.
+ *
+ * ⚠️ `routeDropOffSwipe` is CALLED rather than reimplemented. It already owns
+ * the member-signature guarantee and has a truth table of its own in
+ * `verify-missed-swipe`; B3e adds the mode on top of it instead of beside it.
+ */
+export type SwipeTapRoute =
+  /** Production's alert. One OK, and the mark is not made. */
+  | { kind: "production-refusal"; anchor: SwipeAnchor }
+  /** The proposal, 1a-or-1b: is the member still in the car? */
+  | { kind: "ask-member-aboard" }
+  /** The proposal: reconstruct a leg whose drop-off was never marked live. */
+  | { kind: "missed-swipe-form" }
+  /** The real drop-off sequence — odometer, then both signatures. */
+  | { kind: "drop-off-steps" }
+  /** Production's own action, which this prototype does not stand in for. */
+  | { kind: "production-action" };
+
+export function routeSwipeTap({
+  nextSwipe,
+  pickupPostponed,
+  trailChallengesPickup,
+  trailChallengesDropOff,
+  focus,
+}: {
+  /** The OFFERED swipe — `offeredSwipe`, not `getNextSwipe`. */
+  nextSwipe: "start" | "pick-up" | "drop-off" | null;
+  pickupPostponed: boolean;
+  /** `swipeNeedsConfirming(leg, "pickup")` — the trail cannot place them there. */
+  trailChallengesPickup: boolean;
+  /** `swipeNeedsConfirming(leg, "dropoff")`. */
+  trailChallengesDropOff: boolean;
+  focus: DemoFocus;
+}): SwipeTapRoute {
+  const proposing = showsProposal(focus, MISSED_SWIPE_SOLUTIONS);
+
+  if (nextSwipe === "drop-off") {
+    const route = routeDropOffSwipe({ pickupPostponed, trailChallengesDropOff });
+    if (route === "steps") return { kind: "drop-off-steps" };
+    // The trail cannot place this drop-off and the member is long gone.
+    return proposing
+      ? { kind: "missed-swipe-form" }
+      : { kind: "production-refusal", anchor: "dropoff" };
+  }
+
+  if (nextSwipe === "pick-up" && trailChallengesPickup) {
+    return proposing
+      ? { kind: "ask-member-aboard" }
+      : { kind: "production-refusal", anchor: "pickup" };
+  }
+
+  // Inside the geofence, or a mark the trail cannot speak to, or the start.
+  return { kind: "production-action" };
 }
