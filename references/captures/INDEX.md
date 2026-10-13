@@ -13,12 +13,12 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~137.9 MB of binaries into a branch that every future prototype clones — and
+~142.1 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
 | --- | --- |
-| `CAP-###` | stable id within this index |
+| `CAP-###` | **stable id, owned by the bytes.** Assigned once from `cap-ids.json` and never reassigned, so a capture keeps its id through re-filing, renaming and later shoots. Ids are therefore NOT contiguous within a section. ⛔ Cite this, not a row number. |
 | `Build` | **which shoot it came from** — the fidelity stamp. Never mix builds in one artifact |
 | `SHA-256` | first 16 hex of the file's hash; the identity of the bytes |
 | `Shows` | literal on-screen content, harvested from the Map Request View registry where one exists |
@@ -58,15 +58,15 @@ and predates the build in any case. It is not a source.
 | **01 Home** | 29 | 13.3 | BAL-B1×21, BAL-B2×5, Apr-2026×3 | 🕐 mostly stale — 5 of 29 current — ⛔ nothing for incentives |
 | **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
 | **03 Planner** | 8 | 4.0 | DAB-2026-10-01×8 | ✅ 8 of 8 from a current shoot — multi-trip day and past days still unshot |
-| **04 My Rides** | 29 | 11.2 | Apr-2026×24, DAB-2026-10-01×4, MRV-B2×1 | 🕐 mostly stale — 5 of 29 current |
+| **04 My Rides** | 36 | 14.5 | Apr-2026×24, DAB-2026-10-13×7, DAB-2026-10-01×4, MRV-B2×1 | 🕐 mostly stale — 12 of 36 current |
 | **05 Options** | 7 | 3.2 | DAB-2026-10-01×7 | ✅ 7 of 7 from a current shoot — menu captured; most destinations behind its rows are not |
-| **06 Chat** | 14 | 6.7 | Sep-2026×10, MRV-B2×4 | 🕐 mostly stale — 4 of 14 current — shipped surfaces only |
+| **06 Chat** | 15 | 7.0 | Sep-2026×10, MRV-B2×4, DAB-2026-10-13×1 | 🕐 mostly stale — 5 of 15 current — shipped surfaces only |
 | **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ 31 of 37 from a current shoot — captured, not built (by decision) |
 | **_annotated** | 64 | 16.4 | derived×64 | — derivatives, not captures |
-| **_out-of-scope** | 13 | 2.7 | Apr-2026×10, DAB-2026-10-09×3 | — excluded feature |
+| **_out-of-scope** | 14 | 3.3 | Apr-2026×10, DAB-2026-10-09×3, DAB-2026-10-13×1 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
 | **_unregistered** | 85 | 42.2 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (undated shoot folder)×3, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **319** | **137.9** | | 453 files on disk, 319 unique |
+| **TOTAL** | **328** | **142.1** | | 462 files on disk, 328 unique |
 
 ---
 
@@ -253,10 +253,17 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
 | CAP-071 | `03a - My Rides - Needs Action Tab.png` | Apr-2026 | `ba310c0b8e97c2b3` | 2 |  |
+| CAP-320 | `04-01 - Ride Details - Confirmation Required - Almost There Prompt.png` | DAB-2026-10-13 | `5458f85548f28a51` | 0 |  |
 | CAP-072 | `04-01 - Ride History - List.png` | DAB-2026-10-01 | `a4f24bafca041f98` | 0 |  |
+| CAP-321 | `04-02 - Confirm Flow - Were You Able To Reach The Rider - Next Disabled.png` | DAB-2026-10-13 | `16739228402ba04e` | 0 |  |
 | CAP-073 | `04-02 - Ride History - Filter Sheet.png` | DAB-2026-10-01 | `e2e3a87bf433fda1` | 0 |  |
+| CAP-322 | `04-03 - Confirm Flow - Rider Declined Selected - Next Enabled.png` | DAB-2026-10-13 | `60ccc1905aa52bda` | 0 |  |
 | CAP-074 | `04-03 - Ride History - Filter Options Open.png` | DAB-2026-10-01 | `3217717b762eefec` | 0 |  |
+| CAP-323 | `04-04 - Confirm Flow - Rider Declined The Trip Sheet.png` | DAB-2026-10-13 | `ec81d22b5244a310` | 0 |  |
 | CAP-075 | `04-04 - Ride Details - Completed From History.png` | DAB-2026-10-01 | `fa8e467764d48a10` | 0 |  |
+| CAP-324 | `04-05 - More Options - Ready To Start Or En-Route Refusal.png` | DAB-2026-10-13 | `a430b7be517d8d4d` | 0 |  |
+| CAP-325 | `04-06 - Ride Details - Pre-Check Confirmation.png` | DAB-2026-10-13 | `de90d6471d0c694c` | 0 |  |
+| CAP-326 | `04-07 - Ride Details - Drop-Off Swipe Too Far Refusal.jpg` | DAB-2026-10-13 | `a57e942e813afac8` | 0 |  |
 | CAP-076 | `04a - Ride Details - Before Taken - Top.png` | Apr-2026 | `aba024b50b98b74f` | 2 |  |
 | CAP-077 | `04b - Ride Details - Before Taken - Scrolled.png` | Apr-2026 | `4bf7c543bc94d87b` | 2 |  |
 | CAP-078 | `05a - Ride Details - Needs Action - Top.png` | Apr-2026 | `f366065f4b78530a` | 2 |  |
@@ -285,10 +292,17 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 <details><summary>Source paths</summary>
 
 - `CAP-071` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/03a - My Rides - Needs Action Tab.png`
+- `CAP-320` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-01 - Ride Details - Confirmation Required - Almost There Prompt.png`
 - `CAP-072` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-01 - Ride History - List.png`
+- `CAP-321` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-02 - Confirm Flow - Were You Able To Reach The Rider - Next Disabled.png`
 - `CAP-073` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-02 - Ride History - Filter Sheet.png`
+- `CAP-322` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-03 - Confirm Flow - Rider Declined Selected - Next Enabled.png`
 - `CAP-074` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-03 - Ride History - Filter Options Open.png`
+- `CAP-323` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-04 - Confirm Flow - Rider Declined The Trip Sheet.png`
 - `CAP-075` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-04 - Ride Details - Completed From History.png`
+- `CAP-324` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-05 - More Options - Ready To Start Or En-Route Refusal.png`
+- `CAP-325` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-06 - Ride Details - Pre-Check Confirmation.png`
+- `CAP-326` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-07 - Ride Details - Drop-Off Swipe Too Far Refusal.jpg`
 - `CAP-076` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04a - Ride Details - Before Taken - Top.png`
 - `CAP-077` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04b - Ride Details - Before Taken - Scrolled.png`
 - `CAP-078` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/05a - Ride Details - Needs Action - Top.png`
@@ -348,6 +362,7 @@ Two distinct SHIPPED surfaces: the Zendesk support bubble, and Onboarding Suppor
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
+| CAP-327 | `06-01 - Zendesk Support Chat - Rider Declined Auto-Sent Template.jpg` | DAB-2026-10-13 | `24545dc311ed9eda` | 0 |  |
 | CAP-107 | `12-01 - B2 Messages - List Empty.png` | MRV-B2 | `356bcddbaba31563` | 0 | Messages list, empty — one row, **Onboarding Support**, *No messages yet*. The conversation exists before anything is said |
 | CAP-108 | `12-02 - B2 Messages - List Unread.png` | MRV-B2 | `46b1d67273cb9d57` | 0 | Messages list with an unread — **Onboarding Support · 4:07 AM**, preview *Luis: Need any help?*, green unread count, red dot on the header icon |
 | CAP-109 | `12-03 - B2 Messages - Thread Empty.png` | MRV-B2 | `d8c723b5c19d9b3b` | 0 | Open thread, empty — *No chats here yet…*, **+** attach control and *Send a message* box with a greyed send arrow |
@@ -365,6 +380,7 @@ Two distinct SHIPPED surfaces: the Zendesk support bubble, and Onboarding Suppor
 
 <details><summary>Source paths</summary>
 
+- `CAP-327` — `Project - Driver App Base/Captures/06 Chat/2026-10-13/06-01 - Zendesk Support Chat - Rider Declined Auto-Sent Template.jpg`
 - `CAP-107` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-01 - B2 Messages - List Empty.png`
 - `CAP-108` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-02 - B2 Messages - List Unread.png`
 - `CAP-109` — `Project - Map Request View/Internal Guide/Screenshots/12 - In-App Messages/12-03 - B2 Messages - Thread Empty.png`
@@ -627,6 +643,7 @@ Rider no-show and support-form captures — real production captures of a featur
 | CAP-232 | `s-06d - Member No-Show - Cancel At Door Selected.png` | DAB-2026-10-09 | `d4c37b910e01bcb0` | 0 |  |
 | CAP-233 | `s-06e - Member No-Show - Member Not Home Selected.png` | DAB-2026-10-09 | `2802cd780d3aab9c` | 0 |  |
 | CAP-234 | `s-06f - Member No-Show - Member Not Ready Selected.png` | DAB-2026-10-09 | `11c71a6748acce45` | 0 |  |
+| CAP-328 | `s-06g - Member No-Show - Wait 10 Minutes Refusal.png` | DAB-2026-10-13 | `379d31e2efd93c8a` | 0 |  |
 
 <details><summary>Source paths</summary>
 
@@ -643,6 +660,7 @@ Rider no-show and support-form captures — real production captures of a featur
 - `CAP-232` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-09/s-06d - Member No-Show - Cancel At Door Selected.png`
 - `CAP-233` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-09/s-06e - Member No-Show - Member Not Home Selected.png`
 - `CAP-234` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-09/s-06f - Member No-Show - Member Not Ready Selected.png`
+- `CAP-328` — `Project - Driver App Base/Captures/_out-of-scope/2026-10-13/s-06g - Member No-Show - Wait 10 Minutes Refusal.png`
 
 </details>
 
