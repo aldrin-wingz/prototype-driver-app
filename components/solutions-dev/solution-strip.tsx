@@ -26,6 +26,14 @@ import { cn } from "@/lib/utils";
  *
  * Dark chrome so it reads as tooling. It is not the app.
  *
+ * ⚠️ HIDDEN at the desktop breakpoint. The feature table says everything this
+ * strip said — subject area, calls, share, problem, use case, proposed feature
+ * — against the row it belongs to, so keeping both was duplication. The four
+ * things the table had no equivalent for (clear-focus, the alternates, the
+ * no-surface reason and the entry label) moved into the focused row's last
+ * cell; see `solution-table.tsx`. ⛔ Below the breakpoint this strip is still
+ * the ONLY way in, so nothing here may be deleted — only hidden.
+ *
  * ⚠️ Colours are literal strings, never interpolated into a class name. A
  * Tailwind utility built by interpolation compiles to nothing, with no build
  * error — `verify-base` §4 guards this.
@@ -56,7 +64,7 @@ export function SolutionStrip() {
   const [briefingOpen, setBriefingOpen] = useState(true);
 
   return (
-    <div className="bg-[#0F1A18] text-[#E6EFEC]">
+    <div className="solution-strip bg-[#0F1A18] text-[#E6EFEC]">
       <div className="mx-auto w-full max-w-3xl px-4 py-2.5">
         <div className="flex items-center gap-3">
           <button

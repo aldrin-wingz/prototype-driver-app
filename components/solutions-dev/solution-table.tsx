@@ -1,6 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, CornerDownRight, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   CLASS_LABEL,
@@ -12,7 +13,7 @@ import {
   type Solution,
 } from "@/lib/solutions/catalogue";
 import { tableRows } from "@/lib/solutions/table-shape";
-import { useSolution } from "@/lib/solutions/solution-context";
+import { solutionHref, useSolution } from "@/lib/solutions/solution-context";
 import { cn } from "@/lib/utils";
 import { UseCaseFlow } from "./use-case-flow";
 
@@ -56,7 +57,8 @@ function ClassBadge({ solution }: { solution: Solution }) {
 }
 
 export function SolutionTable() {
-  const { active, focus } = useSolution();
+  const { active, focus, clear } = useSolution();
+  const router = useRouter();
   const rows = tableRows();
   const groups = subjectAreaGroups();
 
@@ -146,6 +148,65 @@ export function SolutionTable() {
                       </span>
                       {isActive && <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#00B090]" />}
                     </span>
+
+                    {/*
+                      ⛔⛔ The focused row's controls live INSIDE this cell, not
+                      in a detail row of their own. An extra <tr> would sit
+                      inside a rowspan run and silently break every span above
+                      it — the table would still render, with cells against the
+                      wrong rows. This is the one column that never merges, so
+                      it is the only safe place to grow.
+
+                      These moved off the strip, which is hidden at this width
+                      because the table already says everything it said. ⚠️ The
+                      strip still carries them below the breakpoint, where it is
+                      the only way in.
+                    */}
+                    {isActive && (
+                      <span className="mt-2 block border-t border-[#E5E7EB] pt-2">
+                        {solution.noSurfaceReason && (
+                          <span className="block text-[11px] leading-snug text-[#92400E]">
+                            {solution.noSurfaceReason}
+                          </span>
+                        )}
+                        {solution.entry && (
+                          <span className="block text-[11px] leading-snug text-gray-500">
+                            {solution.entry.label}
+                          </span>
+                        )}
+                        {/* A slice can have more than one state worth seeing —
+                            10 of these across 8 rows, and they are the only way
+                            to reach a slice's second and third states. */}
+                        {solution.entry?.alternates?.map((alternate) => (
+                          <button
+                            key={alternate.route}
+                            type="button"
+                            onClick={(event) => {
+                              // ⛔ The row itself is clickable. Without this the
+                              // tap re-focuses the row and the alternate's
+                              // navigation is thrown away.
+                              event.stopPropagation();
+                              router.push(solutionHref(alternate.route, solution.id));
+                            }}
+                            className="mt-1 flex w-full items-start gap-1.5 rounded text-left text-[11px] leading-snug text-gray-500 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00B090]"
+                          >
+                            <CornerDownRight className="mt-0.5 h-3 w-3 shrink-0 text-[#00B090]" />
+                            <span>{alternate.label}</span>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            clear();
+                          }}
+                          className="mt-1.5 inline-flex items-center gap-1 rounded text-[11px] font-medium text-gray-500 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00B090]"
+                        >
+                          <X className="h-3 w-3" />
+                          Clear the focus
+                        </button>
+                      </span>
+                    )}
                   </td>
                 </tr>
               );

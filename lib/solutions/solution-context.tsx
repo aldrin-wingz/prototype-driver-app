@@ -12,6 +12,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { findSolution, SOLUTION_HOME, type Solution } from "./catalogue";
+import { adoptDecision, keepClearedMemory } from "./adopt-rules";
 
 /**
  * Which proposed feature the prototype is currently focused on.
@@ -97,6 +98,17 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
    */
   const pendingFocus = useRef<string | null>(null);
 
+  /**
+   * ⛔⛔ **The id `clear()` just removed, until the URL stops echoing it.**
+   *
+   * `writeParam` uses `history.replaceState`, which Next's router never
+   * observes, so `useSearchParams()` keeps handing back the id we deleted. The
+   * adopt effect below then put the focus straight back — measured at ~100ms,
+   * so `clear()` has in fact never worked, on the strip's `×` or anywhere else.
+   * The rule lives in `adopt-rules.ts` where a check can run its truth table.
+   */
+  const clearedId = useRef<string | null>(null);
+
   // Adopt a focus named in the URL: an entry point, a shared link, or a hand
   // edit. Only ever widens — a missing param means "the app navigated", not
   // "the focus was dropped".
@@ -109,8 +121,16 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
      * solution's id and briefing. Half-switched is worse than not switching: it
      * looks like it worked.
      */
-    if (pendingFocus.current) return;
-    if (paramId && paramId !== activeId) setActiveId(paramId);
+    const decision = adoptDecision({
+      paramId,
+      activeId,
+      clearedId: clearedId.current,
+      navigating: pendingFocus.current !== null,
+    });
+    // ⚠️ Forget the clear as soon as the URL stops echoing it, or a later deep
+    // link to the SAME solution would be ignored for the life of the page.
+    if (!keepClearedMemory(clearedId.current, paramId)) clearedId.current = null;
+    if (decision === "adopt" && paramId) setActiveId(paramId);
   }, [paramId, activeId]);
 
   /**
@@ -142,6 +162,9 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
 
   const focus = useCallback(
     (solution: Solution) => {
+      // ⛔ A new focus ends any memory of a clear, so re-picking the row that
+      // was just cleared works rather than being swallowed as its own echo.
+      clearedId.current = null;
       setActiveId(solution.id);
       /**
        * ⛔ **Switching ALWAYS moves the app.** An entry point goes to where the
@@ -163,9 +186,12 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   );
 
   const clear = useCallback(() => {
+    // ⛔ Recorded BEFORE the state change: once `activeId` is null there is
+    // nothing left to tell the stale param apart from a fresh deep link.
+    clearedId.current = activeId;
     setActiveId(null);
     writeParam(null);
-  }, []);
+  }, [activeId]);
 
   const value = useMemo<SolutionValue>(
     () => ({ active, focus, clear, pickerOpen, setPickerOpen }),

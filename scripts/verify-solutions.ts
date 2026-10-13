@@ -31,6 +31,7 @@ import {
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import { mergedRunCounts, tableRows } from "../lib/solutions/table-shape";
+import { adoptDecision, keepClearedMemory, type AdoptDecision, type AdoptInput } from "../lib/solutions/adopt-rules";
 import {
   changeAnchors,
   editableAnchors,
@@ -1607,12 +1608,23 @@ check(
  * Half-switched looks like it worked, which is why this needs a check and not a
  * memory.
  */
-const adoptGuarded = /if \(pendingFocus\.current\) return;/.test(CONTEXT_SRC);
+/**
+ * ⚠️ The adopt guard MOVED on 2026-10-14. It used to be a literal
+ * `if (pendingFocus.current) return;` at the top of the effect; it is now one
+ * input to `adoptDecision`, so the whole rule could be truth-tabled in §14
+ * instead of grepped for. This check follows it rather than being relaxed:
+ * it asserts the wiring is present AND runs the rule, which the old regex
+ * could not do.
+ */
+const adoptGuarded =
+  /navigating:\s*pendingFocus\.current !== null/.test(CONTEXT_SRC) &&
+  adoptDecision({ paramId: "a", activeId: "b", clearedId: null, navigating: true }) ===
+    "wait-for-navigation";
 const mirrorGuarded = /if \(pendingFocus\.current\) \{/.test(CONTEXT_SRC);
 const focusClaims = focusBody.includes("pendingFocus.current =");
 check(
   "the adopt effect stands down mid-switch",
-  `guard present: ${adoptGuarded}`,
+  `pendingFocus wired into the rule, and the rule waits: ${adoptGuarded}`,
   adoptGuarded,
 );
 check(
@@ -5442,6 +5454,56 @@ check(
   drawerSrc.includes("noBodyStyles={Boolean(container)}"),
 );
 
+
+/**
+ * ⛔⛔ The strip and the table are ALTERNATIVES, and exactly one shows at any
+ * width. Above the breakpoint the table carries the briefing against the row it
+ * describes, so the strip would repeat it; below it, the strip is the only way
+ * in and the table is hidden instead.
+ *
+ * Four rules, all in CSS, and a mistake in any one is invisible: drop the base
+ * `display:none` on the table and 26 rows stack above the app on a phone; drop
+ * the desktop `display:none` on the strip and the duplication is back; drop the
+ * desktop `display:block` and the table never appears at all.
+ */
+const cssAll = readFileSync(join(ROOT, "app/globals.css"), "utf8");
+const mediaAt = cssAll.indexOf("@media (min-width: 1280px)");
+const cssBase = mediaAt > 0 ? cssAll.slice(0, mediaAt) : "";
+const cssDesktop = mediaAt > 0 ? cssAll.slice(mediaAt) : "";
+const hides = (css: string, sel: string) =>
+  new RegExp(`\\${sel}\\s*\\{[^}]*display:\\s*none`).test(css);
+const shows = (css: string, sel: string) =>
+  new RegExp(`\\${sel}\\s*\\{[^}]*display:\\s*block`).test(css);
+
+const visibilityRules: Array<[string, boolean]> = [
+  ["below the breakpoint the table is hidden", hides(cssBase, ".solution-table-col")],
+  ["below the breakpoint the strip is NOT hidden", !hides(cssBase, ".solution-strip")],
+  ["above the breakpoint the table is shown", shows(cssDesktop, ".solution-table-col")],
+  ["above the breakpoint the strip is hidden", hides(cssDesktop, ".solution-strip")],
+];
+const brokenRules = visibilityRules.filter(([, ok]) => !ok).map(([label]) => label);
+check(
+  "exactly one of the strip and the table is visible at any width",
+  brokenRules.length ? `BROKEN: ${brokenRules.join("; ")}` : `${visibilityRules.length} of 4 rules hold`,
+  brokenRules.length === 0,
+);
+
+/**
+ * ⛔ Hiding the strip at desktop removes four affordances the table never had.
+ * Each must have landed in the table, or focusing a row on a wide screen is a
+ * one-way trip with no way back and no way to a slice's other states.
+ */
+const tableSrc = readFileSync(join(ROOT, "components/solutions-dev/solution-table.tsx"), "utf8");
+const MOVED_OFF_STRIP = ["clear", "alternates", "noSurfaceReason", "entry.label"] as const;
+const notMoved = MOVED_OFF_STRIP.filter((needle) =>
+  needle === "entry.label" ? !tableSrc.includes("entry.label") : !tableSrc.includes(needle),
+);
+check(
+  "everything the strip carried alone has a home in the table",
+  notMoved.length ? `MISSING: ${notMoved.join(", ")}` : `${MOVED_OFF_STRIP.length} of ${MOVED_OFF_STRIP.length} moved`,
+  notMoved.length === 0,
+);
+
 /** ⭐ The breakpoint is written twice — in TS and in CSS. Prove they agree. */
 const shellSrc = readFileSync(join(ROOT, "components/solutions-dev/phone-shell.tsx"), "utf8");
 const cssSrc = readFileSync(join(ROOT, "app/globals.css"), "utf8");
@@ -5551,6 +5613,84 @@ check(
   "no problem or use-case run crosses a subject-area boundary",
   crossings.length ? `CROSSES: ${crossings.map((r) => r.solution.id).join(", ")}` : `0 crossings of ${merged.area} area runs`,
   crossings.length === 0,
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n14. Clearing the focus actually clears it");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ Regression guard for a bug that shipped unnoticed from the day the
+ * selector was built. `writeParam` removes the query param with
+ * `history.replaceState`, which Next's router never observes, so
+ * `useSearchParams()` kept returning the id just deleted and the adopt effect
+ * put the focus straight back — measured 2026-10-14: gone at t=0, back by
+ * t≈100ms, on the strip's `×` and on the table's button alike.
+ *
+ * ⚠️ It survived because the only way back was an edge affordance. Hiding the
+ * strip at desktop made it the one way out of a focus, which is what exposed it.
+ */
+const ADOPT_CASES: Array<[string, AdoptInput, AdoptDecision]> = [
+  ["a navigation in flight outranks everything",
+    { paramId: "a", activeId: "b", clearedId: null, navigating: true }, "wait-for-navigation"],
+  ["...even when the param echoes a clear",
+    { paramId: "a", activeId: null, clearedId: "a", navigating: true }, "wait-for-navigation"],
+  ["⭐ the stale echo of our own clear is ignored",
+    { paramId: "a", activeId: null, clearedId: "a", navigating: false }, "ignore-cleared-echo"],
+  ["a deep link with nothing focused is adopted",
+    { paramId: "a", activeId: null, clearedId: null, navigating: false }, "adopt"],
+  ["a different solution in the URL is adopted",
+    { paramId: "b", activeId: "a", clearedId: null, navigating: false }, "adopt"],
+  ["⭐ clearing A then deep-linking B still adopts B",
+    { paramId: "b", activeId: null, clearedId: "a", navigating: false }, "adopt"],
+  ["a URL that already agrees changes nothing",
+    { paramId: "a", activeId: "a", clearedId: null, navigating: false }, "nothing-to-do"],
+  ["no param, nothing focused",
+    { paramId: null, activeId: null, clearedId: null, navigating: false }, "nothing-to-do"],
+  ["⭐ the app navigating away drops the param but keeps the focus",
+    { paramId: null, activeId: "a", clearedId: null, navigating: false }, "nothing-to-do"],
+];
+const adoptWrong = ADOPT_CASES.filter(([, input, want]) => adoptDecision(input) !== want);
+check(
+  "the adopt rule's truth table",
+  adoptWrong.length
+    ? `WRONG: ${adoptWrong.map(([label, input, want]) => `${label} (wanted ${want}, got ${adoptDecision(input)})`).join("; ")}`
+    : `${ADOPT_CASES.length} of ${ADOPT_CASES.length} cases correct`,
+  adoptWrong.length === 0,
+);
+/** ⭐ All four outcomes must be reachable, or the table is testing fewer rules than it looks. */
+const reachedDecisions = new Set(ADOPT_CASES.map(([, input]) => adoptDecision(input)));
+check(
+  "...and every outcome is actually exercised",
+  `${reachedDecisions.size} of 4 — ${[...reachedDecisions].sort().join(", ")}`,
+  reachedDecisions.size === 4,
+);
+
+/** ⚠️ The memory must be forgotten, or one clear poisons that id for the page. */
+const MEMORY_CASES: Array<[string | null, string | null, boolean]> = [
+  ["a", "a", true],
+  ["a", "b", false],
+  ["a", null, false],
+  [null, "a", false],
+  [null, null, false],
+];
+const memoryWrong = MEMORY_CASES.filter(([cleared, param, want]) => keepClearedMemory(cleared, param) !== want);
+check(
+  "the memory of a clear is forgotten as soon as the URL moves on",
+  memoryWrong.length ? `WRONG: ${memoryWrong.length}` : `${MEMORY_CASES.length} of ${MEMORY_CASES.length} cases correct`,
+  memoryWrong.length === 0,
+);
+
+/** ⛔ The provider must RECORD the cleared id, or the rule above never fires. */
+const ctxSrc = readFileSync(join(ROOT, "lib/solutions/solution-context.tsx"), "utf8");
+const clearSlice = ctxSrc.slice(ctxSrc.indexOf("const clear = useCallback"), ctxSrc.indexOf("const value = useMemo"));
+check(
+  "clear() records what it cleared, before it forgets it",
+  clearSlice.includes("clearedId.current = activeId")
+    ? "clearedId.current = activeId"
+    : "NOT FOUND — clear() will be undone by the stale param within ~100ms",
+  clearSlice.includes("clearedId.current = activeId") &&
+    clearSlice.indexOf("clearedId.current = activeId") < clearSlice.indexOf("setActiveId(null)"),
 );
 
 // ---------------------------------------------------------------------------

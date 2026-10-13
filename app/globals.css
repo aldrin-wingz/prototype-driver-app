@@ -272,6 +272,15 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
     padding: 1.5rem;
   }
 
+  /* ⛔ The strip and the table are alternatives, not companions. Above the
+     breakpoint the table carries the briefing against the row it describes,
+     so the strip would repeat it; below it, the strip is the only way in and
+     the table is hidden instead. Exactly one of the two is visible at any
+     width — a check asserts that neither rule is dropped. */
+  .solution-strip {
+    display: none;
+  }
+
   .solution-table-col {
     display: block;
     flex: 1 1 0%;
