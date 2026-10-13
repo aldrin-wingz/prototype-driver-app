@@ -13,6 +13,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { findSolution, SOLUTION_HOME, type Solution } from "./catalogue";
 import { adoptDecision, keepClearedMemory } from "./adopt-rules";
+import { demoFocus, type DemoFocus, type DemoMode } from "./demo-mode";
 
 /**
  * Which proposed feature the prototype is currently focused on.
@@ -36,9 +37,31 @@ import { adoptDecision, keepClearedMemory } from "./adopt-rules";
  */
 export const SOLUTION_PARAM = "solution";
 
+/**
+ * ⛔⛔ **The ONE place the demo mode is decided, and for now it is pinned.**
+ *
+ * B1 names the rule and converts every guard and builder to take a `DemoFocus`,
+ * with the mode hardwired to `"fixed"` — the side the app has always shown — so
+ * the walked app is byte-identical to the commit before it. B2 replaces this
+ * constant with real state; a check asserts it is the only `DemoMode` literal
+ * outside `demo-mode.ts`, so there is exactly one seam to move.
+ *
+ * ⚠️ Deliberately NOT `DEFAULT_DEMO_MODE`. That constant is `"now"` — the mode
+ * the app will LAND on once there is a toggle to get back from. Wiring it in
+ * before B4 would hide every proposal behind a switch that does not exist yet.
+ */
+const HARDWIRED_MODE: DemoMode = "fixed";
+
 interface SolutionValue {
   /** `undefined` when nothing is focused — the app runs as the plain mirror. */
   active: Solution | undefined;
+  /**
+   * What the app is being asked to show: the focused row, and which side of it.
+   *
+   * ⭐ Assembled here and passed down, so no screen builds its own and no rule
+   * reads React. Every proposal guard takes this.
+   */
+  demo: DemoFocus;
   /** Focus a solution and navigate to its entry point, if it has one. */
   focus: (solution: Solution) => void;
   clear: () => void;
@@ -159,6 +182,13 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   }, [activeId, paramId, pathname]);
 
   const active = findSolution(activeId);
+  // ⛔ Built through `demoFocus`, never as a bare object literal — a check
+  // asserts this is the ONLY construction in the app, which is what keeps B2 a
+  // one-line change instead of a hunt through the screens.
+  const demo = useMemo<DemoFocus>(
+    () => demoFocus(activeId, HARDWIRED_MODE),
+    [activeId],
+  );
 
   const focus = useCallback(
     (solution: Solution) => {
@@ -194,8 +224,8 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   }, [activeId]);
 
   const value = useMemo<SolutionValue>(
-    () => ({ active, focus, clear, pickerOpen, setPickerOpen }),
-    [active, focus, clear, pickerOpen],
+    () => ({ active, demo, focus, clear, pickerOpen, setPickerOpen }),
+    [active, demo, focus, clear, pickerOpen],
   );
 
   return <SolutionContext.Provider value={value}>{children}</SolutionContext.Provider>;

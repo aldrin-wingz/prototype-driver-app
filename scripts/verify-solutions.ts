@@ -52,6 +52,7 @@ import {
 import { buildTripChange } from "../components/support/trip-change-form";
 import {
   ACCOUNT_SOLUTION_ID,
+  showsAccountProposals,
   ACCOUNT_ON_FILE,
   CODE_PURPOSE_FOR,
   CODE_PURPOSE_LABEL,
@@ -91,7 +92,7 @@ import {
   REACH_OUTCOMES,
 } from "../lib/driver-data/reach-attempt";
 import { reachOptionsFor } from "../components/driver/reach-rider-modal";
-import { CANNOT_REACH_SOLUTIONS } from "../lib/driver-data/reach-attempt";
+import { CANNOT_REACH_SOLUTIONS, showsCannotReachOption } from "../lib/driver-data/reach-attempt";
 import { buildGridTiles } from "../components/driver/more-options-screen";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
 import {
@@ -223,6 +224,14 @@ import {
   ADD_LEG_KEY_FIELDS,
 } from "../components/support/add-leg-form";
 import { solutionHref } from "../lib/solutions/solution-context";
+import {
+  DEFAULT_DEMO_MODE,
+  DEMO_MODES,
+  demoFocus,
+  showsProposal,
+  type DemoFocus,
+  type DemoMode,
+} from "../lib/solutions/demo-mode";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
   mockRequestTrips,
@@ -241,6 +250,20 @@ function check(label: string, detail: string, ok: boolean) {
   console.log(`${ok ? "  ok  " : "  FAIL"} ${label} — ${detail}`);
   if (!ok) failures++;
 }
+
+/**
+ * A focus pinned to `"fixed"` — the side the app has shown since Phase 1.
+ *
+ * ⛔ Every check written BEFORE `DemoMode` existed uses this, and that is the
+ * whole claim of B1: a pure refactor, so each of those checks must go on
+ * asserting exactly what it asserted before. Anything whose answer moves under
+ * `"fixed"` is a regression wearing a new signature.
+ *
+ * ⚠️ §20 below builds its own focuses and drives BOTH modes. If this helper
+ * ever becomes the only way a focus is built in this file, the mode has stopped
+ * being tested and every sweep over it passes vacuously.
+ */
+const FIXED = (solutionId: string | null): DemoFocus => ({ solutionId, mode: "fixed" });
 
 // ── Declared expectations ────────────────────────────────────────────────
 const EXPECTED_ROWS = 26;
@@ -1025,8 +1048,8 @@ const EXPECTED_REACH_OPTIONS = 4;
 // ⚠️ Built for the row that OWNS the proposal. The fourth option is gated on
 // the focused solution now, so a list built with no focus would also carry it
 // and this check could not tell "shown to its owner" from "shown to everyone".
-const standard = reachOptionsFor(false, "cannot-reach-member");
-const sameDay = reachOptionsFor(true, "cannot-reach-member");
+const standard = reachOptionsFor(false, FIXED("cannot-reach-member"));
+const sameDay = reachOptionsFor(true, FIXED("cannot-reach-member"));
 for (const [name, list] of [["standard", standard], ["same-day", sameDay]] as const) {
   check(
     `the ${name} modal offers ${EXPECTED_REACH_OPTIONS} options`,
@@ -1058,7 +1081,7 @@ let wrongFocus: string[] = [];
 for (const row of [...builtRows.map((r) => r.id), null]) {
   for (const variant of [false, true]) {
     focusesSwept += 1;
-    const shown = reachOptionsFor(variant, row).some((o) => o.proposed);
+    const shown = reachOptionsFor(variant, FIXED(row)).some((o) => o.proposed);
     // `null` is the plain mirror and carries every proposal, the same rule
     // `ridesForSolution` and `buildGridTiles` use.
     const expected = row === null || REACH_OWNERS.has(row);
@@ -1080,7 +1103,7 @@ let productionSwept = 0;
 const productionMissing = [...builtRows.map((r) => r.id), null].flatMap((row) =>
   [false, true].flatMap((variant) => {
     productionSwept += 1;
-    const values: string[] = reachOptionsFor(variant, row).map((o) => o.value);
+    const values: string[] = reachOptionsFor(variant, FIXED(row)).map((o) => o.value);
     return ["confirmed", "declined", "later"].every((v) => values.includes(v))
       ? []
       : [`${row ?? "no focus"}/${variant ? "same-day" : "standard"}`];
@@ -1345,7 +1368,13 @@ check(
   `${foundTiles.length} of ${EXPECTED_PRODUCTION_TILES}`,
   foundTiles.length === EXPECTED_PRODUCTION_TILES,
 );
-const PROPOSED_TILE_IDS = ["cannot-reach", "auto-assign"];
+/**
+ * ⛔ All FOUR, not the two this list carried until B1. `PROPOSED_TILES` has had
+ * `add-leg` and `trip-change` in it since rows 19 and 20 were built, and the
+ * sweeps below silently covered half the grid — a denominator that looked like
+ * a sweep and was a spot check.
+ */
+const PROPOSED_TILE_IDS = ["cannot-reach", "auto-assign", "add-leg", "trip-change"];
 /**
  * Which catalogue rows each proposed tile belongs to — DECLARED here, not read
  * off the tile. Reading the tile's own `solutions` would make the sweep below
@@ -1358,6 +1387,8 @@ const PROPOSED_TILE_IDS = ["cannot-reach", "auto-assign"];
 const PROPOSAL_OWNERS: Record<string, string[]> = {
   "cannot-reach": ["tag-number-invalid", "cannot-reach-member"],
   "auto-assign": ["auto-assign-request", "request-feed-member-filter"],
+  "add-leg": ["add-leg-request"],
+  "trip-change": ["change-pickup-dropoff"],
 };
 check(
   "...and every added tile sits OUTSIDE the production list",
@@ -1472,7 +1503,7 @@ const EXPECTED_GRIDS: Array<{
   },
 ];
 for (const { focus, tiles, fullWidth } of EXPECTED_GRIDS) {
-  const grid = buildGridTiles(focus);
+  const grid = buildGridTiles(FIXED(focus));
   const ids = grid.map((t) => t.id);
   check(
     `grid for ${focus ?? "no focus"} is the declared ${tiles.length} tiles, in order`,
@@ -1496,7 +1527,7 @@ for (const { focus, tiles, fullWidth } of EXPECTED_GRIDS) {
  * while leaving a hole the moment the count changed.
  */
 for (const { focus } of EXPECTED_GRIDS) {
-  const grid = buildGridTiles(focus);
+  const grid = buildGridTiles(FIXED(focus));
   const odd = grid.length % 2 === 1;
   check(
     `packing for ${focus ?? "no focus"}: ${grid.length} tiles, ${odd ? "odd" : "even"}`,
@@ -1512,9 +1543,9 @@ for (const { focus } of EXPECTED_GRIDS) {
 /** The rule has to actually fire both ways, or parity is untested. */
 check(
   "the declared grids cover both an odd and an even count",
-  EXPECTED_GRIDS.map((g) => `${g.focus ?? "none"}=${buildGridTiles(g.focus).length}`).join(" "),
-  EXPECTED_GRIDS.some(({ focus }) => buildGridTiles(focus).length % 2 === 1) &&
-    EXPECTED_GRIDS.some(({ focus }) => buildGridTiles(focus).length % 2 === 0),
+  EXPECTED_GRIDS.map((g) => `${g.focus ?? "none"}=${buildGridTiles(FIXED(g.focus)).length}`).join(" "),
+  EXPECTED_GRIDS.some(({ focus }) => buildGridTiles(FIXED(focus)).length % 2 === 1) &&
+    EXPECTED_GRIDS.some(({ focus }) => buildGridTiles(FIXED(focus)).length % 2 === 0),
 );
 
 /**
@@ -1525,7 +1556,7 @@ check(
 let tileSweep = 0;
 let tileLeaks = 0;
 for (const row of builtRows) {
-  const ids = buildGridTiles(row.id).map((t) => t.id);
+  const ids = buildGridTiles(FIXED(row.id)).map((t) => t.id);
   for (const proposal of PROPOSED_TILE_IDS) {
     tileSweep += 1;
     const belongs = PROPOSAL_OWNERS[proposal].includes(row.id);
@@ -1540,8 +1571,8 @@ check(
 check(
   "...and the sweep saw proposals both shown and hidden",
   `${builtRows.length} built row(s) x ${PROPOSED_TILE_IDS.length} proposal(s)`,
-  builtRows.some((r) => buildGridTiles(r.id).some((t) => PROPOSED_TILE_IDS.includes(t.id))) &&
-    builtRows.some((r) => !buildGridTiles(r.id).some((t) => PROPOSED_TILE_IDS.includes(t.id))),
+  builtRows.some((r) => buildGridTiles(FIXED(r.id)).some((t) => PROPOSED_TILE_IDS.includes(t.id))) &&
+    builtRows.some((r) => !buildGridTiles(FIXED(r.id)).some((t) => PROPOSED_TILE_IDS.includes(t.id))),
 );
 /**
  * ⚠️ Every production tile still appears under every focus. The superseded rule
@@ -1549,7 +1580,7 @@ check(
  */
 const droppedProduction = builtRows.filter(
   (row) =>
-    !productionTileIds.every((id) => buildGridTiles(row.id).some((t) => t.id === id)),
+    !productionTileIds.every((id) => buildGridTiles(FIXED(row.id)).some((t) => t.id === id)),
 );
 check(
   "every production tile survives every focus",
@@ -1611,7 +1642,7 @@ check(
 /**
  * ⚠️ The adopt guard MOVED on 2026-10-14. It used to be a literal
  * `if (pendingFocus.current) return;` at the top of the effect; it is now one
- * input to `adoptDecision`, so the whole rule could be truth-tabled in §14
+ * input to `adoptDecision`, so the whole rule could be truth-tabled in §19
  * instead of grepped for. This check follows it rather than being relaxed:
  * it asserts the wiring is present AND runs the rule, which the old regex
  * could not do.
@@ -2477,37 +2508,37 @@ const GROUP_TRIP = mockRequestTrips.find(isGroupRide)!;
 const ASK_CASES: Array<{ name: string; args: Parameters<typeof shouldAskPreferredDriver>[0]; expect: boolean }> = [
   {
     name: "row 09 focused, member not opted out",
-    args: { trip: ASK_TRIP, activeSolutionId: "auto-assign-request", suppressedMembers: [] },
+    args: { trip: ASK_TRIP, focus: FIXED("auto-assign-request"), suppressedMembers: [] },
     expect: true,
   },
   {
     name: "row 10 focused — same build, so still asked",
-    args: { trip: ASK_TRIP, activeSolutionId: "request-feed-member-filter", suppressedMembers: [] },
+    args: { trip: ASK_TRIP, focus: FIXED("request-feed-member-filter"), suppressedMembers: [] },
     expect: true,
   },
   {
     name: "nothing focused — the plain mirror filters nothing",
-    args: { trip: ASK_TRIP, activeSolutionId: null, suppressedMembers: [] },
+    args: { trip: ASK_TRIP, focus: FIXED(null), suppressedMembers: [] },
     expect: true,
   },
   {
     name: "another prototype focused — a proposal stays in its own build",
-    args: { trip: ASK_TRIP, activeSolutionId: "missed-swipe", suppressedMembers: [] },
+    args: { trip: ASK_TRIP, focus: FIXED("missed-swipe"), suppressedMembers: [] },
     expect: false,
   },
   {
     name: "the member opted out",
-    args: { trip: ASK_TRIP, activeSolutionId: null, suppressedMembers: [ASK_TRIP.rider] },
+    args: { trip: ASK_TRIP, focus: FIXED(null), suppressedMembers: [ASK_TRIP.rider] },
     expect: false,
   },
   {
     name: "a DIFFERENT member opted out — this one is still asked",
-    args: { trip: ASK_TRIP, activeSolutionId: null, suppressedMembers: ["SOMEONE ELSE"] },
+    args: { trip: ASK_TRIP, focus: FIXED(null), suppressedMembers: ["SOMEONE ELSE"] },
     expect: true,
   },
   {
     name: "a multi-load — no one member to have a preference",
-    args: { trip: GROUP_TRIP, activeSolutionId: null, suppressedMembers: [] },
+    args: { trip: GROUP_TRIP, focus: FIXED(null), suppressedMembers: [] },
     expect: false,
   },
 ];
@@ -3434,25 +3465,25 @@ check(
 const CAPTURED_OPTIONS_ROWS = 11;
 check(
   "the Options menu is still the captured eleven when nothing is focused",
-  `${buildOptionsRows(null).length} row(s), expected ${CAPTURED_OPTIONS_ROWS}`,
-  buildOptionsRows(null).length === CAPTURED_OPTIONS_ROWS,
+  `${buildOptionsRows(FIXED(null)).length} row(s), expected ${CAPTURED_OPTIONS_ROWS}`,
+  buildOptionsRows(FIXED(null)).length === CAPTURED_OPTIONS_ROWS,
 );
 check(
   "...and it is still eleven under a DIFFERENT solution",
-  `${buildOptionsRows("rider-no-show").length} row(s) focused on row 01`,
-  buildOptionsRows("rider-no-show").length === CAPTURED_OPTIONS_ROWS,
+  `${buildOptionsRows(FIXED("rider-no-show")).length} row(s) focused on row 01`,
+  buildOptionsRows(FIXED("rider-no-show")).length === CAPTURED_OPTIONS_ROWS,
 );
 check(
   "...and exactly one row appears when row 15 is focused",
-  `${buildOptionsRows(ACCOUNT_SOLUTION_ID).length} row(s), expected ${CAPTURED_OPTIONS_ROWS + 1}`,
-  buildOptionsRows(ACCOUNT_SOLUTION_ID).length === CAPTURED_OPTIONS_ROWS + 1,
+  `${buildOptionsRows(FIXED(ACCOUNT_SOLUTION_ID)).length} row(s), expected ${CAPTURED_OPTIONS_ROWS + 1}`,
+  buildOptionsRows(FIXED(ACCOUNT_SOLUTION_ID)).length === CAPTURED_OPTIONS_ROWS + 1,
 );
-const focusedRows = buildOptionsRows(ACCOUNT_SOLUTION_ID);
+const focusedRows = buildOptionsRows(FIXED(ACCOUNT_SOLUTION_ID));
 check(
   "...and it is flagged as proposed, so it cannot be mistaken for captured",
   `${focusedRows.filter((r) => r.proposed).length} proposed of ${focusedRows.length}`,
   focusedRows.filter((r) => r.proposed).length === 1 &&
-    buildOptionsRows(null).every((r) => !r.proposed),
+    buildOptionsRows(FIXED(null)).every((r) => !r.proposed),
 );
 check(
   "...and it sits where it was declared, not at the end",
@@ -3508,9 +3539,9 @@ check(
 );
 check(
   "...and it is still one of the captured eleven, not a proposal",
-  `logout.proposed = ${buildOptionsRows(null).find((r) => r.id === "logout")?.proposed ?? false}`,
-  buildOptionsRows(null).some((r) => r.id === "logout") &&
-    !buildOptionsRows(null).find((r) => r.id === "logout")?.proposed,
+  `logout.proposed = ${buildOptionsRows(FIXED(null)).find((r) => r.id === "logout")?.proposed ?? false}`,
+  buildOptionsRows(FIXED(null)).some((r) => r.id === "logout") &&
+    !buildOptionsRows(FIXED(null)).find((r) => r.id === "logout")?.proposed,
 );
 
 /**
@@ -3948,7 +3979,7 @@ for (const sameDay of [false, true]) {
   // ⚠️ Built under ROW 16's OWN focus, which is how a reviewer meets it — and
   // the list is three options there, not four: rows 04/05's proposal is gated
   // out. Checking under no focus would quietly test a different screen.
-  const options = reachOptionsFor(sameDay, "rider-initiated-cancellation");
+  const options = reachOptionsFor(sameDay, FIXED("rider-initiated-cancellation"));
   check(
     `the ${sameDay ? "same-day" : "standard"} modal offers "Rider declined the trip"`,
     `${options.filter((o) => o.value === "declined").length} of ${options.length} option(s)`,
@@ -4684,8 +4715,8 @@ const ENTRY_SCOPE: Array<[string | null, boolean]> = [
 for (const [focus, expected] of ENTRY_SCOPE) {
   check(
     `the ride's pencil ${expected ? "shows" : "is withheld"} with ${focus ?? "nothing"} focused`,
-    `${showsTripChangeEntry(focus)}`,
-    showsTripChangeEntry(focus) === expected,
+    `${showsTripChangeEntry(FIXED(focus))}`,
+    showsTripChangeEntry(FIXED(focus)) === expected,
   );
 }
 
@@ -5222,8 +5253,8 @@ const ADD_ENTRY_SCOPE: Array<[string | null, boolean]> = [
 for (const [focus, expected] of ADD_ENTRY_SCOPE) {
   check(
     `the completed ride's button ${expected ? "shows" : "is withheld"} with ${focus ?? "nothing"} focused`,
-    `${showsAddLegEntry(focus)}`,
-    showsAddLegEntry(focus) === expected,
+    `${showsAddLegEntry(FIXED(focus))}`,
+    showsAddLegEntry(FIXED(focus)) === expected,
   );
 }
 /** ⛔ Four options, not row 20's five — nobody notices a leg that does not exist. */
@@ -5369,7 +5400,7 @@ check(
 
 
 // ---------------------------------------------------------------------------
-console.log("\n12. The desktop phone frame contains the app, and only the app");
+console.log("\n17. The desktop phone frame contains the app, and only the app");
 // ---------------------------------------------------------------------------
 /**
  * ⛔⛔ A portal escapes every ancestor, including the transform that makes the
@@ -5517,7 +5548,7 @@ check(
 
 
 // ---------------------------------------------------------------------------
-console.log("\n13. The feature table reconstructs the spreadsheet's merged shape");
+console.log("\n18. The feature table reconstructs the spreadsheet's merged shape");
 // ---------------------------------------------------------------------------
 /**
  * ⭐ The source file merges cells; `catalogue.ts` stores a merged cell by
@@ -5617,7 +5648,7 @@ check(
 
 
 // ---------------------------------------------------------------------------
-console.log("\n14. Clearing the focus actually clears it");
+console.log("\n19. Clearing the focus actually clears it");
 // ---------------------------------------------------------------------------
 /**
  * ⛔⛔ Regression guard for a bug that shipped unnoticed from the day the
@@ -5691,6 +5722,259 @@ check(
     : "NOT FOUND — clear() will be undone by the stale param within ~100ms",
   clearSlice.includes("clearedId.current = activeId") &&
     clearSlice.indexOf("clearedId.current = activeId") < clearSlice.indexOf("setActiveId(null)"),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n20. Now / Fixed — one rule, named once, and not yet reachable");
+// ---------------------------------------------------------------------------
+/**
+ * B1 of the "what happens now" slice. The mode does not exist in the UI yet:
+ * `solution-context.tsx` pins it to `"fixed"`, which is the side the app has
+ * shown since Phase 1. So the claim these checks have to make falsifiable is a
+ * narrow one — **the rule is named once, every gate reads that one name, and
+ * nothing the driver sees has moved.**
+ *
+ * ⛔ The 290 checks above are the other half of that claim. They all run with
+ * the mode pinned to `"fixed"` via `FIXED()`, so any behaviour that shifted in
+ * the refactor fails there, not here.
+ */
+
+/* --- 20a. The truth table ------------------------------------------------ */
+/**
+ * ⛔ Every case declared as a literal, including the answer. A table generated
+ * from the function it tests is a restatement, not a test — this project has
+ * shipped two of those and both passed while the code was wrong.
+ */
+const PROPOSAL_CASES: Array<{
+  why: string;
+  focus: DemoFocus;
+  owners: readonly string[];
+  inPlainMirror?: boolean;
+  want: boolean;
+}> = [
+  // The plain mirror: no focus, so no side — and the mode must not be consulted.
+  { why: "plain mirror, default reading", focus: { solutionId: null, mode: "fixed" }, owners: ["a"], want: true },
+  { why: "plain mirror, default reading, mode now", focus: { solutionId: null, mode: "now" }, owners: ["a"], want: true },
+  { why: "plain mirror, capture-locked surface", focus: { solutionId: null, mode: "fixed" }, owners: ["a"], inPlainMirror: false, want: false },
+  { why: "plain mirror, capture-locked, mode now", focus: { solutionId: null, mode: "now" }, owners: ["a"], inPlainMirror: false, want: false },
+  { why: "plain mirror with no owners at all", focus: { solutionId: null, mode: "fixed" }, owners: [], want: true },
+  // Owned, and on the proposal side.
+  { why: "owner focused, fixed", focus: { solutionId: "a", mode: "fixed" }, owners: ["a"], want: true },
+  { why: "owner focused, fixed, second owner of two", focus: { solutionId: "b", mode: "fixed" }, owners: ["a", "b"], want: true },
+  { why: "owner focused, capture-locked surface still shows", focus: { solutionId: "a", mode: "fixed" }, owners: ["a"], inPlainMirror: false, want: true },
+  // Owned, but on production's side — the whole point of the slice.
+  { why: "owner focused, now", focus: { solutionId: "a", mode: "now" }, owners: ["a"], want: false },
+  { why: "owner focused, now, capture-locked", focus: { solutionId: "a", mode: "now" }, owners: ["a"], inPlainMirror: false, want: false },
+  // Someone else's build: hidden on BOTH sides, so a stranger's row never sees it.
+  { why: "stranger focused, fixed", focus: { solutionId: "z", mode: "fixed" }, owners: ["a"], want: false },
+  { why: "stranger focused, now", focus: { solutionId: "z", mode: "now" }, owners: ["a"], want: false },
+  { why: "stranger focused, empty owner list", focus: { solutionId: "z", mode: "fixed" }, owners: [], want: false },
+];
+const proposalWrong = PROPOSAL_CASES.filter(
+  (c) => showsProposal(c.focus, c.owners, { inPlainMirror: c.inPlainMirror }) !== c.want,
+);
+check(
+  "showsProposal answers its declared truth table",
+  proposalWrong.length
+    ? `WRONG: ${proposalWrong.map((c) => c.why).join("; ")}`
+    : `${PROPOSAL_CASES.length} of ${PROPOSAL_CASES.length} case(s) correct`,
+  proposalWrong.length === 0,
+);
+
+/* --- 20b. ...and the table is not one-sided ------------------------------ */
+/**
+ * ⛔⛔ The companion that stops 20a passing vacuously. A truth table of
+ * thirteen cases that all expect `false`, or that never varies the mode, is
+ * indistinguishable from a working one by its pass/fail bit alone.
+ */
+const modesSeen = new Set(PROPOSAL_CASES.map((c) => c.focus.mode));
+check(
+  "...and that table exercises both modes, both readings, and both answers",
+  `${modesSeen.size} of ${DEMO_MODES.length} mode(s); ` +
+    `${PROPOSAL_CASES.filter((c) => c.want).length} true / ${PROPOSAL_CASES.filter((c) => !c.want).length} false; ` +
+    `${PROPOSAL_CASES.filter((c) => c.inPlainMirror === false).length} capture-locked case(s)`,
+  modesSeen.size === DEMO_MODES.length &&
+    DEMO_MODES.every((m) => modesSeen.has(m)) &&
+    PROPOSAL_CASES.some((c) => c.want) &&
+    PROPOSAL_CASES.some((c) => !c.want) &&
+    PROPOSAL_CASES.some((c) => c.inPlainMirror === false) &&
+    PROPOSAL_CASES.some((c) => c.inPlainMirror === undefined),
+);
+/** ⛔ `"now"` is declared but deliberately unreachable until B2. Say so. */
+check(
+  "...and the mode the app will LAND on is declared but not yet wired",
+  `DEFAULT_DEMO_MODE = ${DEFAULT_DEMO_MODE}, hardwired in the provider = fixed`,
+  DEFAULT_DEMO_MODE === "now" && DEMO_MODES.length === 2,
+);
+
+/* --- 20c. Every gate reads the one rule ---------------------------------- */
+/**
+ * ⛔⛔ **The check that makes this a refactor rather than a rename.** Each gate
+ * is driven over the FULL focus matrix — every catalogue row plus the plain
+ * mirror, on both sides — and compared against `showsProposal` with its owners
+ * declared here as literals. A gate that kept its own `=== null ||` spelling
+ * would agree on `"fixed"` and diverge the moment `"now"` became reachable,
+ * which is precisely the drift that would ship silently in B4.
+ *
+ * ⚠️ Owners are LITERAL ids here, not the modules' own constants. Importing
+ * `CANNOT_REACH_SOLUTIONS` and comparing the gate to itself would pass whatever
+ * that array said.
+ */
+const GATES: Array<{
+  name: string;
+  owners: readonly string[];
+  inPlainMirror?: boolean;
+  shown: (focus: DemoFocus) => boolean;
+}> = [
+  { name: "showsAddLegEntry", owners: ["add-leg-request"], shown: (f) => showsAddLegEntry(f) },
+  { name: "showsCannotReachOption", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => showsCannotReachOption(f) },
+  { name: "showsTripChangeEntry", owners: ["change-pickup-dropoff"], shown: (f) => showsTripChangeEntry(f) },
+  { name: "showsAccountProposals", owners: ["account-self-service"], inPlainMirror: false, shown: (f) => showsAccountProposals(f) },
+  {
+    name: "shouldAskPreferredDriver",
+    owners: ["auto-assign-request", "request-feed-member-filter"],
+    // ⚠️ A trip chosen so the OTHER two conditions are satisfied — not a group
+    // ride, member not opted out — leaving the focus gate as the only variable.
+    shown: (f) => shouldAskPreferredDriver({ trip: ASK_TRIP, focus: f, suppressedMembers: [] }),
+  },
+  { name: "buildOptionsRows", owners: ["account-self-service"], inPlainMirror: false, shown: (f) => buildOptionsRows(f).some((r) => r.proposed) },
+  { name: "reachOptionsFor/standard", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(false, f).some((o) => o.proposed) },
+  { name: "reachOptionsFor/same-day", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(true, f).some((o) => o.proposed) },
+  ...PROPOSED_TILE_IDS.map((tile) => ({
+    name: `buildGridTiles/${tile}`,
+    owners: PROPOSAL_OWNERS[tile],
+    shown: (f: DemoFocus) => buildGridTiles(f).some((t) => t.id === tile),
+  })),
+];
+const FOCUS_IDS: Array<string | null> = [...SOLUTIONS.map((s) => s.id), null];
+let gateSweep = 0;
+const gateDisagreements: string[] = [];
+for (const gate of GATES) {
+  for (const id of FOCUS_IDS) {
+    for (const mode of DEMO_MODES) {
+      gateSweep += 1;
+      const focus = demoFocus(id, mode);
+      const want = showsProposal(focus, gate.owners, { inPlainMirror: gate.inPlainMirror });
+      if (gate.shown(focus) !== want) {
+        gateDisagreements.push(`${gate.name}@${id ?? "no focus"}/${mode}`);
+      }
+    }
+  }
+}
+check(
+  "every gate answers exactly what the one rule answers",
+  `${gateDisagreements.length} disagreement(s) of ${gateSweep} (gate x focus x mode)` +
+    (gateDisagreements.length ? ` — ${gateDisagreements.slice(0, 6).join(", ")}` : ""),
+  gateDisagreements.length === 0,
+);
+check(
+  "...and the sweep is the size it claims",
+  `${GATES.length} gate(s) x ${FOCUS_IDS.length} focus(es) x ${DEMO_MODES.length} mode(s)`,
+  gateSweep === GATES.length * FOCUS_IDS.length * DEMO_MODES.length &&
+    FOCUS_IDS.length === EXPECTED_ROWS + 1 &&
+    GATES.length === 12,
+);
+/**
+ * ⛔ Non-vacuity: a sweep where every gate said `false` everywhere would agree
+ * with a `showsProposal` that was also broken to return `false`. Both outcomes
+ * have to be observed, per gate.
+ */
+const flatGates = GATES.filter(
+  (g) =>
+    !FOCUS_IDS.some((id) => DEMO_MODES.some((m) => g.shown(demoFocus(id, m)))) ||
+    !FOCUS_IDS.some((id) => DEMO_MODES.some((m) => !g.shown(demoFocus(id, m)))),
+);
+check(
+  "...and every gate was seen both open and shut",
+  flatGates.length ? `FLAT: ${flatGates.map((g) => g.name).join(", ")}` : `${GATES.length} of ${GATES.length} gate(s) varied`,
+  flatGates.length === 0,
+);
+
+/* --- 20d. Nothing the driver sees has moved ------------------------------ */
+/**
+ * ⛔⛔ **The zero-behaviour-change claim, as literals.** What each gate
+ * answered BEFORE `DemoMode` existed, for the three focuses that matter, with
+ * the mode pinned to `"fixed"`. Written out rather than computed, because a
+ * table derived from the new code cannot detect that the new code is wrong.
+ *
+ * Four of the five guards read "no focus" as *no filtering*; the account slice
+ * reads it as *show nothing*, because its Options menu is capture-locked at
+ * eleven rows. That asymmetry is the one thing a careless refactor would have
+ * flattened, and it is spelled out here.
+ */
+const PRE_B1: Array<{ gate: string; plainMirror: boolean; owner: boolean; stranger: boolean }> = [
+  { gate: "showsAddLegEntry", plainMirror: true, owner: true, stranger: false },
+  { gate: "showsCannotReachOption", plainMirror: true, owner: true, stranger: false },
+  { gate: "showsTripChangeEntry", plainMirror: true, owner: true, stranger: false },
+  { gate: "showsAccountProposals", plainMirror: false, owner: true, stranger: false },
+  { gate: "shouldAskPreferredDriver", plainMirror: true, owner: true, stranger: false },
+  { gate: "buildOptionsRows", plainMirror: false, owner: true, stranger: false },
+  { gate: "reachOptionsFor/standard", plainMirror: true, owner: true, stranger: false },
+  { gate: "reachOptionsFor/same-day", plainMirror: true, owner: true, stranger: false },
+  { gate: "buildGridTiles/cannot-reach", plainMirror: true, owner: true, stranger: false },
+  { gate: "buildGridTiles/auto-assign", plainMirror: true, owner: true, stranger: false },
+  { gate: "buildGridTiles/add-leg", plainMirror: true, owner: true, stranger: false },
+  { gate: "buildGridTiles/trip-change", plainMirror: true, owner: true, stranger: false },
+];
+/** ⛔ A row 03 is nobody's owner here — it is the stranger every gate refuses. */
+const STRANGER = "missed-swipe";
+const movedBehaviour: string[] = [];
+for (const want of PRE_B1) {
+  const gate = GATES.find((g) => g.name === want.gate);
+  if (!gate) { movedBehaviour.push(`${want.gate}: GATE MISSING`); continue; }
+  const got = {
+    plainMirror: gate.shown(demoFocus(null, "fixed")),
+    owner: gate.shown(demoFocus(gate.owners[0], "fixed")),
+    stranger: gate.shown(demoFocus(STRANGER, "fixed")),
+  };
+  for (const key of ["plainMirror", "owner", "stranger"] as const) {
+    if (got[key] !== want[key]) movedBehaviour.push(`${want.gate}.${key}: ${got[key]} (was ${want[key]})`);
+  }
+}
+check(
+  "with the mode pinned to fixed, every gate answers what it answered before B1",
+  movedBehaviour.length
+    ? `MOVED: ${movedBehaviour.join("; ")}`
+    : `${PRE_B1.length * 3} of ${PRE_B1.length * 3} declared answer(s) unchanged`,
+  movedBehaviour.length === 0 && PRE_B1.length === GATES.length,
+);
+/** ⚠️ The stranger must really be a stranger, or the third column is free. */
+check(
+  "...and the stranger row is owned by none of them",
+  `${STRANGER} appears in ${GATES.filter((g) => g.owners.includes(STRANGER)).length} of ${GATES.length} owner list(s)`,
+  GATES.every((g) => !g.owners.includes(STRANGER)) &&
+    SOLUTIONS.some((s) => s.id === STRANGER),
+);
+
+/**
+ * ⛔⛔ **One seam.** A `DemoFocus` is constructed in exactly ONE place in the
+ * app, and that is what makes B2 a one-line change rather than a hunt. A screen
+ * that built its own focus would pin its own mode, and the toggle would do
+ * nothing on that screen — a switch that works everywhere except the one flow
+ * being demonstrated.
+ */
+const APP_DIRS = ["lib", "components", "app"];
+const FOCUS_BUILDER = /\bmode:\s*"(now|fixed)"|\bdemoFocus\(/g;
+function walk(dir: string): string[] {
+  return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory()
+      ? walk(join(dir, e.name))
+      : /\.tsx?$/.test(e.name)
+        ? [join(dir, e.name)]
+        : [],
+  );
+}
+const APP_FILES = APP_DIRS.flatMap(walk).filter((f) => f !== join("lib", "solutions", "demo-mode.ts"));
+const focusBuilders = APP_FILES.flatMap((f) => {
+  const hits = readFileSync(join(ROOT, f), "utf8").match(FOCUS_BUILDER) ?? [];
+  return hits.map(() => f);
+});
+check(
+  "the app constructs a DemoFocus in exactly one place",
+  `${focusBuilders.length} construction(s) across ${APP_FILES.length} file(s): ${[...new Set(focusBuilders)].join(", ") || "none"}`,
+  focusBuilders.length === 1 &&
+    focusBuilders[0] === join("lib", "solutions", "solution-context.tsx"),
 );
 
 // ---------------------------------------------------------------------------

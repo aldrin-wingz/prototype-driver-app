@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import type { Trip, TripContacts } from "./mock-trips";
 import type { SupportFieldOption } from "@/types/support";
 
@@ -132,10 +133,8 @@ export const CANNOT_REACH_SOLUTIONS: readonly string[] = [
  * `buildGridTiles` use: no focus means no filtering rather than an empty
  * screen, so the plain mirror still carries every proposal.
  */
-export function showsCannotReachOption(activeSolutionId: string | null): boolean {
-  return (
-    activeSolutionId === null || CANNOT_REACH_SOLUTIONS.includes(activeSolutionId)
-  );
+export function showsCannotReachOption(focus: DemoFocus): boolean {
+  return showsProposal(focus, CANNOT_REACH_SOLUTIONS);
 }
 
 /**

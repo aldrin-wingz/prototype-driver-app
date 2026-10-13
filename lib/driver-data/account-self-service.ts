@@ -1,3 +1,5 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
+
 /**
  * Catalogue row 15 — self-service email / password / phone. 567 calls.
  *
@@ -326,8 +328,22 @@ export const ACCOUNT_SOLUTION_ID = "account-self-service";
  * agreeing by coincidence is exactly how the proposed More Options tiles nearly
  * drifted apart.
  */
-export function showsAccountProposals(activeSolutionId: string | null): boolean {
-  return activeSolutionId === ACCOUNT_SOLUTION_ID;
+export const ACCOUNT_SOLUTIONS: readonly string[] = [ACCOUNT_SOLUTION_ID];
+
+/**
+ * ⛔⛔ **The one guard where the plain mirror shows NOTHING**, hence
+ * `inPlainMirror: false`. The Options menu is capture-locked at eleven rows, so
+ * an unfocused run has to render the captured screen row for row — the opposite
+ * reading of `null` from the other four guards.
+ *
+ * ⭐ That exception used to be invisible: it was a differently-spelled
+ * predicate (`=== ACCOUNT_SOLUTION_ID`, with no `null` clause) sitting beside
+ * four that all read `null || includes`. Two of those four nearly drifted
+ * apart once already. It is now a named flag on one shared rule, so the
+ * difference is declared rather than inferred from how someone wrote an `if`.
+ */
+export function showsAccountProposals(focus: DemoFocus): boolean {
+  return showsProposal(focus, ACCOUNT_SOLUTIONS, { inPlainMirror: false });
 }
 
 /* -------------------------------------------------------------------------- */

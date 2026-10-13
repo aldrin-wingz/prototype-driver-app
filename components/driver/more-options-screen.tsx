@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import {
   getLegStage,
   type Trip,
@@ -348,11 +349,12 @@ const PROPOSED_TILES: OptionTile[] = [
  * focus. A regex over this file proves a line is spelled a certain way; it
  * cannot prove the grid that line builds is the one on screen.
  */
-export function buildGridTiles(activeSolutionId: string | null): GridTile[] {
-  const proposals = PROPOSED_TILES.filter(
-    (tile) =>
-      activeSolutionId === null ||
-      (tile.solutions ?? []).includes(activeSolutionId)
+export function buildGridTiles(focus: DemoFocus): GridTile[] {
+  // ⚠️ A tile with no `solutions` owns no catalogue row, so it can only ever
+  // appear in the plain mirror — which is what an empty owner list means to
+  // `showsProposal`, and what the `?? []` meant here before the rule was named.
+  const proposals = PROPOSED_TILES.filter((tile) =>
+    showsProposal(focus, tile.solutions ?? [])
   );
 
   /**
@@ -505,7 +507,7 @@ export function MoreOptionsScreen({
     tripChangeRequest,
     addLegRequest,
   } = useRideFlow();
-  const { active } = useSolution();
+  const { demo } = useSolution();
   const pending = submittedForms.some((record) => record.tripId === trip.id);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
@@ -553,10 +555,11 @@ export function MoreOptionsScreen({
    */
   /**
    * ⚠️ The grid depends on what is FOCUSED, so it is rebuilt per render rather
-   * than computed once at module scope. `active` is `undefined` for the plain
-   * mirror and the builder reads that as "no filtering", not "no proposals".
+   * than computed once at module scope. `demo.solutionId` is `null` for the
+   * plain mirror and the builder reads that as "no filtering", not "no
+   * proposals".
    */
-  const gridTiles: GridTile[] = buildGridTiles(active?.id ?? null);
+  const gridTiles: GridTile[] = buildGridTiles(demo);
 
   function handleProductionTile(id: string) {
     const tile = PRODUCTION_TILES.find((candidate) => candidate.id === id);

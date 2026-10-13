@@ -51,7 +51,7 @@ const ICONS: Record<OptionsRowId, typeof History> = {
 export default function OptionsPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { active } = useSolution();
+  const { demo } = useSolution();
   const [notesOpen, setNotesOpen] = useState(false);
 
   /*
@@ -59,7 +59,7 @@ export default function OptionsPage() {
     focused solution. The insertion rule lives in `options-menu.ts` so a check
     can read the array rather than grep this file for a label.
   */
-  const rows = buildOptionsRows(active?.id ?? null);
+  const rows = buildOptionsRows(demo);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6F8] pb-20">

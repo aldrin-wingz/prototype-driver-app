@@ -10,6 +10,7 @@ import {
   CANNOT_REACH_LABEL,
   showsCannotReachOption,
 } from "@/lib/driver-data/reach-attempt";
+import type { DemoFocus } from "@/lib/solutions/demo-mode";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
   DECLINED_BODY,
@@ -68,13 +69,13 @@ interface ReachOption {
  * grid since Phase 6; the modal was missed. The three PRODUCTION options are
  * never filtered: they are what the screen does today, whatever is in focus.
  *
- * ⚠️ `activeSolutionId` is a PARAMETER, not context read inside: this stays
+ * ⚠️ `focus` is a PARAMETER, not context read inside: this stays
  * pure so `verify-solutions` can build the real list for each focus rather than
  * grep for a line.
  */
 export function reachOptionsFor(
   sameDay: boolean,
-  activeSolutionId: string | null
+  focus: DemoFocus
 ): ReachOption[] {
   return [
     { value: "confirmed", label: "Yes, I confirmed with the rider" },
@@ -86,7 +87,7 @@ export function reachOptionsFor(
           note: "Note: Don't worry—you can still start the trip on the pickup day, but it's best to confirm with the rider in advance.",
         }
       : { value: "later", label: "No, try again later" },
-    ...(showsCannotReachOption(activeSolutionId)
+    ...(showsCannotReachOption(focus)
       ? ([
           {
             value: "cannot-reach",
@@ -123,10 +124,11 @@ export function ReachRiderModal({
   const [formOpen, setFormOpen] = useState(false);
   const [declineFormOpen, setDeclineFormOpen] = useState(false);
 
-  const { active } = useSolution();
+  const { demo } = useSolution();
   const sameDay = Boolean(trip.sameDay);
-  // ⚠️ `active` is `undefined` for the plain mirror; the rule takes `null`.
-  const options = reachOptionsFor(sameDay, active?.id ?? null);
+  // ⚠️ `demo.solutionId` is `null` for the plain mirror, which the rule reads
+  // as "no filtering" — see `showsProposal`.
+  const options = reachOptionsFor(sameDay, demo);
   const selected = options.find((option) => option.value === choice);
 
   function close() {

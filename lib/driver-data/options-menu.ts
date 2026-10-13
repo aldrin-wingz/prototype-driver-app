@@ -1,3 +1,4 @@
+import type { DemoFocus } from "@/lib/solutions/demo-mode";
 import { showsAccountProposals } from "./account-self-service";
 
 /**
@@ -107,8 +108,8 @@ export const ACCOUNT_ROW: OptionsRow & { after: OptionsRowId } = {
  * that matched source text passed while the array it claimed to describe said
  * something else.
  */
-export function buildOptionsRows(activeSolutionId: string | null): OptionsRow[] {
-  if (!showsAccountProposals(activeSolutionId)) return OPTIONS_ROWS;
+export function buildOptionsRows(focus: DemoFocus): OptionsRow[] {
+  if (!showsAccountProposals(focus)) return OPTIONS_ROWS;
   return OPTIONS_ROWS.flatMap((row) =>
     row.id === ACCOUNT_ROW.after ? [row, ACCOUNT_ROW] : [row],
   );

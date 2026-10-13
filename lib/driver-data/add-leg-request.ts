@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import { getLegStage, MOCK_TODAY, type Trip } from "./mock-trips";
 import { ALL_POOLS, groupMembers } from "./trip-groups";
 import type { SupportFieldOption } from "@/types/support";
@@ -429,8 +430,10 @@ export const ADD_LEG_SOLUTION = "add-leg-request";
  * this obligation — the More Options tile, the completed ride's own button, and
  * the banner — so the rule is named once, here, where all three read it.
  */
-export function showsAddLegEntry(activeSolutionId: string | null): boolean {
-  return activeSolutionId === null || activeSolutionId === ADD_LEG_SOLUTION;
+export const ADD_LEG_SOLUTIONS: readonly string[] = [ADD_LEG_SOLUTION];
+
+export function showsAddLegEntry(focus: DemoFocus): boolean {
+  return showsProposal(focus, ADD_LEG_SOLUTIONS);
 }
 
 /**

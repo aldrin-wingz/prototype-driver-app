@@ -365,7 +365,7 @@ export function RideDetailLayout({
     preferredDriverOptOuts,
     optOutOfPreferredDriverAsk,
   } = useRideFlow();
-  const { active } = useSolution();
+  const { demo } = useSolution();
 
   // Any swipe the driver made in this session, laid over the seed. Everything
   // below reads the overlaid trip, so a drop-off recorded a moment ago moves the
@@ -417,7 +417,7 @@ export function RideDetailLayout({
    * the Reach Rider modal until the user caught it on 2026-10-13.
    */
   const changeEntryShown =
-    showsTripChangeEntry(active?.id ?? null) &&
+    showsTripChangeEntry(demo) &&
     canRequestTripChange(trip, state, Boolean(changeRequest));
   const editableAnchorIds = new Set(
     changeEntryShown
@@ -447,7 +447,7 @@ export function RideDetailLayout({
    * the pencil.
    */
   const addLegShown =
-    showsAddLegEntry(active?.id ?? null) &&
+    showsAddLegEntry(demo) &&
     canRequestAddLeg(state, Boolean(legRequest));
 
   // ⚠️ Reads the EFFECTIVE `state` above, not `seededState`. A driver who just
@@ -630,7 +630,7 @@ export function RideDetailLayout({
    */
   const askPreferred = shouldAskPreferredDriver({
     trip,
-    activeSolutionId: active?.id ?? null,
+    focus: demo,
     suppressedMembers: preferredDriverOptOuts,
   });
 

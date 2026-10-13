@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import { getMemberOptions } from "@/lib/support-data/member-options";
 import type { Trip } from "./mock-trips";
 import type { SupportFieldOption } from "@/types/support";
@@ -168,16 +169,14 @@ export function filterRequestsByMember(trips: Trip[], member: string): Trip[] {
  */
 export function shouldAskPreferredDriver({
   trip,
-  activeSolutionId,
+  focus,
   suppressedMembers,
 }: {
   trip: Trip;
-  activeSolutionId: string | null;
+  focus: DemoFocus;
   suppressedMembers: string[];
 }): boolean {
-  if (activeSolutionId !== null && !PREFERRED_DRIVER_SOLUTIONS.includes(activeSolutionId)) {
-    return false;
-  }
+  if (!showsProposal(focus, PREFERRED_DRIVER_SOLUTIONS)) return false;
   if (isGroupRide(trip)) return false;
   return !suppressedMembers.includes(trip.rider);
 }

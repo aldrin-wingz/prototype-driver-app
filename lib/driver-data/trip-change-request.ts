@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 import type { SupportFieldOption } from "@/types/support";
 
@@ -210,8 +211,9 @@ export function tripChangeRefusal(
  * `ridesForSolution` and `buildGridTiles` take.
  */
 export const TRIP_CHANGE_SOLUTION = "change-pickup-dropoff";
-export function showsTripChangeEntry(activeSolutionId: string | null): boolean {
-  return activeSolutionId === null || activeSolutionId === TRIP_CHANGE_SOLUTION;
+export const TRIP_CHANGE_SOLUTIONS: readonly string[] = [TRIP_CHANGE_SOLUTION];
+export function showsTripChangeEntry(focus: DemoFocus): boolean {
+  return showsProposal(focus, TRIP_CHANGE_SOLUTIONS);
 }
 
 // ---- Field ids ---------------------------------------------------------
