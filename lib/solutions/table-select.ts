@@ -59,9 +59,20 @@ export const COLUMN_MODE: Record<SelectingColumn, DemoMode> = {
  */
 export function columnModeFor(
   column: SelectingColumn,
-  hasProposal: boolean,
+  sides: readonly DemoMode[],
 ): DemoMode {
-  return hasProposal ? COLUMN_MODE[column] : "now";
+  const wanted = COLUMN_MODE[column];
+  if (sides.includes(wanted)) return wanted;
+  /**
+   * ⛔⛔ A row with ONE demonstrable side: both columns select it. That is
+   * what keeps row 12 reachable — its Use Case cell is merged into row 11's, so
+   * its own Proposed Feature cell is the only way in, and a cell that selected
+   * a side the row does not have would be a control pointing at nothing.
+   *
+   * ⚠️ A row with NO sides never reaches here: the table renders it as plain
+   * cells with no handler at all.
+   */
+  return sides[0] ?? wanted;
 }
 
 /**
@@ -107,16 +118,21 @@ export interface SelectInput {
   activeId: string | null;
   activeMode: DemoMode;
   /**
-   * Whether the clicked row has a proposed side at all — `hasProposedSide`.
+   * The sides the clicked row can demonstrate — `demonstrableSides`.
    *
    * ⚠️ Passed in rather than read from the catalogue here, so this module
    * stays a rule about clicks and does not have to know what a `Solution` is.
+   *
+   * ⛔ `[]` never reaches `selectAction`: the table gives a row with nothing to
+   * show no handler at all. Were it to, every column would ask for a side the
+   * row has not got, and `columnModeFor` would fall back to the column's own —
+   * harmless, and still not something to rely on.
    */
-  hasProposal: boolean;
+  sides: readonly DemoMode[];
 }
 
 export function selectAction(input: SelectInput): SelectAction {
-  const wanted = columnModeFor(input.column, input.hasProposal);
+  const wanted = columnModeFor(input.column, input.sides);
   // Not the focused row's cell — or nothing is focused at all. `focus()` moves
   // the app to the row's entry point and sets the side in one go.
   if (!coversFocus(input.runIds, input.activeId)) return "focus";

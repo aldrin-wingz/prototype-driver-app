@@ -24,9 +24,11 @@ import {
   CATEGORIZED_CALLS,
   CLEAR_FOCUS_LABEL,
   COVERED_CALLS,
+  demonstrableSides,
   entryRouteFor,
   findSolution,
   hasProposedSide,
+  isDemonstrable,
   modeFor,
   SOLUTION_HOME,
   SOLUTIONS,
@@ -7175,17 +7177,17 @@ const SELECT_CASES: Array<{
   column: SelectingColumn;
   activeId: string | null;
   activeMode: DemoMode;
-  hasProposal: boolean;
+  sides: readonly DemoMode[];
   want: SelectAction;
 }> = [
-  { why: "nothing focused, use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: null, activeMode: "now", hasProposal: true, want: "focus" },
-  { why: "nothing focused, proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", hasProposal: true, want: "focus" },
-  { why: "another row's use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", hasProposal: true, want: "focus" },
-  { why: "another row's proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", hasProposal: true, want: "focus" },
-  { why: "⭐ the focused row's use case, while showing the proposal", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", hasProposal: true, want: "set-mode" },
-  { why: "⭐ the focused row's proposed feature, while showing today", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", hasProposal: true, want: "set-mode" },
-  { why: "⛔ the lit use-case cell, clicked again", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", hasProposal: true, want: "nothing" },
-  { why: "⛔ the lit proposed-feature cell, clicked again", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", hasProposal: true, want: "nothing" },
+  { why: "nothing focused, use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: null, activeMode: "now", sides: ["now", "fixed"], want: "focus" },
+  { why: "nothing focused, proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", sides: ["now", "fixed"], want: "focus" },
+  { why: "another row's use case", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", sides: ["now", "fixed"], want: "focus" },
+  { why: "another row's proposed feature", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", sides: ["now", "fixed"], want: "focus" },
+  { why: "⭐ the focused row's use case, while showing the proposal", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", sides: ["now", "fixed"], want: "set-mode" },
+  { why: "⭐ the focused row's proposed feature, while showing today", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", sides: ["now", "fixed"], want: "set-mode" },
+  { why: "⛔ the lit use-case cell, clicked again", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", sides: ["now", "fixed"], want: "nothing" },
+  { why: "⛔ the lit proposed-feature cell, clicked again", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", sides: ["now", "fixed"], want: "nothing" },
   /*
     ⛔⛔ The four that caught a shipped bug, 2026-10-14. A MERGED use-case cell
     is drawn by the first row of its run but speaks for all of them. Row 10's
@@ -7195,21 +7197,21 @@ const SELECT_CASES: Array<{
     all. The highlight was already lighting that cell, because IT compared
     against the run. Found by a walk; these are what would have found it here.
   */
-  { why: "⭐⭐ a merged use case, clicked by the SECOND row of its run", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "fixed", hasProposal: true, want: "set-mode" },
-  { why: "⭐⭐ ...and clicked again once it is lit", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", hasProposal: true, want: "nothing" },
-  { why: "a merged use case with its FIRST row focused still flips", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", hasProposal: true, want: "set-mode" },
-  { why: "a merged use case with a stranger focused takes the focus", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "z", activeMode: "now", hasProposal: true, want: "focus" },
+  { why: "⭐⭐ a merged use case, clicked by the SECOND row of its run", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "fixed", sides: ["now", "fixed"], want: "set-mode" },
+  { why: "⭐⭐ ...and clicked again once it is lit", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", sides: ["now", "fixed"], want: "nothing" },
+  { why: "a merged use case with its FIRST row focused still flips", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", sides: ["now", "fixed"], want: "set-mode" },
+  { why: "a merged use case with a stranger focused takes the focus", runIds: ["a", "b"], clickedId: "a", column: "use-case", activeId: "z", activeMode: "now", sides: ["now", "fixed"], want: "focus" },
   /* ⛔ And the run does NOT widen the proposed-feature column, which never merges. */
-  { why: "the second row's own proposed feature is its own", runIds: ["b"], clickedId: "b", column: "proposed-feature", activeId: "a", activeMode: "fixed", hasProposal: true, want: "focus" },
+  { why: "the second row's own proposed feature is its own", runIds: ["b"], clickedId: "b", column: "proposed-feature", activeId: "a", activeMode: "fixed", sides: ["now", "fixed"], want: "focus" },
   /*
     ⛔⛔ B3f. A `no-app-surface` row has ONE side and both columns select it.
     Selecting `"fixed"` would offer a side that does not exist; selecting
     NOTHING would make row 12 unreachable, because its Use Case cell is merged
     into row 11's. That is the B3d bug again, from the other end.
   */
-  { why: "⭐⭐ no proposal: the proposed-feature cell still focuses the row", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", hasProposal: false, want: "focus" },
-  { why: "⭐⭐ ...landing on the one side it has, so clicking again is a no-op", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", hasProposal: false, want: "nothing" },
-  { why: "⭐ ...and its use-case cell means that same one side", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", hasProposal: false, want: "nothing" },
+  { why: "⭐⭐ no proposal: the proposed-feature cell still focuses the row", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", sides: ["now"], want: "focus" },
+  { why: "⭐⭐ ...landing on the one side it has, so clicking again is a no-op", runIds: ["a"], clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", sides: ["now"], want: "nothing" },
+  { why: "⭐ ...and its use-case cell means that same one side", runIds: ["a"], clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", sides: ["now"], want: "nothing" },
 ];
 
 const selectWrong = SELECT_CASES.filter(
@@ -7220,7 +7222,7 @@ const selectWrong = SELECT_CASES.filter(
       column: c.column,
       activeId: c.activeId,
       activeMode: c.activeMode,
-      hasProposal: c.hasProposal,
+      sides: c.sides,
     }) !== c.want,
 );
 check(
@@ -7331,16 +7333,56 @@ check(
  * ⛔ Counted from the rendered spans, not from the catalogue, so a merge that
  * grew would show up here as rows going dark.
  */
+/**
+ * The cells the table actually draws, as a model.
+ *
+ * ⛔⛔ **ONE model, read by both checks below.** There were two for a few
+ * minutes — this one and a second `reachableBy` loop that re-derived the same
+ * fact — and when greying stopped twelve rows from drawing cells, only one of
+ * them learned about it. The other went on reporting `26 of 26 reachable` while
+ * twelve rows were inert: a check asserting the opposite of what the table did,
+ * still printing `ok`. Two models of one thing is two chances to disagree.
+ *
+ * ⛔ A row with nothing to show contributes NO cells — the table renders it as
+ * plain `<td>`s with no handler.
+ *
+ * ⚠️ **What guards THIS model is the cell COUNT**, asserted in 25c's
+ * reachability search, not the reachability checks themselves. Those filter
+ * both of their inputs through `isDemonstrable`, so they can detect a row that
+ * became unreachable and cannot detect a model that hands out cells the table
+ * does not draw. Proven by a break test that deleted the guard above: the count
+ * failed, the reachability labels did not.
+ */
+type SelectCellModel = {
+  runIds: readonly string[];
+  clickedId: string;
+  column: SelectingColumn;
+};
+const TABLE_CELLS: SelectCellModel[] = tRows.flatMap((r) =>
+  !isDemonstrable(r.solution)
+    ? []
+    : [
+        // Never merges, so it always stands for its own row alone.
+        { runIds: [r.solution.id], clickedId: r.solution.id, column: "proposed-feature" as SelectingColumn },
+        // Drawn only at the head of its run, and speaking for the whole of it.
+        ...(r.useCaseSpan > 0
+          ? [{ runIds: r.useCaseRunIds, clickedId: r.solution.id, column: "use-case" as SelectingColumn }]
+          : []),
+      ],
+);
+
+/** Which columns can focus each row — read off the one model above. */
 const reachableBy = new Map<string, Set<SelectingColumn>>(
   tRows.map((r) => [r.solution.id, new Set<SelectingColumn>()]),
 );
-for (const row of tRows) {
-  // Every row draws its own Proposed Feature cell — that column never merges.
-  reachableBy.get(row.solution.id)!.add("proposed-feature");
-  // A Use Case cell is drawn only at the head of its run, and focuses that row.
-  if (row.useCaseSpan > 0) reachableBy.get(row.useCaseRunIds[0])!.add("use-case");
+for (const cell of TABLE_CELLS) {
+  // ⚠️ A merged Use Case cell focuses the row it BELONGS to — the first of
+  // its run — which is what `clickedId` already carries.
+  reachableBy.get(cell.clickedId)!.add(cell.column);
 }
-const unreachable = [...reachableBy].filter(([, cols]) => cols.size === 0).map(([id]) => id);
+const unreachable = [...reachableBy]
+  .filter(([id, cols]) => cols.size === 0 && isDemonstrable(findSolution(id)!))
+  .map(([id]) => id);
 /**
  * ⛔⛔ The loop above seeds every row from its Proposed Feature cell, which
  * is only true while that column never merges. Asserted against the MARKUP, not
@@ -7350,14 +7392,19 @@ const unreachable = [...reachableBy].filter(([, cols]) => cols.size === 0).map((
  */
 const PROPOSED_CELL_TAG = B6_TABLE_CODE.match(/<SelectCell[^>]*column="proposed-feature"[^>]*>/)?.[0] ?? "";
 const proposedMerges = /rowSpan/.test(PROPOSED_CELL_TAG);
+const liveRows = tRows.filter((r) => isDemonstrable(r.solution));
 check(
-  "every catalogue row can still be focused from the table",
+  "every row with something to show can be focused from the table",
   proposedMerges
     ? "THE PROPOSED FEATURE CELL MERGES — a covered row would have no cell of its own"
     : unreachable.length
       ? `UNREACHABLE: ${unreachable.join(", ")}`
-      : `${reachableBy.size} of ${EXPECTED_TABLE_ROWS} reachable, none merged away`,
-  unreachable.length === 0 && reachableBy.size === EXPECTED_TABLE_ROWS &&
+      : `${liveRows.length} of ${liveRows.length} live row(s) reachable, none merged away; ` +
+        `${EXPECTED_TABLE_ROWS - liveRows.length} greyed`,
+  unreachable.length === 0 &&
+    reachableBy.size === EXPECTED_TABLE_ROWS &&
+    // ⛔ Non-vacuity: the live set must not have quietly emptied.
+    liveRows.length === 14 &&
     PROPOSED_CELL_TAG.length > 0 && !proposedMerges,
 );
 /**
@@ -7373,7 +7420,7 @@ check(
  */
 const PROPOSED_ONLY = ["request-feed-member-filter", "vehicle-capacity-backend"];
 const proposedOnly = [...reachableBy]
-  .filter(([, cols]) => !cols.has("use-case"))
+  .filter(([id, cols]) => isDemonstrable(findSolution(id)!) && !cols.has("use-case"))
   .map(([id]) => id)
   .sort();
 const reachDrift = [
@@ -7386,10 +7433,10 @@ check(
     ? `DRIFT: ${reachDrift.join(" ")}`
     : `${proposedOnly.length} of ${EXPECTED_TABLE_ROWS} — ${proposedOnly.join(", ")}`,
   reachDrift.length === 0 &&
-    // ⚠️ Non-vacuity: most rows must be reachable BOTH ways, or the merged
-    // column has quietly stopped being a control at all.
+    // ⚠️ Non-vacuity: most LIVE rows must be reachable BOTH ways, or the
+    // merged column has quietly stopped being a control at all.
     [...reachableBy].filter(([, cols]) => cols.size === 2).length ===
-      EXPECTED_TABLE_ROWS - PROPOSED_ONLY.length,
+      liveRows.length - PROPOSED_ONLY.length,
 );
 /**
  * ⛔⛔⛔ **Every row reachable on BOTH sides, by table clicks alone.**
@@ -7405,35 +7452,22 @@ check(
  * from the plain mirror, apply every cell click, follow where `selectAction`
  * says it goes, and see which of the 52 (row × side) states are ever entered.
  */
-type SelectCellModel = {
-  runIds: readonly string[];
-  clickedId: string;
-  column: SelectingColumn;
-};
-const TABLE_CELLS: SelectCellModel[] = tRows.flatMap((r) => [
-  // Never merges, so it always stands for its own row alone.
-  { runIds: [r.solution.id], clickedId: r.solution.id, column: "proposed-feature" as SelectingColumn },
-  // Drawn only at the head of its run, and speaking for the whole of it.
-  ...(r.useCaseSpan > 0
-    ? [{ runIds: r.useCaseRunIds, clickedId: r.solution.id, column: "use-case" as SelectingColumn }]
-    : []),
-]);
 function clickCell(
   activeId: string | null,
   mode: DemoMode,
   cell: SelectCellModel,
 ): [string | null, DemoMode] {
-  // ⛔ A `no-app-surface` row has one side, and both columns select it.
-  const hasProposal = hasProposedSide(findSolution(cell.clickedId)!);
+  // ⛔ One rule about how many sides a row has.
+  const sides = demonstrableSides(findSolution(cell.clickedId)!);
   const action = selectAction({
     runIds: cell.runIds,
     clickedId: cell.clickedId,
     column: cell.column,
     activeId,
     activeMode: mode,
-    hasProposal,
+    sides,
   });
-  const side = columnModeFor(cell.column, hasProposal);
+  const side = columnModeFor(cell.column, sides);
   if (action === "focus") return [cell.clickedId, side];
   if (action === "set-mode") return [activeId, side];
   return [activeId, mode];
@@ -7461,35 +7495,71 @@ while (queue.length) {
  * ⛔ Rows 11 and 12 still have a production SCREEN, reached through `nowEntry`.
  * One side is not no sides.
  */
-const SINGLE_SIDED = [
-  "vehicle-capacity-cleanse",
-  "vehicle-capacity-backend",
+/**
+ * ⛔⛔ **The twelve rows the table greys, declared as literals.** User
+ * direction 2026-10-14: *"anything we have not built in the prototype yet lets
+ * not make it clickable and gray it. Gives me a sense of whats remaining."*
+ * They keep their place — §1 mirrors the spreadsheet 1:1 — and carry no
+ * handler at all.
+ *
+ * ⚠️ Rows 11 and 12 are NOT here, and that is the one judgement in this list.
+ * They are `not-yet`, so their badge says *"⚠️ Not in prototype yet"* — their
+ * PROPOSAL is a data cleanse and a backend path. But production's over-capacity
+ * screen is real and B3f built it, so greying them would hide the thing they
+ * exist to show. "Built" and "demonstrable" come apart on exactly these two.
+ */
+const INERT_ROWS = [
+  "ai-assistant",
+  "multiload-disclosure",
+  "coded-term-definitions",
+  "send-back-scoring",
+  "requests-tray",
+  "requests-tray-modifications",
+  "eta-send-back-explicit",
+  "compliance-status",
+  "dispatch-chat",
+  "distribution-restriction",
   "technical-issues",
+  "otp-exclusion",
 ];
+/** Rows with one side: production's screen, and no proposal built. */
+const SINGLE_SIDED = ["vehicle-capacity-cleanse", "vehicle-capacity-backend"];
+/**
+ * ⛔ Both lists checked against the rule, in both directions. A list that
+ * merely happened to match today would stop matching silently the first time a
+ * row was built.
+ */
 const sidedDrift = [
-  ...SINGLE_SIDED.filter((id) => hasProposedSide(findSolution(id)!)).map((id) => `+${id}`),
-  ...SOLUTIONS.filter((row) => !hasProposedSide(row) && !SINGLE_SIDED.includes(row.id)).map(
-    (row) => `-${row.id}`,
+  ...INERT_ROWS.filter((id) => isDemonstrable(findSolution(id)!)).map((id) => `inert+${id}`),
+  ...SOLUTIONS.filter((row) => !isDemonstrable(row) && !INERT_ROWS.includes(row.id)).map(
+    (row) => `inert-${row.id}`,
   ),
+  ...SINGLE_SIDED.filter((id) => demonstrableSides(findSolution(id)!).length !== 1).map((id) => `one+${id}`),
+  ...SOLUTIONS.filter(
+    (row) => demonstrableSides(row).length === 1 && !SINGLE_SIDED.includes(row.id),
+  ).map((row) => `one-${row.id}`),
 ];
 const WANTED_STATES = tRows.flatMap((r) =>
-  (SINGLE_SIDED.includes(r.solution.id) ? [DEFAULT_DEMO_MODE] : DEMO_MODES).map(
-    (m) => `${r.solution.id}/${m}`,
-  ),
+  demonstrableSides(r.solution).map((m) => `${r.solution.id}/${m}`),
 );
-const EXPECTED_STATES = EXPECTED_TABLE_ROWS * DEMO_MODES.length - SINGLE_SIDED.length;
+const EXPECTED_STATES =
+  (EXPECTED_TABLE_ROWS - INERT_ROWS.length - SINGLE_SIDED.length) * DEMO_MODES.length +
+  SINGLE_SIDED.length;
 const unreachableStates = WANTED_STATES.filter((k) => !seen.has(k));
 check(
   "every row is reachable on every side it has, using nothing but the table",
   unreachableStates.length
     ? `UNREACHABLE: ${unreachableStates.slice(0, 6).join(", ")}${unreachableStates.length > 6 ? ` (+${unreachableStates.length - 6})` : ""}`
-    : `${WANTED_STATES.length} of ${EXPECTED_STATES} (row x side) reachable from the plain mirror; ${SINGLE_SIDED.length} row(s) have one side`,
+    : `${WANTED_STATES.length} of ${EXPECTED_STATES} (row x side) reachable; ` +
+      `${SINGLE_SIDED.length} row(s) have one side, ${INERT_ROWS.length} have none`,
   unreachableStates.length === 0 &&
     WANTED_STATES.length === EXPECTED_STATES &&
     // ⛔ The single-sided list is the catalogue's own, not a convenient subset.
     sidedDrift.length === 0 &&
     // ⛔ Non-vacuity: the search must really have had to walk, not start done.
-    TABLE_CELLS.length === EXPECTED_TABLE_ROWS + tRows.filter((r) => r.useCaseSpan > 0).length,
+    TABLE_CELLS.length ===
+      tRows.filter((r) => isDemonstrable(r.solution)).length +
+        tRows.filter((r) => isDemonstrable(r.solution) && r.useCaseSpan > 0).length,
 );
 /**
  * ⛔⛔ And the side they do NOT have is genuinely unreachable — not merely
@@ -7543,7 +7613,7 @@ for (const cell of TABLE_CELLS) {
         column: cell.column,
         activeId: row.solution.id,
         activeMode: mode,
-        hasProposal: hasProposedSide(findSolution(cell.clickedId)!),
+        sides: demonstrableSides(findSolution(cell.clickedId)!),
       });
       const key = `${cell.column}:${cell.clickedId}@${row.solution.id}/${mode}`;
       if (lit && action !== "nothing") litButMoves.push(key);
@@ -7605,6 +7675,84 @@ check(
     : `${tRows.reduce((n, r) => n + r.useCaseRunIds.length, 0)} id(s) across ${tRows.filter((r) => r.useCaseSpan > 0).length} cell(s)`,
   runIdDrift.length === 0 &&
     tRows.reduce((n, r) => n + r.useCaseRunIds.length, 0) === EXPECTED_TABLE_ROWS,
+);
+
+/* --- 25c-2. The greyed rows, and what they are greyed FOR ---------------- */
+/**
+ * ⭐⭐ **The greying is the answer to "what is left".** User direction
+ * 2026-10-14: *"anything we have not built in the prototype yet lets not make
+ * it clickable and gray it. Gives me a sense of whats remaining."* So the
+ * count itself carries meaning — twelve greyed rows is twelve features to
+ * build — and a row greyed for the wrong reason overstates or understates it.
+ */
+check(
+  "the greyed rows are exactly the ones with nothing to demonstrate",
+  sidedDrift.length
+    ? `DRIFT: ${sidedDrift.join(" ")}`
+    : `${INERT_ROWS.length} greyed, ${SINGLE_SIDED.length} one-sided, ` +
+      `${SOLUTIONS.length - INERT_ROWS.length - SINGLE_SIDED.length} with both sides`,
+  sidedDrift.length === 0 &&
+    INERT_ROWS.length + SINGLE_SIDED.length + 12 === EXPECTED_TABLE_ROWS,
+);
+/**
+ * ⛔⛔ **A greyed row really has nothing** — not an entry, not a `nowEntry`,
+ * and not a build state that claims otherwise. The risk is the other direction
+ * from drift: a row correctly ON the list whose state has since changed, so the
+ * table greys something that is now demonstrable.
+ */
+const wronglyGreyed = INERT_ROWS.map((id) => findSolution(id)!).filter(
+  (row) => row.buildState === "in-prototype" || row.entry !== null || row.nowEntry,
+);
+check(
+  "...and each of them really has no screen of any kind",
+  wronglyGreyed.length
+    ? `HAS SOMETHING: ${wronglyGreyed.map((r) => `${r.order} ${r.id}`).join(", ")}`
+    : `${INERT_ROWS.length} of ${INERT_ROWS.length} — no entry, no nowEntry, not in prototype`,
+  wronglyGreyed.length === 0,
+);
+/**
+ * ⚠️ ...while the rows that stay live are live for a stated reason. Rows 11
+ * and 12 are `not-yet` and NOT greyed — the one place "built" and
+ * "demonstrable" come apart — so the thing keeping them clickable is named
+ * here rather than left as an exception someone later tidies away.
+ */
+const liveNotYet = SOLUTIONS.filter(
+  (row) => row.buildState !== "in-prototype" && isDemonstrable(row),
+);
+check(
+  "...and the only not-yet rows still clickable are the ones with a nowEntry",
+  `${liveNotYet.map((r) => `${r.order} ${r.id}`).join(", ") || "none"}`,
+  liveNotYet.length === SINGLE_SIDED.length &&
+    liveNotYet.every((row) => Boolean(row.nowEntry)) &&
+    liveNotYet.every((row) => SINGLE_SIDED.includes(row.id)),
+);
+/** ⛔ And a greyed row carries no handler in the markup at all. */
+check(
+  "...and a row with nothing to show renders plain cells, with no handler",
+  `{!live && (<td` + `: ${/\{!live && \(\s*<td/.test(B6_TABLE_CODE)}; ` +
+    `inert tone: ${/inert:\s*"[^"]*text-gray-400/.test(B6_TABLE_CODE)}`,
+  /\{!live && \(\s*<td/.test(B6_TABLE_CODE) &&
+    /inert:\s*"[^"]*text-gray-400/.test(B6_TABLE_CODE) &&
+    // ⛔ ...and the live branch is still a SelectCell, or nothing selects.
+    /\{live && \(\s*<SelectCell/.test(B6_TABLE_CODE),
+);
+
+/**
+ * ⛔⛔ **And the drawer greys the same rows.** Below 1280px there is no table,
+ * so the picker is the only way in — two surfaces with two opinions about
+ * which rows are pickable would disagree at exactly 1279px.
+ */
+const PICKER_GREY_SRC = readFileSync(join(ROOT, "components/solutions-dev/solution-picker-sheet.tsx"), "utf8");
+const PICKER_CODE = codeOnly(PICKER_GREY_SRC);
+check(
+  "the picker drawer greys the same rows the table does, by the same rule",
+  `isDemonstrable: ${PICKER_CODE.includes("isDemonstrable(solution)")}; ` +
+    `disabled: ${/disabled=\{!live\}/.test(PICKER_CODE)}; ` +
+    `buildState branch: ${/buildState\s*===/.test(PICKER_CODE)}`,
+  PICKER_CODE.includes("isDemonstrable(solution)") &&
+    /disabled=\{!live\}/.test(PICKER_CODE) &&
+    // ⛔ Not a second opinion written as a build-state test.
+    !/buildState\s*===/.test(PICKER_CODE),
 );
 
 /* --- 25d. The table wires the rule, and the row itself is not a control --- */
@@ -8368,25 +8516,49 @@ check(
  * change nothing — the "switch that does nothing" this project has shipped
  * twice and spent two slices removing.
  */
+const TOGGLE_GUARD = /if \(demonstrableSides\(active\)\.length < DEMO_MODES\.length\) return null;/;
 check(
-  "the toggle refuses to render for a row with no proposed side",
-  /if \(!hasProposedSide\(active\)\) return null;/.test(codeOnly(TOGGLE_SRC))
-    ? "if (!hasProposedSide(active)) return null"
+  "the toggle refuses to render for a row that has fewer than two sides",
+  TOGGLE_GUARD.test(codeOnly(TOGGLE_SRC))
+    ? "if (demonstrableSides(active).length < DEMO_MODES.length) return null"
     : "NOT FOUND — a segmented control would offer a side that does not exist",
-  /if \(!hasProposedSide\(active\)\) return null;/.test(codeOnly(TOGGLE_SRC)),
+  TOGGLE_GUARD.test(codeOnly(TOGGLE_SRC)),
 );
-/** ⛔ And `hasProposedSide` reads `klass`, not `entry` — 14 rows have no entry. */
-const sidedByEntry = SOLUTIONS.filter(
-  (row) => hasProposedSide(row) !== (row.entry !== null),
+/**
+ * ⛔⛔ **Two questions that must not be collapsed.** `hasProposedSide` asks
+ * whether the CATALOGUE holds a proposal — row 06's AI assistant does, with a
+ * real klass. `demonstrableSides` asks what the PROTOTYPE can show — row 06 is
+ * nothing at all. Fourteen rows differ between the two, and keeping them apart
+ * is what lets the table grey a row without the catalogue lying about what was
+ * proposed.
+ */
+const proposalVsPrototype = SOLUTIONS.filter(
+  (row) => hasProposedSide(row) !== demonstrableSides(row).includes("fixed"),
 );
 check(
-  "...and having a proposed side is about the proposal, not about being built",
-  `${SOLUTIONS.filter(hasProposedSide).length} of ${SOLUTIONS.length} have one; ` +
-    `${sidedByEntry.length} of them differ from "has an entry point"`,
-  SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - SINGLE_SIDED.length &&
-    // ⭐ The two readings must genuinely differ, or this is reading `entry`
-    // under another name: 14 rows have no entry and most DO have a proposal.
-    sidedByEntry.length > 10,
+  "...and 'has a proposal' is not the same question as 'can show one'",
+  `${SOLUTIONS.filter(hasProposedSide).length} have a proposal, ` +
+    `${SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length} can show one, ` +
+    `${proposalVsPrototype.length} row(s) differ`,
+  SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - 3 &&
+    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 12 &&
+    // ⭐ They must genuinely differ, or one is the other under a new name.
+    proposalVsPrototype.length === 11,
+);
+/**
+ * ⛔ And the greying is driven by the rule, not by a second opinion in the
+ * table. Both the inert cells and the live ones read `isDemonstrable` /
+ * `demonstrableSides`; a `buildState === "not-yet"` written in the component
+ * would grey rows 11 and 12 too, hiding the screen B3f built.
+ */
+const TABLE_GREY = codeOnly(B6_TABLE);
+check(
+  "...and the table greys on that rule, not on buildState",
+  `isDemonstrable: ${TABLE_GREY.includes("isDemonstrable(solution)")}; ` +
+    `buildState branch: ${/buildState\s*===/.test(TABLE_GREY)}`,
+  TABLE_GREY.includes("isDemonstrable(solution)") &&
+    TABLE_GREY.includes("demonstrableSides(solution)") &&
+    !/buildState\s*===/.test(TABLE_GREY),
 );
 /**
  * ⛔ The over-capacity screen is NOT gated on a mode, because there is nothing

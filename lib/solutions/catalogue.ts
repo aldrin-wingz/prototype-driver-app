@@ -797,6 +797,61 @@ export function hasProposedSide(solution: Solution): boolean {
 }
 
 /**
+ * The sides of this row the PROTOTYPE can actually demonstrate.
+ *
+ * ⭐⭐ **One rule, replacing three booleans that could disagree.** Until now the
+ * table asked `hasProposedSide` (does a proposal exist?), `modeFor` (which side
+ * may this row be on?) and `columnModeFor` (which side does this cell select?)
+ * — three predicates about one fact. This is that fact: an array of the sides
+ * there is something to show on, in order.
+ *
+ * ⛔ **Not the same question as `hasProposedSide`.** That one is about the
+ * CATALOGUE — row 06's AI assistant is a real proposal with a real klass, and
+ * the catalogue says so. This one is about the PROTOTYPE, where row 06 is
+ * nothing at all. Fourteen rows have a proposal that is not built; keeping the
+ * two apart is what lets the table grey a row without the catalogue lying about
+ * what was proposed.
+ *
+ * Three shapes come out of it, and the table reads all three off this one call:
+ *
+ * | | sides | what the table does |
+ * | --- | --- | --- |
+ * | 12 rows `in-prototype` | `["now", "fixed"]` | both cells select |
+ * | rows 11 and 12 | `["now"]` | one screen, no toggle — their `nowEntry` |
+ * | the other 12 | `[]` | greyed and inert — nothing to show |
+ *
+ * ⚠️ Rows 11 and 12 are `not-yet` and still have a side, which is the one
+ * place "built" and "demonstrable" come apart: their PROPOSAL is a data cleanse
+ * and a backend path that will never be in a driver app, but production's
+ * over-capacity screen is real and we built it. Greying them would hide the
+ * thing they exist to show.
+ */
+export function demonstrableSides(solution: Solution): readonly DemoMode[] {
+  const sides: DemoMode[] = [];
+  // Production's screen: built with the row, or carried on its own `nowEntry`.
+  if (solution.buildState === "in-prototype" || solution.nowEntry) sides.push("now");
+  // The proposal: only ever built with the row, and only if one exists at all.
+  if (solution.buildState === "in-prototype" && hasProposedSide(solution)) {
+    sides.push("fixed");
+  }
+  return sides;
+}
+
+/**
+ * Is there anything to see on this row at all?
+ *
+ * ⛔ The predicate the table greys on. `false` for the twelve rows whose
+ * proposal is not built and which have no production screen of their own —
+ * they keep their place in the table, because §1 mirrors the spreadsheet 1:1,
+ * but nothing about them is clickable. User direction 2026-10-14: *"anything we
+ * have not built in the prototype yet lets not make it clickable and gray it.
+ * Gives me a sense of whats remaining."*
+ */
+export function isDemonstrable(solution: Solution): boolean {
+  return demonstrableSides(solution).length > 0;
+}
+
+/**
  * The side this row can actually be on.
  *
  * ⛔⛔ **A row with no proposal has ONE side, and nothing may put it on the
@@ -812,7 +867,13 @@ export function hasProposedSide(solution: Solution): boolean {
  */
 export function modeFor(solution: Solution | undefined, wanted: DemoMode): DemoMode {
   if (!solution) return wanted;
-  return hasProposedSide(solution) ? wanted : DEFAULT_DEMO_MODE;
+  const sides = demonstrableSides(solution);
+  if (sides.includes(wanted)) return wanted;
+  // ⚠️ A row with one side is pinned to it. A row with NONE keeps the default
+  // rather than erroring — the table will not focus it, but a hand-edited URL
+  // still can, and landing on `SOLUTION_HOME` in production's reading is the
+  // honest answer to a row that has nothing to show.
+  return sides[0] ?? DEFAULT_DEMO_MODE;
 }
 
 /**

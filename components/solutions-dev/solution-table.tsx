@@ -9,8 +9,9 @@ import {
   COVERED_CALLS,
   SOLUTIONS,
   buildStateLabel,
+  demonstrableSides,
   formatShare,
-  hasProposedSide,
+  isDemonstrable,
   subjectAreaGroups,
   type Solution,
 } from "@/lib/solutions/catalogue";
@@ -92,6 +93,14 @@ const SELECT_TONE = {
   offInFocusedRow: "bg-[#F1F9F6] hover:bg-[#E6F4EF]",
   /** Any other row. */
   idle: "hover:bg-gray-50",
+  /**
+   * ⛔ Nothing to show. User direction 2026-10-14: *"anything we have not built
+   * in the prototype yet lets not make it clickable and gray it. Gives me a
+   * sense of whats remaining."* Twelve rows, and the greying IS the answer to
+   * "what is left" — so it has to be legible at a glance and must not be
+   * mistaken for a disabled control someone could enable.
+   */
+  inert: "bg-[#FAFAFA] text-gray-400",
 } as const;
 
 function ClassBadge({ solution }: { solution: Solution }) {
@@ -211,19 +220,19 @@ export function SolutionTable() {
    * the app back to the entry route for no change of state.
    */
   function select(solution: Solution, column: SelectingColumn, runIds: readonly string[]) {
-    // ⛔ A row with no proposal has ONE side, and both columns select it —
-    // see `columnModeFor`. Reading `COLUMN_MODE` directly here would offer
-    // rows 11, 12 and 25 a side that does not exist.
-    const hasProposal = hasProposedSide(solution);
+    // ⛔ ONE rule about how many sides a row has — see `demonstrableSides`.
+    // Reading `COLUMN_MODE` directly here would offer rows 11 and 12 a side
+    // that does not exist.
+    const sides = demonstrableSides(solution);
     const action = selectAction({
       runIds,
       clickedId: solution.id,
       column,
       activeId,
       activeMode: mode,
-      hasProposal,
+      sides,
     });
-    const side = columnModeFor(column, hasProposal);
+    const side = columnModeFor(column, sides);
     if (action === "focus") focus(solution, side);
     else if (action === "set-mode") setMode(side);
   }
@@ -270,6 +279,13 @@ export function SolutionTable() {
           <tbody>
             {rows.map(({ solution, areaSpan, problemSpan, useCaseSpan, useCaseRunIds }) => {
               const isActive = activeId === solution.id;
+              /**
+               * ⛔ Is there anything on this row to look at? Twelve rows have
+               * a proposal that is not built and no production screen of their
+               * own, so they are greyed and carry no handler — the greying is
+               * what shows at a glance how much is left.
+               */
+              const live = isDemonstrable(solution);
               return (
                 /*
                   ⛔ No `onClick` on the row. Subject Area, Calls, % and Problem
@@ -282,23 +298,23 @@ export function SolutionTable() {
                       emitting an empty <td> instead would silently add a
                       seventh column to every covered row. */}
                   {areaSpan > 0 && (
-                    <td rowSpan={areaSpan} className={cn(CELL, "border-r font-semibold text-gray-900")}>
+                    <td rowSpan={areaSpan} className={cn(CELL, "border-r font-semibold", live ? "text-gray-900" : SELECT_TONE.inert)}>
                       {solution.subjectArea}
                     </td>
                   )}
                   {areaSpan > 0 && (
-                    <td rowSpan={areaSpan} className={cn(CELL, "border-r text-right tabular-nums text-gray-700")}>
+                    <td rowSpan={areaSpan} className={cn(CELL, "border-r text-right tabular-nums", live ? "text-gray-700" : SELECT_TONE.inert)}>
                       {solution.calls.toLocaleString()}
                     </td>
                   )}
                   {areaSpan > 0 && (
-                    <td rowSpan={areaSpan} className={cn(CELL, "border-r text-right tabular-nums text-gray-700")}>
+                    <td rowSpan={areaSpan} className={cn(CELL, "border-r text-right tabular-nums", live ? "text-gray-700" : SELECT_TONE.inert)}>
                       {formatShare(solution)}
                     </td>
                   )}
 
                   {problemSpan > 0 && (
-                    <td rowSpan={problemSpan} className={cn(CELL, "border-r text-gray-800")}>
+                    <td rowSpan={problemSpan} className={cn(CELL, "border-r", live ? "text-gray-800" : SELECT_TONE.inert)}>
                       {solution.problem}
                     </td>
                   )}
@@ -307,7 +323,15 @@ export function SolutionTable() {
                       09+10 and 11+12 share one — so clicking it focuses the row
                       it belongs to, which is the first of that run, and it
                       lights when ANY row of the run is focused on this side. */}
-                  {useCaseSpan > 0 && (
+                  {useCaseSpan > 0 && !live && (
+                    <td
+                      rowSpan={useCaseSpan}
+                      className={cn(CELL, "border-r", SELECT_TONE.inert)}
+                    >
+                      <UseCaseFlow text={solution.useCase} tone="light" />
+                    </td>
+                  )}
+                  {useCaseSpan > 0 && live && (
                     <SelectCell
                       solution={solution}
                       column="use-case"
@@ -330,6 +354,33 @@ export function SolutionTable() {
                     </SelectCell>
                   )}
 
+                  {!live && (
+                    <td className={cn(CELL, SELECT_TONE.inert)}>
+                      <span className="flex items-start gap-2">
+                        <span className="mt-0.5 shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-gray-400">
+                          {String(solution.order).padStart(2, "0")}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block leading-snug">{solution.tableSummary}</span>
+                          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <ClassBadge solution={solution} />
+                            <span className="text-[10px] font-medium text-gray-400">
+                              {buildStateLabel(solution.buildState)}
+                            </span>
+                          </span>
+                          {/* ⚠️ The reason stays even on a dead row — it is the
+                              only thing saying WHY there is nothing here. */}
+                          {solution.noSurfaceReason && (
+                            <span className="mt-1.5 block text-[11px] leading-snug text-[#B08A3E]">
+                              {solution.noSurfaceReason}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </td>
+                  )}
+
+                  {live && (
                   <SelectCell
                     solution={solution}
                     column="proposed-feature"
@@ -424,6 +475,7 @@ export function SolutionTable() {
                       </span>
                     )}
                   </SelectCell>
+                  )}
                 </tr>
               );
             })}

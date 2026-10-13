@@ -9,6 +9,7 @@ import {
   SOLUTIONS,
   findSolution,
   buildStateLabel,
+  isDemonstrable,
   formatShare,
   subjectAreaGroups,
   type Solution,
@@ -29,6 +30,16 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
   const { active } = useSolution();
   const isActive = active?.id === solution.id;
   const unbuildable = solution.klass === "no-app-surface";
+  /**
+   * ⛔⛔ **The same rule the desktop table greys on**, or the two surfaces
+   * disagree about which rows are pickable at 1279px and 1280px. Twelve rows
+   * have nothing to show — see `demonstrableSides`. User direction 2026-10-14.
+   *
+   * ⚠️ `isDemonstrable`, never `buildState`: rows 11 and 12 are `not-yet` and
+   * DO have a production screen, so greying them here would hide it on exactly
+   * the widths where this drawer is the only way in.
+   */
+  const live = isDemonstrable(solution);
   // Resolved from the row it names, never written as a literal. `undefined`
   // when the id does not resolve, so a dangling reference prints nothing rather
   // than a wrong number — and `verify-solutions` already fails on one.
@@ -37,10 +48,15 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
   return (
     <button
       type="button"
+      disabled={!live}
       onClick={() => onPick(solution)}
       className={cn(
         "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left",
-        isActive ? "bg-[#E6F4EF]" : "hover:bg-gray-50",
+        !live
+          ? "cursor-default bg-[#FAFAFA] text-gray-400"
+          : isActive
+            ? "bg-[#E6F4EF]"
+            : "hover:bg-gray-50",
       )}
     >
       <span
