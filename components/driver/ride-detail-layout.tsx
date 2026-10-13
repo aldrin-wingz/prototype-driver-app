@@ -37,6 +37,8 @@ import {
   type LegSwipeStage,
 } from "@/lib/driver-data/mock-trips";
 import { ReachRiderModal } from "@/components/driver/reach-rider-modal";
+import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
+import { refusesDropOffSwipe } from "@/lib/driver-data/swipe-refusal";
 
 type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
 
@@ -267,6 +269,8 @@ export function RideDetailLayout({
 
   /** Stage 01 Step 2 — production's own confirmation sheet. */
   const [reachOpen, setReachOpen] = useState(false);
+  /** `CAP-326` — the swipe production refuses. */
+  const [swipeTooFar, setSwipeTooFar] = useState(false);
 
   /**
    * Say that a production action is not stood in for, rather than leaving a
@@ -293,14 +297,25 @@ export function RideDetailLayout({
   const cta = nextSwipe ? SWIPE_CTA[nextSwipe] : null;
 
   /**
-   * The swipe CTA is a real button, and on this branch it only ever toasts.
+   * The swipe CTA.
    *
-   * Nothing in the prototype advances a swipe mark, so the production swipe has
-   * no behaviour to stand in for. Saying so beats a dead tap that reads as a bug —
-   * the same treatment every unwired More Options tile gets. The way into a form
-   * on this branch is the Member No-Show tile, not this button.
+   * ⛔⛔ **One branch is real production behaviour, and it is a refusal.** A
+   * drop-off swiped from outside the geofence does not record — `CAP-326` —
+   * and the mark is never made. That is not "unwired", it is what the app does,
+   * and the two must not look the same.
+   *
+   * Everything else still toasts: nothing here advances a swipe mark, so a
+   * successful swipe has no behaviour to stand in for, and saying so beats a
+   * dead tap that reads as a bug.
+   *
+   * ⛔ The branch is `refusesDropOffSwipe`'s, not this component's — the rule
+   * lives in `lib/` so a check can run it over every seeded leg.
    */
   function handleSwipeTap() {
+    if (nextSwipe === "drop-off" && activeLeg && refusesDropOffSwipe(activeLeg)) {
+      setSwipeTooFar(true);
+      return;
+    }
     toast({
       title: cta?.name ?? "Swipe",
       description: "Not wired in the prototype — this is the production action.",
@@ -644,6 +659,8 @@ export function RideDetailLayout({
           </div>
         </div>
       ) : null}
+
+      <SwipeTooFarDialog open={swipeTooFar} onOpenChange={setSwipeTooFar} />
 
       {/* ⚠️ Mounted for the unconfirmed state only — it is the only state whose
           footer offers the CTA that opens it. */}

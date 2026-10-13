@@ -62,6 +62,18 @@ export interface TripLeg {
    * carry it, so the existing seeded trips are unaffected.
    */
   progress?: LegSwipeProgress;
+  /**
+   * The driver is not at the drop-off, so production would REFUSE the swipe.
+   *
+   * ⚠️ **SEEDED**, and it has to be: this mirror has no location at all.
+   * Production evaluates a geofence at the moment of the swipe and there is
+   * nothing here to evaluate — the same reason `wasLate` is seeded rather than
+   * compared against a clock.
+   *
+   * ⛔ Drop-off only. The pick-up refusal has never been photographed, so there
+   * is deliberately no pick-up flag to set — see `SWIPE_TOO_FAR_PROVENANCE`.
+   */
+  outsideDropOffGeofence?: boolean;
 }
 
 /**
@@ -1201,6 +1213,9 @@ export const mockInProgressTrips: Trip[] = [
           pickedUpAt: "2:14 PM",
           droppedOffAt: null,
         },
+        // ⚠️ SEEDED. The one leg where production refuses the drop-off swipe —
+        // see `outsideDropOffGeofence`.
+        outsideDropOffGeofence: true,
       },
       {
         id: "1049800376-appt",

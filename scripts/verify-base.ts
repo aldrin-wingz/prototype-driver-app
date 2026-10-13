@@ -36,6 +36,10 @@ import {
   isWillCall, pinPosition, sortTrips, visibleTrips,
 } from "../lib/driver-data/map-view";
 import {
+  SWIPE_TOO_FAR_BODY, SWIPE_TOO_FAR_DISMISS, SWIPE_TOO_FAR_PHONE,
+  SWIPE_TOO_FAR_TITLE, refusesDropOffSwipe,
+} from "../lib/driver-data/swipe-refusal";
+import {
   DECLINED_BODY, DECLINED_CHAT_SUPPORT, DECLINED_TITLE, DECLINED_WALK_BACK,
   ZENDESK_COMPOSER_PLACEHOLDER, ZENDESK_DECLINE_INTRO, ZENDESK_DECLINE_LABELS,
   ZENDESK_SENT_STATUS, declinableLegIds, zendeskDeclineMessage,
@@ -837,6 +841,95 @@ check(
   pushed.length === 1 &&
     pushed[0] === "/support-chat/" &&
     existsSync(join(ROOT, "app/support-chat/[id]/page.tsx")),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n10. The swipe production refuses (CAP-326)");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **A BLOCK, not a warning**, and the checks below are written to keep
+ * that reading. The body's *"Trip payment may be denied"* invites the opposite
+ * one — it is about having driven to the wrong place, not about the tap
+ * succeeding. The title says the action did not happen.
+ */
+
+/** Transcribed from `CAP-326` at fold-in. ⛔ Never re-derive from the module. */
+const CAP_326_TITLE = "Unable to complete action";
+const CAP_326_BODY =
+  "You are too far away from the scheduled drop-off location. Trip payment may be denied. " +
+  "Please contact support if assistance is required. +1 (888) 545-4309";
+check(
+  "the refusal is CAP-326 verbatim",
+  `title ${SWIPE_TOO_FAR_TITLE === CAP_326_TITLE ? "ok" : "DRIFTED"}, body ${SWIPE_TOO_FAR_BODY.length} chars, phone ${SWIPE_TOO_FAR_PHONE}`,
+  SWIPE_TOO_FAR_TITLE === CAP_326_TITLE &&
+    SWIPE_TOO_FAR_BODY === CAP_326_BODY &&
+    SWIPE_TOO_FAR_DISMISS === "OK",
+);
+
+/**
+ * ⛔⛔ **The INFERRED pick-up wording must not arrive here.** The sibling branch
+ * carries it — the same sentence with *drop-off* swapped for *pick-up*, on the
+ * strength of "you can assume it will be the same error". That is an assumption
+ * about wording, not a sighting of a screen, and this mirror admits neither
+ * into its copy. One capture and the ban can be lifted deliberately.
+ */
+const swipeSrc = readFileSync(join(ROOT, "lib/driver-data/swipe-refusal.ts"), "utf8");
+const pickupCopy = /too far away from the scheduled pick-?up/i.test(swipeSrc);
+check(
+  "the uncaptured pick-up refusal has not been written",
+  pickupCopy ? "pick-up wording present in swipe-refusal.ts" : `0 hits, ${SWIPE_TOO_FAR_BODY.includes("drop-off") ? "drop-off only" : "NEITHER ANCHOR — check the copy"}`,
+  !pickupCopy && SWIPE_TOO_FAR_BODY.includes("drop-off"),
+);
+
+/**
+ * ⛔ **Terminal.** One action, no cancel. A second button would be this mirror
+ * inventing a way out of a dead end that production does not offer.
+ */
+const tooFarSrc = readFileSync(join(ROOT, "components/driver/swipe-too-far-dialog.tsx"), "utf8");
+const tooFarActions = (tooFarSrc.match(/<AlertDialogAction[\s/>]/g) ?? []).length;
+const tooFarCancels = (tooFarSrc.match(/<AlertDialogCancel[\s/>]/g) ?? []).length;
+check(
+  "the swipe refusal offers exactly one way out, and it is a dismissal",
+  `${tooFarActions} action(s), ${tooFarCancels} cancel(s)`,
+  tooFarActions === 1 && tooFarCancels === 0,
+);
+
+/**
+ * The rule, over every seeded leg.
+ *
+ * ⛔ **Both outcomes must be seen**, and the refusing leg must actually be
+ * awaiting a drop-off — a flag on a leg whose next swipe is `start` would make
+ * the dialog unreachable while every check stayed green.
+ */
+const EXPECTED_REFUSING_LEGS = 1;
+const allLegs = all.flatMap((t) => t.legs);
+const refusing = allLegs.filter(refusesDropOffSwipe);
+check(
+  "exactly one seeded leg is outside the drop-off geofence",
+  `${refusing.length} of ${allLegs.length} legs (${refusing.map((l) => l.id).join(", ") || "none"})`,
+  refusing.length === EXPECTED_REFUSING_LEGS,
+);
+check(
+  "the refusing leg is actually awaiting its drop-off, so the dialog is reachable",
+  refusing.map((l) => `${l.id}: next=${getNextSwipe(l)}`).join(", ") || "none",
+  refusing.length > 0 && refusing.every((l) => getNextSwipe(l) === "drop-off"),
+);
+check(
+  "every other leg still swipes without a refusal",
+  `${allLegs.length - refusing.length} of ${allLegs.length} legs unrefused`,
+  allLegs.length - refusing.length > 0,
+);
+
+/**
+ * ⛔ The CTA must consult the rule. A refusal that exists in `lib/` and is never
+ * read is a dialog nobody can reach — the failure the reachability check above
+ * guards from the data side, and this one from the wiring side.
+ */
+const detailSrc = readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8");
+check(
+  "the swipe CTA consults the rule and mounts the dialog",
+  `refusesDropOffSwipe ${(detailSrc.match(/refusesDropOffSwipe\(/g) ?? []).length}x, <SwipeTooFarDialog ${(detailSrc.match(/<SwipeTooFarDialog[\s/>]/g) ?? []).length}x`,
+  /refusesDropOffSwipe\(/.test(detailSrc) && /<SwipeTooFarDialog[\s/>]/.test(detailSrc),
 );
 
 // ---------------------------------------------------------------------------
