@@ -226,12 +226,15 @@ import {
 import { solutionHref } from "../lib/solutions/solution-context";
 import {
   DEFAULT_DEMO_MODE,
+  DEMO_MODE_PARAM,
   DEMO_MODES,
   demoFocus,
+  modeFromParam,
   showsProposal,
   type DemoFocus,
   type DemoMode,
 } from "../lib/solutions/demo-mode";
+import { focusParams, SOLUTION_PARAM } from "../lib/solutions/solution-context";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
   mockRequestTrips,
@@ -5726,19 +5729,29 @@ check(
 
 
 // ---------------------------------------------------------------------------
-console.log("\n20. Now / Fixed — one rule, named once, and not yet reachable");
+console.log("\n20. Now / Fixed — one rule, named once, reached by one seam");
 // ---------------------------------------------------------------------------
 /**
- * B1 of the "what happens now" slice. The mode does not exist in the UI yet:
- * `solution-context.tsx` pins it to `"fixed"`, which is the side the app has
- * shown since Phase 1. So the claim these checks have to make falsifiable is a
- * narrow one — **the rule is named once, every gate reads that one name, and
- * nothing the driver sees has moved.**
+ * The "what happens now" slice, B1 and B2.
  *
- * ⛔ The 290 checks above are the other half of that claim. They all run with
- * the mode pinned to `"fixed"` via `FIXED()`, so any behaviour that shifted in
- * the refactor fails there, not here.
+ * **B1** named the rule — `showsProposal` — and converted the five guards and
+ * three builders to take a `DemoFocus`, with the mode pinned so nothing moved.
+ * **B2** replaced the pin with state: `focus()` lands on `"now"`, `setMode`
+ * flips without navigating, and `?mode=fixed` seeds and mirrors the other side.
+ *
+ * Three claims these have to make falsifiable:
+ *
+ * 1. **One rule.** Every gate answers what `showsProposal` answers, over the
+ *    whole matrix — not just where `"fixed"` makes them agree.
+ * 2. **Nothing moved at `"fixed"`.** The 290 checks above all run through
+ *    `FIXED()`, so a behaviour change in the refactor fails there, not here.
+ * 3. **One seam.** The mode is decided in the provider and read from the URL in
+ *    exactly one place, which is what keeps the toggle in B4 a control rather
+ *    than a fifth opinion about which side is showing.
  */
+
+/** The provider, read once — §20 asserts four orderings inside it. */
+const CTX_SRC = readFileSync(join(ROOT, "lib/solutions/solution-context.tsx"), "utf8");
 
 /* --- 20a. The truth table ------------------------------------------------ */
 /**
@@ -5801,11 +5814,19 @@ check(
     PROPOSAL_CASES.some((c) => c.inPlainMirror === false) &&
     PROPOSAL_CASES.some((c) => c.inPlainMirror === undefined),
 );
-/** ⛔ `"now"` is declared but deliberately unreachable until B2. Say so. */
+/**
+ * ⛔ Until B2 this read *"declared but not yet wired"*, and its detail line said
+ * the provider pinned `"fixed"`. B2 wired it, which made the label and the
+ * detail describe a provider that no longer exists while the assertion went on
+ * passing — a check that had stopped testing anything and still printed `ok`.
+ */
 check(
-  "...and the mode the app will LAND on is declared but not yet wired",
-  `DEFAULT_DEMO_MODE = ${DEFAULT_DEMO_MODE}, hardwired in the provider = fixed`,
-  DEFAULT_DEMO_MODE === "now" && DEMO_MODES.length === 2,
+  "...and the mode the app LANDS on is the declared default, with no pin left",
+  `DEFAULT_DEMO_MODE = ${DEFAULT_DEMO_MODE}; HARDWIRED_MODE in the provider: ` +
+    `${/HARDWIRED_MODE/.test(CTX_SRC) ? "STILL THERE" : "gone"}`,
+  DEFAULT_DEMO_MODE === "now" &&
+    DEMO_MODES.length === 2 &&
+    !/HARDWIRED_MODE/.test(CTX_SRC),
 );
 
 /* --- 20c. Every gate reads the one rule ---------------------------------- */
@@ -5971,10 +5992,170 @@ const focusBuilders = APP_FILES.flatMap((f) => {
   return hits.map(() => f);
 });
 check(
-  "the app constructs a DemoFocus in exactly one place",
+  "no screen builds its own DemoFocus — every one is made in the provider",
   `${focusBuilders.length} construction(s) across ${APP_FILES.length} file(s): ${[...new Set(focusBuilders)].join(", ") || "none"}`,
-  focusBuilders.length === 1 &&
-    focusBuilders[0] === join("lib", "solutions", "solution-context.tsx"),
+  focusBuilders.length > 0 &&
+    focusBuilders.every((f) => f === join("lib", "solutions", "solution-context.tsx")),
+);
+
+/* --- 20e. What a URL is asking for --------------------------------------- */
+/**
+ * ⛔ Absence means `"now"`, in both directions — see `DEMO_MODE_PARAM`. The two
+ * failure directions are not symmetrical, which is why the fallback is declared
+ * rather than left to a cast: falling back to `"now"` shows production, which
+ * is merely early; falling back to `"fixed"` would answer "what happens now?"
+ * with the thing we are proposing.
+ */
+const PARAM_CASES: Array<[string | null, DemoMode]> = [
+  [null, "now"],
+  ["", "now"],
+  ["now", "now"],
+  ["fixed", "fixed"],
+  ["Fixed", "now"],
+  ["FIXED", "now"],
+  [" fixed", "now"],
+  ["fixed ", "now"],
+  ["proposal", "now"],
+  ["true", "now"],
+];
+const paramWrong = PARAM_CASES.filter(([raw, want]) => modeFromParam(raw) !== want);
+check(
+  "a URL only gets the proposal side by asking for it exactly",
+  paramWrong.length
+    ? `WRONG: ${paramWrong.map(([raw]) => JSON.stringify(raw)).join(", ")}`
+    : `${PARAM_CASES.length} of ${PARAM_CASES.length} case(s) correct`,
+  paramWrong.length === 0,
+);
+check(
+  "...and that table has something to fall back FROM",
+  `${PARAM_CASES.filter(([, m]) => m === "fixed").length} fixed / ` +
+    `${PARAM_CASES.filter(([, m]) => m === "now").length} now`,
+  PARAM_CASES.some(([, m]) => m === "fixed") &&
+    // ⛔ A non-empty raw value that is not a mode name — a typo or a casing
+    // slip, not just `null` and `""`. A break test removed the six real
+    // fallback cases and this still passed on `""` alone.
+    PARAM_CASES.some(
+      ([raw, m]) => m === "now" && raw !== null && raw !== "" && raw !== "now",
+    ) &&
+    PARAM_CASES.some(([raw]) => raw !== null && raw !== "" && /fixed/i.test(raw) ),
+);
+
+/* --- 20f. What the URL is told ------------------------------------------- */
+/**
+ * ⛔⛔ Two rules, declared as literals: **`"now"` is never written**, and **the
+ * mode param never appears without a solution**. The second matters because
+ * `?mode=fixed` with no focus describes a state the app cannot be in — a URL
+ * that lies to whoever it is sent to.
+ */
+const WRITE_CASES: Array<{ focus: DemoFocus; solution: string | null; mode: string | null }> = [
+  { focus: { solutionId: null, mode: "now" }, solution: null, mode: null },
+  { focus: { solutionId: null, mode: "fixed" }, solution: null, mode: null },
+  { focus: { solutionId: "rider-no-show", mode: "now" }, solution: "rider-no-show", mode: null },
+  { focus: { solutionId: "rider-no-show", mode: "fixed" }, solution: "rider-no-show", mode: "fixed" },
+];
+const writeWrong = WRITE_CASES.filter((c) => {
+  const got = focusParams(c.focus);
+  return got[SOLUTION_PARAM] !== c.solution || got[DEMO_MODE_PARAM] !== c.mode;
+});
+check(
+  "the URL is written with fixed spelled out and now left unsaid",
+  writeWrong.length
+    ? `WRONG: ${writeWrong.map((c) => `${c.focus.solutionId ?? "none"}/${c.focus.mode}`).join(", ")}`
+    : `${WRITE_CASES.length} of ${WRITE_CASES.length} case(s) correct`,
+  writeWrong.length === 0,
+);
+/** ⛔ Round trip: what is written has to read back as what was meant. */
+const roundTripWrong = FOCUS_IDS.flatMap((id) =>
+  DEMO_MODES.filter((m) => {
+    const written = focusParams({ solutionId: id, mode: m });
+    const readBack = modeFromParam(written[DEMO_MODE_PARAM]);
+    // With no focus the mode is not carried at all, so it reads back as the
+    // default — which is correct, because there is no side to be on.
+    return id === null ? readBack !== DEFAULT_DEMO_MODE : readBack !== m;
+  }).map((m) => `${id ?? "no focus"}/${m}`),
+);
+check(
+  "...and every focus survives the round trip through the URL",
+  `${roundTripWrong.length} lost of ${FOCUS_IDS.length * DEMO_MODES.length} (focus x mode)` +
+    (roundTripWrong.length ? ` — ${roundTripWrong.slice(0, 5).join(", ")}` : ""),
+  roundTripWrong.length === 0,
+);
+
+/* --- 20g. The provider's four orderings ---------------------------------- */
+/**
+ * ⚠️ Greps, because there is no renderer here — but greps on CODE, with the
+ * comments stripped, and each one asserting an ORDER rather than the presence
+ * of a line. A check that merely finds `setModeState` somewhere in the file
+ * would pass with the call in the wrong place, which is the only way any of
+ * these four can actually be wrong.
+ */
+const CTX_CODE = codeOnly(CTX_SRC);
+function between(haystack: string, from: string, to: string): string {
+  const a = haystack.indexOf(from);
+  const b = haystack.indexOf(to, a);
+  return a < 0 || b < 0 ? "" : haystack.slice(a, b);
+}
+
+/**
+ * The `{ … }` that follows `marker`, brace-balanced.
+ *
+ * ⛔ Found by a break test: slicing "from the `if` to the end of the effect"
+ * includes everything AFTER the branch closes, so moving a statement out of the
+ * branch left it inside the slice and the check went on passing. A block has to
+ * be read as a block.
+ */
+function balancedBlock(src: string, marker: string): string {
+  const start = src.indexOf(marker);
+  if (start < 0) return "";
+  const open = src.indexOf("{", start);
+  if (open < 0) return "";
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}" && --depth === 0) return src.slice(open, i + 1);
+  }
+  return "";
+}
+
+const ctxFocusBody = between(CTX_CODE, "const focus = useCallback", "const clear = useCallback");
+check(
+  "focus() resets the mode BEFORE it claims the navigation",
+  ctxFocusBody.includes("setModeState(DEFAULT_DEMO_MODE)")
+    ? `reset at ${ctxFocusBody.indexOf("setModeState(DEFAULT_DEMO_MODE)")}, pendingFocus at ${ctxFocusBody.indexOf("pendingFocus.current =")}`
+    : "NOT FOUND — a switch would inherit the previous row's side",
+  ctxFocusBody.includes("setModeState(DEFAULT_DEMO_MODE)") &&
+    ctxFocusBody.includes("pendingFocus.current =") &&
+    ctxFocusBody.indexOf("setModeState(DEFAULT_DEMO_MODE)") < ctxFocusBody.indexOf("pendingFocus.current ="),
+);
+
+const clearBody = between(CTX_CODE, "const clear = useCallback", "const value = useMemo");
+check(
+  "...and clear() puts the mode back too, so no path skips the reset",
+  clearBody.includes("setModeState(DEFAULT_DEMO_MODE)") ? "setModeState(DEFAULT_DEMO_MODE)" : "NOT FOUND",
+  clearBody.includes("setModeState(DEFAULT_DEMO_MODE)"),
+);
+
+const setModeBody = between(CTX_CODE, "const setMode = useCallback", "const value = useMemo");
+check(
+  "...and setMode sets state without navigating",
+  setModeBody.includes("router") ? "NAVIGATES — the ride under the toggle would remount" : "state only",
+  setModeBody.length > 0 && !setModeBody.includes("router"),
+);
+
+/**
+ * ⛔⛔ The D80 trap, in its second incarnation. `writeParams` mirrors with
+ * `history.replaceState`, which Next's router never observes — so an effect
+ * that re-read the mode param on every render would see the pre-flip value a
+ * tick after `setMode` and put it back. The mode may be read from the URL in
+ * exactly one place: inside the branch that is already adopting a new id.
+ */
+const adoptBranch = balancedBlock(CTX_CODE, 'if (decision === "adopt" && paramId)');
+const modeReads = (CTX_CODE.match(/setModeState\(modeFromParam\(/g) ?? []).length;
+check(
+  "the mode is adopted only alongside an id, never re-read on its own",
+  `${modeReads} place(s) read the mode param into state; ` +
+    `${adoptBranch.includes("setModeState(modeFromParam(") ? "inside" : "OUTSIDE"} the adopt branch`,
+  modeReads === 1 && adoptBranch.includes("setModeState(modeFromParam("),
 );
 
 // ---------------------------------------------------------------------------

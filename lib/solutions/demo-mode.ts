@@ -40,8 +40,31 @@ export const DEMO_MODES = ["now", "fixed"] as const;
  */
 export const DEFAULT_DEMO_MODE: DemoMode = "now";
 
-/** The query param the mode is mirrored into. ⛔ Only ever `"fixed"` — see B2. */
+/**
+ * The query param the mode is mirrored into.
+ *
+ * ⛔⛔ **Only ever `"fixed"`.** `"now"` is the default, so writing it would put
+ * a param on the URL that says what its own absence already says — and every
+ * link shared before B2 existed would then mean something different from a link
+ * shared after it. Absence means `"now"`, in both directions.
+ */
 export const DEMO_MODE_PARAM = "mode";
+
+/**
+ * The mode a URL is asking for.
+ *
+ * ⛔ Anything that is not exactly `"fixed"` or `"now"` is `DEFAULT_DEMO_MODE` —
+ * a missing param, an empty one, a typo, a casing slip. The proposal side has
+ * to be asked for explicitly, because the failure directions are not
+ * symmetrical: falling back to `"now"` shows production, which is merely early;
+ * falling back to `"fixed"` would show the proposal and quietly answer "what
+ * happens now?" with the thing we are proposing.
+ */
+export function modeFromParam(raw: string | null): DemoMode {
+  return raw !== null && (DEMO_MODES as readonly string[]).includes(raw)
+    ? (raw as DemoMode)
+    : DEFAULT_DEMO_MODE;
+}
 
 /** What the app is being asked to show. */
 export interface DemoFocus {

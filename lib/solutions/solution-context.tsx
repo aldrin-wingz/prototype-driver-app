@@ -13,7 +13,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { findSolution, SOLUTION_HOME, type Solution } from "./catalogue";
 import { adoptDecision, keepClearedMemory } from "./adopt-rules";
-import { demoFocus, type DemoFocus, type DemoMode } from "./demo-mode";
+import {
+  DEFAULT_DEMO_MODE,
+  DEMO_MODE_PARAM,
+  demoFocus,
+  modeFromParam,
+  type DemoFocus,
+  type DemoMode,
+} from "./demo-mode";
 
 /**
  * Which proposed feature the prototype is currently focused on.
@@ -37,21 +44,6 @@ import { demoFocus, type DemoFocus, type DemoMode } from "./demo-mode";
  */
 export const SOLUTION_PARAM = "solution";
 
-/**
- * ⛔⛔ **The ONE place the demo mode is decided, and for now it is pinned.**
- *
- * B1 names the rule and converts every guard and builder to take a `DemoFocus`,
- * with the mode hardwired to `"fixed"` — the side the app has always shown — so
- * the walked app is byte-identical to the commit before it. B2 replaces this
- * constant with real state; a check asserts it is the only `DemoMode` literal
- * outside `demo-mode.ts`, so there is exactly one seam to move.
- *
- * ⚠️ Deliberately NOT `DEFAULT_DEMO_MODE`. That constant is `"now"` — the mode
- * the app will LAND on once there is a toggle to get back from. Wiring it in
- * before B4 would hide every proposal behind a switch that does not exist yet.
- */
-const HARDWIRED_MODE: DemoMode = "fixed";
-
 interface SolutionValue {
   /** `undefined` when nothing is focused — the app runs as the plain mirror. */
   active: Solution | undefined;
@@ -62,6 +54,17 @@ interface SolutionValue {
    * reads React. Every proposal guard takes this.
    */
   demo: DemoFocus;
+  /** Which side of the focused row is showing. Meaningless with no focus. */
+  mode: DemoMode;
+  /**
+   * Flip the focused row between production and the proposal.
+   *
+   * ⛔ Sets state and NOTHING else. Flipping the toggle on a ride detail has to
+   * leave you on that ride — a navigation here would remount the screen and
+   * throw away the ride-flow state the comparison is being made against, which
+   * is the whole reason there is a mode rather than two separate links.
+   */
+  setMode: (mode: DemoMode) => void;
   /** Focus a solution and navigate to its entry point, if it has one. */
   focus: (solution: Solution) => void;
   clear: () => void;
@@ -89,10 +92,32 @@ export function solutionHref(route: string, id: string): string {
   return `${route}${separator}${SOLUTION_PARAM}=${encodeURIComponent(id)}`;
 }
 
-function writeParam(id: string | null) {
+/**
+ * What the URL should say, for a focus. `null` means "delete this param".
+ *
+ * ⛔ Pure and exported so the rule can be truth-tabled instead of walked. Two
+ * things it encodes, both load-bearing:
+ *
+ * **`"now"` is never written.** Absence means `"now"` — see `DEMO_MODE_PARAM`.
+ *
+ * **The mode param never appears without a solution.** With no focus there is
+ * no side to be on, so `?mode=fixed` alone would describe a state the app
+ * cannot be in, and a reader of the URL would be told something false.
+ */
+export function focusParams(focus: DemoFocus): Record<string, string | null> {
+  return {
+    [SOLUTION_PARAM]: focus.solutionId,
+    [DEMO_MODE_PARAM]:
+      focus.solutionId !== null && focus.mode === "fixed" ? focus.mode : null,
+  };
+}
+
+function writeParams(focus: DemoFocus) {
   const url = new URL(window.location.href);
-  if (id) url.searchParams.set(SOLUTION_PARAM, id);
-  else url.searchParams.delete(SOLUTION_PARAM);
+  for (const [key, value] of Object.entries(focusParams(focus))) {
+    if (value === null) url.searchParams.delete(key);
+    else url.searchParams.set(key, value);
+  }
   window.history.replaceState(null, "", url);
 }
 
@@ -102,8 +127,15 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  /**
+   * ⛔ Seeded from `DEFAULT_DEMO_MODE`, which is `"now"`. The plain mirror has
+   * no focus, so this is inert until one is picked — `showsProposal` returns on
+   * the `null` branch before the mode is read at all.
+   */
+  const [mode, setModeState] = useState<DemoMode>(DEFAULT_DEMO_MODE);
 
   const paramId = searchParams.get(SOLUTION_PARAM);
+  const paramMode = searchParams.get(DEMO_MODE_PARAM);
 
   /**
    * ⛔⛔ **The path a `focus()` navigation is heading for, while it is in
@@ -153,8 +185,25 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
     // ⚠️ Forget the clear as soon as the URL stops echoing it, or a later deep
     // link to the SAME solution would be ignored for the life of the page.
     if (!keepClearedMemory(clearedId.current, paramId)) clearedId.current = null;
-    if (decision === "adopt" && paramId) setActiveId(paramId);
-  }, [paramId, activeId]);
+    if (decision === "adopt" && paramId) {
+      setActiveId(paramId);
+      /**
+       * ⛔⛔ **The mode is adopted ONLY here, as part of taking a new id —
+       * never on its own, on any other render.**
+       *
+       * This is the `clear()` bug's shape (D80) and it would come straight
+       * back. `writeParams` mirrors with `history.replaceState`, which Next's
+       * router never observes, so `useSearchParams()` goes on returning the
+       * mode from before the flip. An effect that re-read it every render
+       * would see `"now"` a tick after `setMode("fixed")` and put it back —
+       * a toggle that visibly bounces, with nothing in the console.
+       *
+       * One seed, and it only ever widens: `(paramId, paramMode)` arrive
+       * together or not at all.
+       */
+      setModeState(modeFromParam(paramMode));
+    }
+  }, [paramId, paramMode, activeId]);
 
   /**
    * ⛔⛔ **The path a `focus()` navigation is heading for, while it is in
@@ -178,16 +227,23 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
       if (pathname !== pendingFocus.current && paramId !== activeId) return;
       pendingFocus.current = null;
     }
-    if (activeId && paramId !== activeId) writeParam(activeId);
-  }, [activeId, paramId, pathname]);
+    /**
+     * ⚠️ Compared on BOTH axes. `paramMode` may be stale — see the adopt effect
+     * — but that only ever causes a redundant write of the value state already
+     * holds, never a write of the stale value itself. State leads; the URL
+     * follows.
+     */
+    const urlAgrees = paramId === activeId && modeFromParam(paramMode) === mode;
+    if (activeId && !urlAgrees) writeParams({ solutionId: activeId, mode });
+  }, [activeId, mode, paramId, paramMode, pathname]);
 
   const active = findSolution(activeId);
   // ⛔ Built through `demoFocus`, never as a bare object literal — a check
   // asserts this is the ONLY construction in the app, which is what keeps B2 a
   // one-line change instead of a hunt through the screens.
   const demo = useMemo<DemoFocus>(
-    () => demoFocus(activeId, HARDWIRED_MODE),
-    [activeId],
+    () => demoFocus(activeId, mode),
+    [activeId, mode],
   );
 
   const focus = useCallback(
@@ -195,6 +251,19 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
       // ⛔ A new focus ends any memory of a clear, so re-picking the row that
       // was just cleared works rather than being swallowed as its own echo.
       clearedId.current = null;
+      /**
+       * ⛔⛔ **The mode resets BEFORE anything else, including `pendingFocus`.**
+       *
+       * An inherited mode is exactly a half-switch: the right ride, the wrong
+       * side of it, and nothing errors. Someone who had row 01 on `"fixed"` and
+       * picked row 16 would land on row 16's ride already showing the proposal,
+       * having never seen what happens today — which is the one thing the
+       * whole slice exists to show.
+       *
+       * ⭐ `DEFAULT_DEMO_MODE` is `"now"`: picking a row lands on the dead end,
+       * and the toggle is how you get to the fix. That order is the argument.
+       */
+      setModeState(DEFAULT_DEMO_MODE);
       setActiveId(solution.id);
       /**
        * ⛔ **Switching ALWAYS moves the app.** An entry point goes to where the
@@ -210,6 +279,9 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
       // Claimed BEFORE the push, so the mirror effect's very first render after
       // `setActiveId` already knows to stay out of the way.
       pendingFocus.current = target.split("?")[0];
+      // ⚠️ `solutionHref` deliberately carries no mode. The push lands on a URL
+      // with no `?mode`, which reads back as `"now"` — the same thing the state
+      // above was just set to, so nothing to reconcile on arrival.
       router.push(solutionHref(target, solution.id));
     },
     [router],
@@ -220,12 +292,27 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
     // nothing left to tell the stale param apart from a fresh deep link.
     clearedId.current = activeId;
     setActiveId(null);
-    writeParam(null);
+    /**
+     * ⚠️ The mode is meaningless without a focus, so it goes back to the
+     * default rather than lingering. Without this, clearing from `"fixed"` and
+     * then deep-linking a row would be the only path that skipped `focus()` and
+     * so kept the old side — one route into a half-switch, left open.
+     */
+    setModeState(DEFAULT_DEMO_MODE);
+    writeParams({ solutionId: null, mode: DEFAULT_DEMO_MODE });
   }, [activeId]);
 
+  /**
+   * ⛔ Sets state, never navigates — see `SolutionValue.setMode`. Declared
+   * immediately before `value` so a check can read this statement on its own:
+   * a slice that ran to the next `const` swept up `focus` and `clear`, both of
+   * which legitimately call `router`, and the check failed on their code.
+   */
+  const setMode = useCallback((next: DemoMode) => setModeState(next), []);
+
   const value = useMemo<SolutionValue>(
-    () => ({ active, demo, focus, clear, pickerOpen, setPickerOpen }),
-    [active, demo, focus, clear, pickerOpen],
+    () => ({ active, demo, mode, setMode, focus, clear, pickerOpen, setPickerOpen }),
+    [active, demo, mode, setMode, focus, clear, pickerOpen],
   );
 
   return <SolutionContext.Provider value={value}>{children}</SolutionContext.Provider>;
