@@ -6906,7 +6906,15 @@ if (STANDING && PLAIN_SEND_BACK) {
     sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ") ===
       "reason → confirm → standing-order → penalty",
   );
-  /** ⛔ And every other path still completes, or this is a block not a gate. */
+  /**
+   * ⛔ Every other path still completes, or this is a block not a gate.
+   *
+   * ⭐⭐ Including the PROPOSED standing-order path, and that is a recorded
+   * decision rather than an accident: user direction, 2026-10-14, *"leave it,
+   * the proposal is about reasons not permissions."* Row 13 proposes collecting
+   * a reason, not lifting production's block. This check is what stops either
+   * half of that being changed quietly.
+   */
   const blocked = PATHS.filter((c) => !sendBackCompletes(sendBackSteps(c.trip, c.focus)));
   check(
     "...while every other path still finishes",

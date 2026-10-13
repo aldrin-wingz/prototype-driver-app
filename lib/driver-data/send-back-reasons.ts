@@ -269,6 +269,21 @@ export function sendBackSteps(trip: Trip, focus: DemoFocus): SendBackStep[] {
     return now;
   }
 
+  /**
+   * ⛔⛔ **The proposal still lets a standing order be sent back, and that is a
+   * DECISION, not an oversight.** User direction, 2026-10-14: *"leave it, the
+   * proposal is about reasons not permissions."*
+   *
+   * Production refuses outright (`CAP-330`). Row 13 proposes collecting a
+   * reason on every send-back; it does not propose lifting the block, and a
+   * prototype that quietly lifted it would be arguing for a change nobody
+   * asked for — on the row whose whole point is a smaller one.
+   *
+   * ⚠️ So the comparison on a standing order is deliberately lopsided: Now
+   * refuses, Proposed proceeds. Anyone reading that as a bug should read this
+   * first. §24 asserts the Proposed path still completes, so the decision
+   * cannot be silently "fixed" either way.
+   */
   const steps: SendBackStep[] = ["reason"];
   if (SEND_BACK_CONFIRM_BUILT) steps.push("confirm");
   if (isStandingOrder(trip)) steps.push("standing-order");
