@@ -65,8 +65,16 @@ interface SolutionValue {
    * is the whole reason there is a mode rather than two separate links.
    */
   setMode: (mode: DemoMode) => void;
-  /** Focus a solution and navigate to its entry point, if it has one. */
-  focus: (solution: Solution) => void;
+  /**
+   * Focus a solution, navigate to its entry point, and land on a side of it.
+   *
+   * ⛔ `mode` defaults to `DEFAULT_DEMO_MODE`, and is never INHERITED. The
+   * old signature had no parameter and always reset; B6 made the side
+   * explicit so the table’s two columns can each ask for one, but the
+   * property that mattered is unchanged — every switch states which side it
+   * wants, so none of them can quietly keep the previous row’s.
+   */
+  focus: (solution: Solution, mode?: DemoMode) => void;
   clear: () => void;
   pickerOpen: boolean;
   setPickerOpen: (open: boolean) => void;
@@ -247,7 +255,7 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   );
 
   const focus = useCallback(
-    (solution: Solution) => {
+    (solution: Solution, mode: DemoMode = DEFAULT_DEMO_MODE) => {
       // ⛔ A new focus ends any memory of a clear, so re-picking the row that
       // was just cleared works rather than being swallowed as its own echo.
       clearedId.current = null;
@@ -261,9 +269,16 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
        * whole slice exists to show.
        *
        * ⭐ `DEFAULT_DEMO_MODE` is `"now"`: picking a row lands on the dead end,
-       * and the toggle is how you get to the fix. That order is the argument.
+       * and the toggle is how you get to the fix. That order is the argument,
+       * and it is what an un-argumented `focus(solution)` still does — the
+       * picker drawer and the strip both call it that way.
+       *
+       * ⚠️ B6 made the side an ARGUMENT so the desktop table’s Proposed
+       * Feature column can land on `"fixed"` directly. The anti-inheritance
+       * property survives because the parameter has a DEFAULT: every call sets
+       * the mode, so none of them can carry the previous row’s over.
        */
-      setModeState(DEFAULT_DEMO_MODE);
+      setModeState(mode);
       setActiveId(solution.id);
       /**
        * ⛔ **Switching ALWAYS moves the app.** An entry point goes to where the
@@ -279,9 +294,13 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
       // Claimed BEFORE the push, so the mirror effect's very first render after
       // `setActiveId` already knows to stay out of the way.
       pendingFocus.current = target.split("?")[0];
-      // ⚠️ `solutionHref` deliberately carries no mode. The push lands on a URL
-      // with no `?mode`, which reads back as `"now"` — the same thing the state
-      // above was just set to, so nothing to reconcile on arrival.
+      /**
+       * ⚠️ `solutionHref` deliberately carries no mode, on either side. On
+       * `"now"` the URL already agrees. On `"fixed"` the mirror effect writes
+       * `?mode=fixed` once the push lands — and the adopt effect cannot undo
+       * it, because it reads the mode ONLY while taking an id it does not
+       * already hold, and `activeId` was set to this id synchronously above.
+       */
       router.push(solutionHref(target, solution.id));
     },
     [router],

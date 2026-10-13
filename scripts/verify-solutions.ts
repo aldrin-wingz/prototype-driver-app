@@ -32,6 +32,16 @@ import {
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import { mergedRunCounts, tableRows } from "../lib/solutions/table-shape";
+import {
+  COLUMN_MODE,
+  INERT_COLUMNS,
+  SELECTING_COLUMNS,
+  cellSelected,
+  selectAction,
+  type SelectAction,
+  type SelectingColumn,
+  type TableColumn,
+} from "../lib/solutions/table-select";
 import { adoptDecision, keepClearedMemory, type AdoptDecision, type AdoptInput } from "../lib/solutions/adopt-rules";
 import {
   changeAnchors,
@@ -557,7 +567,19 @@ const BANNED = ["booking", "BUILT", "NOT-BUILT"];
 const offenders: string[] = [];
 let fieldsScanned = 0;
 for (const s of SOLUTIONS) {
-  const fields = [s.problem, s.useCase, s.proposedFeature, s.noSurfaceReason ?? "", s.entry?.label ?? ""];
+  const fields = [
+    s.problem,
+    s.useCase,
+    s.proposedFeature,
+    // ⭐ B6's two new strings. Both are driver-facing copy on the desktop
+    // table, so the locked vocabulary applies to them exactly as it does to the
+    // fields they shortened — and a field added without being added HERE is a
+    // field the vocabulary rule silently stopped covering.
+    s.tableSummary,
+    s.noSurfaceReason ?? "",
+    s.entry?.label ?? "",
+    ...(s.entry?.alternates ?? []).flatMap((a) => [a.label, a.short]),
+  ];
   for (const text of fields) {
     fieldsScanned++;
     for (const word of BANNED) {
@@ -5581,10 +5603,13 @@ check(
  * one-way trip with no way back and no way to a slice's other states.
  */
 const tableSrc = readFileSync(join(ROOT, "components/solutions-dev/solution-table.tsx"), "utf8");
-const MOVED_OFF_STRIP = ["clear", "alternates", "noSurfaceReason", "entry.label"] as const;
-const notMoved = MOVED_OFF_STRIP.filter((needle) =>
-  needle === "entry.label" ? !tableSrc.includes("entry.label") : !tableSrc.includes(needle),
-);
+/**
+ * ⚠️ B6 dropped `entry.label` from this list — see §25, which asserts it is
+ * GONE from the table's code rather than present in it. The other three are
+ * still the only way out of a focus and into a slice's other states at desktop.
+ */
+const MOVED_OFF_STRIP = ["clear", "alternates", "noSurfaceReason"] as const;
+const notMoved = MOVED_OFF_STRIP.filter((needle) => !codeOnly(tableSrc).includes(needle));
 check(
   "everything the strip carried alone has a home in the table",
   notMoved.length ? `MISSING: ${notMoved.join(", ")}` : `${MOVED_OFF_STRIP.length} of ${MOVED_OFF_STRIP.length} moved`,
@@ -6171,14 +6196,38 @@ function balancedBlock(src: string, marker: string): string {
 }
 
 const ctxFocusBody = between(CTX_CODE, "const focus = useCallback", "const clear = useCallback");
+/**
+ * ⛔⛔ **The side is an ARGUMENT, and the argument has a DEFAULT.**
+ *
+ * Until B6 this read `setModeState(DEFAULT_DEMO_MODE)` with no parameter at
+ * all. B6 gave the desktop table two columns that each ask for a side, so the
+ * constant moved into the signature — and the property that mattered is
+ * unchanged BECAUSE of the default: every call sets the mode, so no switch can
+ * carry the previous row's over. A parameter with NO default would lose that
+ * silently, on exactly the call sites that omit it, which is why the default
+ * is asserted here and not merely assumed.
+ */
+const FOCUS_DEFAULTED_PARAM = /mode: DemoMode = DEFAULT_DEMO_MODE/;
+const focusOrdering =
+  ctxFocusBody.includes("setModeState(mode)") &&
+  ctxFocusBody.includes("pendingFocus.current =") &&
+  ctxFocusBody.indexOf("setModeState(mode)") < ctxFocusBody.indexOf("pendingFocus.current =");
 check(
-  "focus() resets the mode BEFORE it claims the navigation",
-  ctxFocusBody.includes("setModeState(DEFAULT_DEMO_MODE)")
-    ? `reset at ${ctxFocusBody.indexOf("setModeState(DEFAULT_DEMO_MODE)")}, pendingFocus at ${ctxFocusBody.indexOf("pendingFocus.current =")}`
-    : "NOT FOUND — a switch would inherit the previous row's side",
-  ctxFocusBody.includes("setModeState(DEFAULT_DEMO_MODE)") &&
-    ctxFocusBody.includes("pendingFocus.current =") &&
-    ctxFocusBody.indexOf("setModeState(DEFAULT_DEMO_MODE)") < ctxFocusBody.indexOf("pendingFocus.current ="),
+  "focus() sets the mode from a defaulted argument, BEFORE it claims the navigation",
+  FOCUS_DEFAULTED_PARAM.test(ctxFocusBody)
+    ? `(mode: DemoMode = DEFAULT_DEMO_MODE); set at ${ctxFocusBody.indexOf("setModeState(mode)")}, pendingFocus at ${ctxFocusBody.indexOf("pendingFocus.current =")}`
+    : "NO DEFAULTED PARAMETER — a switch that omits the side would inherit the previous row's",
+  FOCUS_DEFAULTED_PARAM.test(ctxFocusBody) && focusOrdering,
+);
+/**
+ * ⛔ Non-vacuity for the line above: the default has to BE the production
+ * side. A signature defaulting to `"fixed"` would satisfy "every call sets the
+ * mode" and would answer "what happens now?" with the thing we are proposing.
+ */
+check(
+  "...and the side it defaults to is the one that shows production",
+  `DEFAULT_DEMO_MODE = ${DEFAULT_DEMO_MODE}`,
+  DEFAULT_DEMO_MODE === "now",
 );
 
 const clearBody = between(CTX_CODE, "const clear = useCallback", "const value = useMemo");
@@ -6231,28 +6280,55 @@ const TOGGLE_CODE = codeOnly(TOGGLE_SRC);
 const STRIP_SRC = readFileSync(join(ROOT, "components/solutions-dev/solution-strip.tsx"), "utf8");
 const TABLE_SRC = readFileSync(join(ROOT, "components/solutions-dev/solution-table.tsx"), "utf8");
 
-/* --- 21a. It is one component, mounted in both places -------------------- */
+/* --- 21a. One mount, and it is the one that is always reachable ---------- */
 /**
- * ⚠️ Two mounts are fine — both read the same `mode` and call the same
- * `setMode`, so they cannot disagree. Two COPIES of the markup could, which is
- * the thing this asserts against.
+ * ⚠️ **B6 moved this.** The toggle used to be mounted twice — in the strip
+ * and in the focused table row. B6 made the table's Use Case and Proposed
+ * Feature columns the desktop control, so that second mount is gone and §25
+ * is what asserts its replacement works.
+ *
+ * ⛔⛔ The strip's mount is NOT optional and never becomes so. Below 1280px
+ * there is no table at all, so this is the only control at that width —
+ * deleting it would leave the production side reachable only by hand-editing a
+ * query string on a phone.
  */
 const MOUNTS: Array<[string, string]> = [
   ["the briefing strip (every width)", STRIP_SRC],
-  ["the focused table row (desktop)", TABLE_SRC],
 ];
 const missingMount = MOUNTS.filter(([, src]) => !src.includes("<DemoModeToggle"));
 check(
-  "the toggle is mounted everywhere a focus is shown",
+  "the toggle is mounted where it is the only control — the strip, at every width",
   missingMount.length
     ? `MISSING: ${missingMount.map(([name]) => name).join(", ")}`
     : `${MOUNTS.length} of ${MOUNTS.length} — ${MOUNTS.map(([n]) => n).join("; ")}`,
   missingMount.length === 0,
 );
+/**
+ * ⛔ And the table does NOT mount it. Two controls for one mode is fine —
+ * both go through the provider — but two controls in the same place, one of
+ * them a segmented switch sitting above the two columns that do the same job,
+ * is a reviewer asking which one is real.
+ */
 check(
-  "...and neither place hand-rolls a second copy of it",
-  `setMode outside the component: ${MOUNTS.filter(([, src]) => codeOnly(src).includes("setMode")).length}`,
-  MOUNTS.every(([, src]) => !codeOnly(src).includes("setMode")),
+  "...and the desktop table no longer mounts it, because its columns replaced it",
+  TABLE_SRC.includes("<DemoModeToggle")
+    ? "STILL MOUNTED — two controls for one mode, in one place"
+    : "the two columns are the desktop control",
+  !TABLE_SRC.includes("<DemoModeToggle"),
+);
+/**
+ * ⛔⛔ **But it must not hand-roll one either.** The real risk B6 introduced
+ * is a second segmented switch spelled out in the table rather than imported.
+ * The table legitimately calls `setMode` now — that is how a cell flips the
+ * side in place — so the guard moved to the MARKUP: a control built from
+ * `DEMO_MODES` is the toggle, and there may be only one of those.
+ */
+check(
+  "...and neither surface hand-rolls a second copy of the control",
+  `DEMO_MODES.map in the strip: ${/DEMO_MODES\.map/.test(codeOnly(STRIP_SRC))}; in the table: ${/DEMO_MODES\.map/.test(codeOnly(TABLE_SRC))}`,
+  !/DEMO_MODES\.map/.test(codeOnly(STRIP_SRC)) &&
+    !/DEMO_MODES\.map/.test(codeOnly(TABLE_SRC)) &&
+    !codeOnly(STRIP_SRC).includes("setMode"),
 );
 
 /* --- 21b. No focus, no side ---------------------------------------------- */
@@ -6990,6 +7066,483 @@ check(
   /<SendBackDeniedDialog/.test(MORE_SRC) ? "mounted" : "MISSING",
   /<SendBackDeniedDialog/.test(MORE_SRC),
 );
+
+// ---------------------------------------------------------------------------
+console.log("\n25. B6 — the table IS the selector");
+// ---------------------------------------------------------------------------
+/**
+ * Four changes the user asked for on 2026-10-14, and the one risk each carries.
+ *
+ * 1. **The cells are the switch.** Use Case shows today, Proposed Feature shows
+ *    the fix, the selected one is lit, and the other four columns are inert.
+ *    ⛔ The risk: a row that can no longer be focused at all. The Use Case
+ *    column MERGES, so a covered row has no use-case cell of its own — it stays
+ *    reachable only because the Proposed Feature column never merges.
+ * 2. **Only the body scrolls.** ⛔ The risk is the obvious implementation: a
+ *    `<tbody>` with its own `overflow-y` must become a block box, and then it
+ *    no longer shares the table's column widths.
+ * 3. **A one-sentence feature column.** ⛔ The risk is editing `proposedFeature`
+ *    to fit, which would stop the catalogue mirroring the spreadsheet § 1
+ *    checks it against. A SECOND field instead.
+ * 4. **No prose under the selection.** ⛔ The risk is deleting the alternates
+ *    with the paragraphs attached to them — 11 buttons across 9 rows that are
+ *    the only route to 11 demonstrable states.
+ */
+const B6_TABLE = readFileSync(join(ROOT, "components/solutions-dev/solution-table.tsx"), "utf8");
+const B6_TABLE_CODE = codeOnly(B6_TABLE);
+
+/* --- 25a. What a click on a cell means ----------------------------------- */
+/**
+ * ⛔ Declared as literals, answers included. The three outcomes are not
+ * interchangeable: `"focus"` moves the app, `"set-mode"` deliberately does NOT,
+ * and `"nothing"` exists so that clicking the lit cell three screens into a
+ * demo does not yank you back to the entry route.
+ */
+const SELECT_CASES: Array<{
+  why: string;
+  clickedId: string;
+  column: SelectingColumn;
+  activeId: string | null;
+  activeMode: DemoMode;
+  want: SelectAction;
+}> = [
+  { why: "nothing focused, use case", clickedId: "a", column: "use-case", activeId: null, activeMode: "now", want: "focus" },
+  { why: "nothing focused, proposed feature", clickedId: "a", column: "proposed-feature", activeId: null, activeMode: "now", want: "focus" },
+  { why: "another row's use case", clickedId: "a", column: "use-case", activeId: "b", activeMode: "now", want: "focus" },
+  { why: "another row's proposed feature", clickedId: "a", column: "proposed-feature", activeId: "b", activeMode: "fixed", want: "focus" },
+  { why: "⭐ the focused row's use case, while showing the proposal", clickedId: "a", column: "use-case", activeId: "a", activeMode: "fixed", want: "set-mode" },
+  { why: "⭐ the focused row's proposed feature, while showing today", clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "now", want: "set-mode" },
+  { why: "⛔ the lit use-case cell, clicked again", clickedId: "a", column: "use-case", activeId: "a", activeMode: "now", want: "nothing" },
+  { why: "⛔ the lit proposed-feature cell, clicked again", clickedId: "a", column: "proposed-feature", activeId: "a", activeMode: "fixed", want: "nothing" },
+];
+const selectWrong = SELECT_CASES.filter(
+  (c) =>
+    selectAction({
+      clickedId: c.clickedId,
+      column: c.column,
+      activeId: c.activeId,
+      activeMode: c.activeMode,
+    }) !== c.want,
+);
+check(
+  "a click on a cell is decided by one rule, with a declared truth table",
+  selectWrong.length
+    ? `WRONG: ${selectWrong.map((c) => c.why).join("; ")}`
+    : `${SELECT_CASES.length} of ${SELECT_CASES.length} case(s) correct`,
+  selectWrong.length === 0,
+);
+/**
+ * ⛔⛔ Non-vacuity. A table that only ever expected `"focus"` would pass over a
+ * rule that had lost both of the other outcomes — and losing `"set-mode"` is
+ * precisely the regression that would make every flip remount the ride the
+ * comparison is being made against.
+ */
+const selectSeen = new Set(SELECT_CASES.map((c) => c.want));
+const selectColumns = new Set(SELECT_CASES.map((c) => c.column));
+const selectModes = new Set(SELECT_CASES.map((c) => c.activeMode));
+check(
+  "...and that table reaches all three outcomes, both columns and both modes",
+  `${selectSeen.size} of 3 outcome(s) — ${[...selectSeen].sort().join(", ")}; ` +
+    `${selectColumns.size} of ${SELECTING_COLUMNS.length} column(s); ${selectModes.size} of ${DEMO_MODES.length} mode(s)`,
+  selectSeen.size === 3 &&
+    selectSeen.has("focus") &&
+    selectSeen.has("set-mode") &&
+    selectSeen.has("nothing") &&
+    selectColumns.size === SELECTING_COLUMNS.length &&
+    selectModes.size === DEMO_MODES.length,
+);
+/**
+ * ⛔⛔ The two columns must mean DIFFERENT sides, and between them cover both.
+ * Mapped the same way, the table would still highlight, still focus, still
+ * look like a selector — and both columns would show the proposal, which is
+ * the one thing the whole slice exists not to do.
+ */
+const columnModes = SELECTING_COLUMNS.map((c) => COLUMN_MODE[c]);
+check(
+  "the two selecting columns mean the two different sides",
+  `${SELECTING_COLUMNS.map((c) => `${c}=${COLUMN_MODE[c]}`).join(", ")}`,
+  COLUMN_MODE["use-case"] === "now" &&
+    COLUMN_MODE["proposed-feature"] === "fixed" &&
+    new Set(columnModes).size === DEMO_MODES.length,
+);
+/**
+ * ⛔ The six columns are partitioned: two select, four do not, none is both and
+ * none is neither. A column dropped from both lists is a column whose
+ * behaviour nothing here describes.
+ */
+const DECLARED_COLUMNS: TableColumn[] = [
+  "subject-area",
+  "calls",
+  "share",
+  "problem",
+  "use-case",
+  "proposed-feature",
+];
+const partitioned = [...SELECTING_COLUMNS, ...INERT_COLUMNS];
+check(
+  "every column is either a control or declared inert, and none is both",
+  `${SELECTING_COLUMNS.length} selecting + ${INERT_COLUMNS.length} inert = ${partitioned.length} of ${DECLARED_COLUMNS.length}`,
+  partitioned.length === DECLARED_COLUMNS.length &&
+    new Set(partitioned).size === DECLARED_COLUMNS.length &&
+    DECLARED_COLUMNS.every((c) => partitioned.includes(c)) &&
+    (INERT_COLUMNS as readonly string[]).join(",") === "subject-area,calls,share,problem",
+);
+
+/* --- 25b. Which cell is lit ---------------------------------------------- */
+/**
+ * ⚠️ The merged case is the one worth writing down. Rows 09+10 and 11+12 share
+ * one Use Case cell, drawn by the first row of the run — so focusing row 10 has
+ * to light a cell that row 09 renders, or the selected row has no highlight.
+ */
+const LIT_CASES: Array<{ why: string; runIds: string[]; column: SelectingColumn; activeId: string | null; activeMode: DemoMode; want: boolean }> = [
+  { why: "no focus at all", runIds: ["a"], column: "use-case", activeId: null, activeMode: "now", want: false },
+  { why: "the focused row's use case, on now", runIds: ["a"], column: "use-case", activeId: "a", activeMode: "now", want: true },
+  { why: "the focused row's use case, on fixed", runIds: ["a"], column: "use-case", activeId: "a", activeMode: "fixed", want: false },
+  { why: "the focused row's proposed feature, on fixed", runIds: ["a"], column: "proposed-feature", activeId: "a", activeMode: "fixed", want: true },
+  { why: "the focused row's proposed feature, on now", runIds: ["a"], column: "proposed-feature", activeId: "a", activeMode: "now", want: false },
+  { why: "another row's cell", runIds: ["a"], column: "use-case", activeId: "z", activeMode: "now", want: false },
+  { why: "⭐ a merged cell lit by the SECOND row of its run", runIds: ["a", "b"], column: "use-case", activeId: "b", activeMode: "now", want: true },
+  { why: "⭐ ...and not lit when that row is on the other side", runIds: ["a", "b"], column: "use-case", activeId: "b", activeMode: "fixed", want: false },
+];
+const litWrong = LIT_CASES.filter(
+  (c) => cellSelected({ runIds: c.runIds, column: c.column, activeId: c.activeId, activeMode: c.activeMode }) !== c.want,
+);
+check(
+  "the highlight follows the focused row and the side it is on",
+  litWrong.length ? `WRONG: ${litWrong.map((c) => c.why).join("; ")}` : `${LIT_CASES.length} of ${LIT_CASES.length} case(s) correct`,
+  litWrong.length === 0,
+);
+check(
+  "...and that table has a lit case, an unlit case and a merged one",
+  `${LIT_CASES.filter((c) => c.want).length} lit / ${LIT_CASES.filter((c) => !c.want).length} unlit; ` +
+    `${LIT_CASES.filter((c) => c.runIds.length > 1).length} merged`,
+  LIT_CASES.some((c) => c.want) &&
+    LIT_CASES.some((c) => !c.want) &&
+    LIT_CASES.some((c) => c.runIds.length > 1 && c.want),
+);
+
+/* --- 25c. ⛔⛔ Every one of the 26 rows is still reachable ----------------- */
+/**
+ * **The check B6 exists to make.** Four of the six columns went inert, so the
+ * only ways into a focus from the table are the two that did not. The Use Case
+ * column merges, and a merged cell focuses the FIRST row of its run — so the
+ * second row of a merged run has no use-case cell of its own and depends
+ * entirely on its Proposed Feature cell, which never merges.
+ *
+ * ⛔ Counted from the rendered spans, not from the catalogue, so a merge that
+ * grew would show up here as rows going dark.
+ */
+const reachableBy = new Map<string, Set<SelectingColumn>>(
+  tRows.map((r) => [r.solution.id, new Set<SelectingColumn>()]),
+);
+for (const row of tRows) {
+  // Every row draws its own Proposed Feature cell — that column never merges.
+  reachableBy.get(row.solution.id)!.add("proposed-feature");
+  // A Use Case cell is drawn only at the head of its run, and focuses that row.
+  if (row.useCaseSpan > 0) reachableBy.get(row.useCaseRunIds[0])!.add("use-case");
+}
+const unreachable = [...reachableBy].filter(([, cols]) => cols.size === 0).map(([id]) => id);
+/**
+ * ⛔⛔ The loop above seeds every row from its Proposed Feature cell, which
+ * is only true while that column never merges. Asserted against the MARKUP, not
+ * assumed: a `rowSpan` on that cell is the obvious tidy-up — rows 17 and 18 say
+ * the same thing, so why draw it twice — and it would take the second row of
+ * that pair out of the table entirely, with nothing to see.
+ */
+const PROPOSED_CELL_TAG = B6_TABLE_CODE.match(/<SelectCell[^>]*column="proposed-feature"[^>]*>/)?.[0] ?? "";
+const proposedMerges = /rowSpan/.test(PROPOSED_CELL_TAG);
+check(
+  "every catalogue row can still be focused from the table",
+  proposedMerges
+    ? "THE PROPOSED FEATURE CELL MERGES — a covered row would have no cell of its own"
+    : unreachable.length
+      ? `UNREACHABLE: ${unreachable.join(", ")}`
+      : `${reachableBy.size} of ${EXPECTED_TABLE_ROWS} reachable, none merged away`,
+  unreachable.length === 0 && reachableBy.size === EXPECTED_TABLE_ROWS &&
+    PROPOSED_CELL_TAG.length > 0 && !proposedMerges,
+);
+/**
+ * ⛔ And the ones that depend on a single cell are named. These two are the
+ * second row of each merged use-case run — rows 10 and 12 — and if that list
+ * ever grows, a merge grew with it.
+ */
+const PROPOSED_ONLY = ["request-feed-member-filter", "vehicle-capacity-backend"];
+const proposedOnly = [...reachableBy]
+  .filter(([, cols]) => !cols.has("use-case"))
+  .map(([id]) => id)
+  .sort();
+const reachDrift = [
+  ...PROPOSED_ONLY.filter((id) => !proposedOnly.includes(id)).map((id) => `-${id}`),
+  ...proposedOnly.filter((id) => !PROPOSED_ONLY.includes(id)).map((id) => `+${id}`),
+];
+check(
+  "...and exactly the two rows under a merged use case rely on their own column",
+  reachDrift.length
+    ? `DRIFT: ${reachDrift.join(" ")}`
+    : `${proposedOnly.length} of ${EXPECTED_TABLE_ROWS} — ${proposedOnly.join(", ")}`,
+  reachDrift.length === 0 &&
+    // ⚠️ Non-vacuity: most rows must be reachable BOTH ways, or the merged
+    // column has quietly stopped being a control at all.
+    [...reachableBy].filter(([, cols]) => cols.size === 2).length ===
+      EXPECTED_TABLE_ROWS - PROPOSED_ONLY.length,
+);
+/** ⛔ `useCaseRunIds` must describe the same merge the rowspan draws. */
+const runIdDrift = tRows.filter(
+  (r) =>
+    r.useCaseRunIds.length !== r.useCaseSpan ||
+    r.useCaseRunIds.some((id, i) => {
+      const covered = tRows.find((x) => x.solution.id === id);
+      return !covered || covered.solution.useCase !== r.solution.useCase || (i > 0 && covered.useCaseSpan !== 0);
+    }),
+);
+check(
+  "...and the ids a use-case cell covers are the rows its rowspan covers",
+  runIdDrift.length
+    ? `DRIFT: ${runIdDrift.map((r) => r.solution.id).join(", ")}`
+    : `${tRows.reduce((n, r) => n + r.useCaseRunIds.length, 0)} id(s) across ${tRows.filter((r) => r.useCaseSpan > 0).length} cell(s)`,
+  runIdDrift.length === 0 &&
+    tRows.reduce((n, r) => n + r.useCaseRunIds.length, 0) === EXPECTED_TABLE_ROWS,
+);
+
+/* --- 25d. The table wires the rule, and the row itself is not a control --- */
+check(
+  "the table decides a click with the rule in lib/, not a ternary of its own",
+  `selectAction: ${B6_TABLE_CODE.includes("selectAction(")}; cellSelected: ${B6_TABLE_CODE.includes("cellSelected(")}; COLUMN_MODE: ${B6_TABLE_CODE.includes("COLUMN_MODE[")}`,
+  B6_TABLE_CODE.includes("selectAction(") &&
+    B6_TABLE_CODE.includes("cellSelected(") &&
+    B6_TABLE_CODE.includes("COLUMN_MODE["),
+);
+/**
+ * ⛔⛔ **The four inert columns are inert because the ROW has no handler.** A
+ * single `onClick` on the `<tr>` would restore all four by inheritance, and
+ * nothing would look wrong — every cell would simply select again.
+ */
+const ROW_HANDLER = /<tr[^>]*\sonClick/;
+check(
+  "...and no handler on the row, which is what keeps the other four columns inert",
+  ROW_HANDLER.test(B6_TABLE_CODE)
+    ? "ROW IS CLICKABLE — all six columns select by inheritance"
+    : "the two cells carry the only handlers",
+  !ROW_HANDLER.test(B6_TABLE_CODE),
+);
+/**
+ * ⛔ And the two that DO select each pass their OWN column, not one constant.
+ * Two cells and two headers, one of each column — a `column` hard-coded on
+ * both cells would make the table a two-column highlight of a single side,
+ * which is a selector that always selects the same thing.
+ */
+function columnsPassedTo(tag: string): string[] {
+  return [...B6_TABLE_CODE.matchAll(new RegExp(`<${tag}\\b[^>]*?column="([a-z-]+)"`, "gs"))].map(
+    (m) => m[1],
+  );
+}
+const cellColumns = columnsPassedTo("SelectCell").sort();
+const headerColumns = columnsPassedTo("SideHeader").sort();
+const WANT_COLUMNS = [...SELECTING_COLUMNS].sort().join(",");
+check(
+  "...and the two cells are wired to the two different columns, as are their headers",
+  `cells: ${cellColumns.join(", ") || "none"}; headers: ${headerColumns.join(", ") || "none"}`,
+  cellColumns.join(",") === WANT_COLUMNS && headerColumns.join(",") === WANT_COLUMNS,
+);
+
+/* --- 25e. The prose went, the buttons stayed ----------------------------- */
+/**
+ * ⛔⛔ Two different things lived in the focused cell and only one goes.
+ * `entry.label` explained and controlled nothing. An alternate is a BUTTON —
+ * the only route to a second or third state of its slice — and deleting it
+ * with its paragraph would cost 11 reachable states across 9 rows.
+ */
+check(
+  "the entry paragraph is gone from the table",
+  B6_TABLE_CODE.includes("entry.label")
+    ? "STILL RENDERED — the description B6 removed"
+    : "gone from the table (the strip still carries it below 1280)",
+  !B6_TABLE_CODE.includes("entry.label"),
+);
+check(
+  "...and the strip, which is the only surface below 1280, still carries it",
+  codeOnly(STRIP_SRC).includes("entry.label") ? "kept" : "DELETED — the briefing lost its entry note on a phone",
+  codeOnly(STRIP_SRC).includes("entry.label"),
+);
+check(
+  "...and the alternates kept their buttons, now reading the short label",
+  `short: ${B6_TABLE_CODE.includes("alternate.short")}; label: ${B6_TABLE_CODE.includes("alternate.label")}`,
+  B6_TABLE_CODE.includes("alternate.short") && !B6_TABLE_CODE.includes("alternate.label"),
+);
+const ALTERNATES = SOLUTIONS.flatMap((s) =>
+  (s.entry?.alternates ?? []).map((a) => ({ id: s.id, ...a })),
+);
+const EXPECTED_SHORTS = 11;
+const SHORT_MAX = 45;
+const SHORT_MIN = 20;
+const shortBad = ALTERNATES.filter(
+  (a) => a.short.length < SHORT_MIN || a.short.length > SHORT_MAX || a.short.length >= a.label.length,
+);
+check(
+  "every alternate carries a short label, and it is short",
+  shortBad.length
+    ? `BAD: ${shortBad.map((a) => `${a.id} (${a.short.length})`).join(", ")}`
+    : `${ALTERNATES.length} of ${EXPECTED_SHORTS}, ${Math.min(...ALTERNATES.map((a) => a.short.length))}-${Math.max(...ALTERNATES.map((a) => a.short.length))} chars vs ${Math.min(...ALTERNATES.map((a) => a.label.length))}-${Math.max(...ALTERNATES.map((a) => a.label.length))}`,
+  shortBad.length === 0 && ALTERNATES.length === EXPECTED_SHORTS,
+);
+/**
+ * ⛔⛔ **Hand-written, never truncated.** A cut paragraph ends mid-word and a
+ * derived label is the subject describing itself — both read as the prose this
+ * field replaced. The falsifiable form of "hand-written" is that no short is a
+ * PREFIX of its own label, which is what any truncation would be.
+ */
+const truncated = ALTERNATES.filter((a) =>
+  a.label.toLowerCase().startsWith(a.short.toLowerCase().replace(/[…\s]+$/, "")),
+);
+check(
+  "...and none of them is its label with the end cut off",
+  truncated.length
+    ? `TRUNCATED: ${truncated.map((a) => a.id).join(", ")}`
+    : `0 of ${ALTERNATES.length} are a prefix of their label`,
+  truncated.length === 0,
+);
+check(
+  "...and no two alternates are named the same thing",
+  `${new Set(ALTERNATES.map((a) => a.short)).size} distinct of ${ALTERNATES.length}`,
+  new Set(ALTERNATES.map((a) => a.short)).size === ALTERNATES.length,
+);
+
+/* --- 25f. One sentence per row, beside an untouched audit trail ---------- */
+/**
+ * ⛔⛔ `proposedFeature` is the spreadsheet's own column and § 1 compares it to
+ * the source. B6 adds a SECOND field rather than shortening it, so the table
+ * can read as one sentence while the catalogue goes on mirroring the document
+ * it claims to mirror.
+ */
+const SUMMARY_MAX = 95;
+const SUMMARY_MIN = 45;
+/** ⚠️ Row 25 has no proposal at all; both fields are an em dash. */
+const NO_PROPOSAL_ID = "technical-issues";
+const summaryBad = SOLUTIONS.filter((s) => {
+  if (s.id === NO_PROPOSAL_ID) return s.tableSummary !== "—" || s.proposedFeature !== "—";
+  return (
+    s.tableSummary.length < SUMMARY_MIN ||
+    s.tableSummary.length > SUMMARY_MAX ||
+    s.tableSummary.length > s.proposedFeature.length ||
+    !s.tableSummary.endsWith(".")
+  );
+});
+const realSummaries = SOLUTIONS.filter((s) => s.id !== NO_PROPOSAL_ID);
+check(
+  "every row carries a one-sentence summary, shorter than the column it stands in for",
+  summaryBad.length
+    ? `BAD: ${summaryBad.map((s) => `${s.id} (${s.tableSummary.length})`).join(", ")}`
+    : `${SOLUTIONS.length} of ${EXPECTED_TABLE_ROWS}, ${Math.min(...realSummaries.map((s) => s.tableSummary.length))}-${Math.max(...realSummaries.map((s) => s.tableSummary.length))} chars vs proposedFeature's ${Math.min(...realSummaries.map((s) => s.proposedFeature.length))}-${Math.max(...realSummaries.map((s) => s.proposedFeature.length))}`,
+  summaryBad.length === 0 && SOLUTIONS.length === EXPECTED_TABLE_ROWS,
+);
+/**
+ * ⛔ Non-vacuity: the bound only means something if `proposedFeature` really is
+ * the wall of prose this replaced. Row 03's is 535 characters, which is why a
+ * 95-character cap is a change and not a restatement.
+ */
+check(
+  "...and the column it replaces really was too long to read in a cell",
+  `longest proposedFeature ${Math.max(...SOLUTIONS.map((s) => s.proposedFeature.length))} chars; longest summary ${Math.max(...realSummaries.map((s) => s.tableSummary.length))}`,
+  Math.max(...SOLUTIONS.map((s) => s.proposedFeature.length)) > 500 &&
+    Math.max(...realSummaries.map((s) => s.tableSummary.length)) <= SUMMARY_MAX,
+);
+/**
+ * ⛔⛔ Exactly one pair of rows says the same thing, and it is the pair that
+ * says the same thing in the SOURCE — rows 17 and 18, one requests tray listed
+ * twice. A second duplicate would mean a summary had been copied rather than
+ * written, and a summary copied onto the wrong row is invisible.
+ */
+const DUPLICATE_PAIR = ["requests-tray", "requests-tray-modifications"];
+const summaryGroups = new Map<string, string[]>();
+for (const s of realSummaries) {
+  summaryGroups.set(s.tableSummary, [...(summaryGroups.get(s.tableSummary) ?? []), s.id]);
+}
+const dupes = [...summaryGroups.values()].filter((ids) => ids.length > 1);
+const summaryDuplicateIds = dupes.flat().sort();
+check(
+  "...and the only two rows that read alike are the two the source writes alike",
+  dupes.length === 0
+    ? "NONE — rows 17 and 18 should share one sentence, as they share one proposedFeature"
+    : `${dupes.length} pair(s): ${dupes.map((ids) => ids.join(" + ")).join("; ")}`,
+  dupes.length === 1 &&
+    summaryDuplicateIds.join(",") === [...DUPLICATE_PAIR].sort().join(",") &&
+    // ⭐ ...and they are alike because the SOURCE is, not because a summary slipped.
+    DUPLICATE_PAIR.every(
+      (id) =>
+        findSolution(id)!.proposedFeature === findSolution(DUPLICATE_PAIR[0])!.proposedFeature,
+    ),
+);
+/** ⛔ And the table renders the summary, not the prose it replaced. */
+check(
+  "the table's last column reads the summary, and the prose reaches it nowhere",
+  `tableSummary: ${B6_TABLE_CODE.includes("solution.tableSummary")}; proposedFeature: ${B6_TABLE_CODE.includes("proposedFeature")}`,
+  B6_TABLE_CODE.includes("solution.tableSummary") && !B6_TABLE_CODE.includes("proposedFeature"),
+);
+/** ⚠️ ...while the strip, the only surface below 1280, still shows the full text. */
+check(
+  "...and the strip still shows the spreadsheet's own wording below the breakpoint",
+  codeOnly(STRIP_SRC).includes("proposedFeature") ? "kept" : "DELETED — the source wording reaches no surface at all",
+  codeOnly(STRIP_SRC).includes("proposedFeature"),
+);
+
+/* --- 25g. Only the body scrolls ------------------------------------------ */
+/**
+ * ⛔⛔ The trap, named so it cannot be "fixed" back in. A `<tbody>` given its
+ * own `overflow-y` has to become a block box, and a block `<tbody>` no longer
+ * participates in the table's column sizing — header and body then line up by
+ * coincidence and drift the moment any cell's content changes. Sticky `<th>`s
+ * inside a scrolling wrapper keep ONE table layout.
+ */
+const SCROLL_RULES: Array<[string, boolean]> = [
+  ["the wrapper is a scrollport", /\.solution-table-scroll\s*\{[^}]*overflow-y:\s*auto/.test(cssDesktop)],
+  ["...and is capped, or it never scrolls", /\.solution-table-scroll\s*\{[^}]*max-height:/.test(cssDesktop)],
+  ["the header cells stick to it", /\.solution-table-scroll thead th\s*\{[^}]*position:\s*sticky/.test(cssDesktop)],
+  ["...at its top edge", /\.solution-table-scroll thead th\s*\{[^}]*top:\s*0/.test(cssDesktop)],
+  ["⛔ and no tbody was made a block box", !/tbody\s*\{[^}]*display:\s*block/.test(cssAll)],
+];
+const scrollBroken = SCROLL_RULES.filter(([, ok]) => !ok).map(([label]) => label);
+check(
+  "the header stays while the body scrolls, and the table keeps one layout",
+  scrollBroken.length ? `BROKEN: ${scrollBroken.join("; ")}` : `${SCROLL_RULES.length} of ${SCROLL_RULES.length} rules hold`,
+  scrollBroken.length === 0,
+);
+/** ⛔ The scroller is desktop-only, like everything else in that block. */
+check(
+  "...and none of it applies below the breakpoint, where there is no table",
+  /\.solution-table-scroll/.test(cssBase)
+    ? "LEAKED into the base stylesheet"
+    : "desktop only",
+  !/\.solution-table-scroll/.test(cssBase) && /\.solution-table-scroll/.test(cssDesktop),
+);
+/** ⛔ And the markup actually uses it, or the CSS is styling nothing. */
+check(
+  "...and the table is inside the scroller it declares",
+  B6_TABLE_CODE.includes("solution-table-scroll") ? "solution-table-scroll" : "NOT MOUNTED",
+  B6_TABLE_CODE.includes("solution-table-scroll"),
+);
+
+/* --- 25h. The two columns say which side they are --------------------- */
+/**
+ * ⭐ The headers read their names from `DEMO_MODE_LABEL` — the same two strings
+ * the strip's toggle uses. Two controls for one mode is fine; two controls
+ * calling the two sides different things is a reviewer asking which is which.
+ */
+check(
+  "the column headers name the sides from the one place the sides are named",
+  `DEMO_MODE_LABEL in the table: ${B6_TABLE_CODE.includes("DEMO_MODE_LABEL[")}; hand-written "Proposed": ${/>\s*Proposed\s*</.test(B6_TABLE_CODE)}`,
+  B6_TABLE_CODE.includes("DEMO_MODE_LABEL[COLUMN_MODE[column]]") &&
+    !/>\s*Proposed\s*</.test(B6_TABLE_CODE),
+);
+/** ⛔ Keyboard-reachable, or the only way into a focus at desktop is a mouse. */
+check(
+  "...and a cell can be reached and pressed without a mouse",
+  `tabIndex: ${B6_TABLE_CODE.includes("tabIndex={0}")}; Enter/Space: ${B6_TABLE_CODE.includes('event.key !== "Enter"')}; aria-pressed: ${B6_TABLE_CODE.includes("aria-pressed=")}`,
+  B6_TABLE_CODE.includes("tabIndex={0}") &&
+    B6_TABLE_CODE.includes('event.key !== "Enter"') &&
+    B6_TABLE_CODE.includes('event.key !== " "') &&
+    B6_TABLE_CODE.includes("aria-pressed="),
+);
+
 
 // ---------------------------------------------------------------------------
 console.log(

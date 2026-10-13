@@ -287,6 +287,36 @@ input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
     min-width: 0;
   }
 
+  /* ⛔⛔ Only the BODY scrolls — and that is done by making this box the
+     scrollport and sticking the <th>s to it, NOT by giving <tbody> its own
+     overflow. A <tbody> with `overflow-y` has to become a block box, and the
+     moment it does it stops sharing the table's column widths: the header and
+     the body then line up by coincidence and drift the instant any cell's
+     content changes. One table layout, a sticky header, same result.
+
+     ⚠️ 9rem is this card's own chrome — the split's 1.5rem of padding top
+     and bottom, plus the title and the paragraph above the table. Capping the
+     scroller at the viewport is what keeps the wheel on the table instead of
+     on the page, which is what makes the sticky phone column beside it sit
+     still. */
+  .solution-table-scroll {
+    max-height: calc(100vh - 9rem);
+    overflow-y: auto;
+    /* The scroller is the card's last child, so it owns the bottom corners. */
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+  }
+
+  /* ⚠️ The header has a solid background rather than a border. Under
+     `border-collapse: collapse` a collapsed border belongs to the table, not
+     to the sticky cell, so it stays behind while the cell travels — a header
+     that loses its underline the moment you scroll. */
+  .solution-table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
   .phone-col {
     position: sticky;
     top: 1.5rem;

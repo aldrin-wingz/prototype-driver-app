@@ -54,7 +54,20 @@ export interface SolutionEntry {
    * only one of them demonstrates half the case. Alternates keep the catalogue
    * at one row per spreadsheet row while making both reachable.
    */
-  alternates?: Array<{ route: string; label: string }>;
+  alternates?: Array<{
+    route: string;
+    label: string;
+    /**
+     * The same state, named in roughly forty characters, for the desktop table.
+     *
+     * ⛔⛔ **Hand-written, never derived.** A truncated `label` ends mid-word
+     * and a generated one is the subject describing itself; both read as the
+     * paragraph this field exists to replace. The eleven of these are the only
+     * route to eleven demonstrable states across nine rows, so a label that
+     * does not say where the button goes costs more than the paragraph did.
+     */
+    short: string;
+  }>;
 }
 
 /**
@@ -82,7 +95,26 @@ export interface Solution {
   calls: number;
   problem: string;
   useCase: string;
+  /**
+   * The spreadsheet's own last column, mirrored 1:1.
+   *
+   * ⛔ Never edited to suit a renderer. It is the audit trail § 1 compares
+   * against the source file — shorten it and the catalogue silently stops
+   * mirroring the document it claims to mirror. The desktop table renders
+   * `tableSummary` instead; this one still reaches the strip and the picker.
+   */
   proposedFeature: string;
+  /**
+   * The same proposal in one sentence, for the desktop table's last column.
+   *
+   * ⭐ Added rather than substituted. `proposedFeature` runs to 535 characters
+   * on row 03 because the spreadsheet says that much; a cell that long turns
+   * the table into a wall of prose and the prototype is standing right beside
+   * it, saying the same thing better. ⚠️ Rows 17 and 18 carry the SAME
+   * sentence, because they carry the same `proposedFeature` — one tray, listed
+   * twice in the source. A check asserts that is the only pair.
+   */
+  tableSummary: string;
   klass: SolutionClass;
   buildState: BuildState;
   /** `null` until the slice is in the prototype. */
@@ -123,6 +155,7 @@ export const SOLUTIONS: Solution[] = [
     useCase: NO_SHOW,
     proposedFeature:
       "Driver files the no-show in-app at the curb; the answers submit to Zendesk as a ticket, handled asynchronously instead of on a call",
+    tableSummary: "File the no-show in-app at the curb instead of calling it in.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -132,6 +165,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800373/more",
+          short: "At the pick-up, short of ten minutes",
           label:
             "The other branch — the driver IS at the pick-up but short of ten minutes, so the refusal carries a live countdown and deliberately offers NO form. A form here would be a way to skip the wait. (Selecting Cancel At Door on this same ride is slice 02, and files instead.)",
         },
@@ -157,6 +191,7 @@ export const SOLUTIONS: Solution[] = [
      */
     proposedFeature:
       "Let Cancel at Door skip the 10-minute wait, in exchange for two questions it asks instead → who came to the door (the member, someone else, or no one) → and what that person is to the member → nobody at the door earns no skip, because that is a Member Not Home",
+    tableSummary: "Skip the ten-minute wait by answering who came to the door.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -190,6 +225,7 @@ export const SOLUTIONS: Solution[] = [
      */
     proposedFeature:
       "The swipe itself is the trigger — tap PICK UP MEMBER from outside the pick-up geofence and the app asks the one thing only the driver knows, is the member still in the car → if yes, take the drop-off properly, odometer and signature and all, then confirm the pick-up alone → if not, confirm both ends → a drop-off missed the same way leaves the rider signature gone for good, so the leg ends COMPLETE and pending rather than simply late → every field is prefilled with what the app holds and only the ends being confirmed can be edited",
+    tableSummary: "The swipe itself asks whether the member is still in the car.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -227,6 +263,7 @@ export const SOLUTIONS: Solution[] = [
     // Was "surface". Both this row and row 05 open the same form from two
     // different places, so the distinction between them stopped meaning
     // anything the moment they became one build.
+    tableSummary: "Report a member number as unreachable, with photo proof.",
     klass: "form",
     buildState: "in-prototype",
     sharedBuildWith: "cannot-reach-member",
@@ -237,6 +274,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800392",
+          short: "The same-day will-call, two numbers",
           label:
             "The SAME-DAY variant, on a will-call ride. Option 3 here reads 'No, but I will go to the pickup as scheduled' and ADVANCES the trip — today a driver who cannot reach the member drives out unconfirmed instead of telling anyone. This ride also carries only TWO member numbers, so the form offers two.",
         },
@@ -254,6 +292,7 @@ export const SOLUTIONS: Solution[] = [
       "Ex 2 — Driver calls the facility → hits a confusing IVR → gives up → Support navigates the IVR for them",
     proposedFeature:
       "“Cannot reach member” in-app form where the driver adds what they tried; filed asynchronously instead of being held on the line",
+    tableSummary: "File what you tried to reach the member, instead of waiting on hold.",
     klass: "form",
     buildState: "in-prototype",
     sharedBuildWith: "tag-number-invalid",
@@ -276,6 +315,7 @@ export const SOLUTIONS: Solution[] = [
       "Ex 1 — Instruction reads “Do not book Police department: UBM” → driver cannot tell what it means → calls Support",
     proposedFeature:
       "In-app AI assistant answering from Help Desk articles and the current leg's own data, escalating anything it cannot resolve",
+    tableSummary: "An in-app assistant that answers from the Help Desk and the leg's own data.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -290,6 +330,7 @@ export const SOLUTIONS: Solution[] = [
       "Ex 2 — Driver assigned a multiload → unsure the member agreed to share → calls Support to verify",
     proposedFeature:
       "Ride Details states plainly that the leg is shared, how many riders, and that the client authorised it",
+    tableSummary: "Ride Details says plainly that the leg is shared, and with how many.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -303,6 +344,7 @@ export const SOLUTIONS: Solution[] = [
     useCase:
       "Ex 3 — Driver sees C2C / D2D on the trip → does not know what they mean → calls Support",
     proposedFeature: "Tap any coded term on Ride Details for a one-line definition",
+    tableSummary: "Tap a coded term on Ride Details for a one-line definition.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -317,6 +359,7 @@ export const SOLUTIONS: Solution[] = [
       "Member asks → driver calls to confirm it is assigned → trip is not created yet → Support asks the broker → broker is slow → repeat follow-ups",
     proposedFeature:
       "In-app request to be auto-assigned that member's future trips — ⚠️ Not in prototype yet: actually assigning them. The request goes to the CS queue and nothing is held, claimed or created. `Project - Standing Order Offers` is building the system that does the assigning; this is the support call it absorbs until that exists.",
+    tableSummary: "Ask in-app to be auto-assigned that member's future trips.",
     klass: "form",
     buildState: "in-prototype",
     sharedBuildWith: "request-feed-member-filter",
@@ -327,6 +370,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800393",
+          short: "Asked after the drop-off instead",
           label:
             "The second door, and the better one: tap DROP OFF MEMBER, enter an odometer reading and sign both panels. Once the leg is complete the app asks whether she requested you — which is the moment the driver actually knows, rather than expecting them to remember and go hunting for a tile afterwards. ⛔ Answering yes opens the same form; it files nothing on its own. 'Don't ask again for this member' is per MEMBER, because a standing order is a weekly ride.",
         },
@@ -343,6 +387,7 @@ export const SOLUTIONS: Solution[] = [
       "Member asks → driver calls to confirm it is assigned → trip is not created yet → Support asks the broker → broker is slow → repeat follow-ups",
     proposedFeature:
       "Request Feed filter by member, so the driver can find that member's trips themselves",
+    tableSummary: "Filter the Request Feed by member and find their trips yourself.",
     klass: "surface",
     buildState: "in-prototype",
     sharedBuildWith: "auto-assign-request",
@@ -353,6 +398,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/requests?member=THEODORE%20ASHBY",
+          short: "A member with nothing posted",
           label:
             "THEODORE ASHBY instead — a member you really have driven, with nothing posted. The feed goes empty with Clear Filters, which is the honest answer and not a broken control.",
         },
@@ -368,6 +414,7 @@ export const SOLUTIONS: Solution[] = [
     useCase: "Driver tries to take a trip → blocked by over-capacity → calls Support",
     proposedFeature:
       "One-off cleanse of stored vehicle capacity so the block reflects the real vehicle",
+    tableSummary: "A one-off cleanse so stored capacity matches the real vehicle.",
     klass: "no-app-surface",
     buildState: "not-yet",
     entry: null,
@@ -383,6 +430,7 @@ export const SOLUTIONS: Solution[] = [
     useCase: "Driver tries to take a trip → blocked by over-capacity → calls Support",
     proposedFeature:
       "Backend path that updates capacity when a driver changes vehicle, so it stays correct",
+    tableSummary: "Capacity updates itself when the driver changes vehicle.",
     klass: "no-app-surface",
     buildState: "not-yet",
     entry: null,
@@ -398,6 +446,7 @@ export const SOLUTIONS: Solution[] = [
     useCase: "Driver needs to send back an SO → denied → calls Support",
     proposedFeature:
       "In-app send-back reason form on every send-back, plus an explicit warning when the trip is a standing order — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 14's scoring decision and still open",
+    tableSummary: "Every send-back collects a reason, and says when the trip is a standing order.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -407,11 +456,13 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800395/more",
+          short: "An advance trip, no penalty",
           label:
             "An ADVANCE trip. Reason, then production's discouragement popup, and NO penalty warning at all. Without this branch a reason form seen only on the way to a penalty screen cannot be told apart from part of the penalty screen.",
         },
         {
           route: "/my-rides/1049800396/more",
+          short: "A standing order, three screens",
           label:
             "A STANDING ORDER (SO-4471, dialysis Mon/Wed/Fri). Three screens: reason, production's own popup, then the standing-order warning — general before specific, so the extra screen is earned by something true about the trip. The warning says in as many words what nothing in the app says today: sending back one trip can cost the whole standing order, and repeated send-backs risk suspension. ⚠️ Not in prototype yet: this copy is PROPOSED — production says nothing at all here today, which is the problem. ⛔ It warns, it does not block; a hard block is what sends drivers to Support in the first place.",
         },
@@ -428,6 +479,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver wants out of a trip → avoids the in-app button → calls Support instead",
     proposedFeature:
       "Score a Support-mediated send-back identically to an in-app one, and weight the penalty by reason so a legitimate send-back is free",
+    tableSummary: "Score a Support send-back like an in-app one, and weight the penalty by reason.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -442,6 +494,7 @@ export const SOLUTIONS: Solution[] = [
       "Ex 1 — Email needs changing → no in-app route → calls Support\nEx 2 — Password needs resetting → calls Support\nEx 3 — Phone number needs changing → calls Support",
     proposedFeature:
       "Let drivers change their own email, password and phone number in the app",
+    tableSummary: "Change your own email, password and phone number in the app.",
     klass: "surface",
     buildState: "in-prototype",
     /*
@@ -476,6 +529,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/options/account",
+          short: "...and the screen it opens",
           label: "...and what it opens: change the email, password or phone",
         },
       ],
@@ -492,6 +546,7 @@ export const SOLUTIONS: Solution[] = [
       "Member declines during member confirmation → the driver's own route out is a send-back, which penalises them → so they call Support to cancel it instead",
     proposedFeature:
       "In-app rider-initiated cancellation form that records the member's cancellation as a cancellation, not as a driver send-back — filed with proof, from the Rider declined the trip option production already shows",
+    tableSummary: "Record the member's cancellation as theirs, not as a driver send-back.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -501,6 +556,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800399",
+          short: "Filed from the return leg",
           label:
             "The SAME decline filed from the return leg. The outbound is offered too — untick it to say the family drove her there and she still needs the ride home. ⛔ Neither filing cancels anything: the ride stays on the manifest marked 'Cancellation requested', because the client owns the cancellation and row 17's tray is what would tell the driver when it lands.",
         },
@@ -517,6 +573,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver reports it → client takes a while to confirm → nothing obvious changes in the app → driver calls back repeatedly",
     proposedFeature:
       "Requests tray — one list of every in-app request the driver has submitted and its current state",
+    tableSummary: "One tray listing every request the driver has submitted, and its state.",
     klass: "surface",
     buildState: "not-yet",
     // ⚠️ Added 2026-10-09. Row 18 has always pointed here; this never pointed
@@ -538,6 +595,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver asks for a leg to be added → the only way to check is to open upcoming rides and find the member's name for that day → not explicit enough to rely on → stays on the call until Support confirms it",
     proposedFeature:
       "Requests tray — one list of every in-app request the driver has submitted and its current state",
+    tableSummary: "One tray listing every request the driver has submitted, and its state.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -552,6 +610,7 @@ export const SOLUTIONS: Solution[] = [
     useCase: "Trip needs an extra leg → driver calls Support to add it",
     proposedFeature:
       "In-app request form to add a leg, tagged critical when it is same-day or the driver has already started",
+    tableSummary: "Request an added leg in-app, flagged critical when it is same-day.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -561,11 +620,13 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800403/more",
+          short: "The same group, from its live half",
           label:
             "The same group from its live half, through the Add Leg to Trip tile in More Options. Same form, same locked leg A — the entry point changes, the case does not.",
         },
         {
           route: "/my-rides/1049800404",
+          short: "One finished leg, no round trip",
           label:
             "One finished leg and no round trip at all — the commonest real case. With no sibling there is no span to average, so the estimate falls back to a declared default and says so in different words. The new leg becomes B.",
         },
@@ -582,6 +643,7 @@ export const SOLUTIONS: Solution[] = [
       "Address or time is wrong on an existing leg → driver calls Support to change it",
     proposedFeature:
       "In-app form to request a change to a leg's pick-up or drop-off address or time",
+    tableSummary: "Ask in-app to change a leg's pick-up or drop-off address or time.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -591,6 +653,7 @@ export const SOLUTIONS: Solution[] = [
       alternates: [
         {
           route: "/my-rides/1049800401",
+          short: "The pick-up already made",
           label:
             "The same ride with the pick-up already made. That end is locked to what was recorded and loses its pencil — asking to move a pick-up that happened is a correction, which is row 03's case — so only the drop-off can be asked about.",
         },
@@ -607,6 +670,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver knows they will arrive early or late → cannot reach the member → calls Support to relay it",
     proposedFeature:
       "Make it explicit in the flow that a driver who cannot accommodate the timing sends the trip back, rather than asking Support to relay a message",
+    tableSummary: "Say plainly in the flow that a timing the driver cannot meet is a send-back.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -621,6 +685,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver submits requirements → no confirmation in the app that it landed → calls Support to check",
     proposedFeature:
       "Compliance section in the driver app showing which requirements have been received and which are outstanding",
+    tableSummary: "A compliance section showing what has been received and what is outstanding.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -634,6 +699,7 @@ export const SOLUTIONS: Solution[] = [
     useCase: "Driver wants more work → calls Support to ask",
     proposedFeature:
       "In-app chat with Dispatch, so drivers ask for work there instead of calling Support",
+    tableSummary: "In-app chat with Dispatch, so asking for work is not a Support call.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -648,6 +714,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver is suspended → loses access to the app → cannot check their payout themselves → calls Support",
     proposedFeature:
       "Restrict trip distribution for non-compliant drivers instead of suspending them, so they keep app access and can check their own earnings",
+    tableSummary: "Restrict trip distribution instead of suspending, so app access survives.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,
@@ -661,6 +728,7 @@ export const SOLUTIONS: Solution[] = [
     useCase:
       "Most recent frequent blocker: Zendesk chat stopped working → driver had no route in → called Support",
     proposedFeature: "—",
+    tableSummary: "—",
     klass: "no-app-surface",
     buildState: "not-yet",
     entry: null,
@@ -677,6 +745,7 @@ export const SOLUTIONS: Solution[] = [
       "Driver is late for a good reason → submits a Late Reason form → reason is recorded but the trip still counts against OTP → strict client flags the OTP miss → calls follow, with no way to exclude the trip",
     proposedFeature:
       "Allow a trip to be excluded from the OTP calculation when the late reason is accepted",
+    tableSummary: "Exclude a trip from OTP when the late reason is accepted.",
     klass: "surface",
     buildState: "not-yet",
     entry: null,

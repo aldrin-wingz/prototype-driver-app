@@ -28,6 +28,17 @@ export interface TableRow {
   areaSpan: number;
   problemSpan: number;
   useCaseSpan: number;
+  /**
+   * The ids this row's Use Case cell covers — itself plus every row merged
+   * under it. `[]` when the cell is not rendered here (`useCaseSpan === 0`).
+   *
+   * ⚠️ Needed because the Use Case cell is a CONTROL as of B6, and a merged
+   * one speaks for its whole run: focusing row 10 has to light the cell that
+   * row 09 draws, or the selected row has no highlight at all. Computed here
+   * rather than in the table, for the same reason the spans are — a rule about
+   * the data, reachable by a check.
+   */
+  useCaseRunIds: readonly string[];
 }
 
 /**
@@ -62,12 +73,19 @@ export function tableRows(): TableRow[] {
   const problemKeys = ordered.map((s) => [s.subjectArea, s.problem]);
   const useCaseKeys = ordered.map((s) => [s.subjectArea, s.problem, s.useCase]);
 
-  return ordered.map((solution, i) => ({
-    solution,
-    areaSpan: runSpan(areaKeys, i),
-    problemSpan: runSpan(problemKeys, i),
-    useCaseSpan: runSpan(useCaseKeys, i),
-  }));
+  return ordered.map((solution, i) => {
+    const useCaseSpan = runSpan(useCaseKeys, i);
+    return {
+      solution,
+      areaSpan: runSpan(areaKeys, i),
+      problemSpan: runSpan(problemKeys, i),
+      useCaseSpan,
+      // ⛔ Sliced from the SAME span the cell is rendered with, so the two can
+      // never disagree about how far the merge reaches. A separately computed
+      // run would be a second opinion about the same fact.
+      useCaseRunIds: ordered.slice(i, i + useCaseSpan).map((s) => s.id),
+    };
+  });
 }
 
 /** How many merged cells each column carries — i.e. runs longer than one row. */
