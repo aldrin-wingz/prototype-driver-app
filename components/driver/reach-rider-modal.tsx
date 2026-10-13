@@ -13,12 +13,10 @@ import {
 import type { DemoFocus } from "@/lib/solutions/demo-mode";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
-  DECLINED_BODY,
-  DECLINED_CONTINUE,
-  DECLINED_TITLE,
-  DECLINED_WALK_BACK,
+  declinedSheetFor,
   SHEET_SWAP_MS,
 } from "@/lib/driver-data/rider-declined";
+import { ZendeskChatSheet } from "./zendesk-chat-sheet";
 import {
   DRIVER_SPRING,
   DRIVER_SPRING_MUTED,
@@ -123,12 +121,21 @@ export function ReachRiderModal({
   const [declined, setDeclined] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [declineFormOpen, setDeclineFormOpen] = useState(false);
+  /** Production's destination — see `declinedSheetFor`. */
+  const [zendeskOpen, setZendeskOpen] = useState(false);
 
   const { demo } = useSolution();
   const sameDay = Boolean(trip.sameDay);
   // ⚠️ `demo.solutionId` is `null` for the plain mirror, which the rule reads
   // as "no filtering" — see `showsProposal`.
   const options = reachOptionsFor(sameDay, demo);
+  /**
+   * ⛔ The sheet's copy AND its destination come from one rule. Production hands
+   * the driver to a Zendesk chat that files a ticket for them; the proposal
+   * hands them a form. A button whose label and target were decided separately
+   * is how `Chat with Support` ends up opening a form.
+   */
+  const declinedSheet = declinedSheetFor(demo);
   const selected = options.find((option) => option.value === choice);
 
   function close() {
@@ -316,10 +323,10 @@ export function ReachRiderModal({
               <FilePlus className="h-8 w-8 text-white" strokeWidth={2} />
             </span>
             <DrawerTitle className="mt-6 text-[28px] font-bold leading-tight text-gray-900">
-              {DECLINED_TITLE}
+              {declinedSheet.title}
             </DrawerTitle>
             <p className="mt-3 text-lg font-semibold leading-snug text-gray-500">
-              {DECLINED_BODY}
+              {declinedSheet.body}
             </p>
           </div>
 
@@ -327,14 +334,17 @@ export function ReachRiderModal({
             type="button"
             onClick={() => {
               setDeclined(false);
-              // ⚠️ Deferred — the form is a third sheet, and the same handover
-              // applies. See `SHEET_SWAP_MS`.
-              setTimeout(() => setDeclineFormOpen(true), SHEET_SWAP_MS);
+              // ⚠️ Deferred — the next screen is a third sheet either way, and
+              // the same handover applies. See `SHEET_SWAP_MS`.
+              setTimeout(() => {
+                if (declinedSheet.primaryGoesTo === "zendesk") setZendeskOpen(true);
+                else setDeclineFormOpen(true);
+              }, SHEET_SWAP_MS);
             }}
             className="mt-8 w-full rounded-full py-4 text-lg font-semibold text-white"
             style={{ backgroundColor: DRIVER_SPRING }}
           >
-            {DECLINED_CONTINUE}
+            {declinedSheet.primaryLabel}
           </button>
 
           {/* ⛔ Files NOTHING and changes nothing — it returns the driver to the
@@ -350,10 +360,15 @@ export function ReachRiderModal({
             }}
             className="mt-3 w-full rounded-full border border-gray-300 py-4 text-lg font-semibold text-gray-900"
           >
-            {DECLINED_WALK_BACK}
+            {declinedSheet.walkBackLabel}
           </button>
         </DrawerContent>
       </Drawer>
+
+      {/* ⭐ Production's dead end: the template is auto-sent and the driver
+          waits. Mounted beside the form, never instead of it — which side opens
+          is the comparison. */}
+      <ZendeskChatSheet trip={trip} open={zendeskOpen} onOpenChange={setZendeskOpen} />
 
       <RiderDeclinedForm
         trip={trip}

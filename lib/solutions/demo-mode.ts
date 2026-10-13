@@ -138,7 +138,6 @@ export const ROWS_AWAITING_NOW: readonly string[] = [
   "missed-swipe",                   // 03 — ⛔ the pick-up refusal is uncaptured
   "request-feed-member-filter",     // 10 — the filter itself is not gated
   "send-back-reason-form",          // 13 — ⛔ the Standing Order denial is uncaptured
-  "rider-initiated-cancellation",   // 16 — five surfaces, none gated yet
 ];
 
 /** Whether the focused row can actually show production today. */

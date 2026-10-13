@@ -1,3 +1,4 @@
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import { type Trip } from "./mock-trips";
 import { groupMembers, LIVE_POOLS } from "./trip-groups";
 import type { SupportFieldOption } from "@/types/support";
@@ -58,6 +59,120 @@ export const DECLINED_CONTINUE = "Continue";
  * having reported a member said something they did not.
  */
 export const DECLINED_WALK_BACK = "Rider Needs Transportation";
+
+/**
+ * Production's primary button, verbatim from `CAP-325` / `CAP-224`.
+ *
+ * ⛔⛔ Not `Contact Support` — that is an Options row, a different screen and a
+ * different string. The capture says `Chat with Support`, and it means Zendesk.
+ */
+export const DECLINED_CHAT_SUPPORT = "Chat with Support";
+
+/** Catalogue row **16**, which owns this whole sheet. */
+export const RIDER_DECLINED_SOLUTIONS: readonly string[] = [
+  "rider-initiated-cancellation",
+];
+
+/** Where the sheet's primary button goes. */
+export type DeclinedDestination = "zendesk" | "form";
+
+export interface DeclinedSheet {
+  title: string;
+  body: string;
+  primaryLabel: string;
+  primaryGoesTo: DeclinedDestination;
+  walkBackLabel: string;
+}
+
+/**
+ * The declined sheet, on the side of the comparison being shown.
+ *
+ * ⛔⛔ **Until B3c this sheet was the PROPOSAL unconditionally** — our body, our
+ * `Continue`, our form — including in Now. It is the sheet a reviewer is most
+ * likely to open, so the prototype was demonstrating its own proposal as the
+ * status quo on the single most visible surface it has.
+ *
+ * ⭐ The two sides differ in where the next tap GOES, not just in wording:
+ * production hands the driver to a Zendesk chat that files a ticket for them;
+ * the proposal hands them a form that files a support request in-app. The copy
+ * follows the destination — a button marked `Chat with Support` that opens a
+ * form would be a small lie about the very next tap.
+ */
+export function declinedSheetFor(focus: DemoFocus): DeclinedSheet {
+  if (showsProposal(focus, RIDER_DECLINED_SOLUTIONS)) {
+    return {
+      title: DECLINED_TITLE,
+      body: DECLINED_BODY,
+      primaryLabel: DECLINED_CONTINUE,
+      primaryGoesTo: "form",
+      walkBackLabel: DECLINED_WALK_BACK,
+    };
+  }
+  return {
+    title: DECLINED_TITLE,
+    body: DECLINED_BODY_2026,
+    primaryLabel: DECLINED_CHAT_SUPPORT,
+    primaryGoesTo: "zendesk",
+    walkBackLabel: DECLINED_WALK_BACK,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// What production actually files, on the driver's behalf
+// ---------------------------------------------------------------------------
+
+/**
+ * ⭐⭐ **The driver types nothing.** Tapping `Chat with Support` opens the
+ * Zendesk chat and **auto-sends** this template into it — confirmed by the user
+ * and captured in `CAP-327`, where it sits above `Sent · Just now` with an
+ * empty composer under it.
+ *
+ * That is what "what happens now" means for row 16: a ticket is filed for you,
+ * and then you wait. Nothing appears on the ride, because the app never learns
+ * the outcome — which is why the proposal's `CANCELLATION_TRACKED_BY_APP` is
+ * also `false`.
+ *
+ * ⚠️ Zendesk chat is not the in-app chat. Two different surfaces.
+ */
+export const ZENDESK_DECLINE_INTRO =
+  "My member no longer needs transportation. I need help in removing the following rides from my manifest.";
+
+/** The label on each detail line, in the captured order. */
+export const ZENDESK_DECLINE_LABELS = [
+  "Member Name",
+  "Trip Date",
+  "Trip ID",
+  "Leg IDs",
+] as const;
+
+/**
+ * The template for a trip, as `label: value` pairs.
+ *
+ * ⚠️ Pure and exported so a check can build the real message rather than grep
+ * the component for a line — the same reason `reachOptionsFor` is.
+ *
+ * ⛔ The capture carries a REAL member's name. The shape is replicated here; the
+ * name comes from the seed, which `verify-base.ts` §5 keeps invented.
+ */
+export function zendeskDeclineMessage(
+  trip: Trip
+): { intro: string; lines: Array<{ label: string; value: string }> } {
+  const legs = legsInGroup(trip).flatMap((other) => other.legs.map((leg) => leg.id));
+  return {
+    intro: ZENDESK_DECLINE_INTRO,
+    lines: [
+      { label: "Member Name", value: trip.rider },
+      { label: "Trip Date", value: trip.date },
+      { label: "Trip ID", value: trip.id },
+      { label: "Leg IDs", value: legs.join(", ") },
+    ],
+  };
+}
+
+/** What the chat says under the auto-sent bubble, verbatim from `CAP-327`. */
+export const ZENDESK_SENT_STATUS = "Sent · Just now";
+/** The dead composer's placeholder, verbatim. */
+export const ZENDESK_COMPOSER_PLACEHOLDER = "Type a message";
 
 /**
  * ⛔⛔ **How long to wait before opening the next sheet.**

@@ -140,6 +140,9 @@ import {
 } from "../lib/support-data/issue-types";
 import {
   ARTIFACT_CHANNELS,
+  DECLINED_CHAT_SUPPORT,
+  declinedSheetFor,
+  zendeskDeclineMessage,
   CANCELLATION_REQUESTED_DETAIL,
   CANCELLATION_REQUESTED_PILL,
   CANCELLATION_REQUESTED_TITLE,
@@ -4010,10 +4013,21 @@ for (const sameDay of [false, true]) {
  * rendered, which is why this reads the component through `codeOnly`.
  */
 const modalCode = codeOnly(D_SOURCES.modal);
+/**
+ * ⚠️ Updated in B3c. It used to grep for `{DECLINED_TITLE}` and `{DECLINED_BODY}`
+ * — the proposal's literals, hard-wired into the JSX. Both sides now come from
+ * `declinedSheetFor`, so the component must render the RULE's fields and must
+ * not reach past it for a constant of its own. §23 runs the rule itself.
+ */
 check(
-  "the declined sheet renders the 2026 copy",
-  "DECLINED_TITLE + DECLINED_BODY",
-  /\{DECLINED_TITLE\}/.test(modalCode) && /\{DECLINED_BODY\}/.test(modalCode),
+  "the declined sheet takes its copy from the rule, not from a literal",
+  /\{declinedSheet\.title\}/.test(modalCode) && /\{declinedSheet\.body\}/.test(modalCode)
+    ? "declinedSheet.title + .body"
+    : "HARD-WIRED — one side of the comparison could never show",
+  /\{declinedSheet\.title\}/.test(modalCode) &&
+    /\{declinedSheet\.body\}/.test(modalCode) &&
+    !/\{DECLINED_BODY\}/.test(modalCode) &&
+    !/\{DECLINED_CONTINUE\}/.test(modalCode),
 );
 check(
   "...and the 2021 copy is nowhere in the rendered component",
@@ -4036,8 +4050,8 @@ check(
 /** ⛔ The walk-back files nothing — it must not reach the form. */
 check(
   "the walk-back returns to the options and opens no form",
-  `${DECLINED_WALK_BACK}`,
-  /\{DECLINED_WALK_BACK\}/.test(modalCode) &&
+  `${DECLINED_WALK_BACK} — via declinedSheet.walkBackLabel`,
+  /\{declinedSheet\.walkBackLabel\}/.test(modalCode) &&
     /setChoice\(null\);\s*\n\s*setTimeout\(\(\) => onOpenChange\(true\), SHEET_SWAP_MS\);/.test(
       modalCode,
     ),
@@ -6316,7 +6330,6 @@ const EXPECTED_AWAITING = [
   "missed-swipe",
   "request-feed-member-filter",
   "send-back-reason-form",
-  "rider-initiated-cancellation",
 ];
 const awaitingDrift = [
   ...EXPECTED_AWAITING.filter((id) => !ROWS_AWAITING_NOW.includes(id)).map((id) => `-${id}`),
@@ -6334,7 +6347,7 @@ const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
 check(
   "...and that list splits the built rows rather than covering none or all",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
-  builtWithNow.length === 8 && builtRows.length === 12,
+  builtWithNow.length === 9 && builtRows.length === 12,
 );
 /** ⚠️ `hasNowState(null)` is false — the plain mirror is on no side at all. */
 check(
@@ -6482,6 +6495,244 @@ check(
   `${SCANNED.length} file(s) across ${SOURCE_DIRS.join(", ")}`,
   SCANNED.length > 150 &&
     SOURCE_DIRS.every((dir) => SCANNED.some((f) => f.startsWith(dir + "/"))),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n23. Row 16 — what happens when the rider declines");
+// ---------------------------------------------------------------------------
+/**
+ * B3c. ⛔⛔ Until this, the declined sheet was the PROPOSAL unconditionally —
+ * our body, our `Continue`, our form — including in Now. It is the sheet a
+ * reviewer is most likely to open, so the prototype was demonstrating its own
+ * proposal as the status quo on its most visible surface.
+ *
+ * ⭐ The two sides differ in where the next tap GOES, not only in wording.
+ * Production opens a Zendesk chat and auto-sends a ticket; the proposal opens a
+ * form. These checks assert the pairing, because a `Chat with Support` button
+ * that opened the form would read as production and behave as the proposal.
+ */
+const DECLINED_SRC = readFileSync(join(ROOT, "components/driver/reach-rider-modal.tsx"), "utf8");
+const ZENDESK_SRC = readFileSync(join(ROOT, "components/driver/zendesk-chat-sheet.tsx"), "utf8");
+const ZENDESK_CODE = codeOnly(ZENDESK_SRC);
+
+/* --- 23a. The sheet, on both sides, as declared literals ----------------- */
+/**
+ * ⛔ Expectations written out HERE, never read back from the module. The point
+ * is that production's copy is `CAP-325` verbatim and ours is not, and a table
+ * derived from `rider-declined.ts` would agree with whatever it said.
+ */
+const SHEET_CASES: Array<{
+  why: string;
+  focus: DemoFocus;
+  body: string;
+  primaryLabel: string;
+  goesTo: "zendesk" | "form";
+}> = [
+  {
+    why: "row 16 focused, Now",
+    focus: demoFocus("rider-initiated-cancellation", "now"),
+    body: "Please chat with support to remove it from your manifest.",
+    primaryLabel: "Chat with Support",
+    goesTo: "zendesk",
+  },
+  {
+    why: "row 16 focused, Proposed",
+    focus: demoFocus("rider-initiated-cancellation", "fixed"),
+    body: "Support needs a few details before we can remove it from your manifest.",
+    primaryLabel: "Continue",
+    goesTo: "form",
+  },
+  {
+    // ⚠️ The plain mirror shows every proposal, so it keeps the form.
+    why: "the plain mirror",
+    focus: demoFocus(null, "now"),
+    body: "Support needs a few details before we can remove it from your manifest.",
+    primaryLabel: "Continue",
+    goesTo: "form",
+  },
+  {
+    // ⛔ A proposal belongs to its own build: row 04's reviewer meets production.
+    why: "another row's focus",
+    focus: demoFocus("cannot-reach-member", "fixed"),
+    body: "Please chat with support to remove it from your manifest.",
+    primaryLabel: "Chat with Support",
+    goesTo: "zendesk",
+  },
+];
+const sheetWrong = SHEET_CASES.filter((c) => {
+  const got = declinedSheetFor(c.focus);
+  return (
+    got.body !== c.body ||
+    got.primaryLabel !== c.primaryLabel ||
+    got.primaryGoesTo !== c.goesTo
+  );
+});
+check(
+  "the declined sheet says and does the right thing on each side",
+  sheetWrong.length
+    ? `WRONG: ${sheetWrong.map((c) => c.why).join("; ")}`
+    : `${SHEET_CASES.length} of ${SHEET_CASES.length} case(s) correct`,
+  sheetWrong.length === 0,
+);
+/** ⛔ Non-vacuity: both destinations and both bodies must actually appear. */
+check(
+  "...and that table covers both destinations",
+  `${SHEET_CASES.filter((c) => c.goesTo === "zendesk").length} zendesk / ` +
+    `${SHEET_CASES.filter((c) => c.goesTo === "form").length} form`,
+  SHEET_CASES.some((c) => c.goesTo === "zendesk") &&
+    SHEET_CASES.some((c) => c.goesTo === "form"),
+);
+/**
+ * ⛔⛔ **The label and the destination are one decision.** A sheet saying
+ * `Chat with Support` that opened the form would pass every copy check in this
+ * file and lie about the very next tap.
+ */
+const labelDestinationMismatch = (["now", "fixed"] as const).flatMap((mode) =>
+  SOLUTIONS.map((row) => declinedSheetFor(demoFocus(row.id, mode)))
+).filter(
+  (sheet) =>
+    (sheet.primaryLabel === DECLINED_CHAT_SUPPORT) !== (sheet.primaryGoesTo === "zendesk"),
+);
+check(
+  "...and the button's words and its destination never disagree",
+  `${labelDestinationMismatch.length} mismatch(es) of ${SOLUTIONS.length * 2} (row x mode)`,
+  labelDestinationMismatch.length === 0,
+);
+/** ⛔ Production's title is shared, so only the BODY may differ. */
+check(
+  "...and the headline is the same on both sides, as both captures have it",
+  `${DECLINED_TITLE}`,
+  SHEET_CASES.every((c) => declinedSheetFor(c.focus).title === DECLINED_TITLE),
+);
+
+/* --- 23b. The component obeys the rule ----------------------------------- */
+check(
+  "the primary button's destination comes from the rule, not a branch of its own",
+  /declinedSheet\.primaryGoesTo === "zendesk"/.test(codeOnly(DECLINED_SRC))
+    ? "declinedSheet.primaryGoesTo"
+    : "NOT FOUND — the button could open the form on both sides",
+  /declinedSheet\.primaryGoesTo === "zendesk"/.test(codeOnly(DECLINED_SRC)),
+);
+/** ⚠️ Both sheets mounted, so which one opens is the comparison. */
+check(
+  "...and both destinations are mounted, never swapped at the mount",
+  `${/<ZendeskChatSheet/.test(DECLINED_SRC) ? "Zendesk" : "—"} + ${/<RiderDeclinedForm/.test(DECLINED_SRC) ? "form" : "—"}`,
+  /<ZendeskChatSheet/.test(DECLINED_SRC) && /<RiderDeclinedForm/.test(DECLINED_SRC),
+);
+/**
+ * ⛔ The handover delay applies to BOTH. Two vaul drawers in one frame do not
+ * hand over — see `SHEET_SWAP_MS`. The Zendesk path is a third sheet exactly
+ * like the form, and a path that skipped the delay would stack them.
+ */
+check(
+  "...and the Zendesk sheet waits for the handover like the form does",
+  /setZendeskOpen\(true\)[\s\S]{0,120}SHEET_SWAP_MS|SHEET_SWAP_MS[\s\S]{0,200}setZendeskOpen\(true\)/.test(codeOnly(DECLINED_SRC))
+    ? `inside the ${SHEET_SWAP_MS}ms handover`
+    : "NOT DEFERRED — two drawers would stack",
+  /setZendeskOpen\(true\)/.test(codeOnly(DECLINED_SRC)) &&
+    /setTimeout\(\(\) => \{[\s\S]{0,200}setZendeskOpen\(true\)[\s\S]{0,200}\}, SHEET_SWAP_MS\)/.test(codeOnly(DECLINED_SRC)),
+);
+
+/* --- 23c. The auto-sent template ----------------------------------------- */
+/**
+ * ⭐⭐ **The driver types nothing.** `CAP-327` shows this template above
+ * `Sent · Just now` with an empty composer. Building it here rather than
+ * grepping the component is the only way to know the real message carries the
+ * real trip.
+ */
+const DECLINE_TRIP = mockNeedsActionTrips.find((t) => t.scenario?.solutions.includes("rider-initiated-cancellation"))
+  ?? mockInProgressTrips.find((t) => t.scenario?.solutions.includes("rider-initiated-cancellation"));
+check(
+  "a row 16 scenario ride is seeded, so the template below is built on a real trip",
+  DECLINE_TRIP ? `${DECLINE_TRIP.id} (${DECLINE_TRIP.scenario?.code})` : "NONE — the checks below are vacuous",
+  DECLINE_TRIP !== undefined,
+);
+if (DECLINE_TRIP) {
+  const message = zendeskDeclineMessage(DECLINE_TRIP);
+  check(
+    "the auto-sent message opens with production's sentence, verbatim",
+    `${message.intro.slice(0, 44)}…`,
+    message.intro ===
+      "My member no longer needs transportation. I need help in removing the following rides from my manifest.",
+  );
+  /** ⛔ The four labels, in the captured order, declared here as literals. */
+  const WANT_LABELS = ["Member Name", "Trip Date", "Trip ID", "Leg IDs"];
+  check(
+    "...and carries the four captured fields, in order",
+    `${message.lines.map((l) => l.label).join(" / ")}`,
+    message.lines.length === WANT_LABELS.length &&
+      WANT_LABELS.every((label, i) => message.lines[i].label === label),
+  );
+  /** ⛔⛔ Every field filled from the trip — a template with a blank is a ticket
+   *  Support cannot act on, and an empty string would pass a shape-only check. */
+  const blanks = message.lines.filter((l) => l.value.trim().length === 0);
+  check(
+    "...and every field is filled from the trip",
+    blanks.length ? `BLANK: ${blanks.map((b) => b.label).join(", ")}` : `${message.lines.length} of ${message.lines.length} filled`,
+    blanks.length === 0,
+  );
+  check(
+    "...and it names THIS trip, not a fixture",
+    `rider=${message.lines[0].value} id=${message.lines[2].value}`,
+    message.lines[0].value === DECLINE_TRIP.rider &&
+      message.lines[2].value === DECLINE_TRIP.id,
+  );
+}
+
+/* --- 23d. The chat is a dead end, and says so by saying nothing ---------- */
+/**
+ * ⛔⛔ No reply, no typing indicator, no agent. Nobody has captured what Support
+ * says back, and the waiting IS the finding — a thread that answered itself
+ * would be the prototype arguing the dead end is fine.
+ */
+const INVENTED_REPLY = /Thank you for contacting|typing|agent will|Sorry I couldn't|Rate your experience/i;
+check(
+  "the Zendesk thread invents no reply",
+  INVENTED_REPLY.test(ZENDESK_CODE)
+    ? `INVENTED: ${ZENDESK_CODE.match(INVENTED_REPLY)?.[0]}`
+    : "one message, no answer",
+  !INVENTED_REPLY.test(ZENDESK_CODE),
+);
+/** ⛔ And the composer does not work — it is a div, not an input. */
+check(
+  "...and the composer is dead, as it was when the driver never used it",
+  /<input|<textarea|onSubmit|onChange/.test(ZENDESK_CODE) ? "INTERACTIVE" : "read-only",
+  !/<input|<textarea|onSubmit|onChange/.test(ZENDESK_CODE),
+);
+/**
+ * ⛔ `CAP-327` carries an agent's photograph and a real member's name. The
+ * photograph is not replicated at all; the name comes from the seed, which
+ * `verify-base.ts` §5 keeps invented.
+ */
+check(
+  "...and it replicates no avatar from the capture",
+  /<img|avatar|Avatar/.test(ZENDESK_CODE) ? "AVATAR PRESENT" : "no avatar",
+  !/<img|avatar|Avatar/.test(ZENDESK_CODE),
+);
+/** ⚠️ Zendesk chat is not the in-app chat. The file must not claim otherwise. */
+check(
+  "...and it does not call itself the in-app chat",
+  /in-app chat/i.test(ZENDESK_CODE) ? "CONFUSED" : "named as Zendesk support",
+  !/in-app chat/i.test(ZENDESK_CODE) && /Support/.test(ZENDESK_CODE),
+);
+
+/* --- 23e. Now files nothing on the ride ---------------------------------- */
+/**
+ * ⛔ The banner, the pill and the My Rides status all hang off a submitted
+ * request. Production's path never submits one — it hands the driver to Zendesk
+ * — so Now leaves the ride exactly as it was. Asserted as the PAIRING rather
+ * than by grepping the ride screen: the only route to the form is the proposal.
+ */
+const formReachable = (["now", "fixed"] as const).flatMap((mode) =>
+  SOLUTIONS.map((row) => ({ row: row.id, mode, sheet: declinedSheetFor(demoFocus(row.id, mode)) }))
+).filter((entry) => entry.sheet.primaryGoesTo === "form");
+check(
+  "the in-app form is reachable only from row 16's proposal",
+  `${formReachable.length} of ${SOLUTIONS.length * 2} (row x mode) reach the form — ${formReachable.map((e) => `${e.row}/${e.mode}`).join(", ") || "none"}`,
+  formReachable.length === 1 &&
+    formReachable[0].row === "rider-initiated-cancellation" &&
+    formReachable[0].mode === "fixed",
 );
 
 // ---------------------------------------------------------------------------
