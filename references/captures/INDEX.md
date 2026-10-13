@@ -13,7 +13,7 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~142.1 MB of binaries into a branch that every future prototype clones — and
+~146.9 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
@@ -55,18 +55,18 @@ and predates the build in any case. It is not a source.
 
 | Section | Captures | MB | Build mix | Verdict |
 | --- | ---: | ---: | --- | --- |
-| **01 Home** | 29 | 13.3 | BAL-B1×21, BAL-B2×5, Apr-2026×3 | 🕐 mostly stale — 5 of 29 current — ⛔ nothing for incentives |
+| **01 Home** | 30 | 13.9 | BAL-B1×21, BAL-B2×5, Apr-2026×3, DAB-2026-10-14×1 | 🕐 mostly stale — 6 of 30 current — ⛔ nothing for incentives |
 | **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
 | **03 Planner** | 8 | 4.0 | DAB-2026-10-01×8 | ✅ 8 of 8 from a current shoot — multi-trip day and past days still unshot |
-| **04 My Rides** | 36 | 14.5 | Apr-2026×24, DAB-2026-10-13×7, DAB-2026-10-01×4, MRV-B2×1 | 🕐 mostly stale — 12 of 36 current |
-| **05 Options** | 7 | 3.2 | DAB-2026-10-01×7 | ✅ 7 of 7 from a current shoot — menu captured; most destinations behind its rows are not |
+| **04 My Rides** | 39 | 16.5 | Apr-2026×24, DAB-2026-10-13×7, DAB-2026-10-01×4, DAB-2026-10-14×3, MRV-B2×1 | 🕐 mostly stale — 15 of 39 current |
+| **05 Options** | 11 | 5.5 | DAB-2026-10-01×7, DAB-2026-10-14×4 | ✅ 11 of 11 from a current shoot — menu captured; most destinations behind its rows are not |
 | **06 Chat** | 15 | 7.0 | Sep-2026×10, MRV-B2×4, DAB-2026-10-13×1 | 🕐 mostly stale — 5 of 15 current — shipped surfaces only |
 | **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ 31 of 37 from a current shoot — captured, not built (by decision) |
 | **_annotated** | 64 | 16.4 | derived×64 | — derivatives, not captures |
 | **_out-of-scope** | 14 | 3.3 | Apr-2026×10, DAB-2026-10-09×3, DAB-2026-10-13×1 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
 | **_unregistered** | 85 | 42.2 | MRV-B1-raw×32, unknown×18, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (undated shoot folder)×3, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **328** | **142.1** | | 462 files on disk, 328 unique |
+| **TOTAL** | **336** | **146.9** | | 470 files on disk, 336 unique |
 
 ---
 
@@ -76,6 +76,7 @@ Weekly view, wallet, payouts, payout detail, help sheet. ⛔ **Home INCENTIVES h
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
+| CAP-329 | `01-01 - Home - Balance Card With Negative Balance.png` | DAB-2026-10-14 | `f13113fa2cf2df86` | 0 |  |
 | CAP-001 | `01-01 - Home - Balance Card Zero State.png` | BAL-B1 | `f1308537afd1be24` | 0 |  |
 | CAP-002 | `01-02 - Home - State 1 No Balance No Scheduled.png` | BAL-B1 | `9eb3335123a7ad57` | 0 |  |
 | CAP-003 | `01-03 - Home - State 3 Balance No Scheduled.png` | BAL-B1 | `e19090dd9ec2a626` | 0 |  |
@@ -108,6 +109,7 @@ Weekly view, wallet, payouts, payout detail, help sheet. ⛔ **Home INCENTIVES h
 
 <details><summary>Source paths</summary>
 
+- `CAP-329` — `Project - Driver App Base/Captures/01 Home/2026-10-14/01-01 - Home - Balance Card With Negative Balance.png`
 - `CAP-001` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/01 - Dashboard Balance Card/01-01 - Home - Balance Card Zero State.png`
 - `CAP-002` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/01 - Dashboard Balance Card/01-02 - Home - State 1 No Balance No Scheduled.png`
 - `CAP-003` — `Project - In-App Balance Dashboard/Internal Guide/Screenshots/01 - Dashboard Balance Card/01-03 - Home - State 3 Balance No Scheduled.png`
@@ -253,12 +255,15 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
 | CAP-071 | `03a - My Rides - Needs Action Tab.png` | Apr-2026 | `ba310c0b8e97c2b3` | 2 |  |
+| CAP-330 | `04-01 - More Options - Standing Order Send-Back Denial.png` | DAB-2026-10-14 | `39f0d5299701ed9b` | 0 |  |
 | CAP-320 | `04-01 - Ride Details - Confirmation Required - Almost There Prompt.png` | DAB-2026-10-13 | `5458f85548f28a51` | 0 |  |
 | CAP-072 | `04-01 - Ride History - List.png` | DAB-2026-10-01 | `a4f24bafca041f98` | 0 |  |
 | CAP-321 | `04-02 - Confirm Flow - Were You Able To Reach The Rider - Next Disabled.png` | DAB-2026-10-13 | `16739228402ba04e` | 0 |  |
+| CAP-331 | `04-02 - Ride Details - Completed Ride With Signatures.png` | DAB-2026-10-14 | `9ec090d66c317bdd` | 0 |  |
 | CAP-073 | `04-02 - Ride History - Filter Sheet.png` | DAB-2026-10-01 | `e2e3a87bf433fda1` | 0 |  |
 | CAP-322 | `04-03 - Confirm Flow - Rider Declined Selected - Next Enabled.png` | DAB-2026-10-13 | `60ccc1905aa52bda` | 0 |  |
 | CAP-074 | `04-03 - Ride History - Filter Options Open.png` | DAB-2026-10-01 | `3217717b762eefec` | 0 |  |
+| CAP-332 | `04-03 - Ride History - List With Late Leg.png` | DAB-2026-10-14 | `bd9baf61aa3b236a` | 0 |  |
 | CAP-323 | `04-04 - Confirm Flow - Rider Declined The Trip Sheet.png` | DAB-2026-10-13 | `ec81d22b5244a310` | 0 |  |
 | CAP-075 | `04-04 - Ride Details - Completed From History.png` | DAB-2026-10-01 | `fa8e467764d48a10` | 0 |  |
 | CAP-324 | `04-05 - More Options - Ready To Start Or En-Route Refusal.png` | DAB-2026-10-13 | `a430b7be517d8d4d` | 0 |  |
@@ -292,12 +297,15 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 <details><summary>Source paths</summary>
 
 - `CAP-071` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/03a - My Rides - Needs Action Tab.png`
+- `CAP-330` — `Project - Driver App Base/Captures/04 My Rides/2026-10-14/04-01 - More Options - Standing Order Send-Back Denial.png`
 - `CAP-320` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-01 - Ride Details - Confirmation Required - Almost There Prompt.png`
 - `CAP-072` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-01 - Ride History - List.png`
 - `CAP-321` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-02 - Confirm Flow - Were You Able To Reach The Rider - Next Disabled.png`
+- `CAP-331` — `Project - Driver App Base/Captures/04 My Rides/2026-10-14/04-02 - Ride Details - Completed Ride With Signatures.png`
 - `CAP-073` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-02 - Ride History - Filter Sheet.png`
 - `CAP-322` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-03 - Confirm Flow - Rider Declined Selected - Next Enabled.png`
 - `CAP-074` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-03 - Ride History - Filter Options Open.png`
+- `CAP-332` — `Project - Driver App Base/Captures/04 My Rides/2026-10-14/04-03 - Ride History - List With Late Leg.png`
 - `CAP-323` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-04 - Confirm Flow - Rider Declined The Trip Sheet.png`
 - `CAP-075` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-04 - Ride Details - Completed From History.png`
 - `CAP-324` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-05 - More Options - Ready To Start Or En-Route Refusal.png`
@@ -336,9 +344,13 @@ The Options menu and the screens behind its rows. The menu itself is captured (`
 
 | CAP | Name | Build | SHA-256 | Dup | Shows |
 | --- | --- | --- | --- | ---: | --- |
+| CAP-333 | `05-01 - Options - Menu Top With Profile.png` | DAB-2026-10-14 | `dd02a5ef93d779de` | 0 |  |
 | CAP-100 | `05-01 - Options - Menu Top.png` | DAB-2026-10-01 | `075d9c3e31e121f6` | 0 |  |
+| CAP-334 | `05-02 - Options - Menu Middle.png` | DAB-2026-10-14 | `520c6c34fc79993d` | 0 |  |
 | CAP-101 | `05-02 - Options - Menu Scrolled.png` | DAB-2026-10-01 | `51bcfd0129726272` | 0 |  |
 | CAP-102 | `05-03 - Options - Menu Lower.png` | DAB-2026-10-01 | `4960b96fc319b86a` | 0 |  |
+| CAP-335 | `05-03 - Options - Telematics Debug Section.png` | DAB-2026-10-14 | `29ee13aca36b3987` | 0 |  |
+| CAP-336 | `05-04 - Options - Menu Bottom With Version.png` | DAB-2026-10-14 | `a8af287cfa8c2bfe` | 0 |  |
 | CAP-103 | `05-04 - Options - Menu Bottom With Version.png` | DAB-2026-10-01 | `475a7de3c8dc0c6f` | 0 |  |
 | CAP-104 | `05-05 - Driver Notes - Empty Modal.png` | DAB-2026-10-01 | `f851ca8d5b3d194a` | 0 |  |
 | CAP-105 | `05-06 - ID Badge - Top.png` | DAB-2026-10-01 | `064444aae88ecbc5` | 0 |  |
@@ -346,9 +358,13 @@ The Options menu and the screens behind its rows. The menu itself is captured (`
 
 <details><summary>Source paths</summary>
 
+- `CAP-333` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-01 - Options - Menu Top With Profile.png`
 - `CAP-100` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-01 - Options - Menu Top.png`
+- `CAP-334` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-02 - Options - Menu Middle.png`
 - `CAP-101` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-02 - Options - Menu Scrolled.png`
 - `CAP-102` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-03 - Options - Menu Lower.png`
+- `CAP-335` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-03 - Options - Telematics Debug Section.png`
+- `CAP-336` — `Project - Driver App Base/Captures/05 Options/2026-10-14/05-04 - Options - Menu Bottom With Version.png`
 - `CAP-103` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-04 - Options - Menu Bottom With Version.png`
 - `CAP-104` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-05 - Driver Notes - Empty Modal.png`
 - `CAP-105` — `Project - Driver App Base/Captures/05 Options/2026-10-01/05-06 - ID Badge - Top.png`
