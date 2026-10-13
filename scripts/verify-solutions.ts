@@ -31,6 +31,7 @@ import {
   SOLUTION_HOME,
   SOLUTIONS,
   subjectAreaGroups,
+  type Solution,
   type SolutionClass,
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
@@ -146,6 +147,8 @@ import {
 } from "../lib/driver-data/member-assignment";
 import { buildAutoAssignRequest } from "../components/support/auto-assign-request-form";
 import { buildSendBackReason } from "../components/support/send-back-reason-form";
+import { treatmentFor } from "../lib/driver-data/no-show-rules";
+import { offeredSwipe, routeSwipeTap } from "../lib/driver-data/missed-swipe-rules";
 import {
   CS_TOOL_DRIVER_INITIATED_REASONS,
   dedupedDriverInitiatedReasons,
@@ -8415,6 +8418,226 @@ check(
   OVER_CAPACITY_SOLUTIONS.length === 2 &&
     OC_ROWS.every((id) => OVER_CAPACITY_SOLUTIONS.includes(id)) &&
     OC_TRIP?.scenario?.solutions.join(",") === OVER_CAPACITY_SOLUTIONS.join(","),
+);
+
+
+// ---------------------------------------------------------------------------
+console.log("\n28. Check 12 — the toggle is not decorative, measured");
+// ---------------------------------------------------------------------------
+/**
+ * B5, and the check the whole slice has been deferring to since B1.
+ *
+ * ⛔⛔ **`ROWS_AWAITING_NOW` is a hand-maintained list, and §21d only asserts it
+ * is well-formed.** Nothing yet proved the thing it claims: that every row NOT
+ * on it actually behaves differently on the two sides. A toggle that moved and
+ * changed nothing on seven of twelve rows would pass every check written so far
+ * and would be demonstrated as an answer.
+ *
+ * So: drive every mode-sensitive rule in the app over the whole seed, twice per
+ * row — once on each side — and compare. The list and the fingerprint are
+ * computed from completely different places: one is a line someone wrote, the
+ * other is the rules themselves run over 63 seeded rides. They have to agree.
+ *
+ * ⭐ This is "the running app" as far as a gate can reach it: not greps, not
+ * restatements, but the same functions the screens call, with the same inputs.
+ */
+
+/**
+ * Every mode-sensitive surface, as one comparable string.
+ *
+ * ⚠️ `modeFor` is applied first, exactly as the provider does — a one-sided row
+ * cannot be put on a side it does not have, and a fingerprint that ignored that
+ * would be measuring a state the app cannot enter.
+ */
+function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, string> {
+  const focus = demoFocus(row.id, modeFor(row, wanted));
+  const out: Record<string, string> = {};
+
+  // The thirteen gates, by name.
+  for (const gate of GATES) out[`gate:${gate.name}`] = String(gate.shown(focus));
+
+  // Rows 01 and 02 — the no-show treatment of every seeded ride.
+  out["no-show"] = ALL_SEEDED.map((trip) => {
+    const t = treatmentFor(trip, focus);
+    return `${t.copy}/${t.showTimer}/${t.offerForm}/${t.pickupTimeGate}`;
+  }).join("|");
+
+  // Row 13 — the send-back path of every seeded ride.
+  out["send-back"] = ALL_SEEDED.map((trip) => sendBackSteps(trip, focus).join(">")).join("|");
+
+  // Row 16 — the sheet production shows when the rider declines.
+  const sheet = declinedSheetFor(focus);
+  out["declined"] = `${sheet.primaryLabel}>${sheet.primaryGoesTo}`;
+
+  // Row 10 — the Request Feed's member filter, and what survives it.
+  out["member-filter"] =
+    `${showsMemberFilter(focus)}/${applicableFilters({ member: "AMARA OKONKWO" }, focus).member ?? "none"}`;
+
+  // Row 03 — where a swipe tap goes, and whether production's block is lifted.
+  out["swipe"] = (["pick-up", "drop-off"] as const)
+    .flatMap((nextSwipe) =>
+      [true, false].map((challenged) =>
+        JSON.stringify(
+          routeSwipeTap({
+            nextSwipe,
+            pickupPostponed: false,
+            trailChallengesPickup: challenged,
+            trailChallengesDropOff: challenged,
+            focus,
+          }),
+        ),
+      ),
+    )
+    .join("|");
+  out["unblock"] = String(offeredSwipe("pick-up", true, focus));
+
+  // Row 15 — the Options menu, and rows 04/05 — the Reach Rider options.
+  out["options"] = buildOptionsRows(focus).map((r) => `${r.label}:${r.proposed ?? false}`).join("|");
+  out["reach"] = [true, false]
+    .map((sameDay) => reachOptionsFor(sameDay, focus).map((o) => `${o.label}:${o.proposed ?? false}`).join(","))
+    .join("|");
+
+  // Rows 04/05/09/19/20 — the More Options grid.
+  out["tiles"] = buildGridTiles(focus).map((t) => t.id).join(",");
+
+  // Where focusing this row lands — rows 11 and 12's `nowEntry` lives here.
+  out["route"] = entryRouteFor(row, modeFor(row, wanted));
+
+  return out;
+}
+
+/** Which named surfaces differ between the two sides, for this row. */
+function changedSurfaces(row: Solution): string[] {
+  const now = surfaceFingerprint(row, "now");
+  const fixed = surfaceFingerprint(row, "fixed");
+  return Object.keys(now).filter((key) => now[key] !== fixed[key]);
+}
+
+const SURFACE_COUNT = Object.keys(surfaceFingerprint(SOLUTIONS[0], "now")).length;
+const EXPECTED_SURFACES = GATES.length + 10;
+check(
+  "the fingerprint covers every mode-sensitive surface in the app",
+  `${SURFACE_COUNT} surface(s) — ${GATES.length} gate(s) + 10 rule(s), over ${ALL_SEEDED.length} seeded ride(s)`,
+  SURFACE_COUNT === EXPECTED_SURFACES && ALL_SEEDED.length > 50,
+);
+
+/* --- 28a. Every built row really does change ---------------------------- */
+const rowChanges = new Map<string, string[]>(
+  SOLUTIONS.map((row) => [row.id, changedSurfaces(row)]),
+);
+const builtUnchanged = builtRows.filter((row) => rowChanges.get(row.id)!.length === 0);
+check(
+  "⭐⭐ every built row behaves differently on the two sides",
+  builtUnchanged.length
+    ? `DECORATIVE on ${builtUnchanged.length} of ${builtRows.length}: ${builtUnchanged.map((r) => `${r.order} ${r.id}`).join(", ")}`
+    : `${builtRows.length} of ${builtRows.length} built row(s) change something`,
+  builtUnchanged.length === 0 && builtRows.length === 12,
+);
+/**
+ * ⛔⛔ **The measurement against the list.** `ROWS_AWAITING_NOW` is a line
+ * someone maintains by hand; this set is the rules run over the seed. The two
+ * are computed from nothing in common, and they have to name the same rows.
+ *
+ * ⚠️ This is the direction §21d could not check. There it compared the list to
+ * a literal copy of itself; here it is compared to the app's behaviour.
+ */
+const awaitingDrift12 = [
+  ...ROWS_AWAITING_NOW.filter((id) => !builtUnchanged.some((r) => r.id === id)).map((id) => `-${id}`),
+  ...builtUnchanged.map((r) => `+${r.id}`),
+];
+check(
+  "...and the rows that do NOT are exactly the ones the app says are awaiting one",
+  awaitingDrift12.length
+    ? `DRIFT: ${awaitingDrift12.join(" ")}`
+    : `${ROWS_AWAITING_NOW.length} awaiting, ${builtUnchanged.length} measured as unchanged — they agree`,
+  awaitingDrift12.length === 0,
+);
+
+/* --- 28b. ...and the rows that should NOT change, don't ----------------- */
+/**
+ * ⛔⛔ **The non-vacuity half, and it is not optional.** A fingerprint that
+ * changed for every row would pass 28a while proving nothing — it would mean
+ * some gate was keyed on the mode rather than on the row, so picking ANY row
+ * and flipping would move the app. Fourteen rows own no proposal that is built;
+ * nothing may move for them.
+ */
+const unbuiltRows = SOLUTIONS.filter((row) => row.buildState !== "in-prototype");
+const unbuiltThatMoved = unbuiltRows.filter((row) => rowChanges.get(row.id)!.length > 0);
+check(
+  "...while a row with nothing built changes nothing at all",
+  unbuiltThatMoved.length
+    ? `MOVED: ${unbuiltThatMoved.map((r) => `${r.order} ${r.id} (${rowChanges.get(r.id)!.join(", ")})`).join("; ")}`
+    : `0 of ${unbuiltRows.length} unbuilt row(s) move`,
+  unbuiltThatMoved.length === 0 && unbuiltRows.length === 14,
+);
+/**
+ * ⛔ And the plain mirror is on no side at all, so it cannot move either. This
+ * is the fifth guard's inversion, measured rather than argued: `null` means
+ * "show everything", and it means that on both readings of the mode.
+ */
+const mirrorNow = GATES.map((g) => `${g.name}:${g.shown(demoFocus(null, "now"))}`).join("|");
+const mirrorFixed = GATES.map((g) => `${g.name}:${g.shown(demoFocus(null, "fixed"))}`).join("|");
+check(
+  "...and the plain mirror is the same on both readings, because it is on neither side",
+  mirrorNow === mirrorFixed
+    ? `${GATES.length} gate(s) identical with no focus`
+    : "THE MODE LEAKS INTO THE PLAIN MIRROR",
+  mirrorNow === mirrorFixed,
+);
+
+/* --- 28c. What each row actually changes -------------------------------- */
+/**
+ * ⭐ The artifact. A row that changes exactly one thing is worth looking at —
+ * it may be a tile moving while the feature it is about stays put, which is the
+ * half-truth row 10 sat in until B3d. Printed rather than asserted, because the
+ * right number varies by row; the ASSERTION is that none of them is zero.
+ */
+for (const row of builtRows) {
+  const changed = rowChanges.get(row.id)!;
+  check(
+    `  row ${String(row.order).padStart(2, "0")} ${row.id}`,
+    `${changed.length} surface(s): ${changed.join(", ")}`,
+    changed.length > 0,
+  );
+}
+/**
+ * ⛔ Non-vacuity for the fingerprint itself: the surfaces have to be reached by
+ * more than one row between them. If every built row moved the same single
+ * surface, the fingerprint would be measuring one gate and calling it twelve.
+ */
+const surfacesTouched = new Set(builtRows.flatMap((row) => rowChanges.get(row.id)!));
+check(
+  "...and between them the built rows move many different surfaces, not one",
+  `${surfacesTouched.size} of ${SURFACE_COUNT} surface(s) move for at least one row`,
+  surfacesTouched.size >= 10,
+);
+/**
+ * ⛔⛔ **And the surfaces that move for NOBODY are named.** A line in the
+ * fingerprint that can never vary contributes nothing and quietly inflates the
+ * denominator above — which is the shape of a check measuring less than it
+ * says. There is exactly one, and it has a reason.
+ *
+ * `route` is `entryRouteFor`, which differs between the two sides only for a
+ * row carrying BOTH an `entry` and a `nowEntry`. No row does today: rows 11 and
+ * 12 have a `nowEntry` and no `entry`, so they land in the same place on either
+ * reading. It stays in the fingerprint so that the first row to carry both is
+ * measured rather than assumed — but it is declared inert until then.
+ */
+const INERT_SURFACES = ["route"];
+const allSurfaces = Object.keys(surfaceFingerprint(SOLUTIONS[0], "now"));
+const inertDrift = [
+  ...INERT_SURFACES.filter((k) => surfacesTouched.has(k)).map((k) => `+${k}`),
+  ...allSurfaces.filter((k) => !surfacesTouched.has(k) && !INERT_SURFACES.includes(k)).map((k) => `-${k}`),
+];
+check(
+  "...and the one surface that moves for nobody is declared, with a reason",
+  inertDrift.length
+    ? `DRIFT: ${inertDrift.join(" ")}`
+    : `${INERT_SURFACES.length} inert — ${INERT_SURFACES.join(", ")}; ` +
+      `${surfacesTouched.size} live of ${allSurfaces.length}`,
+  inertDrift.length === 0 &&
+    // ⚠️ ...and `route` is inert for the reason claimed, not by accident.
+    SOLUTIONS.filter((row) => row.entry && row.nowEntry).length === 0,
 );
 
 
