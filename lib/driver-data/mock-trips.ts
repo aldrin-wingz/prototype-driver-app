@@ -417,6 +417,21 @@ export interface TripScenario {
   label: string;
   /** Catalogue solution ids this ride demonstrates. */
   solutions: string[];
+  /**
+   * Tagged for the solution, but carrying NO demo pill.
+   *
+   * ⛔⛔ **For a row whose demo is the LIST, not any one ride in it.** Row 18's
+   * argument is thirteen rides of which three are cancelled; each ride is the
+   * backdrop, not the exhibit. Labelling every card `18a · Still on` put the
+   * same sentence on ten cards and competed with the one pill that carries the
+   * only distinction that matters — `Cancelled`. (User direction, 2026-10-15.)
+   *
+   * ⚠️ It silences the PILL and nothing else. The ride is still a scenario
+   * ride: `ridesForSolution` still filters to it, `isScenarioFor` still
+   * answers true, and every count that reads the seed still sees it. Dropping
+   * `scenario` instead would empty the tab the moment the row was focused.
+   */
+  silent?: boolean;
 }
 
 export interface TripPill {
@@ -1454,6 +1469,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18a",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1498,6 +1514,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18b",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1543,6 +1560,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18c",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1587,6 +1605,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18d",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1631,6 +1650,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18e",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1676,6 +1696,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18f",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1720,6 +1741,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18g",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1764,6 +1786,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18h",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1808,6 +1831,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18i",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1853,6 +1877,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18j",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1897,6 +1922,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18k",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1941,6 +1967,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18l",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -1985,6 +2012,7 @@ export const mockUpcomingTrips: Trip[] = [
       code: "18m",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
+      silent: true,
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,

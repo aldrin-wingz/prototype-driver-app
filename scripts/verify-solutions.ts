@@ -1000,6 +1000,64 @@ check(
   })[0].label === "Waiting on Support",
 );
 
+/**
+ * ⛔⛔ **A SILENT scenario shows no identifier at all**, and the distinction is
+ * the point: `tagged[0]` above is a loud one, so without this the rule would be
+ * checked in one direction only.
+ *
+ * Row 18's demo is the LIST — thirteen rides of which three are cancelled — so
+ * each ride is the backdrop, not the exhibit. Labelling every card
+ * `18a · Still on` put the same sentence on ten of them and competed with the
+ * one pill carrying the only distinction that matters. (User direction,
+ * 2026-10-15.)
+ *
+ * ⚠️ Silence is about the PILL and nothing else. These rides are still scenario
+ * rides everywhere that counts them, which the second check below measures —
+ * dropping `scenario` instead would empty the tab the moment row 18 was focused.
+ */
+const SILENT_SCENARIO_ROWS = ["my-rides-cancelled"];
+const EXPECTED_SILENT_RIDES = 13;
+const silentRides = ALL_SEEDED.filter((t) => t.scenario?.silent);
+const loudRides = tagged.filter((t) => !t.scenario?.silent);
+check(
+  "a silent scenario ride shows no identifier pill",
+  `${silentRides.length} silent of ${tagged.length} tagged; ` +
+    `${silentRides.filter((t) => pillsFor(t).length > 0).length} still carry one`,
+  silentRides.length === EXPECTED_SILENT_RIDES &&
+    silentRides.every((t) => pillsFor(t).length === 0) &&
+    // ⛔ Both directions, or "nothing is tagged" would pass this perfectly.
+    loudRides.length > 0 &&
+    loudRides.every((t) => pillsFor(t).some((p) => p.label.startsWith(t.scenario!.code))),
+);
+check(
+  "...and silence is declared, on one row, which still filters normally",
+  `${[...new Set(silentRides.flatMap((t) => t.scenario!.solutions))].join(", ")}; ` +
+    `ridesForSolution sees ${ridesForSolution(mockUpcomingTrips, SILENT_SCENARIO_ROWS[0]).length}`,
+  [...new Set(silentRides.flatMap((t) => t.scenario!.solutions))].join(",") ===
+    SILENT_SCENARIO_ROWS.join(",") &&
+    ridesForSolution(mockUpcomingTrips, SILENT_SCENARIO_ROWS[0]).length ===
+      EXPECTED_SILENT_RIDES,
+);
+/**
+ * ⛔ ...and the cancelled ones still say so. Silencing the scaffolding must not
+ * take the PRODUCT pill with it — `statusPills` are what a screen is saying
+ * about a ride right now, and they survive the swap by construction.
+ */
+const silentCancelled = silentRides
+  .filter(isClientCancelled)
+  .map((t) => pillsFor({ ...t, statusPills: [{ label: CLIENT_CANCELLED_PILL, variant: "danger" }] }));
+check(
+  "...while a cancelled one still carries its Cancelled pill, and only that",
+  `${silentCancelled.length} ride(s), pills: ${[...new Set(silentCancelled.flat().map((p) => p.label))].join(" | ")}`,
+  // ⚠️ Declared here rather than reaching forward to §31's literal — this
+  // section runs first, and a check that reads a constant defined 9,000 lines
+  // later is a check that depends on file order to be true.
+  silentCancelled.length === 3 &&
+    silentCancelled.every(
+      (pills) => pills.length === 1 && pills[0].label === CLIENT_CANCELLED_PILL,
+    ),
+);
+
 console.log("\n8. Focusing a solution narrows the ride list");
 
 const inProgress = mockInProgressTrips;

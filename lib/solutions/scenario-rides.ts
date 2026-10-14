@@ -9,9 +9,14 @@ import type { Trip, TripPill } from "@/lib/driver-data/mock-trips";
  * would be worse than no labelling at all.
  */
 
-/** The pill a scenario ride shows IN PLACE OF its production pills. */
+/**
+ * The pill a scenario ride shows IN PLACE OF its production pills.
+ *
+ * ⛔ `null` for a SILENT scenario — a row whose demo is the list rather than
+ * any one ride in it. See `TripScenario.silent`.
+ */
 export function scenarioPill(trip: Trip): TripPill | null {
-  if (!trip.scenario) return null;
+  if (!trip.scenario || trip.scenario.silent) return null;
   return {
     label: `${trip.scenario.code} · ${trip.scenario.label}`,
     // One variant for every scenario pill, deliberately. These are scaffolding,
@@ -28,6 +33,10 @@ export function scenarioPill(trip: Trip): TripPill | null {
  * seed where they exist, so stripping this scaffolding restores a faithful ride
  * — but showing both would put "Wheelchair" beside "03a · Missed pick-up" and
  * make the demo label read as product state.
+ *
+ * ⚠️ A SILENT scenario falls through to the seed's own pills, which is the same
+ * answer as "no scenario" — because for pill purposes that is exactly what it
+ * is. The ride stays a scenario ride everywhere else.
  */
 export function pillsFor(trip: Trip): TripPill[] {
   const scenario = scenarioPill(trip);
