@@ -11,8 +11,10 @@
 import { readFileSync } from "node:fs";
 import {
   DEFAULT_DEMO_MODE,
+  DEMO_MODES,
   demoFocus,
   type DemoFocus,
+  type DemoMode,
 } from "../lib/solutions/demo-mode";
 import {
   NO_SHOW_PICKUP_TIME_MINUTES,
@@ -22,6 +24,7 @@ import {
   NO_SHOW_TREATMENTS,
   NO_SHOW_TYPES,
   NO_SHOW_WAIT_MINUTES,
+  type NoShowType,
   postPickupAvailableAt,
   postPickupRefusalCopy,
   postPickupThresholdMinutes,
@@ -1088,6 +1091,121 @@ check(
     !/>\s*OK\s*</.test(SCREEN_CODE) &&
     SCREEN_CODE.includes("{LEAVE_WARNING_TITLE}"),
   "a literal OK is still in the markup"
+);
+
+/* ===========================================================================
+   The countdown and the dismissal are independent
+   =========================================================================== */
+
+/**
+ * ⛔⛔ **This section exists because a screenshot said the countdown was gone.**
+ *
+ * It was not — the full cycle renders it, and the sweep below says no reachable
+ * state loses it. But the countdown is decided by `refusal?.kind === "timer" &&
+ * treatment.showTimer` **in JSX**, and when `confirmLeaving` was added right
+ * beside it, checks were written for the new label and the new confirmation and
+ * NOTHING was written for the line they sit next to. A rule inline in JSX is a
+ * rule no check can reach; that is the oldest trap in this repo and it was
+ * walked into one commit ago.
+ *
+ * ⭐ The load-bearing one is the last: the reported shape — production's
+ * wording, `Close`, no countdown, no form — is asserted UNREACHABLE. If it ever
+ * becomes reachable, this fails rather than a screenshot having to find it.
+ */
+type RefusalShape = {
+  id: string;
+  demo: string;
+  mode: DemoMode;
+  type: NoShowType;
+  kind: string;
+  timerLine: boolean;
+  formButton: boolean;
+  dismiss: string;
+};
+const shapes: RefusalShape[] = [];
+for (const trip of mockInProgressTrips) {
+  const leg = activeLeg(trip);
+  if (!leg) continue;
+  for (const mode of DEMO_MODES) {
+    const focus = { solutionId: "rider-no-show", mode };
+    const treatment = treatmentFor(trip, focus);
+    for (const type of NO_SHOW_TYPES) {
+      const outcome = resolveNoShow(trip, leg, focus, 0, type);
+      if (outcome.kind === "files") continue;
+      shapes.push({
+        id: trip.id,
+        demo: trip.noShowDemo ?? "-",
+        mode,
+        type,
+        kind: outcome.kind,
+        // ⚠️ The two conditions the dialog renders on, restated here ONCE and
+        // driven — not grepped out of the markup.
+        timerLine: outcome.kind === "timer" && treatment.showTimer,
+        formButton: outcome.kind === "form" && treatment.offerForm,
+        dismiss: refusalDismissLabel(treatment),
+      });
+    }
+  }
+}
+/**
+ * ⚠️ Declared, and the first version of this was a GUESS — `> 100`, carried
+ * over from a wider sweep that walked three focuses and every pool. It failed
+ * on the real number, which is the floor doing the one thing a floor is good
+ * for. The literals below are the measured shape: 12 seeded in-progress rides
+ * × 2 sides × 3 no-show types, of which 60 refuse and the rest file.
+ */
+const EXPECTED_COMBINATIONS = 12 * DEMO_MODES.length * NO_SHOW_TYPES.length;
+const EXPECTED_REFUSING = 60;
+check(
+  "the refusal sweep covers both sides of every seeded ride",
+  shapes.length === EXPECTED_REFUSING &&
+    new Set(shapes.map((r) => r.mode)).size === DEMO_MODES.length &&
+    new Set(shapes.map((r) => r.kind)).size === 3,
+  `${shapes.length} refusing of ${EXPECTED_COMBINATIONS} combination(s), kinds: ${[...new Set(shapes.map((r) => r.kind))].sort().join(", ")}`
+);
+
+/** ⛔ Every timer refusal on the proposal side keeps its countdown. */
+const timerStates = shapes.filter((r) => r.kind === "timer" && r.mode === "fixed" && r.demo !== "-");
+const silentTimers = timerStates.filter((r) => !r.timerLine);
+check(
+  "every tagged timer refusal on the proposal side carries its countdown",
+  silentTimers.length === 0 && timerStates.length > 0,
+  silentTimers.length
+    ? silentTimers.map((r) => `${r.id}/${r.type}`).join(", ")
+    : `${timerStates.length} of ${timerStates.length} timer state(s)`
+);
+
+/** ⛔ ...and production's still does not, which is what the gate is for. */
+const nowTimers = shapes.filter((r) => r.kind === "timer" && r.mode === "now");
+check(
+  "...and production's refusal still has none",
+  nowTimers.length > 0 && nowTimers.every((r) => !r.timerLine),
+  `${nowTimers.filter((r) => !r.timerLine).length} of ${nowTimers.length} production timer state(s) are silent`
+);
+
+/**
+ * ⭐⭐ **The reported shape, asserted unreachable.**
+ *
+ * `Close` is the proposal's dismissal, so a refusal showing it must also be
+ * showing something production's does not — a countdown or a way forward. A
+ * `Close` with neither is the proposal wearing production's dialog: the driver
+ * is told to wait and not told how long, and then asked to confirm leaving a
+ * wait whose length they cannot see.
+ */
+const hollow = shapes.filter((r) => r.dismiss === "Close" && !r.timerLine && !r.formButton);
+check(
+  "no refusal offers Close without either a countdown or a way forward",
+  hollow.length === 0,
+  hollow.length
+    ? hollow.slice(0, 5).map((r) => `${r.id}/${r.demo}/${r.mode}/${r.type}`).join(", ")
+    : `0 of ${shapes.length} refusing states`
+);
+/** ⛔ And the converse, so the check above cannot pass by nothing saying Close. */
+const closers = shapes.filter((r) => r.dismiss === "Close");
+check(
+  "...and Close is reached, so that sweep is not vacuous",
+  closers.length > 0 && closers.length < shapes.length,
+  `${closers.length} of ${shapes.length} refusing states show Close`
 );
 
 console.log(
