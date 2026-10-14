@@ -17,14 +17,35 @@ interface HeaderProps {
   onFilterClick?: () => void;
   onRefreshClick?: () => void;
   messageCount?: number;
+  /**
+   * How many filters are applied, shown on the filter icon.
+   *
+   * ⭐ Production's own, not an invention: `CAP-054` photographs the Requests
+   * header with a green `2` on the filter icon, and the Map Request View
+   * contract says it *"counts the filters you have added beyond day and time"*.
+   * WHICH filters count is the caller's rule, never this component's.
+   *
+   * ⚠️ `0` renders no badge. A zero in a counter reads as a broken feature.
+   */
+  filterBadge?: number;
 }
 
 /**
  * The app header, unmodified from the production driver app.
  *
- * v1 deliberately adds nothing here. A support form belongs to a trip, so the
- * only way into one is from the trip — there is no trip-independent entry point
- * and no support surface in the app chrome.
+ * v1 deliberately adds no SUPPORT surface here. A support form belongs to a
+ * trip, so the only way into one is from the trip — there is no trip-independent
+ * entry point and nothing about support in the app chrome.
+ *
+ * ⚠️ `filterBadge` is the one later addition, and it is a replication rather
+ * than an invention: `CAP-054` shows production's Requests header carrying
+ * exactly this badge on exactly this icon.
+ *
+ * ⚠️ `app/requests/page.tsx` does NOT use it. That screen predates the prop and
+ * renders its own absolutely-positioned button so it could carry a badge at
+ * all; the two are duplicate MARKUP, not duplicate rules — each page decides
+ * its own count. Worth merging, but a change to a replicated screen is its own
+ * decision and not a side effect of adding a feature elsewhere.
  */
 export function Header({
   title,
@@ -35,6 +56,7 @@ export function Header({
   onFilterClick,
   onRefreshClick,
   messageCount = 6,
+  filterBadge = 0,
 }: HeaderProps) {
   const router = useRouter();
 
@@ -73,9 +95,16 @@ export function Header({
         {showFilter && (
           <button
             onClick={onFilterClick}
-            className="flex h-10 w-10 items-center justify-center text-gray-700"
+            aria-label="Filter rides"
+            aria-haspopup="dialog"
+            className="relative flex h-10 w-10 items-center justify-center text-gray-700"
           >
             <SlidersHorizontal className="h-5 w-5" />
+            {filterBadge > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#10B981] text-[10px] font-bold text-white">
+                {filterBadge}
+              </span>
+            )}
           </button>
         )}
         {showRefresh && (

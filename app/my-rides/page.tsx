@@ -22,18 +22,25 @@ import {
 import { ClientCancellationAlert } from "@/components/driver/client-cancellation-alert";
 import { RidesFilterBar } from "@/components/driver/rides-filter-bar";
 import {
-  applicableRidesFilter,
-  applyRidesFilter,
   cancelledRides,
   isClientCancelled,
   needsAcknowledgement,
-  showsCancelledRides,
   upcomingRides,
   CLIENT_CANCELLATION_SOLUTIONS,
   CLIENT_CANCELLED_PILL,
-  DEFAULT_RIDES_FILTER,
-  type RidesFilter,
 } from "@/lib/driver-data/client-cancellation";
+import { RidesFilterSheet } from "@/components/driver/rides-filter-sheet";
+import {
+  addedFilterCount,
+  applicableRideFilters,
+  applyRideFilters,
+  showsRidesFilter,
+  FILTER_EMPTY_BODY,
+  FILTER_EMPTY_TITLE,
+  NO_RIDE_FILTERS,
+  type RideFilterKey,
+  type RideFilterValues,
+} from "@/lib/driver-data/ride-filters";
 import { groupByRideDay, sortByRideDate } from "@/lib/driver-data/ride-date";
 
 type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
@@ -217,15 +224,21 @@ export default function MyRidesPage() {
    * that Now says do not exist, so the bar would populate a list the mode had
    * just emptied.
    */
-  const [ridesFilter, setRidesFilter] = useState<RidesFilter>(DEFAULT_RIDES_FILTER);
-  // ⛔ ONE answer, read by the list, the tab count and the bar — see
-  // `applicableRidesFilter`. Reading `ridesFilter` directly anywhere below is
-  // how row 10 shipped a feed narrowed by a filter nobody could see.
-  const appliedFilter = applicableRidesFilter(ridesFilter, demo);
-  const showsFilterBar = showsCancelledRides(demo);
+  const [rideFilters, setRideFilters] = useState<RideFilterValues>(NO_RIDE_FILTERS);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [filterSheetKey, setFilterSheetKey] = useState<RideFilterKey | null>(null);
+  // ⛔ ONE answer, read by the list, the tab count, the chips and the badge —
+  // see `applicableRideFilters`. Reading `rideFilters` directly anywhere below
+  // is how row 10 shipped a feed narrowed by a filter nobody could see.
+  const appliedFilters = applicableRideFilters(rideFilters, demo);
+  const showsFilterBar = showsRidesFilter(demo);
+  const openFilterSheet = (key: RideFilterKey | null) => {
+    setFilterSheetKey(key);
+    setFilterSheetOpen(true);
+  };
 
   const upcomingVisible = upcomingRides(withoutPending(mockUpcomingTrips), demo);
-  const upcomingList = applyRidesFilter(upcomingVisible, appliedFilter);
+  const upcomingList = applyRideFilters(upcomingVisible, appliedFilters);
 
   /**
    * ⛔⛔ **A cancellation is in TWO tabs, and that is deliberate.**
@@ -291,11 +304,20 @@ export default function MyRidesPage() {
     }
   };
 
-  /** What each option would show, so the bar and the list cannot disagree. */
-  const filterCounts: Record<RidesFilter, number> = {
-    all: applyRidesFilter(upcomingVisible, "all").length,
-    active: applyRidesFilter(upcomingVisible, "active").length,
-    cancelled: applyRidesFilter(upcomingVisible, "cancelled").length,
+  /**
+   * The numbers the chips carry.
+   *
+   * ⛔ The LIST'S OWN LENGTH, handed to the chip row rather than counted there
+   * — the list, the tab count and the chips must agree, and three places that
+   * each count for themselves is three chances to disagree.
+   *
+   * ⚠️ Only the always-shown chip carries one, deliberately. Every other chip
+   * would print the same number: a chip's count under the OTHER filters, with
+   * its own value applied, IS the filtered list. Seven copies of one number
+   * reads as seven facts.
+   */
+  const filterCounts: Partial<Record<RideFilterKey, number>> = {
+    status: upcomingList.length,
   };
 
   /**
@@ -321,6 +343,9 @@ export default function MyRidesPage() {
   }, [active?.id]);
 
   const currentTrips = getTripsForTab(activeTab);
+  /** Rides exist on this tab; the filters exclude all of them. */
+  const filteredToNothing =
+    activeTab === "upcoming" && currentTrips.length === 0 && upcomingVisible.length > 0;
 
   /**
    * ⭐⭐ Production's cancellation alert — `CAP-341`, row 18's Now side.
@@ -348,7 +373,16 @@ export default function MyRidesPage() {
   
   return (
     <div className="flex min-h-screen flex-col pb-20">
-      <Header title="My Rides" showFilter={false} />
+      {/* ⛔ The icon is offered only where the filter is — an icon that opened
+          a sheet whose every control did nothing is worse than no icon. The
+          badge counts the filters BEYOND the always-shown chip; see
+          `addedFilterCount` for why the status chip is not in it. */}
+      <Header
+        title="My Rides"
+        showFilter={showsFilterBar}
+        onFilterClick={() => openFilterSheet(null)}
+        filterBadge={addedFilterCount(appliedFilters)}
+      />
 
       {/*
         Tab row — pinned under the header.
@@ -404,14 +438,35 @@ export default function MyRidesPage() {
           control that can never match anything. */}
       {showsFilterBar && activeTab === "upcoming" && (
         <RidesFilterBar
-          value={appliedFilter}
-          onChange={setRidesFilter}
+          values={appliedFilters}
           counts={filterCounts}
+          onOpen={openFilterSheet}
         />
       )}
 
       <main className="flex-1 space-y-4 p-4">
         {currentTrips.length === 0 ? (
+          /**
+           * ⛔⛔ **An empty tab and a filter that matched nothing are different
+           * answers, and saying the wrong one sends the driver looking for a
+           * ride that is there.** "No rides in this tab" over a manifest the
+           * driver has just narrowed to one client reads as the day being
+           * empty. The test is the UNFILTERED list: rides exist, these filters
+           * exclude them.
+           */
+          filteredToNothing ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <p className="font-semibold text-gray-900">{FILTER_EMPTY_TITLE}</p>
+              <p className="text-sm text-gray-500">{FILTER_EMPTY_BODY}</p>
+              <button
+                type="button"
+                onClick={() => setRideFilters(NO_RIDE_FILTERS)}
+                className="mt-2 rounded-full border border-[#10B981] px-5 py-2 text-sm font-semibold text-[#047857]"
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <p className="text-gray-500">
               {activeTab === "pending"
@@ -421,6 +476,7 @@ export default function MyRidesPage() {
                   : "No rides in this category"}
             </p>
           </div>
+          )
         ) : (
           (() => {
             const cards = withClientCancellation(withCancellation(currentTrips));
@@ -461,6 +517,21 @@ export default function MyRidesPage() {
       {/* ⛔ Mounted at the page root, not inside a tab — production raises it
           over whatever the driver is looking at, and `Go to ride` navigates
           away from here entirely. */}
+      {/* ⛔⛔ Mounted HERE, at the page root, and not inside the sticky tab box
+          — that box's `z-40` opens a stacking context the sheet cannot climb
+          out of, and the bottom nav then covers its Update button. */}
+      <RidesFilterSheet
+        open={filterSheetOpen}
+        openKey={filterSheetKey}
+        values={appliedFilters}
+        trips={upcomingVisible}
+        onClose={() => setFilterSheetOpen(false)}
+        onApply={(next) => {
+          setRideFilters(next);
+          setFilterSheetOpen(false);
+        }}
+      />
+
       <ClientCancellationAlert
         trip={cancelAlertTrip}
         onOpenChange={(open) => {

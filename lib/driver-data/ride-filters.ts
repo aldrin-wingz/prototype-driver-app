@@ -458,14 +458,25 @@ export function applyRideFilters(
  * offered under drop-off, which is how a driver learns that the pair does not
  * exist rather than selecting it and getting an empty list.
  *
- * ⛔ A zero-count option is ABSENT, not greyed — *"a day with no trips does not
- * appear in the list at all"*.
+ * ⛔ A zero-count option in a **seeded list** is ABSENT, not greyed — *"a day
+ * with no trips does not appear in the list at all"*.
  *
- * ⚠️ Two exceptions, both so the sheet can never disagree with the chip row:
- * the filter's own DEFAULT is always offered (otherwise there is no way back
- * to "all"), and the CURRENTLY SET value is always offered even at zero — it is
- * on a chip the driver can see, and a sheet that omitted it would leave them
- * looking for a control that is not there.
+ * ⛔⛔ **A `chips` control keeps all of its options, and that is not an
+ * inconsistency.** Production narrows the day and county pickers, which are
+ * lists of whatever happens to be posted; it renders all five pick-up time
+ * chips whether or not a trip falls in them (`CAP-053`). The difference is
+ * real: a seeded list shrinking tells the driver something true about the day,
+ * whereas a fixed vocabulary shrinking just reflows a row of five chips into
+ * four every time another filter moves. Walked at :3028 and found: `Evening`
+ * vanished from the sheet because the focused manifest has no evening ride,
+ * which reads as a missing feature rather than an empty band.
+ *
+ * ⚠️ Two more values survive a zero count, both so the sheet can never
+ * disagree with the chip row: the filter's own DEFAULT is always offered
+ * (otherwise there is no way back to "all"), and the CURRENTLY SET value is
+ * always offered even at zero — it is on a chip the driver can see, and a
+ * sheet that omitted it would leave them looking for a control that is not
+ * there.
  */
 export function narrowedOptions(
   key: RideFilterKey,
@@ -485,6 +496,7 @@ export function narrowedOptions(
     }))
     .filter(
       (option) =>
+        def.control === "chips" ||
         option.count > 0 ||
         option.value === selected ||
         option.value === def.defaultValue,

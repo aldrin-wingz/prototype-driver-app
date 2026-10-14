@@ -328,6 +328,10 @@ import {
   type RideFilterKey,
   type RideFilterValues,
 } from "../lib/driver-data/ride-filters";
+import {
+  missingFilterIcons,
+  RIDE_FILTER_ICONS,
+} from "../components/driver/ride-filter-icon";
 import { detailStateFor } from "../lib/driver-data/ride-detail-state";
 import {
   groupByRideDay,
@@ -10648,75 +10652,152 @@ check(
 );
 /**
  * ⛔⛔ **The filter runs AFTER the Now-strip, and the order is the property.**
- * Reversed, `cancelled` selects rides Now says do not exist — so the bar
- * populates a list the mode had just emptied, and every count still looks
- * plausible. Asserted on the composition, which is the only place it exists.
+ * Reversed, a `cancelled` status would select rides Now says do not exist — so
+ * the chips populate a list the mode had just emptied, and every count still
+ * looks plausible. Asserted on the composition, which is the only place it
+ * exists.
  */
 const stripThenFilter =
-  /upcomingRides\(withoutPending\(mockUpcomingTrips\), demo\)[\s\S]{0,120}applyRidesFilter\(upcomingVisible, appliedFilter\)/;
+  /upcomingRides\(withoutPending\(mockUpcomingTrips\), demo\)[\s\S]{0,120}applyRideFilters\(upcomingVisible, appliedFilters\)/;
 check(
   "the Now-strip runs before the filter, never after",
   stripThenFilter.test(PAGE_CODE)
-    ? "upcomingRides(…) → applyRidesFilter(…)"
+    ? "upcomingRides(…) → applyRideFilters(…)"
     : "REVERSED or rewritten — a `cancelled` filter would select rides Now hides",
   stripThenFilter.test(PAGE_CODE) &&
     // ⛔ ...and the filter is never handed the raw seed, which is the same bug
     // written another way.
-    !/applyRidesFilter\(withoutPending\(mockUpcomingTrips\)/.test(PAGE_CODE),
+    !/applyRideFilters\(withoutPending\(mockUpcomingTrips\)/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **One answer, four readers.** The bar's value, the list, the counts and
- * the bar's own visibility must all come from `applicableRidesFilter` /
- * `showsCancelledRides` — never from the raw `ridesFilter` state. Feeding the
- * bar the raw value leaves a `cancelled` selection lit in a mode that has no
- * cancellations, which is row 10's half-truth exactly.
+ * ⛔⛔ **The filter touches ONE tab.** The driver's own constraint, and the
+ * reason for it is that Needs Action, In Progress and Pending are TASK lists —
+ * a filter that hid work waiting on the driver would be worse than no filter.
+ * Upcoming is the manifest, and narrowing a manifest loses nothing.
+ *
+ * ⚠️ Asserted by counting call sites, not by reading the guard. A second call
+ * inside `getTripsForTab` would narrow a task list while every other check
+ * here still passed.
+ */
+const filterCalls = (PAGE_CODE.match(/applyRideFilters\(/g) ?? []).length;
+check(
+  "the filter is applied in exactly one place, and it is the manifest",
+  `${filterCalls} call site(s); the one is upcomingVisible ${/const upcomingList = applyRideFilters\(upcomingVisible, appliedFilters\)/.test(PAGE_CODE)}`,
+  filterCalls === 1 &&
+    /const upcomingList = applyRideFilters\(upcomingVisible, appliedFilters\)/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **One answer, five readers.** The chips' values, the list, the counts,
+ * the header badge and the chip row's own visibility must all come from
+ * `applicableRideFilters` / `showsRidesFilter` — never from the raw
+ * `rideFilters` state. Feeding the chips the raw values leaves a `Cancelled`
+ * chip lit in a mode that has no cancellations, which is row 10's half-truth
+ * exactly.
  */
 check(
-  "the bar is fed the applicable filter, never the raw state",
-  `value={appliedFilter} ${/value=\{appliedFilter\}/.test(PAGE_CODE)}; ` +
-    `raw state read elsewhere ${(PAGE_CODE.match(/\bridesFilter\b/g) ?? []).length - 1}x`,
-  /value=\{appliedFilter\}/.test(PAGE_CODE) &&
-    !/value=\{ridesFilter\}/.test(PAGE_CODE) &&
-    /const appliedFilter = applicableRidesFilter\(ridesFilter, demo\)/.test(PAGE_CODE),
-);
-/** ⛔ ...and the bar only renders where it can match something. */
-check(
-  "...and the bar renders only on Upcoming, and only where cancellations exist",
-  `guard: ${/showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE)}`,
-  /const showsFilterBar = showsCancelledRides\(demo\)/.test(PAGE_CODE) &&
-    /showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE),
+  "the chips and the badge are fed the applicable filters, never the raw state",
+  `values={appliedFilters} ${/values=\{appliedFilters\}/.test(PAGE_CODE)}; ` +
+    `badge from applied ${/filterBadge=\{addedFilterCount\(appliedFilters\)\}/.test(PAGE_CODE)}`,
+  /const appliedFilters = applicableRideFilters\(rideFilters, demo\)/.test(PAGE_CODE) &&
+    /values=\{appliedFilters\}/.test(PAGE_CODE) &&
+    /filterBadge=\{addedFilterCount\(appliedFilters\)\}/.test(PAGE_CODE) &&
+    !/values=\{rideFilters\}/.test(PAGE_CODE) &&
+    !/addedFilterCount\(rideFilters\)/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **One pill and a sheet, not a row of pills** — production's own Requests
- * filter shape, reused (user direction, 2026-10-15). Three properties, because
- * any one alone passes on a half-build:
- *
- *   · the pill shows the CURRENT value, so the state is readable without a tap;
- *   · the sheet edits a DRAFT that `Update` applies, or `Update` is decorative
- *     and `Clear` is ambiguous;
- *   · `Clear` returns to the default without closing — clearing and applying
- *     are two decisions, which is what production does.
+ * ⛔ ...and the chip row AND the header icon appear only where the filter can
+ * do something. An icon that opens a sheet whose every control is inert is
+ * worse than no icon.
+ */
+check(
+  "...and both ways in are offered only where the filter is",
+  `row guard ${/showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE)}, ` +
+    `icon guard ${/showFilter=\{showsFilterBar\}/.test(PAGE_CODE)}`,
+  /const showsFilterBar = showsRidesFilter\(demo\)/.test(PAGE_CODE) &&
+    /showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE) &&
+    /showFilter=\{showsFilterBar\}/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **The sheet counts against the UNFILTERED manifest.** Handed
+ * `upcomingList` it would count every option against the filters already
+ * applied, so every option but the chosen ones would read `0` and the driver
+ * could never widen a selection — the sheet would be a one-way door. Handed the
+ * raw seed it would offer days the mode strips.
+ */
+check(
+  "the sheet counts its options against the manifest, not the filtered list",
+  `trips={upcomingVisible} ${/trips=\{upcomingVisible\}/.test(PAGE_CODE)}`,
+  /trips=\{upcomingVisible\}/.test(PAGE_CODE) &&
+    !/trips=\{upcomingList\}/.test(PAGE_CODE) &&
+    !/trips=\{mockUpcomingTrips\}/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **An empty tab and a filter that matched nothing are different answers.**
+ * "No rides in this category" over a manifest the driver has just narrowed to
+ * one client reads as the day being empty, and sends them looking for a ride
+ * that is there. The test has to be the UNFILTERED list.
+ */
+check(
+  "an empty filtered manifest says so, rather than claiming the tab is empty",
+  `predicate reads upcomingVisible ${/filteredToNothing =[\s\S]{0,160}upcomingVisible\.length > 0/.test(PAGE_CODE)}`,
+  /filteredToNothing =[\s\S]{0,160}upcomingVisible\.length > 0/.test(PAGE_CODE) &&
+    /filteredToNothing \?/.test(PAGE_CODE) &&
+    /FILTER_EMPTY_TITLE/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **The chip row states no rule of its own.** Which chips are shown is
+ * `chipRowKeys`, what each says is `chipText`, and whether the row renders at
+ * all is the page's. A row that read the demo focus, or decided its own
+ * membership, would be a second reader of a rule the list already uses — and
+ * the two could disagree.
  */
 const FILTER_SRC = codeOnly(
   readFileSync(join(ROOT, "components/driver/rides-filter-bar.tsx"), "utf8"),
 );
 check(
-  "the filter is one pill carrying its current value, opening a sheet",
-  `pill reads the value ${/ridesFilterLabel\(value\)/.test(FILTER_SRC)}; ` +
-    `opens a dialog ${/role="dialog"/.test(FILTER_SRC)}`,
-  /ridesFilterLabel\(value\)/.test(FILTER_SRC) &&
-    /aria-haspopup="dialog"/.test(FILTER_SRC) &&
-    /role="dialog"/.test(FILTER_SRC),
+  "the chip row is one chip per applied filter, and decides none of it",
+  `chipRowKeys ${/chipRowKeys\(values\)/.test(FILTER_SRC)}, ` +
+    `chipText ${/chipText\(key, values\)/.test(FILTER_SRC)}, ` +
+    `reads the focus ${/useSolution|showsRidesFilter|DemoFocus/.test(FILTER_SRC)}`,
+  /chipRowKeys\(values\)/.test(FILTER_SRC) &&
+    /chipText\(key, values\)/.test(FILTER_SRC) &&
+    /onOpen\(key\)/.test(FILTER_SRC) &&
+    !/useSolution|showsRidesFilter|DemoFocus/.test(FILTER_SRC),
+);
+/**
+ * ⛔⛔ **The sheet renders the REGISTRY, not a list of its own.** The whole
+ * point of the feature is that the eighth filter is one object literal; a sheet
+ * that named its seven sections would quietly stop at seven.
+ */
+const RIDES_SHEET_SRC = codeOnly(
+  readFileSync(join(ROOT, "components/driver/rides-filter-sheet.tsx"), "utf8"),
 );
 check(
-  "...and the sheet edits a draft that Update applies",
-  `draft state ${/const \[draft, setDraft\]/.test(FILTER_SRC)}; ` +
-    `onChange calls ${(FILTER_SRC.match(/onChange\(/g) ?? []).length}`,
-  /const \[draft, setDraft\] = useState<RidesFilter>/.test(FILTER_SRC) &&
-    // ⛔ Exactly one, and it is Update's. An option that applied on tap would
-    // call it from the chip as well.
-    (FILTER_SRC.match(/onChange\(/g) ?? []).length === 1 &&
-    /onChange\(draft\)/.test(FILTER_SRC),
+  "the sheet renders every filter in the registry, naming none of them",
+  `maps RIDE_FILTERS ${/RIDE_FILTERS\.map\(/.test(RIDES_SHEET_SRC)}; ` +
+    `filter keys spelled in the sheet: ${RIDE_FILTERS.filter((f) => RIDES_SHEET_SRC.includes(`"${f.key}"`)).length}`,
+  /RIDE_FILTERS\.map\(/.test(RIDES_SHEET_SRC) &&
+    RIDE_FILTERS.every((f) => !RIDES_SHEET_SRC.includes(`"${f.key}"`)),
+);
+/**
+ * ⛔⛔ **The sheet edits a DRAFT that `Update` applies**, or `Update` is
+ * decorative and `Clear Filters` is ambiguous — the driver cannot tell whether
+ * clearing has already taken effect. Exactly one call site applies it; an
+ * option that applied on tap would call it from the chip as well.
+ */
+check(
+  "...and it edits a draft that Update applies, from exactly one place",
+  `draft state ${/const \[draft, setDraft\] = useState<RideFilterValues>/.test(RIDES_SHEET_SRC)}; ` +
+    `onApply calls ${(RIDES_SHEET_SRC.match(/onApply\(/g) ?? []).length}`,
+  /const \[draft, setDraft\] = useState<RideFilterValues>/.test(RIDES_SHEET_SRC) &&
+    (RIDES_SHEET_SRC.match(/onApply\(/g) ?? []).length === 1 &&
+    /onApply\(draft\)/.test(RIDES_SHEET_SRC),
+);
+check(
+  "...and Clear Filters resets the draft without closing the sheet",
+  `setDraft(NO_RIDE_FILTERS) ${/setDraft\(NO_RIDE_FILTERS\)/.test(RIDES_SHEET_SRC)}`,
+  /setDraft\(NO_RIDE_FILTERS\)/.test(RIDES_SHEET_SRC) &&
+    !/setDraft\(NO_RIDE_FILTERS\);\s*onClose\(\)/.test(RIDES_SHEET_SRC),
 );
 /**
  * ⛔⛔ **The sheet sits ABOVE the bottom nav**, and a walk is what found this.
@@ -10726,17 +10807,24 @@ check(
  */
 const NAV_SRC = codeOnly(readFileSync(join(ROOT, "components/driver/bottom-nav.tsx"), "utf8"));
 const navZ = Number(/z-\[?(\d+)\]?/.exec(NAV_SRC)?.[1] ?? "0");
-const sheetZ = Number(/fixed inset-0 z-\[(\d+)\]/.exec(FILTER_SRC)?.[1] ?? "0");
+const sheetZ = Number(/fixed inset-0 z-\[(\d+)\]/.exec(RIDES_SHEET_SRC)?.[1] ?? "0");
 check(
   "the filter sheet outranks the bottom nav, which covers its Update button",
   `sheet z-${sheetZ} vs nav z-${navZ}`,
   sheetZ > navZ && navZ > 0,
 );
+/**
+ * ⛔ Every icon name the registry uses is mapped. The map is typed
+ * `Record<RideFilterIcon, …>`, so a NEW name fails to compile — this is the
+ * other direction, where a name is dropped from the union and the map keeps a
+ * dead entry while a filter renders with nothing.
+ */
 check(
-  "...and Clear resets the draft to the default without closing",
-  `setDraft(DEFAULT_RIDES_FILTER) ${/setDraft\(DEFAULT_RIDES_FILTER\)/.test(FILTER_SRC)}`,
-  /setDraft\(DEFAULT_RIDES_FILTER\)/.test(FILTER_SRC) &&
-    !/setDraft\(DEFAULT_RIDES_FILTER\);\s*setOpen\(false\)/.test(FILTER_SRC),
+  "every filter in the registry has an icon the renderer can draw",
+  `${missingFilterIcons().length} unmapped of ${RIDE_FILTERS.length}; ` +
+    `${Object.keys(RIDE_FILTER_ICONS).length} icon(s) declared`,
+  missingFilterIcons().length === 0 &&
+    Object.keys(RIDE_FILTER_ICONS).length === RIDE_FILTERS.length,
 );
 /**
  * ⛔⛔ **Two pill maps, composed, never merged.** Both write `statusPills`, and
@@ -11187,6 +11275,7 @@ check(
 let zeroSwept = 0;
 const zeroWrong: string[] = [];
 for (const f of RIDE_FILTERS) {
+  if (f.control === "chips") continue;
   const context: RideFilterValues = { rider: "ROSALIND ACHTERBERG" };
   for (const choice of narrowedOptions(f.key, mockUpcomingTrips, context)) {
     zeroSwept += 1;
@@ -11195,10 +11284,40 @@ for (const f of RIDE_FILTERS) {
   }
 }
 check(
-  "...and a zero-count option survives only as the default or the current value",
+  "...and in a seeded list a zero-count option survives only as the default or the current value",
   `${zeroWrong.length} stray zero(s) of ${zeroSwept} option(s)` +
     (zeroWrong.length ? ` — ${zeroWrong.slice(0, 3).join(", ")}` : ""),
   zeroWrong.length === 0 && zeroSwept > RIDE_FILTERS.length,
+);
+/**
+ * ⛔⛔ **...while a `chips` control keeps every option, however narrow the
+ * pool.** Production renders all five pick-up time chips whether or not a trip
+ * falls in them (`CAP-053`); a fixed vocabulary that reflowed from five chips
+ * to four as another filter moved reads as a missing feature. Walked at :3028
+ * and found exactly that — `Evening` vanished because the focused manifest has
+ * no evening ride.
+ *
+ * ⚠️ Driven against a context that really does empty some of them, with a
+ * control proving at least one option is at zero and still rendered.
+ */
+const narrowContext: RideFilterValues = { pickupLocation: "Lee County" };
+const chipFilters = RIDE_FILTERS.filter((f) => f.control === "chips");
+const shrunkChipSets = chipFilters.filter(
+  (f) =>
+    narrowedOptions(f.key, mockUpcomingTrips, narrowContext).length !==
+    f.options(mockUpcomingTrips).length,
+);
+const zeroesKept = chipFilters.flatMap((f) =>
+  narrowedOptions(f.key, mockUpcomingTrips, narrowContext).filter((o) => o.count === 0),
+);
+check(
+  "a fixed set of chips keeps every option, even the ones at zero",
+  `${shrunkChipSets.length} of ${chipFilters.length} chip set(s) shrank; ` +
+    `${zeroesKept.length} zero(s) still offered: ${zeroesKept.map((o) => o.label).join(", ") || "none"}`,
+  shrunkChipSets.length === 0 &&
+    chipFilters.length > 0 &&
+    // ⛔ ...and some really are at zero, or "kept every option" was free.
+    zeroesKept.length > 0,
 );
 
 /* --- 32e. The pick-up time bands ----------------------------------------- */
