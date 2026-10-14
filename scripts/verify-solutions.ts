@@ -885,6 +885,45 @@ check(
   `${tagged.filter((t) => t.scenario!.label.trim()).length} of ${tagged.length}`,
   tagged.every((trip) => trip.scenario!.label.trim().length > 0),
 );
+/**
+ * ⛔⛔ **A handle's number must be the order of a row it claims.**
+ *
+ * The handle is the first thing on a scenario pill and the only thing four
+ * check scripts cite a ride by, so `19a` has to mean row 19. Nothing enforced
+ * that until now, and it had already failed twice without a single check
+ * noticing: inserting row 19 on 2026-10-15 renumbered Add Leg and Update Trip
+ * Details and left their handles behind, so `19a`–`19f` sat on row 20 and
+ * `20a`/`20b` on row 21 — six pills naming the requests tray, which is not
+ * built, and two naming Add Leg, which is something else. Corrected to
+ * `21a`–`21f` and `22a`/`22b` with the row 13 insertion.
+ *
+ * ⚠️ "a row it claims", not "its first row": `11a` is the over-capacity
+ * request, which three rows share, and it names the lowest-numbered of them.
+ * Requiring the lowest would be a second rule; requiring ANY is the honest
+ * one, and it still fails the moment a handle names no claimed row at all.
+ */
+const handleDrift = tagged.filter((trip) => {
+  const number = Number(trip.scenario!.code.slice(0, 2));
+  return !trip.scenario!.solutions.some((id) => findSolution(id)?.order === number);
+});
+check(
+  "every scenario handle names a row the ride actually claims",
+  handleDrift.length
+    ? `DRIFT: ${handleDrift
+        .map(
+          (t) =>
+            `${t.scenario!.code} claims ${t
+              .scenario!.solutions.map((id) => findSolution(id)?.order ?? "?")
+              .join("/")}`,
+        )
+        .slice(0, 6)
+        .join(", ")}`
+    : `${tagged.length} of ${tagged.length} — ${[...new Set(tagged.map((t) => t.scenario!.code.slice(0, 2)))].sort().join(", ")}`,
+  handleDrift.length === 0 &&
+    // ⛔ Non-vacuity: a seed whose handles all parsed to NaN would pass an
+    // every() that never ran. Every handle must carry two digits and a letter.
+    tagged.every((t) => /^\d{2}[a-z]$/.test(t.scenario!.code)),
+);
 
 /**
  * ⛔ A solution id that does not resolve would filter a ride out of its own
@@ -1116,10 +1155,10 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // would read as built while having nothing of its own to show.
   "auto-assign-request": 1,
   "request-feed-member-filter": 1,
-  // Three: `13a` short-notice (penalty), `13b` advance (neither warning),
-  // `13c` standing order. The second is the negative control for both.
+  // Three: `14a` short-notice (penalty), `14b` advance (neither warning),
+  // `14c` standing order. The second is the negative control for both.
   "send-back-reason-form": 3,
-  // ⭐ ONE, and it is the `20b` ride with the pick-up already made — the only
+  // ⭐ ONE, and it is the `22b` ride with the pick-up already made — the only
   // demo of the passed-anchor rule. Row 22's OTHER ride is in Needs Action, so
   // this row is declared in BOTH maps: a row with rides in two tabs that named
   // only one would hide half its demo behind a number that still looked right.
@@ -1138,12 +1177,12 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
 const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   "tag-number-invalid": 2,
   "cannot-reach-member": 2,
-  // ⭐ TWO, and they are one round trip rather than two scenarios. `16a` is the
-  // outbound and `16b` the return, sharing a `tripGroup` — which is the case:
+  // ⭐ TWO, and they are one round trip rather than two scenarios. `17a` is the
+  // outbound and `17b` the return, sharing a `tripGroup` — which is the case:
   // production's own decline template removes several leg ids at once, so a
   // single seeded ride could not have shown the checklist doing anything.
   "rider-initiated-cancellation": 2,
-  // ⭐ ONE here, the `20a` ride where nothing has started and both ends are
+  // ⭐ ONE here, the `22a` ride where nothing has started and both ends are
   // still editable. See the note beside its In Progress entry above.
   "change-pickup-dropoff": 1,
   /**
@@ -1152,7 +1191,7 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
    * Row 21 is the only built row whose demo lives half outside the tabbed
    * pools, so a number here that looked right would be hiding half of it.
    *
-   * ⭐ `19b` is the two-leg group's live half; `19e` and `19f` are the
+   * ⭐ `21b` is the two-leg group's live half; `21e` and `21f` are the
    * three-leg group's middle and last legs, added 2026-10-14 so the row can
    * demonstrate adding to a one-, two- and three-leg trip.
    */
@@ -1169,8 +1208,8 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
  * declare "1 ride" while demonstrating three.
  */
 const EXPECTED_COMPLETED_SCENARIOS: Record<string, number> = {
-  // `19a` the two-leg group's finished leg, `19c` the solo finished leg, and
-  // `19d` the three-leg group's finished first leg. Each is the ENTRY for one
+  // `21a` the two-leg group's finished leg, `21c` the solo finished leg, and
+  // `21d` the three-leg group's finished first leg. Each is the ENTRY for one
   // of the three trip shapes the row now demonstrates.
   "add-leg-request": 3,
 };
@@ -2109,8 +2148,8 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
    *
    * Row 22 is the first built row with rides in two tabs, and `firstTabWithRides`
    * walks `TAB_ORDER` — In Progress first. So a reviewer who focuses row 22 and
-   * then opens My Rides meets `20b`, the ride with its pick-up behind it, rather
-   * than `20a`.
+   * then opens My Rides meets `22b`, the ride with its pick-up behind it, rather
+   * than `22a`.
    *
    * Declared rather than fixed. The selector routes to `entry.route` directly,
    * so the entry is still what OPENS; this only decides which tab a later tap on
@@ -4901,42 +4940,42 @@ console.log("\n15. Update Trip Details — catalogue row 22");
 
 const TRIP_CHANGE_ENTRY_RIDE = "1049800400";
 const TRIP_CHANGE_ALT_RIDE = "1049800401";
-const change20a = ALL_SEEDED.find((t) => t.id === TRIP_CHANGE_ENTRY_RIDE)!;
-const change20b = ALL_SEEDED.find((t) => t.id === TRIP_CHANGE_ALT_RIDE)!;
+const change22a = ALL_SEEDED.find((t) => t.id === TRIP_CHANGE_ENTRY_RIDE)!;
+const change22b = ALL_SEEDED.find((t) => t.id === TRIP_CHANGE_ALT_RIDE)!;
 check(
   "both scenario rides are seeded",
-  `${[change20a, change20b].filter(Boolean).length} of 2 — ${change20a?.scenario?.code}, ${change20b?.scenario?.code}`,
-  Boolean(change20a) && Boolean(change20b),
+  `${[change22a, change22b].filter(Boolean).length} of 2 — ${change22a?.scenario?.code}, ${change22b?.scenario?.code}`,
+  Boolean(change22a) && Boolean(change22b),
 );
 
 // ---- 15a · The anchors, and what the ride has moved past -----------------
-const anchors20a = changeAnchors(change20a);
-const anchors20b = changeAnchors(change20b);
+const anchors22a = changeAnchors(change22a);
+const anchors22b = changeAnchors(change22b);
 check(
   "the clean ride offers BOTH ends",
-  `${anchors20a.length} anchor(s), ${editableAnchors(change20a).length} editable — ${anchors20a.map((a) => `${a.kind}:${a.passed ? "passed" : "open"}`).join(", ")}`,
-  anchors20a.length === 2 && editableAnchors(change20a).length === 2,
+  `${anchors22a.length} anchor(s), ${editableAnchors(change22a).length} editable — ${anchors22a.map((a) => `${a.kind}:${a.passed ? "passed" : "open"}`).join(", ")}`,
+  anchors22a.length === 2 && editableAnchors(change22a).length === 2,
 );
 /**
- * ⭐ The whole reason `20b` exists. Its pick-up has been swiped, so it is
+ * ⭐ The whole reason `22b` exists. Its pick-up has been swiped, so it is
  * `passed` and drops out of the editable set — asking to move a pick-up that
  * already happened is a correction, which is catalogue row 03's case.
  *
- * ⛔ A check that only ever saw `20a` would pass while `anchorPassed` returned
+ * ⛔ A check that only ever saw `22a` would pass while `anchorPassed` returned
  * a constant `false`, which is the exact shape of a check that stops checking.
  */
 check(
   "the ride with its pick-up behind it offers ONLY the drop-off",
-  `${anchors20b.length} anchor(s), ${editableAnchors(change20b).length} editable — ${anchors20b.map((a) => `${a.kind}:${a.passed ? "passed" : "open"}`).join(", ")}`,
-  anchors20b.length === 2 &&
-    editableAnchors(change20b).length === 1 &&
-    anchors20b[0].passed &&
-    !anchors20b[1].passed,
+  `${anchors22b.length} anchor(s), ${editableAnchors(change22b).length} editable — ${anchors22b.map((a) => `${a.kind}:${a.passed ? "passed" : "open"}`).join(", ")}`,
+  anchors22b.length === 2 &&
+    editableAnchors(change22b).length === 1 &&
+    anchors22b[0].passed &&
+    !anchors22b[1].passed,
 );
 check(
   "the two rides DISAGREE about the pick-up, so the rule is doing work",
-  `20a pick-up passed=${anchors20a[0].passed}, 20b pick-up passed=${anchors20b[0].passed}`,
-  anchors20a[0].passed !== anchors20b[0].passed,
+  `20a pick-up passed=${anchors22a[0].passed}, 20b pick-up passed=${anchors22b[0].passed}`,
+  anchors22a[0].passed !== anchors22b[0].passed,
 );
 /**
  * ⛔⛔ The anchor's label is the RIDE's own wording, never a fixed "Drop-off
@@ -4946,14 +4985,14 @@ check(
  */
 check(
   "each anchor label is the ride's own, verbatim",
-  `${anchors20a.map((a) => a.label).join(" | ")}`,
-  anchors20a.every((a, i) => a.label === change20a.legs[i].label),
+  `${anchors22a.map((a) => a.label).join(" | ")}`,
+  anchors22a.every((a, i) => a.label === change22a.legs[i].label),
 );
 
 // ---- 15b · The case the two entry points build ---------------------------
-const built20a = buildTripChange(change20a, change20a.legs[0]);
-const built20b = buildTripChange(change20b, change20b.legs[0]);
-const ids20a = built20a.supportCase.fields
+const built22a = buildTripChange(change22a, change22a.legs[0]);
+const built22b = buildTripChange(change22b, change22b.legs[0]);
+const ids22a = built22a.supportCase.fields
   .filter((f) => f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST))
   .map((f) => f.id);
 const EXPECTED_CHANGE_FIELDS = [
@@ -4966,9 +5005,9 @@ const EXPECTED_CHANGE_FIELDS = [
 ];
 check(
   "a two-anchor ride builds the declared six fields, in order",
-  `${ids20a.length}: ${ids20a.join(", ")}`,
-  ids20a.length === EXPECTED_CHANGE_FIELDS.length &&
-    EXPECTED_CHANGE_FIELDS.every((id, i) => ids20a[i] === id),
+  `${ids22a.length}: ${ids22a.join(", ")}`,
+  ids22a.length === EXPECTED_CHANGE_FIELDS.length &&
+    EXPECTED_CHANGE_FIELDS.every((id, i) => ids22a[i] === id),
 );
 /**
  * ⛔⛔ **No `notice` field on this case.** `canSubmitCase` treats a visible
@@ -4978,17 +5017,17 @@ check(
  */
 check(
   "no notice field — one would block Submit forever",
-  `${built20a.supportCase.fields.filter((f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST)).length} notice(s) of ${ids20a.length}`,
-  built20a.supportCase.fields.every(
+  `${built22a.supportCase.fields.filter((f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST)).length} notice(s) of ${ids22a.length}`,
+  built22a.supportCase.fields.every(
     (f) =>
       !(f.type === "notice" && f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST)),
   ),
 );
 /** Who asked is the one thing Support cannot proceed without. */
-const sourceField = built20a.supportCase.fields.find(
+const sourceField = built22a.supportCase.fields.find(
   (f) => f.id === CHANGE_SOURCE_FIELD,
 )!;
-const notesField = built20a.supportCase.fields.find(
+const notesField = built22a.supportCase.fields.find(
   (f) => f.id === CHANGE_NOTES_FIELD,
 )!;
 check(
@@ -5007,14 +5046,14 @@ check(
  * nothing downstream of the helper was being read. A form is what the driver
  * sees, so the form is what has to be asserted.
  */
-const timeLabels = built20a.supportCase.fields
+const timeLabels = built22a.supportCase.fields
   .filter((f) => f.id.startsWith("changeTime"))
   .map((f) => f.label);
 check(
   "each TIME FIELD prints the anchor's own label, verbatim",
   `${timeLabels.join(" | ")}`,
-  timeLabels.length === anchors20a.length &&
-    timeLabels.every((label, i) => label === anchors20a[i].label),
+  timeLabels.length === anchors22a.length &&
+    timeLabels.every((label, i) => label === anchors22a[i].label),
 );
 check(
   "...and the two are genuinely different words, so the check can fail",
@@ -5027,7 +5066,7 @@ check(
  * field shows the ride's scheduled 1:20 PM while the swipe that passed it landed
  * at 1:22 PM — "Already happened" was shipped and caught in the walk.
  */
-const passedBadges = built20b.supportCase.fields
+const passedBadges = built22b.supportCase.fields
   .filter((f) => f.lockWhenPrefilled && f.id.startsWith("change"))
   .map((f) => f.lockedBadge);
 check(
@@ -5039,13 +5078,13 @@ check(
 );
 
 /** Locked on the end that has happened, open on the end that has not. */
-const lock20b = built20b.supportCase.fields
+const lock22b = built22b.supportCase.fields
   .filter((f) => f.id.startsWith("changeTime") || f.id.startsWith("changeAddress"))
   .map((f) => `${f.id}:${f.lockWhenPrefilled ? "locked" : "open"}`);
 check(
   "20b locks the pick-up's two fields and leaves the drop-off's open",
-  lock20b.join(", "),
-  lock20b.join(", ") ===
+  lock22b.join(", "),
+  lock22b.join(", ") ===
     "changeTime0:locked, changeAddress0:locked, changeTime1:open, changeAddress1:open",
 );
 
@@ -5064,32 +5103,32 @@ check(
 // form that omitted it would fail the ordinary submit rule for a reason this
 // check is not about.
 const untouched = {
-  ...built20a.initialValues,
+  ...built22a.initialValues,
   [CHANGE_SOURCE_FIELD]: "member",
   signature: SIGNED,
 };
 check(
   "the untouched form passes the ORDINARY submit rule — the gate it needed does not exist",
-  `canSubmitCase=${canSubmitCase(built20a.supportCase.fields, untouched)}`,
-  canSubmitCase(built20a.supportCase.fields, untouched) === true,
+  `canSubmitCase=${canSubmitCase(built22a.supportCase.fields, untouched)}`,
+  canSubmitCase(built22a.supportCase.fields, untouched) === true,
 );
 check(
   "...and the diff gate refuses it anyway",
-  `hasRequiredChange=${hasRequiredChange(built20a.supportCase.requireChangedFrom, untouched, built20a.initialValues)}`,
+  `hasRequiredChange=${hasRequiredChange(built22a.supportCase.requireChangedFrom, untouched, built22a.initialValues)}`,
   hasRequiredChange(
-    built20a.supportCase.requireChangedFrom,
+    built22a.supportCase.requireChangedFrom,
     untouched,
-    built20a.initialValues,
+    built22a.initialValues,
   ) === false,
 );
 const movedTime = { ...untouched, changeTime1: "15:30" };
 check(
   "...and admits it once one field actually differs",
-  `hasRequiredChange=${hasRequiredChange(built20a.supportCase.requireChangedFrom, movedTime, built20a.initialValues)}`,
+  `hasRequiredChange=${hasRequiredChange(built22a.supportCase.requireChangedFrom, movedTime, built22a.initialValues)}`,
   hasRequiredChange(
-    built20a.supportCase.requireChangedFrom,
+    built22a.supportCase.requireChangedFrom,
     movedTime,
-    built20a.initialValues,
+    built22a.initialValues,
   ) === true,
 );
 /**
@@ -5104,14 +5143,14 @@ check(
 );
 check(
   "⛔ a LOCKED field is not in the gate's list — it could never satisfy it",
-  `20b watches ${built20b.supportCase.requireChangedFrom?.join(", ")}`,
-  (built20b.supportCase.requireChangedFrom ?? []).join(",") ===
+  `20b watches ${built22b.supportCase.requireChangedFrom?.join(", ")}`,
+  (built22b.supportCase.requireChangedFrom ?? []).join(",") ===
     "changeTime1,changeAddress1",
 );
 
 // ---- 15d · What the request says ----------------------------------------
-const diff = tripChanges(built20a.anchors, built20a.initialValues, {
-  ...built20a.initialValues,
+const diff = tripChanges(built22a.anchors, built22a.initialValues, {
+  ...built22a.initialValues,
   changeTime1: "15:30",
   changeAddress0: "  2201 Glenwood Ave SE, Atlanta, GA 30316  ",
 });
@@ -5127,8 +5166,8 @@ check(
 );
 check(
   "an untouched form produces no changes at all",
-  `${tripChanges(built20a.anchors, built20a.initialValues, built20a.initialValues).length} change(s)`,
-  tripChanges(built20a.anchors, built20a.initialValues, built20a.initialValues)
+  `${tripChanges(built22a.anchors, built22a.initialValues, built22a.initialValues).length} change(s)`,
+  tripChanges(built22a.anchors, built22a.initialValues, built22a.initialValues)
     .length === 0,
 );
 
@@ -5139,14 +5178,14 @@ check(
  */
 check(
   "the time sequence names every anchor, in timeline order",
-  `${built20a.supportCase.timeSequence?.join(", ")}`,
-  (built20a.supportCase.timeSequence ?? []).join(",") ===
+  `${built22a.supportCase.timeSequence?.join(", ")}`,
+  (built22a.supportCase.timeSequence ?? []).join(",") ===
     "changeTime0,changeTime1",
 );
 const backwards = getTimeOrderWarnings(
-  built20a.supportCase.fields,
-  { ...built20a.initialValues, changeTime1: "10:30" },
-  built20a.supportCase.timeSequence ?? [],
+  built22a.supportCase.fields,
+  { ...built22a.initialValues, changeTime1: "10:30" },
+  built22a.supportCase.timeSequence ?? [],
 );
 check(
   "a drop-off asked for before its own pick-up warns",
@@ -5155,12 +5194,12 @@ check(
 );
 check(
   "...and the ride as it stands warns about nothing",
-  `${Object.keys(getTimeOrderWarnings(built20a.supportCase.fields, built20a.initialValues, built20a.supportCase.timeSequence ?? [])).length} warning(s)`,
+  `${Object.keys(getTimeOrderWarnings(built22a.supportCase.fields, built22a.initialValues, built22a.supportCase.timeSequence ?? [])).length} warning(s)`,
   Object.keys(
     getTimeOrderWarnings(
-      built20a.supportCase.fields,
-      built20a.initialValues,
-      built20a.supportCase.timeSequence ?? [],
+      built22a.supportCase.fields,
+      built22a.initialValues,
+      built22a.supportCase.timeSequence ?? [],
     ),
   ).length === 0,
 );
@@ -5177,7 +5216,7 @@ const REFUSAL_CASES: Array<[string, string | null]> = [
   ["completed", TRIP_CHANGE_REFUSAL.state],
 ];
 for (const [state, expected] of REFUSAL_CASES) {
-  const actual = tripChangeRefusal(change20a, state, false);
+  const actual = tripChangeRefusal(change22a, state, false);
   check(
     `a ${state} ride ${expected === null ? "opens the form" : "is refused"}`,
     actual === null ? "opens" : actual.slice(0, 40) + "…",
@@ -5186,8 +5225,8 @@ for (const [state, expected] of REFUSAL_CASES) {
 }
 check(
   "a ride that already has a request is refused, with its own reason",
-  tripChangeRefusal(change20a, "needs-action", true)?.slice(0, 40) + "…",
-  tripChangeRefusal(change20a, "needs-action", true) ===
+  tripChangeRefusal(change22a, "needs-action", true)?.slice(0, 40) + "…",
+  tripChangeRefusal(change22a, "needs-action", true) ===
     TRIP_CHANGE_REFUSAL.pending,
 );
 check(
@@ -5224,7 +5263,7 @@ const TRIP_CHANGE_DRIVER_FACING = [
   TRIP_CHANGE_SUBMIT_TOAST,
   ...Object.values(TRIP_CHANGE_REFUSAL),
   ...CHANGE_SOURCE_OPTIONS.map((o) => o.label),
-  ...built20a.supportCase.fields
+  ...built22a.supportCase.fields
     .filter((f) => f.showIf?.equals.includes(ISSUE_TRIP_CHANGE_REQUEST))
     .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
 ];
@@ -5255,14 +5294,14 @@ check(
  * thing it edits is a label that is not finished — so the anchor went into the
  * label and this check followed it there.
  */
-const addressFields = built20a.supportCase.fields.filter((f) =>
+const addressFields = built22a.supportCase.fields.filter((f) =>
   f.id.startsWith("changeAddress"),
 );
 check(
   "every address field names the anchor it belongs to, in its own label",
-  `${addressFields.filter((f, i) => f.label.includes(anchors20a[i].label)).length} of ${anchors20a.length} — e.g. "${addressFields[0]?.label ?? "none"}"`,
-  addressFields.length === anchors20a.length &&
-    addressFields.every((f, i) => f.label.includes(anchors20a[i].label)),
+  `${addressFields.filter((f, i) => f.label.includes(anchors22a[i].label)).length} of ${anchors22a.length} — e.g. "${addressFields[0]?.label ?? "none"}"`,
+  addressFields.length === anchors22a.length &&
+    addressFields.every((f, i) => f.label.includes(anchors22a[i].label)),
 );
 /**
  * ⛔ The app never learns the outcome — the client owns the manifest. Asserted
@@ -5282,13 +5321,13 @@ console.log("\n16. Add Leg to Trip — catalogue row 21");
 const ADD_ENTRY = "1049800402";   // 19a — the FINISHED leg of the group
 const ADD_LIVE = "1049800403";    // 19b — its live half
 const ADD_SOLO = "1049800404";    // 19c — one finished leg, no group
-const leg19a = ALL_SEEDED.find((t) => t.id === ADD_ENTRY)!;
-const leg19b = ALL_SEEDED.find((t) => t.id === ADD_LIVE)!;
-const leg19c = ALL_SEEDED.find((t) => t.id === ADD_SOLO)!;
+const leg21a = ALL_SEEDED.find((t) => t.id === ADD_ENTRY)!;
+const leg21b = ALL_SEEDED.find((t) => t.id === ADD_LIVE)!;
+const leg21c = ALL_SEEDED.find((t) => t.id === ADD_SOLO)!;
 check(
   "all three scenario rides are seeded",
-  `${[leg19a, leg19b, leg19c].filter(Boolean).length} of 3 — ${[leg19a, leg19b, leg19c].map((t) => t?.scenario?.code).join(", ")}`,
-  Boolean(leg19a) && Boolean(leg19b) && Boolean(leg19c),
+  `${[leg21a, leg21b, leg21c].filter(Boolean).length} of 3 — ${[leg21a, leg21b, leg21c].map((t) => t?.scenario?.code).join(", ")}`,
+  Boolean(leg21a) && Boolean(leg21b) && Boolean(leg21c),
 );
 
 // ---- 16a · ⛔⛔ Two pools, one matcher ------------------------------------
@@ -5305,24 +5344,24 @@ check(
 );
 check(
   "⛔ row 17 CANNOT see the finished half of the group",
-  `legsInGroup(19b) → ${legsInGroup(leg19b).map((t) => t.id).join(", ")}`,
-  legsInGroup(leg19b).length === 1 && legsInGroup(leg19b)[0].id === ADD_LIVE,
+  `legsInGroup(21b) → ${legsInGroup(leg21b).map((t) => t.id).join(", ")}`,
+  legsInGroup(leg21b).length === 1 && legsInGroup(leg21b)[0].id === ADD_LIVE,
 );
 check(
   "⭐ ...and row 21 CAN",
-  `groupLegs(19b) → ${groupLegs(leg19b).map((l) => `${l.letter}:${l.trip.id}`).join(", ")}`,
-  groupLegs(leg19b).length === 2 &&
-    groupLegs(leg19b).some((l) => l.trip.id === ADD_ENTRY),
+  `groupLegs(21b) → ${groupLegs(leg21b).map((l) => `${l.letter}:${l.trip.id}`).join(", ")}`,
+  groupLegs(leg21b).length === 2 &&
+    groupLegs(leg21b).some((l) => l.trip.id === ADD_ENTRY),
 );
 check(
   "both ends of the group see the SAME order",
-  `from 19a: ${groupLegs(leg19a).map((l) => l.letter).join("")} · from 19b: ${groupLegs(leg19b).map((l) => l.letter).join("")}`,
-  groupLegs(leg19a).map((l) => l.trip.id).join() ===
-    groupLegs(leg19b).map((l) => l.trip.id).join(),
+  `from 19a: ${groupLegs(leg21a).map((l) => l.letter).join("")} · from 19b: ${groupLegs(leg21b).map((l) => l.letter).join("")}`,
+  groupLegs(leg21a).map((l) => l.trip.id).join() ===
+    groupLegs(leg21b).map((l) => l.trip.id).join(),
 );
 
 // ---- 16b · The forbidden slot --------------------------------------------
-const legs19 = groupLegs(leg19a);
+const legs19 = groupLegs(leg21a);
 check(
   "the finished leg is read as finished and the live one as pending",
   legs19.map((l) => `${l.letter}:${l.activity}`).join(", "),
@@ -5372,7 +5411,7 @@ check(
     newLegMinutes(legs19).source === "group",
 );
 /** ⭐ The commonest real case, and a different branch. */
-const legsSolo = groupLegs(leg19c);
+const legsSolo = groupLegs(leg21c);
 check(
   "a lone finished leg has no sample, so the declared default is used",
   `${newLegMinutes(legsSolo).minutes} min from ${newLegMinutes(legsSolo).source}, ${legsSolo.length} leg(s)`,
@@ -5444,7 +5483,7 @@ check(
 );
 
 // ---- 16e · The case the three entry points build -------------------------
-const built19 = buildAddLeg(leg19a, leg19a.legs[0]);
+const built19 = buildAddLeg(leg21a, leg21a.legs[0]);
 const ids19 = built19.supportCase.fields
   .filter((f) => f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST))
   .map((f) => f.id);
@@ -5489,11 +5528,11 @@ check(
  * does. A pick-up time that pushes leg B adds an editable time for leg B; one
  * that does not, does not.
  */
-const pushedCase = buildAddLegCase(leg19a, {
+const pushedCase = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 });
-const slackCaseFields = buildAddLegCase(leg19a, {
+const slackCaseFields = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "13:00",
 });
@@ -5548,11 +5587,11 @@ check(
  * and stays meaningful if a block is ever generated out of order.
  */
 const seqWrong = allowedSlots(legs19).filter((slot) => {
-  const built = buildAddLegCase(leg19a, {
+  const built = buildAddLegCase(leg21a, {
     [SLOT_FIELD]: String(slot),
     [ADD_PICKUP_TIME_FIELD]: "14:30",
   });
-  const blocks = addLegPlan(leg19a, {
+  const blocks = addLegPlan(leg21a, {
     [SLOT_FIELD]: String(slot),
     [ADD_PICKUP_TIME_FIELD]: "14:30",
   }).blocks;
@@ -5603,7 +5642,7 @@ check(
  * kept its pre-insertion one. The letter is the question this control exists to
  * answer, and two adjacent rows claiming the same one answers it twice over.
  */
-const rowsAtSlot1 = buildAddLegCase(leg19a, {
+const rowsAtSlot1 = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 }).fields.find((f) => f.id === SLOT_FIELD)!.legOrder!;
@@ -5613,7 +5652,7 @@ check(
   rowsAtSlot1.newLegLabel === "New leg B" &&
     rowsAtSlot1.rows.map((r) => r.letter).join(",") === "A,C",
 );
-const rowsAtSlot2 = buildAddLegCase(leg19a, {
+const rowsAtSlot2 = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "2",
 }).fields.find((f) => f.id === SLOT_FIELD)!.legOrder!;
 check(
@@ -5652,7 +5691,7 @@ const planValues = {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 };
-const planned = addLegPlan(leg19a, planValues);
+const planned = addLegPlan(leg21a, planValues);
 /**
  * ⛔⛔ Reads the REAL function and the REAL key field list, not a restatement.
  * The first version of this check declared its own `keyIds` and `patchIds`
@@ -5660,7 +5699,7 @@ const planned = addLegPlan(leg19a, planValues);
  * actual key produced NO failure. A check that compares two copies of a claim
  * is testing the copies.
  */
-const realDerive = addLegDerive(leg19a, planValues);
+const realDerive = addLegDerive(leg21a, planValues);
 const patchIds = Object.keys(realDerive.patch);
 check(
   "the patch writes the fields it is supposed to",
@@ -5694,7 +5733,7 @@ check(
  * applying the patch must leave the key UNCHANGED. If it does not, the sheet's
  * effect writes, re-keys and writes again — forever.
  */
-const afterPatch = addLegDerive(leg19a, { ...planValues, ...realDerive.patch });
+const afterPatch = addLegDerive(leg21a, { ...planValues, ...realDerive.patch });
 check(
   "⛔⛔ ...so applying the patch leaves the key identical — the effect cannot retrigger",
   `"${realDerive.key}" → "${afterPatch.key}"`,
@@ -5710,12 +5749,12 @@ check(
  * passed throughout the defect, because the plan was never the broken part —
  * the third time in two slices that a check aimed one layer away from the fault.
  */
-const atLate = addLegDerive(leg19a, {
+const atLate = addLegDerive(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
   [ADD_DROPOFF_TIME_FIELD]: "15:20",
 });
-const atEarly = addLegDerive(leg19a, {
+const atEarly = addLegDerive(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "13:00",
   // ⛔ The stale drop-off the app wrote a moment ago — the exact state the
@@ -5741,7 +5780,7 @@ check(
   `${minutesToClock(planned.proposedDropoff!)}`,
   planned.proposedDropoff === timeInputToMinutes("14:30")! + estimate19,
 );
-const overridden = addLegPlan(leg19a, {
+const overridden = addLegPlan(leg21a, {
   ...planValues,
   [ADD_DROPOFF_TIME_FIELD]: "16:00",
 });
@@ -5819,10 +5858,10 @@ check(
 );
 check(
   "...which the two-leg group cannot do, whatever is typed into it",
-  `${allowedSlots(legs19).map((slot) => addLegPlan(leg19a, { [SLOT_FIELD]: String(slot), [ADD_PICKUP_TIME_FIELD]: "14:30" }).shifts.length).join(", ")} shift(s) per slot`,
+  `${allowedSlots(legs19).map((slot) => addLegPlan(leg21a, { [SLOT_FIELD]: String(slot), [ADD_PICKUP_TIME_FIELD]: "14:30" }).shifts.length).join(", ")} shift(s) per slot`,
   allowedSlots(legs19).every(
     (slot) =>
-      addLegPlan(leg19a, {
+      addLegPlan(leg21a, {
         [SLOT_FIELD]: String(slot),
         [ADD_PICKUP_TIME_FIELD]: "14:30",
       }).shifts.length <= 1,
@@ -5846,8 +5885,8 @@ check(
  */
 check(
   "the seeded trips are read against MOCK_TODAY, not the real clock",
-  `19a ${isTripToday(leg19a)} · 19c ${isTripToday(leg19c)}`,
-  isTripToday(leg19a) && isTripToday(leg19c),
+  `19a ${isTripToday(leg21a)} · 19c ${isTripToday(leg21c)}`,
+  isTripToday(leg21a) && isTripToday(leg21c),
 );
 
 /**
@@ -5857,7 +5896,7 @@ check(
  * four, which before 2026-10-14 it was not: it had exactly one field, its new
  * pick-up time.
  */
-const pushedBlocks = addLegPlan(leg19a, {
+const pushedBlocks = addLegPlan(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 }).blocks;
@@ -5871,11 +5910,11 @@ check(
 );
 check(
   "...and a pick-up with slack produces only the new leg's",
-  `${addLegPlan(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "13:00" }).blocks.length} block(s)`,
-  addLegPlan(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "13:00" })
+  `${addLegPlan(leg21a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "13:00" }).blocks.length} block(s)`,
+  addLegPlan(leg21a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "13:00" })
     .blocks.length === 1,
 );
-const pushedFields = buildAddLegCase(leg19a, {
+const pushedFields = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 }).fields.map((f) => f.id);
@@ -5907,7 +5946,7 @@ check(
  * would have to be recomputed by hand every time the seed moves, and the
  * property is that the leg's length survives, not that it lands at 4:25.
  */
-const pushedShift = addLegPlan(leg19a, {
+const pushedShift = addLegPlan(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 }).shifts[0];
@@ -5921,7 +5960,7 @@ check(
     originalSpan > 0,
 );
 /** ⛔ ...and the patch writes that, not the time the leg holds today. */
-const pushedPatch = addLegDerive(leg19a, {
+const pushedPatch = addLegDerive(leg21a, {
   [SLOT_FIELD]: "1",
   [ADD_PICKUP_TIME_FIELD]: "14:30",
 }).patch;
@@ -5939,9 +5978,9 @@ check(
  * the pushed leg had a drop-off field there was nothing to compare it to.
  */
 const pushedWarnings = getTimeOrderWarnings(
-  buildAddLegCase(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" }).fields,
+  buildAddLegCase(leg21a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" }).fields,
   { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30", ...pushedPatch },
-  buildAddLegCase(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" })
+  buildAddLegCase(leg21a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" })
     .timeSequence ?? [],
 );
 check(
@@ -5959,7 +5998,7 @@ check(
  * and a box offered nowhere both pass a spot check on one slot.
  */
 const slotSweep = allowedSlots(legs19).map((slot) => {
-  const blocks = addLegPlan(leg19a, {
+  const blocks = addLegPlan(leg21a, {
     [SLOT_FIELD]: String(slot),
     [ADD_PICKUP_TIME_FIELD]: "14:30",
   }).blocks;
@@ -6008,7 +6047,7 @@ const tickValues: Record<string, string> = {
   [ADD_DROPOFF_ADDRESS_FIELD]: "77 Example Clinic Dr",
   [liveBlock.fields.sameAsPrevious!]: CHECKED,
 };
-const ticked19 = addLegDerive(leg19a, tickValues);
+const ticked19 = addLegDerive(leg21a, tickValues);
 check(
   "⭐ ticking the pushed leg's box copies the NEW leg's drop-off, as typed",
   `${liveBlock.fields.pickupAddress} = "${ticked19.patch[liveBlock.fields.pickupAddress]}"`,
@@ -6016,8 +6055,8 @@ check(
 );
 check(
   "...and unticked it takes the leg's own address instead",
-  `"${addLegDerive(leg19a, { ...tickValues, [liveBlock.fields.sameAsPrevious!]: "" }).patch[liveBlock.fields.pickupAddress]}"`,
-  addLegDerive(leg19a, {
+  `"${addLegDerive(leg21a, { ...tickValues, [liveBlock.fields.sameAsPrevious!]: "" }).patch[liveBlock.fields.pickupAddress]}"`,
+  addLegDerive(leg21a, {
     ...tickValues,
     [liveBlock.fields.sameAsPrevious!]: "",
   }).patch[liveBlock.fields.pickupAddress] ===
@@ -6025,12 +6064,12 @@ check(
 );
 /** ⛔ The home box copies the trip's ORIGINAL first pick-up, whatever the slot. */
 const lastSlot = allowedSlots(legs19)[allowedSlots(legs19).length - 1];
-const homeBlocks = addLegPlan(leg19a, {
+const homeBlocks = addLegPlan(leg21a, {
   [SLOT_FIELD]: String(lastSlot),
   [ADD_PICKUP_TIME_FIELD]: "16:30",
 }).blocks;
 const homeBlock = homeBlocks.find((b) => b.fields.dropoffIsHome)!;
-const homed = addLegDerive(leg19a, {
+const homed = addLegDerive(leg21a, {
   [SLOT_FIELD]: String(lastSlot),
   [ADD_PICKUP_TIME_FIELD]: "16:30",
   [homeBlock.fields.dropoffIsHome!]: CHECKED,
@@ -6056,9 +6095,9 @@ check(
  */
 check(
   "⭐ row 21 accepts a COMPLETED ride and row 22 refuses one",
-  `add-leg ${canRequestAddLeg("completed", false)} · trip-change ${tripChangeRefusal(change20a, "completed", false) === null}`,
+  `add-leg ${canRequestAddLeg("completed", false)} · trip-change ${tripChangeRefusal(change22a, "completed", false) === null}`,
   canRequestAddLeg("completed", false) === true &&
-    tripChangeRefusal(change20a, "completed", false) !== null,
+    tripChangeRefusal(change22a, "completed", false) !== null,
 );
 check(
   "⛔ an offer the driver has not accepted is refused",
@@ -6073,8 +6112,8 @@ check(
 /** ⛔ Keyed by GROUP, so the sibling leg shows it too. */
 check(
   "⛔ the request is keyed by GROUP, so both legs resolve to one key",
-  `19a ${groupKey(leg19a)} · 19b ${groupKey(leg19b)} · 19c ${groupKey(leg19c)}`,
-  groupKey(leg19a) === groupKey(leg19b) && groupKey(leg19c) !== groupKey(leg19a),
+  `19a ${groupKey(leg21a)} · 19b ${groupKey(leg21b)} · 19c ${groupKey(leg21c)}`,
+  groupKey(leg21a) === groupKey(leg21b) && groupKey(leg21c) !== groupKey(leg21a),
 );
 /** ⛔⛔ A proposal belongs to its own build — row 21's THIRD surface. */
 const ADD_ENTRY_SCOPE: Array<[string | null, boolean]> = [
@@ -6143,7 +6182,7 @@ check(
  * `getTimeOrderWarnings` compares FIELDS and the leg in front has none unless
  * the insertion happened to shift it.
  */
-const outOfOrder = buildAddLegCase(leg19a, {
+const outOfOrder = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "2",
   [ADD_PICKUP_TIME_FIELD]: "13:00",
 }).fields.find((f) => f.id === SLOT_FIELD)!;
@@ -6154,7 +6193,7 @@ check(
     outOfOrder.warning!.includes("3:00 PM") &&
     outOfOrder.warning!.includes("1:00 PM"),
 );
-const slotInOrder = buildAddLegCase(leg19a, {
+const slotInOrder = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "2",
   [ADD_PICKUP_TIME_FIELD]: "16:00",
 }).fields.find((f) => f.id === SLOT_FIELD)!;
@@ -6166,7 +6205,7 @@ check(
 check(
   "...and it WARNS rather than blocking, like every other time rule here",
   `canSubmitCase with the warning showing = ${canSubmitCase(
-    buildAddLegCase(leg19a, { [SLOT_FIELD]: "2", [ADD_PICKUP_TIME_FIELD]: "13:00" }).fields,
+    buildAddLegCase(leg21a, { [SLOT_FIELD]: "2", [ADD_PICKUP_TIME_FIELD]: "13:00" }).fields,
     {
       ...built19.initialValues,
       [SLOT_FIELD]: "2",
@@ -6178,7 +6217,7 @@ check(
     },
   )}`,
   canSubmitCase(
-    buildAddLegCase(leg19a, { [SLOT_FIELD]: "2", [ADD_PICKUP_TIME_FIELD]: "13:00" }).fields,
+    buildAddLegCase(leg21a, { [SLOT_FIELD]: "2", [ADD_PICKUP_TIME_FIELD]: "13:00" }).fields,
     {
       ...built19.initialValues,
       [SLOT_FIELD]: "2",
@@ -6196,7 +6235,7 @@ check(
  * rather than row 22's trap. It blocks Submit, and here that is the behaviour
  * wanted: a schedule crossing midnight is one the app genuinely cannot work out.
  */
-const overnightCase = buildAddLegCase(leg19a, {
+const overnightCase = buildAddLegCase(leg21a, {
   [SLOT_FIELD]: "2",
   [ADD_PICKUP_TIME_FIELD]: "23:30",
 });
@@ -7773,7 +7812,7 @@ if (STANDING && PLAIN_SEND_BACK) {
    * seeded, because a ride raising two warnings reads as one screen.
    *
    * ⚠️ A break test appending the penalty after the refusal PASSED when this
-   * ran on the seeded `13c`, which is not short-notice: there was nothing for
+   * ran on the seeded `14c`, which is not short-notice: there was nothing for
    * the break to append, so the terminal claim was never exercised. The
    * synthesised trip is the only way to put a step after `denied` at all.
    */
@@ -11922,7 +11961,7 @@ check(
  * would not quietly make this vacuous.
  */
 const ADD_LEG_VALUES = { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" };
-const rf34Blocks = addLegPlan(leg19a, ADD_LEG_VALUES).blocks;
+const rf34Blocks = addLegPlan(leg21a, ADD_LEG_VALUES).blocks;
 const rf34PushedBlocks = rf34Blocks.filter((block) => block.kind === "existing");
 const rf34NewBlocks = rf34Blocks.filter((block) => block.kind === "new");
 check(
@@ -11952,7 +11991,7 @@ check(
  * block carrying `was` whose fields never declare a `previousValue` renders
  * exactly like one that has none.
  */
-const addLegFields = buildAddLegCase(leg19a, ADD_LEG_VALUES).fields;
+const addLegFields = buildAddLegCase(leg21a, ADD_LEG_VALUES).fields;
 const pushedFieldIds = rf34PushedBlocks.flatMap((block) => [
   block.fields.pickupAddress,
   block.fields.pickupTime,
@@ -12011,7 +12050,7 @@ check(
  */
 console.log("\n35. Add Leg: the leg list is the form");
 
-const ADD_LEG_CASE = buildAddLegCase(leg19a, ADD_LEG_VALUES);
+const ADD_LEG_CASE = buildAddLegCase(leg21a, ADD_LEG_VALUES);
 const groupedFields = ADD_LEG_CASE.fields.filter((field) => field.group);
 const blockFieldIds = new Set(
   rf34Blocks.flatMap((block) => [

@@ -133,21 +133,21 @@ const OTHER_SLICE_RIDES = new Set([
   "1049800381",
   "1049800382",
   /**
-   * ⚠️ Row 14's advance send-back ride (`13b`), added 2026-10-12. It carries no
+   * ⚠️ Row 14's advance send-back ride (`14b`), added 2026-10-12. It carries no
    * `locationRecords` at all, so the no-show walk finds nothing in its lookback
    * and falls through to the form — the same shape as the Missed Swipe seeds
    * and for the same reason. Nobody files a no-show on it; it exists to show a
    * send-back that attracts no penalty.
    *
-   * ⛔ Its sibling `1049800394` (`13a`) is deliberately NOT here: that leg is
+   * ⛔ Its sibling `1049800394` (`14a`) is deliberately NOT here: that leg is
    * `wait-for-call`, so the no-show rule never reaches this branch for it. An
    * id in this set that never refuses would inflate the carve-out while
    * exercising nothing, which the count below exists to catch.
    */
   "1049800395",
   /**
-   * ⚠️ Row 14's standing-order ride (`13c`), added 2026-10-13 — same shape as
-   * `13b`: no `locationRecords`, so the no-show walk finds nothing and falls
+   * ⚠️ Row 14's standing-order ride (`14c`), added 2026-10-13 — same shape as
+   * `14b`: no `locationRecords`, so the no-show walk finds nothing and falls
    * through to the form. Nobody files a no-show on it; it exists to show what
    * sending back a standing order costs.
    */

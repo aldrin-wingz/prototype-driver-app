@@ -412,18 +412,26 @@ export interface Trip {
  */
 export interface TripScenario {
   /**
-   * Short, **stable** handle shown first on the pill, e.g. "03a".
+   * Short handle shown first on the pill — the row number and a letter, e.g.
+   * `"03a"`.
    *
-   * ⛔⛔ **Minted from the catalogue row number once, and never re-minted.**
-   * Inserting a row renumbers every row after it, and the handles deliberately
-   * do NOT follow: they are printed on pills, quoted in four check scripts and
-   * used as identifiers, and a handle that moves is a handle nobody can cite.
-   * After the 2026-10-15 insertion at order 13, `13a`–`13c` belong to row 14,
-   * `16a`/`16b` to row 17, `18a`–`18m` to row 19, `19a`–`19f` to row 20 and
-   * `20a`/`20b` to row 21.
+   * ⛔⛔ **It MOVES when the row does.** Inserting a catalogue row renumbers
+   * every row after it, and the handles have to follow, because the handle is
+   * what a reviewer reads off a pill before looking the row up. The 2026-10-15
+   * insertion at order 13 moved every handle numbered 13 and above up by one —
+   * in the seed, in four check scripts, and in the identifiers those scripts
+   * name them by.
    *
-   * ⛔ So the handle is NOT the link to the catalogue. `solutions` below is,
-   * and it is keyed by id — which no renumber touches.
+   * ⛔⛔ **Two of them moved TWICE, because the previous insertion forgot
+   * them.** Adding row 19 on 2026-10-15 renumbered Add Leg and Update Trip
+   * Details without touching their handles, so `19a`–`19f` sat on row 20 and
+   * `20a`/`20b` on row 21 — a pill naming a row that was something else
+   * entirely, and nothing failed. They are now `21a`–`21f` and `22a`/`22b`,
+   * and the check below is what makes a third silent drift impossible.
+   *
+   * ⚠️ So it is NOT a key. `solutions` below is the link to the catalogue and
+   * it is keyed by id, which no renumber touches; the handle is a label. A
+   * check asserts every handle's number matches the order of a row it claims.
    */
   code: string;
   /** What this ride is the case OF, in a few words. */
@@ -1422,7 +1430,7 @@ export const mockUpcomingTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 18a-18m — catalogue row 19, cancelled rides in the manifest =====
+  // ===== 19a-18m — catalogue row 19, cancelled rides in the manifest =====
   //
   // Thirteen rides over four dates: **ten still on and three cancelled by
   // Wingz**, the cancellations spread across three of the four days so that
@@ -1483,7 +1491,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18a",
+      code: "19a",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1528,7 +1536,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18b",
+      code: "19b",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1574,7 +1582,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18c",
+      code: "19c",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1619,7 +1627,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18d",
+      code: "19d",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1664,7 +1672,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18e",
+      code: "19e",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1710,7 +1718,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18f",
+      code: "19f",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1755,7 +1763,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18g",
+      code: "19g",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1800,7 +1808,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18h",
+      code: "19h",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1845,7 +1853,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18i",
+      code: "19i",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1891,7 +1899,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18j",
+      code: "19j",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1936,7 +1944,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18k",
+      code: "19k",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1981,7 +1989,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18l",
+      code: "19l",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -2026,7 +2034,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "18m",
+      code: "19m",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -2225,7 +2233,7 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 16a / 16b — the member declined, and it is a ROUND TRIP =====
+  // ===== 17a / 17b — the member declined, and it is a ROUND TRIP =====
   //
   // Catalogue row 17. TWO rides sharing one `tripGroup`, because that is what
   // the case is about: `CAP-225`'s decline template lists TWO leg ids, and a
@@ -2284,7 +2292,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "16a",
+      code: "17a",
       label: "Member declined — the outbound leg",
       solutions: ["rider-initiated-cancellation"],
     },
@@ -2292,7 +2300,7 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 16b — the return, same member, same day =====
+  // ===== 17b — the return, same member, same day =====
   //
   // ⚠️ Seeded as its own ride because that is how this app models legs: a round
   // trip is two `Trip` objects carrying `legCode` A and B. `tripGroup` is what
@@ -2347,7 +2355,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "16b",
+      code: "17b",
       label: "Member declined — filed from the return",
       solutions: ["rider-initiated-cancellation"],
     },
@@ -2355,7 +2363,7 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 20a — Update Trip Details, the clean case =====
+  // ===== 22a — Update Trip Details, the clean case =====
   //
   // Catalogue row **20**, `Trip / Ride Modification`, 364 calls. Accepted but not
   // yet begun, so BOTH anchors are editable — the form opens with four fields,
@@ -2407,7 +2415,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "20a",
+      code: "22a",
       label: "Both ends still editable — the four-field form",
       solutions: ["change-pickup-dropoff"],
     },
@@ -2415,7 +2423,7 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 19a (leg B) — Add Leg to Trip, the group's live half =====
+  // ===== 21a (leg B) — Add Leg to Trip, the group's live half =====
   //
   // Catalogue row **19**. The other half of this group, `1049800402`, is
   // COMPLETED and lives in `mockCompletedTrips` — which is the whole point:
@@ -2471,7 +2479,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "19b",
+      code: "21b",
       label: "Add a leg from the LIVE half of the group",
       solutions: ["add-leg-request"],
     },
@@ -2479,7 +2487,7 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 19d (legs B and C) — the three-leg group's live half =====
+  // ===== 21d (legs B and C) — the three-leg group's live half =====
   //
   // ⛔ Both PENDING, and both tight against the leg before them: B's pick-up is
   // 25 minutes after A's drop-off, C's is 35 after B's. `LEG_TURNAROUND_MINUTES`
@@ -2530,7 +2538,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "19e",
+      code: "21e",
       label: "The three-leg group's middle leg",
       solutions: ["add-leg-request"],
     },
@@ -2583,7 +2591,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "19f",
+      code: "21f",
       label: "The three-leg group's last leg — where the home tick box lands",
       solutions: ["add-leg-request"],
     },
@@ -3103,7 +3111,7 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 13a — a SHORT-NOTICE send-back, which attracts the penalty =====
+  // ===== 14a — a SHORT-NOTICE send-back, which attracts the penalty =====
   //
   // Catalogue row 14. `sameDay: true` is what makes production's step 2 penalty
   // popup appear at all — per the story's AC, "The popup appears only for
@@ -3152,7 +3160,7 @@ export const mockInProgressTrips: Trip[] = [
     status: "in-progress",
     pills: [],
     scenario: {
-      code: "13a",
+      code: "14a",
       label: "Send-back, short notice — penalty applies",
       solutions: ["send-back-reason-form"],
     },
@@ -3160,7 +3168,7 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 13b — an ADVANCE send-back, which does NOT =====
+  // ===== 14b — an ADVANCE send-back, which does NOT =====
   //
   // ⛔ The negative control, and the slice needs it: a reason form that can only
   // ever be seen on the way to a penalty warning is indistinguishable from one
@@ -3206,7 +3214,7 @@ export const mockInProgressTrips: Trip[] = [
     status: "in-progress",
     pills: [],
     scenario: {
-      code: "13b",
+      code: "14b",
       label: "Send-back, advance — no penalty",
       solutions: ["send-back-reason-form"],
     },
@@ -3214,7 +3222,7 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 13c — sending back a STANDING ORDER =====
+  // ===== 14c — sending back a STANDING ORDER =====
   //
   // ⛔⛔ The trip a driver least wants to lose and least understands the cost
   // of. A standing order is a recurring booking the client relies on, so
@@ -3272,7 +3280,7 @@ export const mockInProgressTrips: Trip[] = [
     status: "in-progress",
     pills: [],
     scenario: {
-      code: "13c",
+      code: "14c",
       label: "Send-back of a STANDING ORDER",
       solutions: ["send-back-reason-form"],
     },
@@ -3280,7 +3288,7 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 20b — Update Trip Details, with the pick-up already behind them =====
+  // ===== 22b — Update Trip Details, with the pick-up already behind them =====
   //
   // ⭐ The ONLY demo of the passed-anchor rule. `pickedUpAt` is set, so the
   // pick-up end has happened: its two fields render locked with what was
@@ -3331,7 +3339,7 @@ export const mockInProgressTrips: Trip[] = [
     status: "in-progress",
     pills: [],
     scenario: {
-      code: "20b",
+      code: "22b",
       label: "Pick-up already made — only the drop-off can change",
       solutions: ["change-pickup-dropoff"],
     },
@@ -3342,7 +3350,7 @@ export const mockInProgressTrips: Trip[] = [
 ];
 
 export const mockCompletedTrips: Trip[] = [
-  // ===== 19a (leg A) — Add Leg to Trip, the FINISHED half =====
+  // ===== 21a (leg A) — Add Leg to Trip, the FINISHED half =====
   //
   // Catalogue row **19**, and the ride the whole slice turns on. It is done, so
   // nothing may be inserted ahead of it — and it is also the only state in this
@@ -3398,7 +3406,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     scenario: {
-      code: "19a",
+      code: "21a",
       label: "Add a leg from a FINISHED leg — the entry point",
       solutions: ["add-leg-request"],
     },
@@ -3406,7 +3414,7 @@ export const mockCompletedTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 19d — a THREE-leg trip, the group's completed first leg =====
+  // ===== 21d — a THREE-leg trip, the group's completed first leg =====
   //
   // ⭐ The third shape of the same case (user direction, 2026-10-14: *"give me
   // a scenario for adding to a 1 leg trip, a 2 leg trip and a 3 leg trip"*).
@@ -3465,7 +3473,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     scenario: {
-      code: "19d",
+      code: "21d",
       label: "Add a leg to a THREE-leg trip — the finished first leg",
       solutions: ["add-leg-request"],
     },
@@ -3473,7 +3481,7 @@ export const mockCompletedTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 19b — one finished leg, no group =====
+  // ===== 21b — one finished leg, no group =====
   //
   // ⭐ The commonest real case, and a different code path: with no sibling and
   // only one anchor there is no span to average, so `estimateFromGroup` returns
@@ -3513,7 +3521,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     scenario: {
-      code: "19c",
+      code: "21c",
       label: "One finished leg, no group — the fallback estimate",
       solutions: ["add-leg-request"],
     },

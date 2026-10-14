@@ -202,7 +202,7 @@ export function isStandingOrder(trip: Trip): boolean {
  * moves it.
  *
  * ⚠️ **All four combinations are real and the rule handles each**; the seed
- * demonstrates three (`13a` short-notice, `13b` plain, `13c` standing order). A
+ * demonstrates three (`14a` short-notice, `14b` plain, `14c` standing order). A
  * standing order that is ALSO short-notice raises both conditional warnings —
  * four screens — which is correct and is asserted rather than seeded, because a
  * ride raising both would let a reviewer read them as one screen.

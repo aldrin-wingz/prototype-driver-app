@@ -289,16 +289,16 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   // at all, so the trail has nothing to challenge the drop-off with, which is
   // the same reason `1049800376` is quiet.
   "1049800393": "none",   // no trail
-  // ⚠️ Row 14's two send-back rides (`13a` short-notice, `13b` advance). Both
+  // ⚠️ Row 14's two send-back rides (`14a` short-notice, `14b` advance). Both
   // accepted and unstarted with no `locationRecords`, so the next swipe is the
   // START and there is no trail to challenge it with. Declared rather than left
   // to fall through — an undeclared ride here is one whose swipe behaviour
   // nobody decided.
   "1049800394": "none",
   "1049800395": "none",
-  // Row 14's standing-order ride (`13c`) — same shape as the two above.
+  // Row 14's standing-order ride (`14c`) — same shape as the two above.
   "1049800396": "none",
-  // ⚠️ Row 22's second scenario ride (`20b`), the one with the pick-up already
+  // ⚠️ Row 22's second scenario ride (`22b`), the one with the pick-up already
   // made. It carries no `locationRecords`, so the trail has nothing to challenge
   // the drop-off with. Declared rather than left to fall through — an undeclared
   // ride here is one whose swipe behaviour nobody decided.
