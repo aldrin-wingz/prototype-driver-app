@@ -804,7 +804,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 24;  // ⭐ +3 on 2026-10-14: row 20's three-leg group
+const EXPECTED_SCENARIO_RIDES = 37;  // ⭐ +13 on 2026-10-15: row 18's manifest — 10 still on, 3 cancelled
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -9935,6 +9935,95 @@ check(
   /tripContextFor\(option\)/.test(BANNER_SRC) &&
     !/trip\.rider/.test(BANNER_SRC) &&
     !/leg\.address/.test(BANNER_SRC),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n31. Row 18 — the manifest the cancellations sit in");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **The seed is the argument here.** Row 18 is about a cancelled ride being
+ * findable among a day's worth of others, so a two-ride list would prove
+ * nothing — and a list where all three cancellations fell on one date would
+ * prove the opposite of "in the right date position, mixed in with the rest".
+ * Both counts declared.
+ */
+const ROW_18 = "my-rides-cancelled";
+const EXPECTED_ROW_18_RIDES = 13;
+const EXPECTED_ROW_18_CANCELLED = 3;
+const EXPECTED_ROW_18_DATES = 4;
+const row18 = ALL_SEEDED.filter((t) => t.scenario?.solutions.includes(ROW_18));
+const row18Cancelled = row18.filter((t) => Boolean(t.clientCancelNoticeAt));
+const row18Dates = [...new Set(row18.map((t) => t.date))];
+check(
+  "row 18 is demonstrated on a whole manifest, not a pair of rides",
+  `${row18.length} ride(s), ${row18Cancelled.length} cancelled, over ${row18Dates.length} date(s)`,
+  row18.length === EXPECTED_ROW_18_RIDES &&
+    row18Cancelled.length === EXPECTED_ROW_18_CANCELLED &&
+    row18Dates.length === EXPECTED_ROW_18_DATES,
+);
+/**
+ * ⛔ **Spread, not clumped.** Three cancellations on one date would sit
+ * together under one heading and never demonstrate placement at all. Asserted
+ * as a count of distinct dates, and as each cancellation having an active ride
+ * on the same day to be mixed in with.
+ */
+const cancelDates = [...new Set(row18Cancelled.map((t) => t.date))];
+const unmixed = row18Cancelled.filter(
+  (c) => !row18.some((t) => t.date === c.date && !t.clientCancelNoticeAt),
+);
+check(
+  "...and the cancellations are spread across days, each beside a live ride",
+  `${cancelDates.length} of ${EXPECTED_ROW_18_CANCELLED} date(s); ${unmixed.length} with nothing to mix into`,
+  cancelDates.length === EXPECTED_ROW_18_CANCELLED && unmixed.length === 0,
+);
+/**
+ * ⛔⛔ **Thirteen legs that must NOT reach a support form.** `getLegOptions`
+ * offers every leg carrying `progress`; these rides carry none, which is the
+ * only thing keeping them out of every form's leg picker. The count is declared
+ * beside §30's so the two cannot drift apart silently.
+ */
+const row18WithProgress = row18.filter((t) => t.legs.some((l) => l.progress));
+check(
+  "none of row 18's rides carries a swipe mark, so none reaches a leg picker",
+  `${row18WithProgress.length} of ${row18.length} with progress; picker offers ${getLegOptions("all").length}`,
+  row18WithProgress.length === 0 &&
+    getLegOptions("all").length === EXPECTED_CONTEXT_LEGS,
+);
+/** ⛔ ...and none joins a trip group, which would pull them into row 16/20's pools. */
+const row18Grouped = row18.filter((t) => Boolean(t.tripGroup));
+check(
+  "...and none of them joins a trip group",
+  `${row18Grouped.length} of ${row18.length}`,
+  row18Grouped.length === 0,
+);
+/**
+ * ⛔ The notice stamp is a `date · time` the seed could print, not an ISO
+ * string or an epoch. It is shown to the driver verbatim.
+ */
+const badStamp = row18Cancelled.filter(
+  (t) => !/^\w{3}, \w{3} \d{1,2}, \d{4} · \d{1,2}:\d{2} (AM|PM)$/.test(t.clientCancelNoticeAt!),
+);
+check(
+  "...and every cancellation stamp is in the seed's own date format",
+  badStamp.length
+    ? badStamp.map((t) => `${t.id}: "${t.clientCancelNoticeAt}"`).join(", ")
+    : row18Cancelled.map((t) => t.clientCancelNoticeAt).join(" · "),
+  badStamp.length === 0,
+);
+/**
+ * ⛔⛔ **The stamp is BEFORE the ride it cancels.** A notice dated after the
+ * pick-up would be telling the driver about a trip they had already run, which
+ * is a different problem and not this one.
+ */
+const lateStamp = row18Cancelled.filter((t) => {
+  const notice = new Date(t.clientCancelNoticeAt!.replace(/^\w{3},\s*/, "").replace(" · ", " "));
+  const pickup = new Date(`${t.date.replace(/^\w{3},\s*/, "")} ${t.legs[0].time}`);
+  return Number.isNaN(notice.getTime()) || Number.isNaN(pickup.getTime()) || notice >= pickup;
+});
+check(
+  "...and every one was raised before its own pick-up",
+  `${lateStamp.length} of ${row18Cancelled.length} raised late or unparseable`,
+  lateStamp.length === 0,
 );
 
 // ---------------------------------------------------------------------------

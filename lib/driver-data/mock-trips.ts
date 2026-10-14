@@ -372,6 +372,27 @@ export interface Trip {
    */
   overCapacityTripNumber?: string;
   /**
+   * When the driver was TOLD Wingz cancelled this ride — the moment
+   * production's alert fired, in the seed's own `date · time` format.
+   *
+   * ⛔⛔ **Presence is the whole predicate** — see `isClientCancelled`. The app
+   * does not know when the cancellation was DECIDED, only when it learned;
+   * naming the field for the notice is what stops a later reader treating it
+   * as the client's own timestamp.
+   *
+   * ⛔⛔ **NOT the driver's own cancellation report.** That is
+   * `cancellationRequests` in the ride-flow provider and `rider-declined.ts`,
+   * and it runs the opposite direction — the driver asking for a trip to come
+   * off, which nobody has granted. This one is Wingz having already done it.
+   * The two must never be read as one field. `CAP-341` / `CAP-342`.
+   *
+   * ⚠️ A flat scalar, like `overCapacityTripNumber` and `standingOrderId`. A
+   * one-key object is an invitation to add a second key nobody decided, and
+   * there is no second fact here: production's own screen says "No action is
+   * required" and gives neither a reason nor who asked.
+   */
+  clientCancelNoticeAt?: string;
+  /**
    * Pills a SCREEN adds at render time, e.g. "Waiting on Support".
    *
    * ⚠️ Separate from `pills` because those are seed decoration and a scenario
@@ -1332,7 +1353,20 @@ export const mockUpcomingTrips: Trip[] = [
   },
   {
     id: "UP-001",
-    date: "Wed, Feb 25, 2026",
+    /**
+     * ⚠️ **Re-dated 2026-10-15, from `Wed, Feb 25, 2026`.** Once Upcoming
+     * sorts by date, a ride five months in the past is the first thing the
+     * plain mirror shows. This one is free to move — a Postman test ride that
+     * nothing references.
+     *
+     * ⛔ The other three are NOT free: `lib/data/payout.ts` pins
+     * `UP-CURRENT-001`/`-002` to the Apr 28 – May 4 pay period and
+     * `UP-FUTURE-001` to May 5 – 11, and re-dating them would make the payout
+     * model disagree with the rides it is projecting from. They stay stale, and
+     * the focused demo filters all three out — only the plain mirror shows the
+     * seam.
+     */
+    date: "Thu, Aug 7, 2026",
     rider: "Test Rider",
     client: "Verida",
     passengerCount: 1,
@@ -1352,6 +1386,606 @@ export const mockUpcomingTrips: Trip[] = [
     ],
     status: "upcoming",
     pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 18a-18m — catalogue row 18, cancelled rides in the manifest =====
+  //
+  // Thirteen rides over four dates: **ten still on and three cancelled by
+  // Wingz**, the cancellations spread across three of the four days so that
+  // "in the right date position, mixed in with the rest" is visible rather
+  // than asserted.
+  //
+  // ⛔⛔ **All thirteen carry a `scenario`, including the ten that are fine.**
+  // `ridesForSolution` filters to scenario rides whenever anything is focused,
+  // and it runs first — tag only the three cancellations and focusing row 18
+  // gives a three-ride Upcoming list with a filter bar that has nothing to
+  // filter. The demo collapses into its own punchline.
+  //
+  // ⛔ **No `progress` on any leg.** `leg-options.ts` offers only legs that
+  // carry one, so these stay out of every support form's leg picker. One
+  // `progress` block added to make a detail screen look richer would silently
+  // add thirteen legs to every form in the app.
+  //
+  // ⛔ No `tripGroup` either, so `LIVE_POOLS` and `groupMembers` are untouched.
+  //
+  // ⚠️ The weekday labels follow THIS SEED's calendar, not the real one — it
+  // calls 2026-07-31 a Thursday where the actual date is a Friday. Internally
+  // consistent and cosmetic: the date parser strips the weekday before
+  // parsing, so nothing sorts on it.
+  {
+    id: "1049800410",
+    date: "Fri, Aug 1, 2026",
+    rider: "ROSALIND ACHTERBERG",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 29.40,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0150",
+    },
+    legs: [
+      {
+        id: "1049800410",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "7:20 AM",
+        address: "1812 Cascade Rd SW, Atlanta, GA 30311",
+        county: "Fulton County",
+        revenue: 29.40,
+      },
+      {
+        id: "1049800410-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "8:05 AM",
+        address: "3215 Hospital Way, East Point, GA 30344",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18a",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800411",
+    date: "Fri, Aug 1, 2026",
+    rider: "DEMETRIUS OYELARAN",
+    client: "MTM",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 33.15,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0151",
+    },
+    legs: [
+      {
+        id: "1049800411",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:15 AM",
+        address: "664 Candler Rd, Decatur, GA 30032",
+        county: "DeKalb County",
+        revenue: 33.15,
+      },
+      {
+        id: "1049800411-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:00 AM",
+        address: "2701 N Decatur Rd, Decatur, GA 30033",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18b",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800412",
+    date: "Fri, Aug 1, 2026",
+    rider: "BEATRIX NDIAYE",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 27.80,
+    notes: "",
+    clientCancelNoticeAt: "Thu, Jul 31, 2026 · 4:12 PM",
+    contacts: {
+      riderPhone: "(404) 555-0152",
+    },
+    legs: [
+      {
+        id: "1049800412",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "11:40 AM",
+        address: "4490 Buford Hwy NE, Chamblee, GA 30341",
+        county: "DeKalb County",
+        revenue: 27.80,
+      },
+      {
+        id: "1049800412-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "12:25 PM",
+        address: "5665 Peachtree Dunwoody Rd, Atlanta, GA 30342",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18c",
+      label: "Cancelled by Wingz",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800413",
+    date: "Fri, Aug 1, 2026",
+    rider: "CLEMENT FAIRWEATHER",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 31.05,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0153",
+    },
+    legs: [
+      {
+        id: "1049800413",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "2:10 PM",
+        address: "3860 Colonial Blvd, Fort Myers, FL 33966",
+        county: "Lee County",
+        revenue: 31.05,
+      },
+      {
+        id: "1049800413-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "2:55 PM",
+        address: "13685 Doctors Way, Fort Myers, FL 33912",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18d",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800414",
+    date: "Mon, Aug 4, 2026",
+    rider: "IMOGEN STRACHAN",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 24.60,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0154",
+    },
+    legs: [
+      {
+        id: "1049800414",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "6:45 AM",
+        address: "925 Ralph David Abernathy Blvd SW, Atlanta, GA 30310",
+        county: "Fulton County",
+        revenue: 24.60,
+      },
+      {
+        id: "1049800414-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "7:30 AM",
+        address: "80 Jesse Hill Jr Dr SE, Atlanta, GA 30303",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18e",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800415",
+    date: "Mon, Aug 4, 2026",
+    rider: "OSVALDO QUINTANILLA",
+    client: "MTM",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 30.70,
+    notes: "",
+    clientCancelNoticeAt: "Sun, Aug 2, 2026 · 7:48 PM",
+    contacts: {
+      riderPhone: "(404) 555-0155",
+    },
+    legs: [
+      {
+        id: "1049800415",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "8:50 AM",
+        address: "2135 Flat Shoals Rd, Decatur, GA 30032",
+        county: "DeKalb County",
+        revenue: 30.70,
+      },
+      {
+        id: "1049800415-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:35 AM",
+        address: "1821 Clifton Rd NE, Atlanta, GA 30329",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18f",
+      label: "Cancelled by Wingz",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800416",
+    date: "Mon, Aug 4, 2026",
+    rider: "PRISCILLA WOLDEMARIAM",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 26.95,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0156",
+    },
+    legs: [
+      {
+        id: "1049800416",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "1:05 PM",
+        address: "1260 Collier Rd NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 26.95,
+      },
+      {
+        id: "1049800416-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "1:50 PM",
+        address: "550 Peachtree St NE, Atlanta, GA 30308",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18g",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800417",
+    date: "Mon, Aug 4, 2026",
+    rider: "BARNABY TEWKSBURY",
+    client: "CareSource",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 35.20,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0157",
+    },
+    legs: [
+      {
+        id: "1049800417",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "3:30 PM",
+        address: "3379 Panthersville Rd, Decatur, GA 30034",
+        county: "DeKalb County",
+        revenue: 35.20,
+      },
+      {
+        id: "1049800417-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "4:15 PM",
+        address: "1968 Peachtree Rd NW, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18h",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800418",
+    date: "Tue, Aug 5, 2026",
+    rider: "LUCINDA ABERNATHY",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 28.35,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0158",
+    },
+    legs: [
+      {
+        id: "1049800418",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "7:55 AM",
+        address: "2370 Bolton Rd NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 28.35,
+      },
+      {
+        id: "1049800418-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "8:40 AM",
+        address: "1405 Clifton Rd NE, Atlanta, GA 30322",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18i",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800419",
+    date: "Tue, Aug 5, 2026",
+    rider: "RAFAEL ESPINOZA-LARA",
+    client: "Alivi",
+    market: "FL",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 32.40,
+    notes: "",
+    clientCancelNoticeAt: "Mon, Aug 3, 2026 · 11:26 AM",
+    contacts: {
+      riderPhone: "(404) 555-0159",
+    },
+    legs: [
+      {
+        id: "1049800419",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "10:20 AM",
+        address: "4120 Winkler Ave, Fort Myers, FL 33916",
+        county: "Lee County",
+        revenue: 32.40,
+      },
+      {
+        id: "1049800419-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:05 AM",
+        address: "9981 S HealthPark Dr, Fort Myers, FL 33908",
+        county: "Lee County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18j",
+      label: "Cancelled by Wingz",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800420",
+    date: "Tue, Aug 5, 2026",
+    rider: "HENRIETTA VOSKUIJLEN",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 25.50,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0160",
+    },
+    legs: [
+      {
+        id: "1049800420",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "4:00 PM",
+        address: "1570 Howell Mill Rd NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 25.50,
+      },
+      {
+        id: "1049800420-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "4:45 PM",
+        address: "35 Collier Rd NW, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18k",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800421",
+    date: "Wed, Aug 6, 2026",
+    rider: "SOLOMON BRIGHTWATER",
+    client: "MTM",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 29.85,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0161",
+    },
+    legs: [
+      {
+        id: "1049800421",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:05 AM",
+        address: "3120 Memorial Dr SE, Atlanta, GA 30317",
+        county: "DeKalb County",
+        revenue: 29.85,
+      },
+      {
+        id: "1049800421-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:50 AM",
+        address: "2665 N Decatur Rd, Decatur, GA 30033",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18l",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800422",
+    date: "Wed, Aug 6, 2026",
+    rider: "ADELAIDE PENHALIGON",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 27.25,
+    notes: "",
+    contacts: {
+      riderPhone: "(404) 555-0162",
+    },
+    legs: [
+      {
+        id: "1049800422",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "12:30 PM",
+        address: "755 Commerce Dr, Decatur, GA 30030",
+        county: "DeKalb County",
+        revenue: 27.25,
+      },
+      {
+        id: "1049800422-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "1:15 PM",
+        address: "1364 Clifton Rd NE, Atlanta, GA 30322",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "18m",
+      label: "Still on",
+      solutions: ["my-rides-cancelled"],
+    },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
   },
