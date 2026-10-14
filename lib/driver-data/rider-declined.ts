@@ -228,13 +228,26 @@ export interface DeclineChannelRule {
   /**
    * What the proof field is called when this channel is chosen.
    *
-   * ⛔ Found by walking, 2026-10-13: three of these help strings said "below"
-   * about a field that renders ABOVE the proof box. Help text must never name
-   * another field's POSITION — field order is a property of the case registry
-   * and this table cannot see it. Checked.
+   * ⛔ Found by walking, 2026-10-13: three of the help strings that used to sit
+   * under this field said "below" about a field that renders ABOVE the proof
+   * box. Copy here must never name another field's POSITION — field order is a
+   * property of the case registry and this table cannot see it. Still checked,
+   * now over the label and the warning.
    */
   proofLabel: string;
-  proofHelp: string;
+  /**
+   * ⛔⛔ **A disclosure, not a description — which is why only two channels
+   * have one.** Every channel used to carry a `proofHelp` line rendered in grey
+   * under the field; those came out with every other descriptor (user
+   * direction, 2026-10-14). What could not come out is the fact that on the two
+   * channels where an artifact EXISTS, the real form would require it and this
+   * one does not. That is a build-state flag, so it renders as the amber
+   * warning the rest of the app uses for exactly that.
+   *
+   * ⚠️ `undefined` on the three channels where nothing can be attached — there
+   * is no gap to disclose when production would not ask either.
+   */
+  proofWarning?: string;
 }
 
 /**
@@ -253,8 +266,8 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: true,
     secondHand: false,
     proofLabel: "Screenshot of the message",
-    proofHelp:
-      "The message where they said they no longer need the ride. ⚠️ Not in prototype yet — the real form would require this, and you can submit without it here.",
+    proofWarning:
+      "Not in prototype yet — the real form would require this, and you can submit without it here.",
   },
   {
     value: "call",
@@ -262,8 +275,8 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: true,
     secondHand: false,
     proofLabel: "Screenshot of your call log",
-    proofHelp:
-      "Your phone's call log showing the call. It shows the call happened, not what was said — which is what the question about their words is for. ⚠️ Not in prototype yet — the real form would require this, and you can submit without it here.",
+    proofWarning:
+      "Not in prototype yet — the real form would require this, and you can submit without it here.",
   },
   {
     value: "in-person",
@@ -271,8 +284,6 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: false,
     secondHand: false,
     proofLabel: "Anything that supports this (optional)",
-    proofHelp:
-      "There is usually nothing to attach to a doorstep conversation — your account of it and your signature are the record.",
   },
   {
     value: "caregiver",
@@ -280,8 +291,6 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: false,
     secondHand: true,
     proofLabel: "Anything that supports this (optional)",
-    proofHelp:
-      "Nothing to attach is normal here. Naming who told you is what Support can check.",
   },
   {
     value: "facility",
@@ -289,8 +298,6 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: false,
     secondHand: true,
     proofLabel: "Anything that supports this (optional)",
-    proofHelp:
-      "Nothing to attach is normal here. Naming who told you is what Support can check.",
   },
 ];
 

@@ -498,7 +498,6 @@ export function buildSupportFormCase({
               type: "time",
               label: "What time did you arrive?",
               shortLabel: "time you arrived",
-              helpText: "When you got to the pick-up.",
               required: true,
               prefillFrom: "waitArrivedAt",
               // ⚠️ NO `lockWhenPrefilled` — the inverse of a recorded swipe mark. What
@@ -512,7 +511,6 @@ export function buildSupportFormCase({
               type: "time",
               label: "What time did you leave?",
               shortLabel: "time you left",
-              helpText: "When you gave up and drove off.",
               required: true,
               prefillFrom: "waitLeftAt",
               showIf: EITHER_NO_SHOW_CASE,
@@ -528,8 +526,8 @@ export function buildSupportFormCase({
         // ⚠️ Production should offer a map pin as well as free text — "the main
         // entrance" of a hospital campus is not a location. Text only here,
         // because a pin picker is a map the prototype does not have.
-        helpText:
-          "Be specific — it is how Support can tell you were at the right door. ⚠️ A map pin belongs here too.",
+        warning:
+          "A map pin belongs here too.",
         showIf: ONLY_RIDER_NO_SHOW,
       },
       {
@@ -564,7 +562,6 @@ export function buildSupportFormCase({
          * previous screen…", which contradicts itself the moment a driver picks
          * the option this field exists to offer.
          */
-        helpText: "Not their name — you gave that on the previous screen.",
         showIf: ONLY_CANCEL_AT_DOOR,
       },
       {
@@ -604,7 +601,6 @@ export function buildSupportFormCase({
               id: "enRouteTime",
               type: "time",
               label: "En-route time",
-              helpText: "When you swiped to start. This is the one mark we always have.",
               prefillFrom: "enRouteTime",
               lockWhenPrefilled: true,
               showIf: ONLY_MISSED_SWIPE,
@@ -624,9 +620,6 @@ export function buildSupportFormCase({
                   // the address, which is when they arrived, not when the member
                   // got in. Locking a guess makes the driver file a time they
                   // can see is wrong.
-                  helpText: confirmed("pickup")
-                    ? "Your location history puts you at the pick-up around this time. Change it if the member got in later."
-                    : "We could not place you at the pick-up, so this one is yours to fill in.",
                   showIf: ONLY_MISSED_SWIPE,
                 }
               : {
@@ -646,8 +639,6 @@ export function buildSupportFormCase({
                   required: true,
                   min: 0,
                   placeholder: "e.g. 48213",
-                  helpText:
-                    "We have no reading for that moment — the swipe that captures it is the one that was missed.",
                   showIf: ONLY_MISSED_SWIPE,
                 }
               : {
@@ -669,8 +660,6 @@ export function buildSupportFormCase({
                     label: "Where did you pick them up?",
                     placeholder:
                       "e.g. west tower lobby, the side entrance, in the driveway",
-                    helpText:
-                      "Be specific — with no location record of the pick-up, this is what Support has.",
                     required: true,
                     showIf: ONLY_MISSED_SWIPE,
                   },
@@ -686,9 +675,6 @@ export function buildSupportFormCase({
                   shortLabel: "drop-off time",
                   required: true,
                   prefillFrom: "dropoffSeenAt",
-                  helpText: confirmed("dropoff")
-                    ? "Your location history puts you at the drop-off around this time. Change it if you left later."
-                    : "We could not place you at the drop-off, so this one is yours to fill in.",
                   showIf: ONLY_MISSED_SWIPE,
                 }
               : {
@@ -708,8 +694,6 @@ export function buildSupportFormCase({
                   required: true,
                   min: 0,
                   placeholder: "e.g. 48229",
-                  helpText:
-                    "We have no reading for that moment — the swipe that captures it is the one that was missed.",
                   showIf: ONLY_MISSED_SWIPE,
                 }
               : {
@@ -727,8 +711,6 @@ export function buildSupportFormCase({
                     type: "text",
                     label: "Where did you drop them off?",
                     placeholder: "e.g. the main entrance, bay 3, the front desk",
-                    helpText:
-                      "Be specific — with no location record of the drop-off, this is what Support has.",
                     required: true,
                     showIf: ONLY_MISSED_SWIPE,
                   },
@@ -749,7 +731,6 @@ export function buildSupportFormCase({
               id: "attachment",
               type: "file",
               label: "Attachments (optional)",
-              helpText: "Add a photo or screenshot if it helps explain.",
               showIf: ONLY_MISSED_SWIPE,
             },
             /**
@@ -770,8 +751,6 @@ export function buildSupportFormCase({
                     id: "driverSignature",
                     type: "signature",
                     label: "Driver Signature",
-                    helpText:
-                      "The member's signature can no longer be taken, so yours is what attests to this leg.",
                     required: true,
                     showIf: ONLY_MISSED_SWIPE,
                   },
@@ -808,8 +787,6 @@ export function buildSupportFormCase({
                   // Offering a number that was never on the driver's screen
                   // sends Support chasing a call nobody made.
                   options: cannotReach.contactOptions,
-                  helpText:
-                    "Only the member's numbers are listed. Calling Wingz Support is not an attempt to reach them, so it is not an option here.",
                   showIf: ONLY_CANNOT_REACH,
                 }
               : {
@@ -866,8 +843,8 @@ export function buildSupportFormCase({
                */
               required: true,
               requiredNotEnforced: true,
-              helpText:
-                "A screenshot of your phone's call log showing the attempt. ⚠️ Not in prototype yet — the real form would require this, and you can submit without it here.",
+              warning:
+                "Not in prototype yet — the real form would require this, and you can submit without it here.",
               showIf: ONLY_CANNOT_REACH,
             },
           ] as SupportCaseDefinition["fields"])
@@ -901,8 +878,6 @@ export function buildSupportFormCase({
               // going has usually dropped the return too. ⚠️ But not always: a
               // member whose family drove them to the appointment still needs
               // the ride home, and unticking is the only way to say so.
-              helpText:
-                "Both legs are selected because a member who cancels usually cancels the return too. Untick one if they still need it.",
               showIf: ONLY_RIDER_DECLINED,
             },
             {
@@ -928,7 +903,6 @@ export function buildSupportFormCase({
               label: "When did they tell you?",
               shortLabel: "time they told you",
               required: true,
-              helpText: "Roughly is fine.",
               showIf: ONLY_RIDER_DECLINED,
             },
             {
@@ -987,7 +961,7 @@ export function buildSupportFormCase({
               label: channel.proofLabel,
               required: channel.hasArtifact,
               requiredNotEnforced: channel.hasArtifact,
-              helpText: channel.proofHelp,
+              warning: channel.proofWarning,
               showIf: { field: "declineChannel", equals: [channel.value] },
             })),
             {
@@ -1005,8 +979,6 @@ export function buildSupportFormCase({
                * field after it would be signed for before it was written.
                */
               required: true,
-              helpText:
-                "Sign to confirm the member told you they no longer need this ride.",
               showIf: ONLY_RIDER_DECLINED,
             },
           ] as SupportCaseDefinition["fields"])
@@ -1049,12 +1021,19 @@ export function buildSupportFormCase({
             {
               id: changeAddressFieldId(anchor.index),
               type: "text",
-              label: anchor.addressLabel,
-              // ⚠️ Names the anchor it belongs to WITHOUT describing where
-              // either sits on screen. Help text cannot see field order — the
-              // copy lives here and the order lives in this array — so "the
-              // field above" is a claim it is in no position to make.
-              helpText: `The address the ride shows for ${anchor.label}.`,
+              /**
+               * ⛔⛔ **The anchor is in the LABEL, not in help text beneath it.**
+               * It was a help line — and when the help lines came out, that
+               * line was the only thing tying a field called "Drop-off address"
+               * to a row this ride calls "Appointment Time". A label that needs
+               * a sentence under it to say which thing it edits is a label that
+               * is not finished.
+               *
+               * ⚠️ Still names the anchor WITHOUT describing where either sits
+               * on screen: the copy lives here and the order lives in the array
+               * around it, so "the field above" is a claim it cannot make.
+               */
+              label: `${anchor.addressLabel} · ${anchor.label}`,
               maxLength: 160,
               showIf: ONLY_TRIP_CHANGE,
               lockWhenPrefilled: anchor.passed,
@@ -1120,8 +1099,6 @@ export function buildSupportFormCase({
               // ⛔ The slot and the pick-up time are two separate answers and
               // can contradict each other — see `slotOrderWarning`.
               warning: addLeg.slotWarning,
-              helpText:
-                "Drag it, or tap a gap. A leg you have already started or finished cannot have anything put in front of it.",
               showIf: ONLY_ADD_LEG,
             },
             {
@@ -1164,7 +1141,6 @@ export function buildSupportFormCase({
                * estimate, and ⛔ it is not `required`: a figure the app supplied
                * cannot be something the driver failed to provide.
                */
-              helpText: ESTIMATE_HELP[addLeg.estimateSource],
               showIf: ONLY_ADD_LEG,
             },
           ] as SupportCaseDefinition["fields"])
@@ -1182,7 +1158,12 @@ export function buildSupportFormCase({
             type: "time" as const,
             label: `Leg ${shift.letter} pick-up moves to`,
             shortLabel: `leg ${shift.letter}'s new pick-up time`,
-            helpText: `Leg ${shift.letter} is scheduled for ${shift.fromLabel}, which no longer fits. Change this if the member can manage something else.`,
+            /**
+             * ⚠️ A `warning`, not help text. It is not describing the question —
+             * it is saying that a leg already on the manifest has stopped
+             * fitting, which is the reason this field exists at all.
+             */
+            warning: `Leg ${shift.letter} is scheduled for ${shift.fromLabel}, which no longer fits. Change this if the member can manage something else.`,
             showIf: ONLY_ADD_LEG,
           })) as SupportCaseDefinition["fields"])
         : []),
@@ -1321,8 +1302,6 @@ export function buildSupportFormCase({
                * that is not on the list, which is worse than no help at all.
                * A check asserts every quoted phrase matches a real option.
                */
-              helpText:
-                "A standing order is a repeating ride. Pick \u201cOnly a specific trip\u201d if they only asked about one.",
               showIf: ONLY_AUTO_ASSIGN,
             },
             {
@@ -1332,8 +1311,6 @@ export function buildSupportFormCase({
               shortLabel: "the schedule",
               placeholder: "e.g. every Tue and Thu, 9:40 AM pickup",
               required: true,
-              helpText:
-                "Which days and roughly what time. Support matches incoming trips against this, so a pattern is worth more than an exact minute.",
               /**
                * ⚠️ Gated on the ANSWER, like `reachOutcomeOther` and
                * `spokeWithRelation`, and safe for the same reason:
@@ -1360,8 +1337,6 @@ export function buildSupportFormCase({
                * picker can express. Two different questions, two field types,
                * and neither one doing the other's job badly.
                */
-              helpText:
-                "The pick-up date and time they gave you, as near as you have it.",
               showIf: {
                 field: "assignmentScope",
                 equals: [ASSIGNMENT_SCOPE_SPECIFIC],
@@ -1460,8 +1435,6 @@ export function buildSupportFormCase({
               id: "signature",
               type: "signature",
               label: "Sign to confirm",
-              helpText:
-                "Sign to confirm the member did not come out for this ride.",
               required: true,
               showIf: ONLY_RIDER_NO_SHOW,
             },

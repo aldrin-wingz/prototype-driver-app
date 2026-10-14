@@ -874,9 +874,25 @@ check("...and the sheet has no way to render one",
   !/SupportCallout/.test(readFileSync("components/support/support-form-sheet.tsx", "utf8")) &&
     !/SupportCallout/.test(readFileSync("types/support.ts", "utf8")),
   "the callout type is still reachable");
-check("...while the field-level explanations survive",
-  caseFor(["dropoff"], RIDE_2).fields.filter((f) => f.helpText).length >= 3,
-  "the per-field copy went with it");
+/**
+ * ⛔⛔ **Inverted, 2026-10-14.** This used to assert the per-field help SURVIVED
+ * the callout's removal — "at least 3 fields still carry helpText". The grey
+ * descriptor under every question has now gone too, by user direction, so the
+ * old assertion is false by decision and the new rule is the opposite one:
+ * `helpText` renders for exactly one field type.
+ *
+ * ⚠️ The property is kept rather than deleted because `notice` fields use it as
+ * their BODY — an amber block that IS its text, not a description of a question
+ * above it. Keeping the property without this check is the trap: someone sets
+ * helpText on a text field, sees nothing, and cannot tell why.
+ */
+const swipeFields = caseFor(["pickup", "dropoff"], RIDE_2).fields;
+const strayHelp = swipeFields.filter((f) => f.helpText && f.type !== "notice");
+check("only a notice carries helpText — no field descriptors are left",
+  strayHelp.length === 0 && swipeFields.length > 5,
+  strayHelp.length
+    ? `${strayHelp.map((f) => `${f.id} (${f.type})`).join(", ")}`
+    : `0 of ${swipeFields.length} fields`);
 
 check("Missed Swipe is the case that keeps Pending",
   FORM.includes("appTracksStatus: true"), "appTracksStatus is not true");

@@ -698,10 +698,6 @@ export function SupportFieldRenderer({
         </label>
       )}
 
-      {field.helpText && !isLocked && (
-        <p className="text-sm text-gray-500">{field.helpText}</p>
-      )}
-
       {/* Same amber as the unenforced-required line, because it is the same kind
           of thing: something worth reading that is not stopping you. A red error
           would claim the value is rejected, and it isn't. */}

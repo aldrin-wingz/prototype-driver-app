@@ -2143,31 +2143,52 @@ for (const scope of ASSIGNMENT_SCOPES) {
  * write help text will not have been here.
  */
 const QUOTED = /[\u201c\u201d"]([^\u201c\u201d"]{3,60})[\u201c\u201d"]/g;
+/**
+ * ⚠️ **Retargeted when the help text went.** It used to read `field.helpText`
+ * alone; those strings were removed from every input field (user direction,
+ * 2026-10-14) and a sweep keyed on one dead property is a sweep over nothing.
+ * The RULE was never about help text — it is about copy attached to a select —
+ * so it now reads every string a field can carry.
+ */
+const copyOf = (field: { label?: string; placeholder?: string; warning?: string; helpText?: string }) =>
+  [field.label, field.placeholder, field.warning, field.helpText].filter(Boolean) as string[];
 let quotesChecked = 0;
+let stringsSwept = 0;
 const badQuotes: string[] = [];
 for (const supportCase of [ASSIGN_CASE, buildSupportFormCase(), reachCase]) {
   for (const field of supportCase.fields) {
-    if (field.type !== "select" || !field.options || !field.helpText) continue;
-    for (const match of field.helpText.matchAll(QUOTED)) {
-      quotesChecked += 1;
-      const phrase = match[1];
-      if (!field.options.some((o) => o.label === phrase)) {
-        badQuotes.push(`${field.id}: \u201c${phrase}\u201d`);
+    if (field.type !== "select" || !field.options) continue;
+    for (const copy of copyOf(field)) {
+      stringsSwept += 1;
+      for (const match of copy.matchAll(QUOTED)) {
+        quotesChecked += 1;
+        const phrase = match[1];
+        if (!field.options.some((o) => o.label === phrase)) {
+          badQuotes.push(`${field.id}: \u201c${phrase}\u201d`);
+        }
       }
     }
   }
 }
 check(
-  "every option quoted in a select's help text is a real option",
+  "every option quoted in a select's copy is a real option",
   badQuotes.length
     ? badQuotes.join(" | ")
-    : `${quotesChecked} quoted phrase(s) across 3 case(s), all matched`,
+    : `${quotesChecked} quoted phrase(s) in ${stringsSwept} string(s) across 3 case(s)`,
   badQuotes.length === 0,
 );
+/**
+ * ⛔ Non-vacuity on the SWEEP, not on the quotes.
+ *
+ * It used to demand `quotesChecked > 0` — which was true only while one help
+ * string happened to quote an option, and went false the moment that string was
+ * deleted. Whether anyone currently quotes an option is not something this check
+ * should require; whether it looked at real copy is.
+ */
 check(
-  "...and the sweep found a quote to check, rather than passing on nothing",
-  `${quotesChecked} quoted phrase(s)`,
-  quotesChecked > 0,
+  "...and the sweep read real copy, rather than passing on nothing",
+  `${stringsSwept} string(s) over ${quotesChecked} quote(s)`,
+  stringsSwept > 10,
 );
 
 /** The two schedule fields are different SHAPES, not one field copied. */
@@ -4223,11 +4244,16 @@ check(
 /**
  * ⛔ **Found by walking.** Three of the five help strings said "below" about
  * "Who told you?" and "What did they say?", both of which render ABOVE the
- * proof box. A help string cannot see the field order — that lives in the case
+ * proof box. Copy here cannot see the field order — that lives in the case
  * registry — so naming a position is a claim this table has no way to keep.
+ *
+ * ⚠️ Retargeted when the help strings went: the rule is about COPY attached to
+ * a field, not about one property, so it now reads the label and the warning —
+ * the two that survived. Narrowing it to `proofLabel` alone would have left the
+ * warning free to reintroduce exactly the bug this caught.
  */
 const positional = DECLINE_CHANNELS.filter((c) =>
-  /\b(above|below)\b/i.test(`${c.proofLabel} ${c.proofHelp}`),
+  /\b(above|below)\b/i.test(`${c.proofLabel} ${c.proofWarning ?? ""}`),
 );
 check(
   "no proof copy points at where another field sits",
@@ -4505,18 +4531,25 @@ check(
   declineLeaks.length === 0,
 );
 /**
- * ⚠️ The proof help text is the ONE place a ⚠️ is allowed, because it carries
- * the project's locked flag wording — "⚠️ Not in prototype yet". Asserted
- * rather than exempted silently.
+ * ⛔⛔ **The disclosure survived the descriptor cull, and this is what proves
+ * it.** Every channel used to carry a grey `proofHelp` line; those came out
+ * with every other field descriptor. What could not come out is that on the
+ * two channels where an artifact EXISTS, the real form would require it and
+ * this one does not — so that moved to `proofWarning`, which renders amber.
+ *
+ * ⚠️ The renderer prepends the ⚠️, so the string itself no longer carries the
+ * flag wording. Asserted on the PAIRING instead: a warning exists exactly where
+ * an artifact does, and nowhere else.
  */
-const flagged = DECLINE_CHANNELS.filter((c) =>
-  c.proofHelp.includes("⚠️ Not in prototype yet"),
-);
+const flagged = DECLINE_CHANNELS.filter((c) => Boolean(c.proofWarning));
 check(
-  "the unenforced proof asks carry the locked flag wording",
-  `${flagged.length} of ${ARTIFACT_CHANNELS.length} artifact channel(s)`,
+  "the unenforced proof asks disclose that the real form would require them",
+  `${flagged.length} warning(s) of ${ARTIFACT_CHANNELS.length} artifact channel(s), ${DECLINE_CHANNELS.length} channels total`,
   flagged.length === ARTIFACT_CHANNELS.length &&
-    flagged.every((c) => c.hasArtifact),
+    flagged.every((c) => c.hasArtifact) &&
+    // ⛔ ...and no channel without an artifact claims a gap production does not have.
+    DECLINE_CHANNELS.every((c) => c.hasArtifact || !c.proofWarning) &&
+    flagged.every((c) => c.proofWarning!.includes("Not in prototype yet")),
 );
 
 
@@ -4864,17 +4897,22 @@ check(
   placed.length === 0,
 );
 /**
- * ⚠️ The help on each address names its own anchor, which is the only thing
- * tying "Drop-off address" to a row the ride calls "Appointment Time".
+ * ⛔⛔ **The anchor is in the LABEL now, and that move is the point.**
+ *
+ * It was a help line under the field, and when the help lines came out it was
+ * the only thing tying a field called "Drop-off address" to a row this ride
+ * calls "Appointment Time". A label needing a sentence beneath it to say which
+ * thing it edits is a label that is not finished — so the anchor went into the
+ * label and this check followed it there.
  */
-const addressHelp = built20a.supportCase.fields.filter(
-  (f) => f.id.startsWith("changeAddress") && f.helpText,
+const addressFields = built20a.supportCase.fields.filter((f) =>
+  f.id.startsWith("changeAddress"),
 );
 check(
-  "every address field names the anchor it belongs to",
-  `${addressHelp.filter((f, i) => f.helpText!.includes(anchors20a[i].label)).length} of ${anchors20a.length}`,
-  addressHelp.length === anchors20a.length &&
-    addressHelp.every((f, i) => f.helpText!.includes(anchors20a[i].label)),
+  "every address field names the anchor it belongs to, in its own label",
+  `${addressFields.filter((f, i) => f.label.includes(anchors20a[i].label)).length} of ${anchors20a.length} — e.g. "${addressFields[0]?.label ?? "none"}"`,
+  addressFields.length === anchors20a.length &&
+    addressFields.every((f, i) => f.label.includes(anchors20a[i].label)),
 );
 /**
  * ⛔ The app never learns the outcome — the client owns the manifest. Asserted
@@ -8880,6 +8918,62 @@ check(
     ? notFirst.map((c) => `${c.why} → ${c.built.fields[0]?.id}`).join(", ")
     : `${HEADING_CASES.length} of ${HEADING_CASES.length} cases, each ${HEADING_CASES[0].built.fields.length}+ fields`,
   notFirst.length === 0 && HEADING_CASES.length === 5,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n29b. No field carries a descriptor under it");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **The grey line under every question is gone** — user direction,
+ * 2026-10-14: *"after every question even if it's straightforward we don't need
+ * a full description."* Twenty-one of them came out; six dynamic ones were each
+ * decided rather than swept.
+ *
+ * ⚠️ `helpText` SURVIVES as a property, and that is why this check exists.
+ * `notice` fields use it as their BODY — an amber block that IS its text, not a
+ * description of a question above it. Keeping the property with nothing
+ * asserting its one legal home is the trap: someone sets it on a text field,
+ * sees nothing render, and cannot tell why.
+ */
+const HELP_CASES = HEADING_CASES.map((c) => c.built);
+const descriptorFields = HELP_CASES.flatMap((c) =>
+  c.fields.filter((f) => f.helpText && f.type !== "notice").map((f) => `${f.id} (${f.type})`),
+);
+const sweptFields = HELP_CASES.reduce((n, c) => n + c.fields.length, 0);
+check(
+  "no input field carries help text",
+  descriptorFields.length
+    ? descriptorFields.slice(0, 5).join(", ")
+    : `0 of ${sweptFields} fields across ${HELP_CASES.length} cases`,
+  descriptorFields.length === 0 && sweptFields > 30,
+);
+/**
+ * ⛔ ...and the renderer has no way to show one, so the rule cannot be bypassed.
+ *
+ * ⚠️ Asserted by POSITION, not by count. The first version expected exactly one
+ * `field.helpText` and found two — the guard and the body of the same JSX
+ * expression. Counting occurrences was never the property; where they sit is.
+ * The `notice` branch returns early, so every legal mention is above the
+ * generic return.
+ */
+const RENDERER_SRC = codeOnly(readFileSync(join(ROOT, "components/support/support-field-renderer.tsx"), "utf8"));
+const noticeBranch = RENDERER_SRC.indexOf('field.type === "notice"');
+/**
+ * ⚠️ The component's own top-level `return` — two-space indent, the first one
+ * AFTER the notice branch. The first attempt anchored on the generic markup
+ * instead and matched an earlier block in the file, which put the boundary
+ * before the notice branch and failed both sites. An anchor that is not unique
+ * is not an anchor.
+ */
+const genericReturn = RENDERER_SRC.indexOf("\n  return (", noticeBranch);
+const helpSites = [...RENDERER_SRC.matchAll(/field\.helpText/g)].map((m) => m.index ?? -1);
+const strays = helpSites.filter((i) => i < noticeBranch || i > genericReturn);
+check(
+  "...and every helpText the renderer reads is inside the notice branch",
+  strays.length
+    ? `${strays.length} of ${helpSites.length} site(s) outside it`
+    : `${helpSites.length} site(s), all between the notice branch and the generic return`,
+  helpSites.length > 0 && genericReturn > noticeBranch && strays.length === 0,
 );
 
 // ---------------------------------------------------------------------------
