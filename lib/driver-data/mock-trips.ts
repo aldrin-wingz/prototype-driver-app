@@ -2673,7 +2673,7 @@ export const mockCompletedTrips: Trip[] = [
   // "actually, I also need the pharmacy".
   //
   // ⛔⛔ Seeded in the COMPLETED pool with a `tripGroup`, which `legsInGroup`
-  // (row 16, `LIVE_POOLS`) cannot see and `groupLegs` (row 19, `ALL_POOLS`)
+  // (row 16, `LIVE_POOLS`) cannot see and `groupLegs` (row 20, `ALL_POOLS`)
   // must. Two cases, two pools, one matcher — see `trip-groups.ts`.
   {
     id: "1049800402",

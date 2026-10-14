@@ -934,7 +934,7 @@ if (CAD_RIDE) {
 // ── 9f · a stranger's focus shows production too ─────────────────────────
 /**
  * ⚠️ "A proposal belongs to its own build", applied here. A reviewer walking
- * row 19 who wanders into Member No-Show must not meet rows 01/02's proposal on
+ * row 20 who wanders into Member No-Show must not meet rows 01/02's proposal on
  * the way past.
  */
 const leakedToStranger = tagged.filter(

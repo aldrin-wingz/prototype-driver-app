@@ -17,7 +17,7 @@ import {
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 
 /**
- * Build the Update Trip Details case for one ride — catalogue row 20.
+ * Build the Update Trip Details case for one ride — catalogue row 21.
  *
  * Exported so `scripts/verify-solutions.ts` can build the same case both entry
  * points do. Two entry points assembling two subtly different forms is the
@@ -55,7 +55,7 @@ export function buildTripChange(trip: Trip, leg: TripLeg | undefined) {
 }
 
 /**
- * The Update Trip Details form — catalogue row 20.
+ * The Update Trip Details form — catalogue row 21.
  *
  * ⛔⛔ **Nothing this form does changes the ride.** The driver types over the
  * ride's own times and addresses, which looks exactly like editing it, and it is

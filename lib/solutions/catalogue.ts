@@ -112,7 +112,7 @@ export interface Solution {
    * ⭐ Added rather than substituted. `proposedFeature` runs to 535 characters
    * on row 03 because the spreadsheet says that much; a cell that long turns
    * the table into a wall of prose and the prototype is standing right beside
-   * it, saying the same thing better. ⚠️ Rows 17 and 18 carry the SAME
+   * it, saying the same thing better. ⚠️ Rows 17 and 19 carry the SAME
    * sentence, because they carry the same `proposedFeature` — one tray, listed
    * twice in the source. A check asserts that is the only pair.
    */
@@ -603,17 +603,52 @@ export const SOLUTIONS: Solution[] = [
     tableSummary: "One tray listing every request the driver has submitted, and its state.",
     klass: "surface",
     buildState: "not-yet",
-    // ⚠️ Added 2026-10-09. Row 18 has always pointed here; this never pointed
+    // ⚠️ Added 2026-10-09. Row 19 has always pointed here; this never pointed
     // back, so the relationship existed in one direction only. Invisible while
     // the picker's label was hardcoded — it printed "17" regardless of which
-    // row you opened, which is the right answer for row 18 and the reason
+    // row you opened, which is the right answer for row 19 and the reason
     // nobody noticed row 17 was silent.
     sharedBuildWith: "requests-tray-modifications",
     entry: null,
   },
+  /**
+   * ⛔⛔ **Inserted 2026-10-15, which is why rows 19-27 moved.** It had to take
+   * an `order` INSIDE the `Trip / Ride Cancellation` run, and that is what
+   * forced the renumber — not where it sits in this array.
+   *
+   * ⚠️ The distinction cost a break test to find. `subjectAreaGroups()` sorts
+   * by `order` and only THEN groups adjacent rows, so moving this literal to
+   * the bottom of the file changes nothing and every check stays green. Give it
+   * `order: 28` instead and `Trip / Ride Cancellation` appears twice in the
+   * group list — area count 16 of 15, the area order stops matching the
+   * spreadsheet, and covered calls reconcile at 7174 against a declared 6665.
+   * Three §1 checks, and the first version of this comment blamed the wrong
+   * one of the two.
+   *
+   * ⚠️ Not a flip of row 17. That one is the requests TRAY — a list of
+   * submitted requests — and six built forms depend on it being unbuilt. This
+   * is the opposite direction: a cancellation nobody submitted, arriving from
+   * Wingz, which the driver can reach exactly once.
+   */
+  {
+    id: "my-rides-cancelled",
+    order: 18,
+    subjectArea: "Trip / Ride Cancellation",
+    calls: 509,
+    problem:
+      "A cancelled ride is reachable only from the alert, so dismissing it loses the trip",
+    useCase:
+      "Wingz cancels an accepted trip → an alert offers Go to ride → the driver taps OK mid-drive → the ride is in no tab and the id is gone → calls Support to work out which of the day's rides went",
+    proposedFeature:
+      "Cancelled rides kept in My Rides — in Upcoming on their own date behind an All / Active / Cancelled filter, and in Needs Action until the driver acknowledges having seen it",
+    tableSummary: "Keep cancelled rides in the manifest, filtered and acknowledged.",
+    klass: "surface",
+    buildState: "not-yet",
+    entry: null,
+  },
   {
     id: "requests-tray-modifications",
-    order: 18,
+    order: 19,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem:
@@ -630,7 +665,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "add-leg-request",
-    order: 19,
+    order: 20,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem: "A leg needs to be added",
@@ -668,7 +703,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "change-pickup-dropoff",
-    order: 20,
+    order: 21,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem: "A leg's pick-up/drop-off address or time needs changing",
@@ -695,7 +730,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "eta-send-back-explicit",
-    order: 21,
+    order: 22,
     subjectArea: "ETA Request",
     calls: 196,
     problem: "Driver needs the member told about a changed arrival",
@@ -710,7 +745,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "compliance-status",
-    order: 22,
+    order: 23,
     subjectArea: "Compliance Related",
     calls: 167,
     problem: "Driver confirming their requirements were received",
@@ -725,7 +760,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "dispatch-chat",
-    order: 23,
+    order: 24,
     subjectArea: "Trip Requests",
     calls: 156,
     problem: "Driver asking for more trips — not Support's role",
@@ -739,7 +774,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "distribution-restriction",
-    order: 24,
+    order: 25,
     subjectArea: "Payment Issues",
     calls: 146,
     problem: "Driver wants to know when they will get paid",
@@ -754,7 +789,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "technical-issues",
-    order: 25,
+    order: 26,
     subjectArea: "Technical Issues",
     calls: 127,
     problem: "Generic and varied — no single recurring cause",
@@ -770,7 +805,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "otp-exclusion",
-    order: 26,
+    order: 27,
     subjectArea: "OTP",
     calls: 123,
     problem: "Drivers are dinged for lateness even when the delay was legitimate",

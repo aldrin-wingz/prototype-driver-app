@@ -14,7 +14,7 @@ export const DRIVER_EMAIL = "driver@wingz.com";
 /**
  * Convert "9:40 AM" to the `<input type="time">` value "09:40".
  *
- * ⚠️ Exported since row 20, which seeds a ride's own scheduled times into a form
+ * ⚠️ Exported since row 21, which seeds a ride's own scheduled times into a form
  * directly rather than through a `prefillFrom` source. A second copy of this
  * conversion would be a second place for an AM/PM to be read wrongly.
  */

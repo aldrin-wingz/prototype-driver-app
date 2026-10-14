@@ -212,7 +212,7 @@ interface RideFlowValue {
   requestCancellation: (tripIds: string[]) => void;
   isCancellationRequested: (tripId: string) => boolean;
 
-  // ---- Update Trip Details (catalogue row 20) ---------------------------
+  // ---- Update Trip Details (catalogue row 21) ---------------------------
   /**
    * The change the driver has asked Support for, per ride.
    *
@@ -233,11 +233,11 @@ interface RideFlowValue {
   requestTripChange: (tripId: string, changes: TripChange[]) => void;
   tripChangeRequest: (tripId: string) => TripChange[] | undefined;
 
-  // ---- Add Leg to Trip (catalogue row 19) -------------------------------
+  // ---- Add Leg to Trip (catalogue row 20) -------------------------------
   /**
    * The leg the driver has asked Support to add, per **trip group**.
    *
-   * ⛔⛔ **Keyed by GROUP, not by ride** — the one difference from row 20's
+   * ⛔⛔ **Keyed by GROUP, not by ride** — the one difference from row 21's
    * record, and it is load-bearing. A new leg is a claim about the whole
    * sequence, so every leg of the group has to show it, including the one the
    * driver was not looking at when they filed. Keying by ride would show the

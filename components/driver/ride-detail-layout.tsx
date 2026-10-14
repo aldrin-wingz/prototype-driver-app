@@ -246,7 +246,7 @@ function LegCard({
   isLast: boolean;
   state: DetailState;
   /**
-   * Catalogue row 20 — open Update Trip Details for this anchor.
+   * Catalogue row 21 — open Update Trip Details for this anchor.
    *
    * ⛔ Optional, and the decision of whether to pass it is NOT taken here. Which
    * anchors can be changed, whether the ride's state admits a request at all and
@@ -388,7 +388,7 @@ export function RideDetailLayout({
   const cancellationRequested = isCancellationRequested(trip.id);
 
   /**
-   * Catalogue row 20 — the change this ride is waiting on, if any.
+   * Catalogue row 21 — the change this ride is waiting on, if any.
    *
    * ⛔ The ride below still shows its OLD times and addresses, because nothing
    * about it has changed and nothing will until the client acts. That is exactly
@@ -435,7 +435,7 @@ export function RideDetailLayout({
   );
 
   /**
-   * Catalogue row 19 — the leg this TRIP GROUP is waiting on, if any.
+   * Catalogue row 20 — the leg this TRIP GROUP is waiting on, if any.
    *
    * ⛔ Looked up by GROUP, so the sibling leg the driver was not looking at when
    * they filed also says that its own pick-up time is part of a request.
@@ -949,7 +949,7 @@ export function RideDetailLayout({
             ))}
           </div>
 
-          {/* ⭐ Catalogue row 19's third entry point, and the only action a
+          {/* ⭐ Catalogue row 20's third entry point, and the only action a
               COMPLETED ride offers. In the BODY, under the timeline, never in a
               footer — the completed state deliberately renders no footer at all
               and the capture has none, so putting it there would rewrite

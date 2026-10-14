@@ -347,7 +347,7 @@ export function legsInGroup(trip: Trip): Trip[] {
   /**
    * ⛔⛔ **`LIVE_POOLS`, and the exclusion is load-bearing.** It leaves out
    * completed trips, because a member cannot decline a leg they have already
-   * ridden. Row 19 calls the same matcher with `ALL_POOLS` for the opposite
+   * ridden. Row 20 calls the same matcher with `ALL_POOLS` for the opposite
    * reason. The pools are declared separately in `trip-groups.ts` precisely so
    * neither case can be widened into the other's by accident.
    */

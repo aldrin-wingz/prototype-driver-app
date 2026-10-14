@@ -46,7 +46,7 @@ export const COLUMN_MODE: Record<SelectingColumn, DemoMode> = {
  * The side a click on this column selects, **for this row**.
  *
  * ⛔⛔ **A row with no proposal has ONE side, and both columns select it.**
- * Rows 11, 12 and 25 are `no-app-surface`; rows 11 and 12 still have a
+ * Rows 11, 12 and 26 are `no-app-surface`; rows 11 and 12 still have a
  * production screen worth landing on. If their Proposed Feature cell selected
  * `"fixed"` the table would offer a side that does not exist — and if it
  * selected NOTHING, row 12 would become unreachable, because its Use Case cell

@@ -97,7 +97,7 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
             {buildStateLabel(solution.buildState)}
           </span>
           {/* ⛔⛔ This number was HARDCODED to 17. It was written when rows 17
-              and 18 were the only shared pair, so it read correctly by
+              and 19 were the only shared pair, so it read correctly by
               accident — and when rows 04 and 05 became a shared build it told
               you row 05 shared one with the requests tray. A fact about one row
               written as a literal in another row's JSX is a fact nothing can

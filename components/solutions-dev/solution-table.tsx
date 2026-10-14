@@ -319,8 +319,7 @@ export function SolutionTable() {
                     </td>
                   )}
 
-                  {/* ⚠️ A merged Use Case cell speaks for its whole run — rows
-                      09+10 and 11+12 share one — so clicking it focuses the row
+                  {/* ⚠️ A merged Use Case cell speaks for its whole run — rows 09+10 and 11+12 share one — so clicking it focuses the row
                       it belongs to, which is the first of that run, and it
                       lights when ANY row of the run is focused on this side. */}
                   {useCaseSpan > 0 && !live && (
@@ -398,8 +397,7 @@ export function SolutionTable() {
                         {/*
                           ⛔ `tableSummary`, NOT `proposedFeature`. The second is
                           the spreadsheet's own column, mirrored 1:1 and asserted
-                          against the source — it runs to 535 characters on row
-                          03. The prototype is standing right beside this table
+                          against the source — it runs to 535 characters on row 03. The prototype is standing right beside this table
                           saying the same thing better, so the cell says it once.
                         */}
                         <span className="block leading-snug">{solution.tableSummary}</span>

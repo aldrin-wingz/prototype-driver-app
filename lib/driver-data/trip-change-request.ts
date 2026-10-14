@@ -11,11 +11,11 @@ import type { SupportFieldOption } from "@/types/support";
  * can: what it produces is a request, and the ride goes on showing its old
  * values until the client acts.
  *
- * ⛔⛔ **"Leg" means two things in this app and row 20 uses the one the code does
+ * ⛔⛔ **"Leg" means two things in this app and row 21 uses the one the code does
  * not.** Driver-facing, "A Leg" / "B Leg" are the outbound ride and the return —
  * two `Trip` objects tied by `tripGroup`, which is what row 16's checklist walks.
  * In the data model `Trip.legs[]` is something else entirely: the **time anchors**
- * on ONE ride's timeline. Row 20 is about the first sense, so there is no
+ * on ONE ride's timeline. Row 21 is about the first sense, so there is no
  * checklist here and no round-trip question — the form is about the ride the
  * driver opened, and the anchors are its two ends.
  */
@@ -134,9 +134,9 @@ export function editableAnchors(trip: Trip): ChangeAnchor[] {
  * Ride states the entry points appear on.
  *
  * ⛔ `before-taken` is deliberately absent. That is an offer the driver has not
- * accepted, and "I would take it if it were an hour later" is **row 21** — the
+ * accepted, and "I would take it if it were an hour later" is **row 22** — the
  * ETA row, whose proposal is that a driver who cannot accommodate the timing
- * sends the trip back. Offering this form there would answer row 21 without
+ * sends the trip back. Offering this form there would answer row 22 without
  * specifying it.
  *
  * ⛔ `completed` likewise. A finished ride's times are history, and correcting
@@ -354,6 +354,6 @@ export const TRIP_CHANGE_SUBMIT_TOAST =
  * we did, never what happened next.
  *
  * Knowing the outcome is **catalogue row 17**, the requests tray, 509 calls and
- * specified nowhere. Row 20 is the fifth build leaning on it.
+ * specified nowhere. Row 21 is the fifth build leaning on it.
  */
 export const TRIP_CHANGE_TRACKED_BY_APP = false;

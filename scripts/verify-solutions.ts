@@ -329,7 +329,7 @@ const FIXED = (solutionId: string | null): DemoFocus => ({ solutionId, mode: "fi
 const PLAIN: DemoFocus = { solutionId: null, mode: "now" };
 
 // ── Declared expectations ────────────────────────────────────────────────
-const EXPECTED_ROWS = 26;
+const EXPECTED_ROWS = 27;  // ⭐ +1 on 2026-10-15: row 18, cancelled rides in My Rides
 const EXPECTED_DENOMINATOR = 7483;
 const EXPECTED_COVERED = 6665;
 /** The 15 subject areas, in call order, exactly as the spreadsheet lists them. */
@@ -418,6 +418,72 @@ check(
   "every row carries its own area's call total",
   areaConsistent ? `${SOLUTIONS.length} rows consistent` : "a row disagrees with its area",
   areaConsistent,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n1b. The source calls each row by its CURRENT number");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **A row number lives in sixty comments and in no check.**
+ *
+ * Inserting row 18 on 2026-10-15 renumbered nine rows and shifted 99 prose
+ * mentions of `row NN` across 23 files. Every gate in this repo keys on the
+ * row's **id**, so a sweep that missed a file would have passed all 850 checks
+ * while leaving comments pointing at the wrong feature — the failure mode this
+ * project fears most, a check that goes on printing `ok`.
+ *
+ * Two cheap assertions catch the two directions a sweep goes wrong.
+ */
+/** Each rule module, and the catalogue row it owns. Declared, never derived. */
+const ROW_OWNERS: Array<[string, string]> = [
+  ["lib/driver-data/no-show-rules.ts", "rider-no-show"],
+  ["lib/driver-data/missed-swipe-rules.ts", "missed-swipe"],
+  ["lib/driver-data/member-assignment.ts", "request-feed-member-filter"],
+  ["lib/driver-data/send-back-reasons.ts", "send-back-reason-form"],
+  ["lib/driver-data/account-self-service.ts", "account-self-service"],
+  ["lib/driver-data/rider-declined.ts", "rider-initiated-cancellation"],
+  ["lib/driver-data/add-leg-request.ts", "add-leg-request"],
+  ["lib/driver-data/trip-change-request.ts", "change-pickup-dropoff"],
+];
+const misnamed = ROW_OWNERS.filter(([file, id]) => {
+  const order = findSolution(id)!.order;
+  const src = readFileSync(join(ROOT, file), "utf8");
+  return !new RegExp(`\\brow 0?${order}\\b`, "i").test(src);
+});
+check(
+  "every rule module calls its own row by its current number",
+  misnamed.length
+    ? misnamed.map(([f, id]) => `${f} does not say "row ${findSolution(id)!.order}"`).join("; ")
+    : `${ROW_OWNERS.length} of ${ROW_OWNERS.length} module(s)`,
+  misnamed.length === 0 && ROW_OWNERS.length > 5,
+);
+/**
+ * ⛔ ...and the other direction: a sweep that over-shifted invents a row that
+ * does not exist. Swept over the whole source rather than the declared files,
+ * because an over-shift lands wherever the stale mention was.
+ */
+const ROW_MENTION = /\brow (\d+)\b/gi;
+const SWEPT_DIRS = ["lib", "components", "app", "scripts"];
+let mentionsSeen = 0;
+// ⚠️ `walkSource` is declared further down; function declarations hoist, and
+// reusing it is the point — a second walker here is a second chance to sweep a
+// different set of files from the one the rest of this script checks.
+const outOfRange = SWEPT_DIRS.flatMap((dir) =>
+  walkSource(dir).flatMap((rel) => {
+    const src = readFileSync(join(ROOT, rel), "utf8");
+    return [...src.matchAll(ROW_MENTION)]
+      .map((m) => {
+        mentionsSeen += 1;
+        return Number(m[1]);
+      })
+      .filter((n) => n < 1 || n > SOLUTIONS.length)
+      .map((n) => `${rel}: row ${n}`);
+  }),
+);
+check(
+  "...and no comment names a row the catalogue does not have",
+  `${outOfRange.length} of ${mentionsSeen} mention(s) out of 1-${SOLUTIONS.length}${outOfRange.length ? " — " + outOfRange.slice(0, 4).join(", ") : ""}`,
+  outOfRange.length === 0 && mentionsSeen > 100,
 );
 
 // ---------------------------------------------------------------------------
@@ -579,7 +645,7 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * to supply its alternate.
  */
 /**
- * ⭐ 12 since 2026-10-14: row 19 gained a THIRD trip shape. Its three
+ * ⭐ 12 since 2026-10-14: row 20 gained a THIRD trip shape. Its three
  * alternates are the one-leg trip, the three-leg trip, and the two-leg group
  * reached from its live half — so the row demonstrates adding a leg to a trip
  * of one, two and three legs, which is what the user asked for.
@@ -738,7 +804,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 24;  // ⭐ +3 on 2026-10-14: row 19's three-leg group
+const EXPECTED_SCENARIO_RIDES = 24;  // ⭐ +3 on 2026-10-14: row 20's three-leg group
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -862,7 +928,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 20;  // ⭐ +1: row 19's three-leg trip
+const EXPECTED_RIDE_ROUTES = 20;  // ⭐ +1: row 20's three-leg trip
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
 const EXPECTED_SURFACE_ROUTES = 4;
 check(
@@ -933,7 +999,7 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // `13c` standing order. The second is the negative control for both.
   "send-back-reason-form": 3,
   // ⭐ ONE, and it is the `20b` ride with the pick-up already made — the only
-  // demo of the passed-anchor rule. Row 20's OTHER ride is in Needs Action, so
+  // demo of the passed-anchor rule. Row 21's OTHER ride is in Needs Action, so
   // this row is declared in BOTH maps: a row with rides in two tabs that named
   // only one would hide half its demo behind a number that still looked right.
   "change-pickup-dropoff": 1,
@@ -960,9 +1026,9 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   // still editable. See the note beside its In Progress entry above.
   "change-pickup-dropoff": 1,
   /**
-   * ⛔⛔ THREE of row 19's SIX scenario rides, and the other three are in a
+   * ⛔⛔ THREE of row 20's SIX scenario rides, and the other three are in a
    * pool no My Rides tab counts — see `EXPECTED_COMPLETED_SCENARIOS` below.
-   * Row 19 is the only built row whose demo lives half outside the tabbed
+   * Row 20 is the only built row whose demo lives half outside the tabbed
    * pools, so a number here that looked right would be hiding half of it.
    *
    * ⭐ `19b` is the two-leg group's live half; `19e` and `19f` are the
@@ -977,8 +1043,8 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
  *
  * ⛔⛔ **A denominator the tab maps structurally cannot supply.** My Rides has
  * four tabs and none of them is "completed", so every count above is taken over
- * live pools only. Until row 19 that was harmless — no scenario ride was
- * finished. Row 19's entry point IS a finished ride, so without this a row could
+ * live pools only. Until row 20 that was harmless — no scenario ride was
+ * finished. Row 20's entry point IS a finished ride, so without this a row could
  * declare "1 ride" while demonstrating three.
  */
 const EXPECTED_COMPLETED_SCENARIOS: Record<string, number> = {
@@ -1494,7 +1560,7 @@ check(
 );
 /**
  * ⛔ All FOUR, not the two this list carried until B1. `PROPOSED_TILES` has had
- * `add-leg` and `trip-change` in it since rows 19 and 20 were built, and the
+ * `add-leg` and `trip-change` in it since rows 20 and 21 were built, and the
  * sweeps below silently covered half the grid — a denominator that looked like
  * a sweep and was a spot check.
  */
@@ -1553,7 +1619,7 @@ const EXPECTED_GRIDS: Array<{
     // Nothing focused: no filtering, so every proposal shows. TEN tiles now —
     // even, so nothing is full-width and `send-back` takes a column. ⚠️ That is
     // the packing rule working, not a regression: full-width is a function of
-    // the COUNT, and row 20's tile changed the count's parity.
+    // the COUNT, and row 21's tile changed the count's parity.
     focus: null,
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
@@ -1566,7 +1632,7 @@ const EXPECTED_GRIDS: Array<{
     fullWidth: "send-back",
   },
   {
-    // Row 19 focused — its own tile and ⛔ no other proposal. Eight tiles.
+    // Row 20 focused — its own tile and ⛔ no other proposal. Eight tiles.
     focus: "add-leg-request",
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
@@ -1575,7 +1641,7 @@ const EXPECTED_GRIDS: Array<{
     fullWidth: null,
   },
   {
-    // Row 20 focused — its own tile and ⛔ no other proposal, after Add Event To
+    // Row 21 focused — its own tile and ⛔ no other proposal, after Add Event To
     // Calendar so No-Show and Send Back Trip still end the grid side by side.
     // Eight tiles, four clean rows of two.
     focus: "change-pickup-dropoff",
@@ -1805,7 +1871,7 @@ check(
 /**
  * ⛔⛔ **The "same build as NN" label was HARDCODED to 17.**
  *
- * Written when rows 17 and 18 were the only shared pair, so it printed the
+ * Written when rows 17 and 19 were the only shared pair, so it printed the
  * right number by accident for a year. The moment rows 04 and 05 became a
  * shared build, the picker told you row 05 shared one with the requests tray.
  * A fact about one row, written as a literal in another row's JSX, is a fact
@@ -1886,14 +1952,14 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   /**
    * ⚠️ **In Progress, which is the ALTERNATE's tab and not the entry's.**
    *
-   * Row 20 is the first built row with rides in two tabs, and `firstTabWithRides`
-   * walks `TAB_ORDER` — In Progress first. So a reviewer who focuses row 20 and
+   * Row 21 is the first built row with rides in two tabs, and `firstTabWithRides`
+   * walks `TAB_ORDER` — In Progress first. So a reviewer who focuses row 21 and
    * then opens My Rides meets `20b`, the ride with its pick-up behind it, rather
    * than `20a`.
    *
    * Declared rather than fixed. The selector routes to `entry.route` directly,
    * so the entry is still what OPENS; this only decides which tab a later tap on
-   * My Rides lands on, and both rides are row 20's. Changing the rule to prefer
+   * My Rides lands on, and both rides are row 21's. Changing the rule to prefer
    * the entry's tab would mean teaching `firstTabWithRides` about entries, which
    * is a bigger claim than this row has earned.
    */
@@ -1901,7 +1967,7 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   /**
    * ⚠️ Needs Action — its only TABBED ride is the group's live half. The entry
    * point and the second alternate are both completed rides, which no tab shows
-   * at all, so a reviewer who focuses row 19 and then opens My Rides sees one
+   * at all, so a reviewer who focuses row 20 and then opens My Rides sees one
    * of its three demos. The selector routes to `entry.route` directly, so the
    * entry is still what opens.
    */
@@ -3319,7 +3385,7 @@ check(
     /row 14|scoring/i.test(ROW_13.proposedFeature),
 );
 check(
-  "...and rows 14 and 19 stay unbuilt, still gated on the scoring policy",
+  "...and rows 14 and 20 stay unbuilt, still gated on the scoring policy",
   ["send-back-scoring", "eta-send-back-explicit"]
     .map((id) => `${id}=${SOLUTIONS.find((r) => r.id === id)?.buildState}`)
     .join(" "),
@@ -4670,7 +4736,7 @@ check(
 
 
 // ===========================================================================
-console.log("\n15. Update Trip Details — catalogue row 20");
+console.log("\n15. Update Trip Details — catalogue row 21");
 
 const TRIP_CHANGE_ENTRY_RIDE = "1049800400";
 const TRIP_CHANGE_ALT_RIDE = "1049800401";
@@ -4941,7 +5007,7 @@ check(
 // ---- 15f · Who can open it ----------------------------------------------
 /**
  * ⛔ Three doors closed for three different reasons, and each refusal says
- * which. A `completed` ride is row 03's case; an unaccepted offer is row 21's.
+ * which. A `completed` ride is row 03's case; an unaccepted offer is row 22's.
  */
 const REFUSAL_CASES: Array<[string, string | null]> = [
   ["needs-action", null],
@@ -5002,7 +5068,7 @@ const TRIP_CHANGE_DRIVER_FACING = [
     .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
 ];
 check(
-  "no internal marker reaches row 20's driver-facing copy",
+  "no internal marker reaches row 21's driver-facing copy",
   `${TRIP_CHANGE_DRIVER_FACING.filter((t) => /⛔|⭐/.test(t)).length} leak(s) of ${TRIP_CHANGE_DRIVER_FACING.length} string(s)`,
   TRIP_CHANGE_DRIVER_FACING.every((t) => !/⛔|⭐/.test(t)),
 );
@@ -5015,7 +5081,7 @@ const placed = TRIP_CHANGE_DRIVER_FACING.filter((t) =>
   /\b(above|below)\b/i.test(t),
 );
 check(
-  "no row 20 copy claims where another field sits",
+  "no row 21 copy claims where another field sits",
   `${placed.length} of ${TRIP_CHANGE_DRIVER_FACING.length} string(s)`,
   placed.length === 0,
 );
@@ -5043,14 +5109,14 @@ check(
  * declared fact rather than a comment.
  */
 check(
-  "row 20 does NOT claim to track what happens next",
+  "row 21 does NOT claim to track what happens next",
   `TRIP_CHANGE_TRACKED_BY_APP=${TRIP_CHANGE_TRACKED_BY_APP}`,
   TRIP_CHANGE_TRACKED_BY_APP === false,
 );
 
 
 // ===========================================================================
-console.log("\n16. Add Leg to Trip — catalogue row 19");
+console.log("\n16. Add Leg to Trip — catalogue row 20");
 
 const ADD_ENTRY = "1049800402";   // 19a — the FINISHED leg of the group
 const ADD_LIVE = "1049800403";    // 19b — its live half
@@ -5067,7 +5133,7 @@ check(
 // ---- 16a · ⛔⛔ Two pools, one matcher ------------------------------------
 /**
  * The finding this whole slice turns on. Row 16 must NOT see a completed leg
- * (you cannot report that a member declined a ride they already took); row 19
+ * (you cannot report that a member declined a ride they already took); row 20
  * must, because a finished leg is its commonest entry point. One function
  * serving both would be wrong for one of them.
  */
@@ -5082,7 +5148,7 @@ check(
   legsInGroup(leg19b).length === 1 && legsInGroup(leg19b)[0].id === ADD_LIVE,
 );
 check(
-  "⭐ ...and row 19 CAN",
+  "⭐ ...and row 20 CAN",
   `groupLegs(19b) → ${groupLegs(leg19b).map((l) => `${l.letter}:${l.trip.id}`).join(", ")}`,
   groupLegs(leg19b).length === 2 &&
     groupLegs(leg19b).some((l) => l.trip.id === ADD_ENTRY),
@@ -5548,7 +5614,7 @@ const shapeWrong = SHAPES.filter(([id, size]) => {
   return !trip || groupLegs(trip).length !== size;
 });
 check(
-  "row 19 is demonstrated on a one-, two- and three-leg trip",
+  "row 20 is demonstrated on a one-, two- and three-leg trip",
   `${SHAPES.map(([id, n]) => `${id}:${ALL_SEEDED.find((t) => t.id === id) ? groupLegs(ALL_SEEDED.find((t) => t.id === id)!).length : "missing"}/${n}`).join(" · ")}`,
   shapeWrong.length === 0 && new Set(SHAPES.map(([, n]) => n)).size === 3,
 );
@@ -5824,11 +5890,11 @@ check(
 /**
  * ⭐ The completed state is included — user direction 1.1 — and it is the only
  * state in this app that offers a support action from a finished ride.
- * ⛔ Row 20 refuses `completed` for the opposite reason: that one would be
+ * ⛔ Row 21 refuses `completed` for the opposite reason: that one would be
  * CORRECTING a finished leg, which is row 03's case.
  */
 check(
-  "⭐ row 19 accepts a COMPLETED ride and row 20 refuses one",
+  "⭐ row 20 accepts a COMPLETED ride and row 21 refuses one",
   `add-leg ${canRequestAddLeg("completed", false)} · trip-change ${tripChangeRefusal(change20a, "completed", false) === null}`,
   canRequestAddLeg("completed", false) === true &&
     tripChangeRefusal(change20a, "completed", false) !== null,
@@ -5849,7 +5915,7 @@ check(
   `19a ${groupKey(leg19a)} · 19b ${groupKey(leg19b)} · 19c ${groupKey(leg19c)}`,
   groupKey(leg19a) === groupKey(leg19b) && groupKey(leg19c) !== groupKey(leg19a),
 );
-/** ⛔⛔ A proposal belongs to its own build — row 19's THIRD surface. */
+/** ⛔⛔ A proposal belongs to its own build — row 20's THIRD surface. */
 const ADD_ENTRY_SCOPE: Array<[string | null, boolean]> = [
   [null, true],
   ["add-leg-request", true],
@@ -5863,7 +5929,7 @@ for (const [focus, expected] of ADD_ENTRY_SCOPE) {
     showsAddLegEntry(FIXED(focus)) === expected,
   );
 }
-/** ⛔ Four options, not row 20's five — nobody notices a leg that does not exist. */
+/** ⛔ Four options, not row 21's five — nobody notices a leg that does not exist. */
 check(
   "⛔ 'who asked' is its OWN field, with its own shorter list",
   `add-leg ${ADD_SOURCE_OPTIONS.length} vs trip-change ${CHANGE_SOURCE_OPTIONS.length}; ids ${ADD_SOURCE_FIELD} / ${CHANGE_SOURCE_FIELD}`,
@@ -5887,21 +5953,21 @@ const ADD_DRIVER_FACING = [
     .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
 ];
 check(
-  "no internal marker reaches row 19's driver-facing copy",
+  "no internal marker reaches row 20's driver-facing copy",
   `${ADD_DRIVER_FACING.filter((t) => /⛔|⭐/.test(t)).length} leak(s) of ${ADD_DRIVER_FACING.length} string(s)`,
   ADD_DRIVER_FACING.every((t) => !/⛔|⭐/.test(t)),
 );
 check(
-  "no row 19 copy claims where another field sits",
+  "no row 20 copy claims where another field sits",
   `${ADD_DRIVER_FACING.filter((t) => /\b(above|below)\b/i.test(t)).length} of ${ADD_DRIVER_FACING.length} string(s)`,
   !ADD_DRIVER_FACING.some((t) => /\b(above|below)\b/i.test(t)),
 );
 check(
-  "row 19 does NOT claim to track what happens next",
+  "row 20 does NOT claim to track what happens next",
   `ADD_LEG_TRACKED_BY_APP=${ADD_LEG_TRACKED_BY_APP}`,
   ADD_LEG_TRACKED_BY_APP === false,
 );
-/** ⛔ A notice would block Submit forever — the row 20 lesson, re-asserted. */
+/** ⛔ A notice would block Submit forever — the row 21 lesson, re-asserted. */
 check(
   "no notice field on this case either",
   `${built19.supportCase.fields.filter((f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST)).length} of ${ids19.length}`,
@@ -5966,7 +6032,7 @@ check(
 
 /**
  * ⭐ The overnight notice, which is the ONE place a `notice` is the right answer
- * rather than row 20's trap. It blocks Submit, and here that is the behaviour
+ * rather than row 21's trap. It blocks Submit, and here that is the behaviour
  * wanted: a schedule crossing midnight is one the app genuinely cannot work out.
  */
 const overnightCase = buildAddLegCase(leg19a, {
@@ -6000,7 +6066,7 @@ check(
 
 /** ⛔ No diff gate here — an added leg has no baseline to differ from. */
 check(
-  "⛔ row 19 declares NO diff gate — row 20's rule does not transfer",
+  "⛔ row 20 declares NO diff gate — row 21's rule does not transfer",
   `requireChangedFrom=${built19.supportCase.requireChangedFrom ?? "undefined"}`,
   built19.supportCase.requireChangedFrom === undefined,
 );
@@ -6174,7 +6240,7 @@ console.log("\n18. The feature table reconstructs the spreadsheet's merged shape
 const EXPECTED_MERGED_AREA = 7;
 const EXPECTED_MERGED_PROBLEM = 4;
 const EXPECTED_MERGED_USECASE = 2;
-const EXPECTED_TABLE_ROWS = 26;
+const EXPECTED_TABLE_ROWS = 27;  // ⭐ +1 on 2026-10-15: row 18
 
 const tRows = tableRows();
 check(
@@ -7886,7 +7952,7 @@ const unreachable = [...reachableBy]
 /**
  * ⛔⛔ The loop above seeds every row from its Proposed Feature cell, which
  * is only true while that column never merges. Asserted against the MARKUP, not
- * assumed: a `rowSpan` on that cell is the obvious tidy-up — rows 17 and 18 say
+ * assumed: a `rowSpan` on that cell is the obvious tidy-up — rows 17 and 19 say
  * the same thing, so why draw it twice — and it would take the second row of
  * that pair out of the table entirely, with nothing to see.
  */
@@ -8014,6 +8080,8 @@ const INERT_ROWS = [
   "coded-term-definitions",
   "send-back-scoring",
   "requests-tray",
+  // ⚠️ Inert only until its build lands — it is the row this slice exists for.
+  "my-rides-cancelled",
   "requests-tray-modifications",
   "eta-send-back-explicit",
   "compliance-status",
@@ -8323,7 +8391,7 @@ check(
 const ALTERNATES = SOLUTIONS.flatMap((s) =>
   (s.entry?.alternates ?? []).map((a) => ({ id: s.id, ...a })),
 );
-const EXPECTED_SHORTS = 12;  // ⭐ +1 on 2026-10-14: row 19's three-leg trip
+const EXPECTED_SHORTS = 12;  // ⭐ +1 on 2026-10-14: row 20's three-leg trip
 const SHORT_MAX = 45;
 const SHORT_MIN = 20;
 const shortBad = ALTERNATES.filter(
@@ -8367,7 +8435,7 @@ check(
  */
 const SUMMARY_MAX = 95;
 const SUMMARY_MIN = 45;
-/** ⚠️ Row 25 has no proposal at all; both fields are an em dash. */
+/** ⚠️ Row 26 has no proposal at all; both fields are an em dash. */
 const NO_PROPOSAL_ID = "technical-issues";
 const summaryBad = SOLUTIONS.filter((s) => {
   if (s.id === NO_PROPOSAL_ID) return s.tableSummary !== "—" || s.proposedFeature !== "—";
@@ -8399,7 +8467,7 @@ check(
 );
 /**
  * ⛔⛔ Exactly one pair of rows says the same thing, and it is the pair that
- * says the same thing in the SOURCE — rows 17 and 18, one requests tray listed
+ * says the same thing in the SOURCE — rows 17 and 19, one requests tray listed
  * twice. A second duplicate would mean a summary had been copied rather than
  * written, and a summary copied onto the wrong row is invisible.
  */
@@ -8413,7 +8481,7 @@ const summaryDuplicateIds = dupes.flat().sort();
 check(
   "...and the only two rows that read alike are the two the source writes alike",
   dupes.length === 0
-    ? "NONE — rows 17 and 18 should share one sentence, as they share one proposedFeature"
+    ? "NONE — rows 17 and 19 should share one sentence, as they share one proposedFeature"
     : `${dupes.length} pair(s): ${dupes.map((ids) => ids.join(" + ")).join("; ")}`,
   dupes.length === 1 &&
     summaryDuplicateIds.join(",") === [...DUPLICATE_PAIR].sort().join(",") &&
@@ -9028,9 +9096,14 @@ check(
  * ⛔⛔ **Two questions that must not be collapsed.** `hasProposedSide` asks
  * whether the CATALOGUE holds a proposal — row 06's AI assistant does, with a
  * real klass. `demonstrableSides` asks what the PROTOTYPE can show — row 06 is
- * nothing at all. Fourteen rows differ between the two, and keeping them apart
+ * nothing at all. Twelve rows differ between the two, and keeping them apart
  * is what lets the table grey a row without the catalogue lying about what was
  * proposed.
+ *
+ * ⚠️ The prose said "fourteen" while the assertion said 11 — stale since
+ * before this slice, corrected here rather than left to rot further. The
+ * number is 12 as of 2026-10-15: row 18 has a proposal in the catalogue and
+ * nothing built yet, which is exactly the gap these two questions measure.
  */
 const proposalVsPrototype = SOLUTIONS.filter(
   (row) => hasProposedSide(row) !== demonstrableSides(row).includes("fixed"),
@@ -9043,7 +9116,7 @@ check(
   SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - 3 &&
     SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 12 &&
     // ⭐ They must genuinely differ, or one is the other under a new name.
-    proposalVsPrototype.length === 11,
+    proposalVsPrototype.length === 12,
 );
 /**
  * ⛔ And the greying is driven by the rule, not by a second opinion in the
@@ -9169,7 +9242,7 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
     .map((sameDay) => reachOptionsFor(sameDay, focus).map((o) => `${o.label}:${o.proposed ?? false}`).join(","))
     .join("|");
 
-  // Rows 04/05/09/19/20 — the More Options grid.
+  // Rows 04/05/09/20/21 — the More Options grid.
   out["tiles"] = buildGridTiles(focus).map((t) => t.id).join(",");
 
   // Where focusing this row lands — rows 11 and 12's `nowEntry` lives here.
@@ -9240,7 +9313,7 @@ check(
   unbuiltThatMoved.length
     ? `MOVED: ${unbuiltThatMoved.map((r) => `${r.order} ${r.id} (${rowChanges.get(r.id)!.join(", ")})`).join("; ")}`
     : `0 of ${unbuiltRows.length} unbuilt row(s) move`,
-  unbuiltThatMoved.length === 0 && unbuiltRows.length === 14,
+  unbuiltThatMoved.length === 0 && unbuiltRows.length === 15,
 );
 /**
  * ⛔ And the plain mirror is on no side at all, so it cannot move either. This
@@ -9696,7 +9769,7 @@ check(
 );
 const PICKERLESS_CALLERS: Array<[string, string]> = [
   ["rider-declined-form.tsx", "row 16 — Rider Declined the Trip"],
-  ["add-leg-form.tsx", "row 19 — Add Leg to Trip"],
+  ["add-leg-form.tsx", "row 20 — Add Leg to Trip"],
 ];
 const notPassing = PICKERLESS_CALLERS.filter(
   ([file]) =>

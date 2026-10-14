@@ -12,7 +12,7 @@ import {
  *
  * ⛔⛔ **"Leg" means two incompatible things in this app and the seed contains
  * both.** `1049800398` / `1049800399` are two `Trip`s tied by `tripGroup`,
- * carrying legCodes A and B — the model row 16 established and the one row 19
+ * carrying legCodes A and B — the model row 16 established and the one row 20
  * extends. But `RECENT-COMP-001` carries legCodes **A and B on two anchors of
  * the SAME `Trip`**. That one is history-list decoration; it is named here so
  * the next slice does not read it as the model. Only the group model gives a leg
@@ -20,7 +20,7 @@ import {
  *
  * ⛔⛔ **The POOL is the whole reason this module exists.** Row 16 asks which
  * legs should come off a manifest and must never offer a leg the member has
- * already ridden; row 19's commonest case is a leg that just FINISHED and a
+ * already ridden; row 20's commonest case is a leg that just FINISHED and a
  * member who now needs one more. Two cases, two pools, and one function serving
  * both would be wrong for one of them. So the matching rule lives here once and
  * each caller passes the pool it has declared.
@@ -56,7 +56,7 @@ export const LIVE_POOLS: Trip[] = [
 ];
 
 /**
- * Every leg of a trip, finished or not — row 19's pool.
+ * Every leg of a trip, finished or not — row 20's pool.
  *
  * ⭐ The completed half is the POINT: the commonest add-a-leg case is a driver
  * who has just swiped drop-off and is told the member also needs the pharmacy.

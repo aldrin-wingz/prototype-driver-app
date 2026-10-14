@@ -293,7 +293,7 @@ const TRIP_CHANGE_TILE: OptionTile = {
  * reserved for the two tiles that report something going wrong.
  *
  * ⚠️ Ahead of `trip-change` in `PROPOSED_TILES`, because that array is in
- * CATALOGUE order and row 19 precedes row 20 — not in the order they were built.
+ * CATALOGUE order and row 20 precedes row 21 — not in the order they were built.
  * The two Trip / Ride Modification rows end up adjacent either way.
  * ⛔ Anchored to the production tile `calendar` like its neighbour, because
  * `after` names a PRODUCTION tile — anchoring a proposal to another proposal

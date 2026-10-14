@@ -554,7 +554,7 @@ export function legDropoffIsHomeFieldId(tripId: string): string {
 /**
  * Who asked for the new leg.
  *
- * ⛔ **Deliberately NOT row 20's `changeRequestedBy`.** That list offers *"I
+ * ⛔ **Deliberately NOT row 21's `changeRequestedBy`.** That list offers *"I
  * found the details are wrong"*, because a driver can notice a bad address on a
  * leg they can see. Nobody notices a leg that does not exist — a new leg is
  * always asked for by a person, so this list is four options, not five. Two
@@ -599,7 +599,7 @@ export function isTripToday(trip: Trip): boolean {
 export const ADD_LEG_SOLUTION = "add-leg-request";
 
 /**
- * ⛔⛔ **A proposal belongs to its own build.** Row 19 has THREE surfaces under
+ * ⛔⛔ **A proposal belongs to its own build.** Row 20 has THREE surfaces under
  * this obligation — the More Options tile, the completed ride's own button, and
  * the banner — so the rule is named once, here, where all three read it.
  */
@@ -614,7 +614,7 @@ export function showsAddLegEntry(focus: DemoFocus): boolean {
  *
  * ⭐ `completed` is INCLUDED, and it is the whole of user direction 1.1: a
  * driver who has just swiped drop-off is exactly who hears *"actually, I also
- * need the pharmacy"*. ⛔ No conflict with row 20, which refuses completed rides
+ * need the pharmacy"*. ⛔ No conflict with row 21, which refuses completed rides
  * — that one would be CORRECTING a finished leg, which is row 03's case. This
  * one does not touch the finished leg at all.
  *
@@ -683,7 +683,7 @@ export const ADD_LEG_SUBMIT_TOAST =
 
 /**
  * ⛔ The app never learns the outcome — the client owns the manifest. Filed with
- * `appTracksStatus: false`, like rows 05, 09, 13, 16 and 20. Knowing it landed
+ * `appTracksStatus: false`, like rows 05, 09, 13, 16 and 21. Knowing it landed
  * is **catalogue row 17**, the requests tray, and this is the sixth build
  * leaning on it.
  */

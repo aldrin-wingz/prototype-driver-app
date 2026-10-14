@@ -179,7 +179,7 @@ v0 should treat these screenshots as own-brand captures of the existing producti
 | 01c | `01c - Dashboard - Scrolled.png` | I-0, I-3 | `i-0/`, `i-3/` | Scrolled view — "Next Accepted Ride" section appears below New Requests preview |
 | 02a | `02a - Requests - Single Legs Allowed Pill.png` | I-0, I-2, I-5 | `i-0/`, `i-2/`, `i-5/` | Requests list with green "Single Legs Allowed" pill + orange "Expires in 4 hours" pill |
 | 02b | `02b - Requests - Will-Call Pill.png` | I-0, I-2, I-5 | `i-0/`, `i-2/`, `i-5/` | Requests list with yellow "Wait For Call" pill + blue Appointment Time anchor + gray expiration pill |
-| 03a | `03a - My Rides - Needs Action Tab.png` | I-0, I-2 | `i-0/`, `i-2/` | My Rides 3-tab row; cards on Needs Action carry red `Not Confirmed` pill |
+| 03a | `03a - My Rides - Needs Action Tab.png` | I-0, I-2 | `i-0/`, `i-2/` | ⚠️ Shows a 3-tab row — superseded by `CAP-341`, which photographs four. Cards on Needs Action carry red `Not Confirmed` pill |
 | 04a | `04a - Ride Details - Before Taken - Top.png` | I-0, I-4 | `i-0/`, `i-4/` | Top of detail screen — header, map preview, leg list begins; pink/green swipe footer |
 | 04b | `04b - Ride Details - Before Taken - Scrolled.png` | I-0, I-4 | `i-0/`, `i-4/` | Scrolled — full leg cards, Notes line, gray expiration pill |
 | 05a | `05a - Ride Details - Needs Action - Top.png` | I-0, I-4 | `i-0/`, `i-4/` | Canonical "after-taken" state — "Accepted Ride" subtitle, amber alert, red CTA |
@@ -247,7 +247,12 @@ The bottom pill row is where `pill-named-bottom` (I-2) slots in alongside existi
 
 ### My Rides Tabs (slot 03a)
 
-- 3-tab row directly under the header: `In Progress` / `Needs Action` (default active) / `Upcoming`.
+- **4-tab row** directly under the header: `In Progress` / `Needs Action` (default active) / `Upcoming` / `Pending`, each with its count as a small superscript.
+- ⛔ **Corrected 2026-10-15 from `CAP-341`**, which photographs the row reading
+  `In Progress 1 · Needs Action 9 · Upcoming 10 · Pending 1`. This section said
+  three tabs, sourced from `03a` — an older shoot that predates `Pending`. The
+  prototype's fourth tab had been treated as an ungated proposal on the strength
+  of that line; it is production's.
 - Active tab = bold black with thin black underline below the label. Inactive = lighter gray, no underline.
 - Cards on Needs Action carry the red `Not Confirmed` pill at the bottom.
 

@@ -153,7 +153,7 @@ export function SolutionProvider({ children }: { children: React.ReactNode }) {
   const active = findSolution(activeId);
   /**
    * ⛔⛔ **The mode, normalised for the row it applies to — one line, one
-   * place.** Rows 11, 12 and 25 are `no-app-surface` and have no proposed side,
+   * place.** Rows 11, 12 and 26 are `no-app-surface` and have no proposed side,
    * so nothing may put them on it: not a cell, not a deep link. State goes on
    * holding whatever was asked for; every consumer reads THIS, including the
    * URL mirror — which quietly rewrites `?mode=fixed` off a row that cannot be

@@ -321,7 +321,7 @@ export function buildSupportFormCase({
    */
   riderDeclined?: { legOptions: SupportFieldOption[] };
   /**
-   * Build the Update Trip Details case — catalogue row 20.
+   * Build the Update Trip Details case — catalogue row 21.
    *
    * ⚠️ Carries the ride's own ANCHORS, because the field set is generated from
    * them: two fields per anchor, labelled with the anchor's own wording. A fixed
@@ -334,7 +334,7 @@ export function buildSupportFormCase({
    */
   tripChange?: { anchors: ChangeAnchor[] };
   /**
-   * Build the Add Leg to Trip case — catalogue row 19.
+   * Build the Add Leg to Trip case — catalogue row 20.
    *
    * ⚠️ Carries the whole placement picture, because every part of it is a rule
    * this builder has no way to work out: which slots are legal, what each leg's
@@ -343,7 +343,7 @@ export function buildSupportFormCase({
    *
    * ⛔ `shifts` is the field set's own shape — one editable time per existing leg
    * the insertion would push later — so it changes as the driver types. The
-   * caller rebuilds the case on every render, exactly as row 20's anchors do.
+   * caller rebuilds the case on every render, exactly as row 21's anchors do.
    */
   addLeg?: {
     legOrder: LegOrderConfig;
@@ -435,7 +435,7 @@ export function buildSupportFormCase({
        * there is on a drop-off being asked for at 10:30.
        */
       /**
-       * ⭐ Derived, like row 20's — the new leg's two ends, then every leg the
+       * ⭐ Derived, like row 21's — the new leg's two ends, then every leg the
        * insertion pushes, in the order they would happen. A driver who edits a
        * proposed time backwards gets the same warning row 01 already built.
        */
@@ -957,7 +957,7 @@ export function buildSupportFormCase({
 
       // ---- Update Trip Details -------------------------------------------
       //
-      // Catalogue row 20 — `Trip / Ride Modification`, 364 calls. The member's
+      // Catalogue row 21 — `Trip / Ride Modification`, 364 calls. The member's
       // appointment moved, or the address on the manifest is the front entrance
       // when they need the back one. Today that is a phone call, because there
       // is nothing in the app that can even state the request.
@@ -1050,12 +1050,12 @@ export function buildSupportFormCase({
 
       // ---- Add Leg to Trip -----------------------------------------------
       //
-      // Catalogue row 19 — `Trip / Ride Modification`, 364 calls, and the LAST
+      // Catalogue row 20 — `Trip / Ride Modification`, 364 calls, and the LAST
       // of the ten form rows. The member needs one more ride on the same trip,
       // most often said at the door seconds after the drop-off swipe.
       //
       // ⛔⛔ "Leg" here is a `Trip` in a `tripGroup`, not an anchor on one
-      // trip's timeline — the opposite of row 20's sense of the same word. See
+      // trip's timeline — the opposite of row 21's sense of the same word. See
       // `lib/driver-data/trip-groups.ts`, which names both and says why only one
       // of them can carry a new leg's id, revenue and swipes.
       ...(addLeg
@@ -1074,7 +1074,7 @@ export function buildSupportFormCase({
               shortLabel: "who asked",
               placeholder: "Select:",
               required: true,
-              // ⛔ FOUR options, not row 20's five. A driver can notice a wrong
+              // ⛔ FOUR options, not row 21's five. A driver can notice a wrong
               // address; nobody notices a leg that does not exist.
               options: [...ADD_SOURCE_OPTIONS],
               showIf: ONLY_ADD_LEG,
@@ -1201,7 +1201,7 @@ export function buildSupportFormCase({
       /**
        * ⭐ The one place a `notice` is the RIGHT answer rather than a trap.
        *
-       * ⛔⛔ Row 20 learned that a visible notice blocks Submit outright, and
+       * ⛔⛔ Row 21 learned that a visible notice blocks Submit outright, and
        * treated that as a hazard. Here it is exactly the behaviour wanted: the
        * values map holds no date beside a time, so a schedule running past
        * midnight is one the app genuinely cannot work out. Refusing and saying
