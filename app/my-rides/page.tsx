@@ -404,15 +404,22 @@ export default function MyRidesPage() {
       />
 
       {/*
-        Tab row — pinned under the header.
+        The tab row AND the chip row, pinned under the header as one box.
 
         ⛔ `top-14` is not a measurement, it is the header's own declared
         height (`h-14` in `components/driver/header.tsx`). A sticky offset
         guessed from a screenshot drifts the moment that header changes; this
         one cannot, and a check reads both files to keep the two in step.
 
+        ⛔⛔ **One sticky box, not two sticky children.** Both rows have to stay
+        put while the manifest scrolls, and neither height is fixed — the chip
+        row is conditional and its chips wrap. Sticking each separately means
+        the second needs `top` = the first's measured height, which is a number
+        nothing in the source can state truthfully. Sticking the box they share
+        needs no measurement at all.
+
         ⛔ `z-40`, UNDER the header's `z-50`. The two never overlap — the
-        header occupies 0–56px and this row starts at 56px — but on the seam a
+        header occupies 0–56px and this box starts at 56px — but on the seam a
         card passes between them, and the one that outranks the other is what
         decides whether it disappears behind the tabs or behind the header.
 
@@ -421,10 +428,12 @@ export default function MyRidesPage() {
         `fixed bottom-0 z-50` and a sibling of this div; a sheet mounted in
         here tops out at this box's `z-40` however large its own z-index is,
         and the nav paints over its Update button — which is a bug this page
-        has already shipped once. The filter sheet is mounted at the page root
-        for exactly that reason.
+        has already shipped once. `RidesFilterBar` is only chips and belongs
+        here; `RidesFilterSheet` is mounted at the page root for exactly that
+        reason, and a check asserts the pair stay on their own sides.
       */}
-      <div className="sticky top-14 z-40 flex border-b border-gray-200 bg-white">
+      <div className="sticky top-14 z-40 bg-white">
+      <div className="flex border-b border-gray-200 bg-white">
         {tabs.map((tab) => (
           <button
             key={tab.value}
@@ -462,6 +471,7 @@ export default function MyRidesPage() {
           onOpen={openFilterSheet}
         />
       )}
+      </div>
 
       <main className="flex-1 space-y-4 p-4">
         {currentTrips.length === 0 ? (

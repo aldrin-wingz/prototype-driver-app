@@ -104,13 +104,24 @@ export type RideFilterIcon =
 /**
  * How the sheet renders the choice.
  *
- * `chips` is inline on the sheet — production's own treatment for a short,
- * fixed set (`All day · Before noon · Morning · Afternoon · Evening`).
- * `list` is a row showing the current value with `Edit ›`, opening the
- * option sub-sheet `CAP-052` shows, because the options are seeded data and
- * there can be any number of them.
+ * `chips` is inline on the sheet — production's treatment for a short, fixed
+ * set it can render in full. `CAP-053`'s time presets are one; `CLIENT` is the
+ * other, and it is chips because a driver has one or two clients, not a list.
+ *
+ * `list` is a row showing the current value with `Edit ›`, opening the option
+ * sub-sheet `CAP-052` shows, because the options are seeded data and there can
+ * be any number of them.
+ *
+ * `time-range` is production's PICKUP TIME RANGE block in full: a `Start` row
+ * and an `End` row, each with its own `Edit ›`, ABOVE the preset chips. ⛔ The
+ * presets are shorthand for a range, not a separate setting — tapping
+ * `Morning` writes the same value a driver could reach by editing both ends,
+ * which is why there is one key here and not three.
+ *
+ * ⚠️ The renderer switches on THIS, never on a filter key. A sheet that
+ * special-cased `pickupTime` by name would stop being a registry.
  */
-export type RideFilterControl = "chips" | "list";
+export type RideFilterControl = "chips" | "list" | "time-range";
 
 export interface RideFilterOption {
   value: string;
@@ -195,27 +206,113 @@ const byDate = (a: string, b: string) => parseRideDate(a) - parseRideDate(b);
  * noon and is not morning. Replicating the list means replicating the overlap.
  */
 export const PICKUP_TIME_BANDS: ReadonlyArray<{
-  value: string;
   label: string;
-  /** Inclusive minutes past midnight. */
+  /** Inclusive minutes past midnight. The pair IS the preset's value. */
   from: number;
   to: number;
 }> = [
   // ⛔ No band may start before midnight — see `matchesBand`. A negative floor
   // would quietly admit every ride whose pick-up clock cannot be read.
-  { value: "all-day", label: "All day", from: 0, to: 1439 },
-  { value: "before-noon", label: "Before noon", from: 0, to: 719 },
-  { value: "morning", label: "Morning", from: 300, to: 719 },
-  { value: "afternoon", label: "Afternoon", from: 720, to: 1019 },
-  { value: "evening", label: "Evening", from: 1020, to: 1439 },
+  { label: "All day", from: 0, to: 1439 },
+  { label: "Before noon", from: 0, to: 719 },
+  { label: "Morning", from: 300, to: 719 },
+  { label: "Afternoon", from: 720, to: 1019 },
+  { label: "Evening", from: 1020, to: 1439 },
 ];
 
-export const DEFAULT_PICKUP_TIME = "all-day";
+/** The whole day — the value that narrows nothing, and `All day`'s own range. */
+export const ALL_DAY_RANGE = "0-1439";
+export const DEFAULT_PICKUP_TIME = ALL_DAY_RANGE;
+
+/**
+ * A pick-up range as a value: `"300-719"`, minutes past midnight, inclusive.
+ *
+ * ⛔⛔ **One key holds the whole block.** `Start`, `End` and the five preset
+ * chips all write this; the presets are shorthand, so `Morning` and a hand-set
+ * 5:00 AM–11:59 AM are the SAME value and the chip lights for both. Three keys
+ * would let the presets and the ends disagree, and the sheet would show a lit
+ * `Morning` over an `End` of 4 PM.
+ */
+export function rangeValue(from: number, to: number): string {
+  return `${from}-${to}`;
+}
+
+export function rangeBounds(value: string): { from: number; to: number } {
+  const [from, to] = value.split("-").map(Number);
+  return Number.isFinite(from) && Number.isFinite(to)
+    ? { from, to }
+    : { from: 0, to: DAY_END };
+}
+
+export const DAY_START = 0;
+export const DAY_END = 1439;
+
+/** One end moved. `null` returns that end to the edge of the day — "Any". */
+export function withRangeBound(
+  value: string,
+  bound: "from" | "to",
+  minutes: number | null,
+): string {
+  const current = rangeBounds(value);
+  const next = {
+    ...current,
+    [bound]: minutes ?? (bound === "from" ? DAY_START : DAY_END),
+  };
+  /*
+    ⛔⛔ **When the ends cross, the end the driver did NOT just touch is the one
+    that moves.** Setting `End` to 1:00 AM under a `Start` of 5:00 PM is not a
+    typo to reject; it is a driver saying "nothing after 1 AM", and the honest
+    reading is to widen the start rather than to refuse, silently keep the old
+    end, or store a backwards range no `matches` can satisfy.
+
+    ⚠️ The result can still be a range no ride falls in — `0-60` matches
+    nothing here — and that is a TRUE answer, not a broken filter. The
+    filtered-empty state is what explains it.
+  */
+  if (next.from > next.to) {
+    if (bound === "from") next.to = DAY_END;
+    else next.from = DAY_START;
+  }
+  return rangeValue(next.from, next.to);
+}
+
+/**
+ * `420` → `"7:00 AM"`, and at an edge of the day `"Any"` — the way `CAP-053`
+ * writes `Start: Any`.
+ *
+ * ⚠️ `edge` is what makes the two ends read differently: midnight is "Any" for
+ * a start and a real time for an end, and 11:59 PM the other way round. An
+ * earlier version dodged this by labelling the midnight OPTION as 12:01 AM,
+ * which put a time on the row that was not the value behind it — caught by
+ * reading this gate's own output.
+ */
+export function clockLabel(minutes: number | null, edge?: "from" | "to"): string {
+  if (minutes === null) return RANGE_ANY_LABEL;
+  if (edge === "from" && minutes === DAY_START) return RANGE_ANY_LABEL;
+  if (edge === "to" && minutes === DAY_END) return RANGE_ANY_LABEL;
+  const hour = Math.floor(minutes / 60);
+  const minute = String(minutes % 60).padStart(2, "0");
+  const suffix = hour < 12 ? "AM" : "PM";
+  return `${((hour + 11) % 12) + 1}:${minute} ${suffix}`;
+}
+
+export const RANGE_ANY_LABEL = "Any";
+
+/**
+ * The times `Start` and `End` offer.
+ *
+ * ⚠️ HOURLY, and declared rather than captured — `CAP-053` shows the two rows
+ * but not what opens behind them. Hourly is enough to express every band the
+ * presets name, and a finer grid would be a list of 96 rows to scroll.
+ */
+export const TIME_CHOICES: readonly RideFilterOption[] = Array.from(
+  { length: 24 },
+  (_, hour) => ({ value: String(hour * 60), label: clockLabel(hour * 60) }),
+);
 
 function matchesBand(trip: Trip, value: string): boolean {
   if (value === DEFAULT_PICKUP_TIME) return true;
-  const band = PICKUP_TIME_BANDS.find((b) => b.value === value);
-  if (!band) return true;
+  const band = rangeBounds(value);
   const minutes = clockMinutes(trip.legs[0]?.time);
   /*
     ⛔⛔ **Both ends are compared, and the lower one is what excludes a ride
@@ -230,8 +327,18 @@ function matchesBand(trip: Trip, value: string): boolean {
   return minutes >= band.from && minutes <= band.to;
 }
 
+/**
+ * A preset's name when the range is exactly one, otherwise the range itself.
+ *
+ * ⛔ Exact match only. A range that merely sits inside `Morning` is not
+ * `Morning`, and labelling it so would put a name on the chip that the ends
+ * below it contradict.
+ */
 function bandLabel(value: string): string {
-  return PICKUP_TIME_BANDS.find((b) => b.value === value)?.label ?? value;
+  const preset = PICKUP_TIME_BANDS.find((b) => rangeValue(b.from, b.to) === value);
+  if (preset) return preset.label;
+  const { from, to } = rangeBounds(value);
+  return `${clockLabel(from, "from")} – ${clockLabel(to, "to")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -282,7 +389,17 @@ export const RIDE_FILTERS: readonly RideFilterDefinition[] = [
     label: "Client",
     title: "Client",
     icon: "client",
-    control: "list",
+    /**
+     * ⭐ Chips, not a list — `CAP-051` shows `CLIENT` rendered as a row of
+     * unselected pills with a single `Verida` in it. A driver works for one or
+     * two clients, so the whole set fits on screen and a sub-sheet to pick from
+     * one option would be a door onto a cupboard. (User direction, 2026-10-15.)
+     *
+     * ⛔ And there is NO `All` chip, which is what makes this a TOGGLE set
+     * rather than a radio one: nothing selected means every client, and the way
+     * back is to tap the lit chip again. See `clearsOnRetap`.
+     */
+    control: "chips",
     alwaysOnChipRow: false,
     defaultValue: "",
     options: (trips) => distinct(trips, (t) => t.client, alphabetical),
@@ -314,10 +431,11 @@ export const RIDE_FILTERS: readonly RideFilterDefinition[] = [
     label: "Pickup time range",
     title: "Pickup Time",
     icon: "time",
-    control: "chips",
+    control: "time-range",
     alwaysOnChipRow: false,
     defaultValue: DEFAULT_PICKUP_TIME,
-    options: () => PICKUP_TIME_BANDS.map((b) => ({ value: b.value, label: b.label })),
+    options: () =>
+      PICKUP_TIME_BANDS.map((b) => ({ value: rangeValue(b.from, b.to), label: b.label })),
     matches: matchesBand,
     chipLabel: bandLabel,
   },
@@ -461,8 +579,8 @@ export function applyRideFilters(
  * ⛔ A zero-count option in a **seeded list** is ABSENT, not greyed — *"a day
  * with no trips does not appear in the list at all"*.
  *
- * ⛔⛔ **A `chips` control keeps all of its options, and that is not an
- * inconsistency.** Production narrows the day and county pickers, which are
+ * ⛔⛔ **Only a `list` narrows; a rendered-in-full control keeps every option,
+ * and that is not an inconsistency.** Production narrows the day and county pickers, which are
  * lists of whatever happens to be posted; it renders all five pick-up time
  * chips whether or not a trip falls in them (`CAP-053`). The difference is
  * real: a seeded list shrinking tells the driver something true about the day,
@@ -496,11 +614,67 @@ export function narrowedOptions(
     }))
     .filter(
       (option) =>
-        def.control === "chips" ||
+        def.control !== "list" ||
         option.count > 0 ||
         option.value === selected ||
         option.value === def.defaultValue,
     );
+}
+
+/**
+ * Whether tapping the lit chip clears the filter.
+ *
+ * ⛔⛔ **Derived from the registry, not declared beside it.** A chips filter
+ * whose default is one of its own options — `status` with `All`, `pickupTime`
+ * with `All day` — is a RADIO set: there is a chip meaning "no filter", so
+ * re-tapping the lit one should do nothing. A chips filter whose default is
+ * absent from its options — `client`, which `CAP-051` shows as a bare `Verida`
+ * pill with no `All` beside it — is a TOGGLE set, and the lit chip is the only
+ * way back. Declaring a `toggle: true` flag beside the options would be the
+ * same fact written twice, and the two would disagree the day someone adds an
+ * `All` chip.
+ */
+export function clearsOnRetap(key: RideFilterKey): boolean {
+  const def = rideFilter(key);
+  if (def.control === "list") return false;
+  return !def.options([]).some((option) => option.value === def.defaultValue)
+    && def.defaultValue === "";
+}
+
+/**
+ * What `Start` or `End` should offer, and what each would leave.
+ *
+ * ⛔ Counted the same way `narrowedOptions` counts: against every OTHER filter,
+ * with this filter's own range rewritten to the candidate. A driver choosing an
+ * end time sees how many rides that end would keep, not how many the band it
+ * happens to fall in holds.
+ *
+ * ⚠️ `null` is the `Any` row, which returns that end to the edge of the day.
+ */
+export function narrowedRangeOptions(
+  key: RideFilterKey,
+  bound: "from" | "to",
+  trips: readonly Trip[],
+  values: RideFilterValues,
+): RideFilterChoice[] {
+  const def = rideFilter(key);
+  const others: Partial<Record<RideFilterKey, string>> = { ...values };
+  delete others[key];
+  const pool = applyRideFilters(trips, others);
+  const current = values[key] ?? def.defaultValue;
+  const count = (value: string) =>
+    pool.filter((trip) => def.matches(trip, value)).length;
+  return [
+    {
+      value: "",
+      label: RANGE_ANY_LABEL,
+      count: count(withRangeBound(current, bound, null)),
+    },
+    ...TIME_CHOICES.map((choice) => ({
+      ...choice,
+      count: count(withRangeBound(current, bound, Number(choice.value))),
+    })),
+  ];
 }
 
 // ---------------------------------------------------------------------------

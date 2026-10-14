@@ -316,15 +316,21 @@ import {
   applyRideFilters,
   chipRowKeys,
   chipText,
+  clearsOnRetap,
   isFilterSet,
   narrowedOptions,
+  narrowedRangeOptions,
+  rangeBounds,
   rideFilter,
   setFilterKeys,
   showsRidesFilter,
+  withRangeBound,
   withRideFilter,
+  ALL_DAY_RANGE,
   NO_RIDE_FILTERS,
   PICKUP_TIME_BANDS,
   RIDE_FILTERS,
+  TIME_CHOICES,
   type RideFilterKey,
   type RideFilterValues,
 } from "../lib/driver-data/ride-filters";
@@ -10798,13 +10804,42 @@ check(
  * clearing has already taken effect. Exactly one call site applies it; an
  * option that applied on tap would call it from the chip as well.
  */
+const applyCalls = (RIDES_SHEET_SRC.match(/onApply\(/g) ?? []).length;
+const updateButtons = (RIDES_SHEET_SRC.match(/onClick=\{\(\) => commit\(draft\)\}/g) ?? []).length;
 check(
-  "...and it edits a draft that Update applies, from exactly one place",
+  "...and it edits a draft that Update applies, through one commit",
   `draft state ${/const \[draft, setDraft\] = useState<RideFilterValues>/.test(RIDES_SHEET_SRC)}; ` +
-    `onApply calls ${(RIDES_SHEET_SRC.match(/onApply\(/g) ?? []).length}`,
+    `onApply calls ${applyCalls}; Update buttons ${updateButtons}`,
   /const \[draft, setDraft\] = useState<RideFilterValues>/.test(RIDES_SHEET_SRC) &&
-    (RIDES_SHEET_SRC.match(/onApply\(/g) ?? []).length === 1 &&
-    /onApply\(draft\)/.test(RIDES_SHEET_SRC),
+    // ⛔ ONE call site, and it is `commit`. Three controls reach it — this
+    // sheet's Update, the time-range sub-sheet's, and a pick in a chip-opened
+    // sub-sheet — and three `onApply` calls is three chances to disagree about
+    // what "applying" closes.
+    applyCalls === 1 &&
+    /const commit = \(next: RideFilterValues\) => \{\s*onApply\(next\);/.test(RIDES_SHEET_SRC) &&
+    // ⛔ Both Update buttons go through it, and there are exactly two.
+    updateButtons === 2,
+);
+/**
+ * ⛔⛔ **A chip-opened sub-sheet APPLIES on pick; one reached from inside the
+ * sheet goes back and waits.** Production's `Mode` sub-sheet, opened from the
+ * chip row, has no Update at all — the tick is the decision. Reached through
+ * `Edit ›` it is one section of a sheet the driver is still filling in.
+ *
+ * ⛔ And a BOUND pick never applies however it was reached: `Start` is half of
+ * a range, and committing it alone narrows the manifest to a filter the driver
+ * is in the middle of choosing.
+ */
+check(
+  "a chip-opened sub-sheet applies on pick, and a half-set range never does",
+  `guard: ${/if \(at\.fromChip && !at\.bound\) commit\(next\);/.test(RIDES_SHEET_SRC)}; ` +
+    `chips open their own sub-sheet: ${/setEditing\(openKey \? \{ key: openKey, fromChip: true \} : null\)/.test(RIDES_SHEET_SRC)}`,
+  /if \(at\.fromChip && !at\.bound\) commit\(next\);/.test(RIDES_SHEET_SRC) &&
+    // ⛔ ...and EVERY control opens one from the bar, not only `list`. A chip
+    // that opened the full seven-section sheet would make the driver find the
+    // control again, which is the opposite of what a chip is for.
+    /setEditing\(openKey \? \{ key: openKey, fromChip: true \} : null\)/.test(RIDES_SHEET_SRC) &&
+    !/control === "list" \? \{ key: openKey \}/.test(RIDES_SHEET_SRC),
 );
 check(
   "...and Clear Filters resets the draft without closing the sheet",
@@ -10939,12 +10974,11 @@ const headerTag = /<header className="([^"]*)"/.exec(HEADER_SRC)?.[1] ?? "";
 const headerHeight = /\bh-(\d+)\b/.exec(headerTag)?.[1] ?? "";
 const headerTop = /\btop-(\d+)\b/.exec(headerTag)?.[1] ?? "";
 const headerZ = Number(/\bz-\[?(\d+)\]?/.exec(headerTag)?.[1] ?? "0");
-const tabRowTag =
-  /<div className="(sticky [^"]*flex border-b border-gray-200 bg-white)"/.exec(PAGE_CODE)?.[1] ?? "";
+const tabRowTag = /<div className="(sticky top-\d+ [^"]*)"/.exec(PAGE_CODE)?.[1] ?? "";
 const tabRowTop = /\btop-(\d+)\b/.exec(tabRowTag)?.[1] ?? "";
 const tabRowZ = Number(/\bz-\[?(\d+)\]?/.exec(tabRowTag)?.[1] ?? "0");
 check(
-  "the tab row sticks at exactly the header's own declared height",
+  "the pinned box sticks at exactly the header's own declared height",
   `header h-${headerHeight} at top-${headerTop}, tab row at top-${tabRowTop || "—"}`,
   // ⛔ The header must itself be pinned at 0, or "its height" is not the offset.
   headerTop === "0" && headerHeight !== "" && tabRowTop === headerHeight,
@@ -10987,16 +11021,25 @@ function jsxExtent(src: string, openTag: string): string {
   return "";
 }
 const tabRowExtent = jsxExtent(PAGE_CODE, `<div className="${tabRowTag}"`);
-/** ⛔ Named literally. When the sheet becomes its own component, name that. */
-const MUST_STAY_OUTSIDE = ["RidesFilterBar", "fixed inset-0"];
+/**
+ * ⛔⛔ **The chip row belongs INSIDE and the sheet belongs OUTSIDE**, and the
+ * difference is the whole point of this check. `RidesFilterBar` is chips; it
+ * has to stay put while the manifest scrolls. `RidesFilterSheet` is an overlay
+ * that must outrank the bottom nav, and no z-index can lift it out of this
+ * box's stacking context.
+ */
+const MUST_STAY_OUTSIDE = ["RidesFilterSheet", "fixed inset-0"];
+const MUST_BE_INSIDE = ["tabs.map(", "<RidesFilterBar"];
 const trapped = MUST_STAY_OUTSIDE.filter((what) => tabRowExtent.includes(what));
+const escaped = MUST_BE_INSIDE.filter((what) => !tabRowExtent.includes(what));
 check(
-  "nothing that must outrank the bottom nav is mounted inside the sticky row",
+  "the rows that must stay put are pinned, and the overlay that must not is outside",
   tabRowExtent
-    ? `${tabRowExtent.length} chars, holds tabs.map ${tabRowExtent.includes("tabs.map(")}, ` +
-      `${trapped.length} of ${MUST_STAY_OUTSIDE.length} trapped${trapped.length ? ": " + trapped.join(", ") : ""}`
-    : "the sticky row could not be located",
-  tabRowExtent !== "" && tabRowExtent.includes("tabs.map(") && trapped.length === 0,
+    ? `${tabRowExtent.length} chars; ` +
+      `${escaped.length} of ${MUST_BE_INSIDE.length} escaped${escaped.length ? " (" + escaped.join(", ") + ")" : ""}; ` +
+      `${trapped.length} of ${MUST_STAY_OUTSIDE.length} trapped${trapped.length ? " (" + trapped.join(", ") + ")" : ""}`
+    : "the pinned box could not be located",
+  tabRowExtent !== "" && escaped.length === 0 && trapped.length === 0,
 );
 
 /* === 32. The My Rides filter feature ====================================== */
@@ -11288,7 +11331,8 @@ check(
 let zeroSwept = 0;
 const zeroWrong: string[] = [];
 for (const f of RIDE_FILTERS) {
-  if (f.control === "chips") continue;
+  // ⛔ Only a `list` narrows — everything rendered in full keeps every option.
+  if (f.control !== "list") continue;
   const context: RideFilterValues = { rider: "ROSALIND ACHTERBERG" };
   for (const choice of narrowedOptions(f.key, mockUpcomingTrips, context)) {
     zeroSwept += 1;
@@ -11314,7 +11358,7 @@ check(
  * control proving at least one option is at zero and still rendered.
  */
 const narrowContext: RideFilterValues = { pickupLocation: "Lee County" };
-const chipFilters = RIDE_FILTERS.filter((f) => f.control === "chips");
+const chipFilters = RIDE_FILTERS.filter((f) => f.control !== "list");
 const shrunkChipSets = chipFilters.filter(
   (f) =>
     narrowedOptions(f.key, mockUpcomingTrips, narrowContext).length !==
@@ -11340,9 +11384,13 @@ check(
  * disjoint ones must partition the day exactly; `Before noon` and `Morning`
  * overlap on purpose, because production lists both.
  */
-const disjointBands = ["before-noon", "afternoon", "evening"];
+const bandRange = (label: string) => {
+  const band = PICKUP_TIME_BANDS.find((b) => b.label === label)!;
+  return `${band.from}-${band.to}`;
+};
+const disjointBands = ["Before noon", "Afternoon", "Evening"];
 const bandCounts = disjointBands.map(
-  (v) => applyRideFilters(mockUpcomingTrips, { pickupTime: v }).length,
+  (label) => applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange(label) }).length,
 );
 check(
   "the three disjoint pick-up bands partition the manifest",
@@ -11353,12 +11401,12 @@ check(
 );
 check(
   "...and Morning sits inside Before noon, which is production's own overlap",
-  `morning ${applyRideFilters(mockUpcomingTrips, { pickupTime: "morning" }).length} ⊆ ` +
+  `morning ${applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange("Morning") }).length} ⊆ ` +
     `before noon ${bandCounts[0]}; bands declared ${PICKUP_TIME_BANDS.length}`,
   PICKUP_TIME_BANDS.length === 5 &&
-    PICKUP_TIME_BANDS[0].value === "all-day" &&
-    applyRideFilters(mockUpcomingTrips, { pickupTime: "morning" }).every((t) =>
-      applyRideFilters(mockUpcomingTrips, { pickupTime: "before-noon" }).some(
+    bandRange("All day") === ALL_DAY_RANGE &&
+    applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange("Morning") }).every((t) =>
+      applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange("Before noon") }).some(
         (x) => x.id === t.id,
       ),
     ),
@@ -11376,12 +11424,12 @@ const clocklessRide = {
   legs: [{ ...mockUpcomingTrips[0].legs[0], time: "Wait For Call" }],
 } as Trip;
 const bandsHit = PICKUP_TIME_BANDS.filter((b) =>
-  rideFilter("pickupTime").matches(clocklessRide, b.value),
-).map((b) => b.value);
+  rideFilter("pickupTime").matches(clocklessRide, `${b.from}-${b.to}`),
+).map((b) => b.label);
 check(
   "a ride with no readable pick-up clock falls in no band but All day",
   `bands matched: ${bandsHit.join(", ") || "none"}`,
-  bandsHit.join(",") === "all-day",
+  bandsHit.join(",") === "All day",
 );
 /**
  * ⛔ ...and the reason it does is that NO BAND STARTS BEFORE MIDNIGHT, which
@@ -11393,8 +11441,156 @@ const badFloors = PICKUP_TIME_BANDS.filter((b) => b.from < 0 || b.to < b.from);
 check(
   "...because no band starts before midnight, which is what excludes the sentinel",
   `${badFloors.length} bad of ${PICKUP_TIME_BANDS.length} band(s): ` +
-    PICKUP_TIME_BANDS.map((b) => `${b.value} ${b.from}-${b.to}`).join(", "),
+    PICKUP_TIME_BANDS.map((b) => `${b.label} ${b.from}-${b.to}`).join(", "),
   badFloors.length === 0,
+);
+
+/* --- 32e-bis. Start and End are two doors onto one value ----------------- */
+/**
+ * ⛔⛔ **One key holds the whole PICKUP TIME RANGE block** — `Start`, `End` and
+ * the five presets all write it (`CAP-053`). Three keys would let them
+ * disagree, and the sheet would show a lit `Morning` over an `End` of 4 PM.
+ * Proven by reaching a preset's exact value through the two ends and getting
+ * the preset's own label back.
+ */
+const viaEnds = withRangeBound(
+  withRangeBound(ALL_DAY_RANGE, "from", 300),
+  "to",
+  719,
+);
+check(
+  "a range set through Start and End is the same value a preset writes",
+  `ends → "${viaEnds}" (${rideFilter("pickupTime").chipLabel(viaEnds)}); ` +
+    `preset → "${bandRange("Morning")}"`,
+  viaEnds === bandRange("Morning") &&
+    rideFilter("pickupTime").chipLabel(viaEnds) === "Morning",
+);
+/**
+ * ⛔ ...and a range that is NOT a preset reads as its own times, never as the
+ * preset it happens to sit inside. A label naming a band the ends contradict
+ * is worse than no label.
+ */
+const oddRange = withRangeBound(withRangeBound(ALL_DAY_RANGE, "from", 420), "to", 660);
+check(
+  "...and a range no preset names reads as its own times",
+  `"${oddRange}" → ${rideFilter("pickupTime").chipLabel(oddRange)}`,
+  rideFilter("pickupTime").chipLabel(oddRange) === "7:00 AM – 11:00 AM" &&
+    // ⛔ ...and it really does sit inside Morning, so the check is not trivially
+    // true for a range that is simply out of every band.
+    rideFilter("pickupTime").matches(
+      { ...mockUpcomingTrips[0], legs: [{ ...mockUpcomingTrips[0].legs[0], time: "8:00 AM" }] } as Trip,
+      bandRange("Morning"),
+    ),
+);
+/** ⛔ Returning an end to `Any` returns it to the edge of the day, not to 0:00. */
+check(
+  "returning an end to Any widens it to the edge of the day",
+  `from-Any "${withRangeBound(bandRange("Morning"), "from", null)}", ` +
+    `to-Any "${withRangeBound(bandRange("Morning"), "to", null)}"`,
+  withRangeBound(bandRange("Morning"), "from", null) === `0-719` &&
+    withRangeBound(bandRange("Morning"), "to", null) === `300-1439` &&
+    withRangeBound(withRangeBound(bandRange("Morning"), "from", null), "to", null) ===
+      ALL_DAY_RANGE,
+);
+/**
+ * ⛔⛔ **When the ends cross, the one the driver did NOT just touch moves.**
+ * Setting `End` to 1:00 AM under a `Start` of 5:00 PM is a driver saying
+ * "nothing after 1 AM", not a typo to reject — so the START widens and the end
+ * they chose is kept. Refusing, silently keeping the old end, or storing a
+ * backwards range no `matches` can satisfy are the three wrong answers.
+ *
+ * ⚠️ The result here really is a range no ride falls in, and that is a TRUE
+ * answer the filtered-empty state explains. The check asserts the range stays
+ * VALID and keeps the driver's own end — not that it still finds rides.
+ */
+const rf32Crossed = withRangeBound(bandRange("Evening"), "to", 60);
+check(
+  "an end set before the start moves the other end, keeping the one just chosen",
+  `evening + end 1:00 AM → "${rf32Crossed}" ` +
+    `(${applyRideFilters(mockUpcomingTrips, { pickupTime: rf32Crossed }).length} ride(s), legitimately none)`,
+  rangeBounds(rf32Crossed).from <= rangeBounds(rf32Crossed).to &&
+    rangeBounds(rf32Crossed).to === 60 &&
+    rangeBounds(rf32Crossed).from === 0 &&
+    // ⛔ ...and the mirror case moves the END, not the start.
+    withRangeBound(bandRange("Before noon"), "from", 1020) === "1020-1439",
+);
+/** ⛔ Every time `Start`/`End` offers is a real clock, and `Any` leads. */
+const rangeChoices = narrowedRangeOptions("pickupTime", "from", mockUpcomingTrips, NO_RIDE_FILTERS);
+check(
+  "Start and End offer the hours of the day, led by Any",
+  `${rangeChoices.length} row(s): ${rangeChoices[0]?.label}, ${rangeChoices[1]?.label} … ${rangeChoices[rangeChoices.length - 1]?.label}`,
+  rangeChoices.length === TIME_CHOICES.length + 1 &&
+    rangeChoices[0].label === "Any" &&
+    rangeChoices[1].label === "12:00 AM" &&
+    rangeChoices[0].count === mockUpcomingTrips.length &&
+    // ⛔ ...and the counts are real: a later start keeps fewer rides.
+    rangeChoices[rangeChoices.length - 1].count < rangeChoices[1].count,
+);
+
+/**
+ * ⛔⛔ **Every option a rendered-in-full control offers must NAME ITSELF.**
+ *
+ * The lit chip IS one of the options, so `chipLabel(option.value)` has to come
+ * back as `option.label` — otherwise tapping `Morning` sets a range the label
+ * function does not recognise, the chip reads `5:00 AM – 12:00 PM`, and nothing
+ * lights. A break test is what found this: shifting the presets' values by one
+ * minute left the whole gate green, because the checks above read
+ * `PICKUP_TIME_BANDS` directly and never the options the sheet actually
+ * renders. **The band literals and the filter's own options are two different
+ * things, and only one of them reaches the screen.**
+ *
+ * ⚠️ `list` filters are exempt by design: their chip shortens the value
+ * (`"Fri, Aug 1, 2026"` → `"Fri, Aug 1"`) because a chip row is not a sheet.
+ */
+let selfNaming = 0;
+const rf32Misnamed: string[] = [];
+for (const def of RIDE_FILTERS) {
+  if (def.control === "list") continue;
+  for (const option of def.options(mockUpcomingTrips)) {
+    selfNaming += 1;
+    if (def.chipLabel(option.value) !== option.label)
+      rf32Misnamed.push(`${def.key}=${option.value}: "${def.chipLabel(option.value)}" ≠ "${option.label}"`);
+  }
+}
+check(
+  "every option a chip row renders names itself when it is the one selected",
+  `${rf32Misnamed.length} wrong of ${selfNaming} option(s)` +
+    (rf32Misnamed.length ? ` — ${rf32Misnamed.slice(0, 3).join("; ")}` : ""),
+  rf32Misnamed.length === 0 && selfNaming > RIDE_FILTERS.length,
+);
+
+/* --- 32e-ter. Chips, radio and toggle ------------------------------------ */
+/**
+ * ⛔⛔ **A chips filter with no "all" option is a TOGGLE set.** `CAP-051` shows
+ * `CLIENT` as a bare `Verida` pill with nothing beside it, so the only way back
+ * to every client is to tap the lit chip again. A filter that HAS such an
+ * option — `status` with `All`, `pickupTime` with `All day` — is a radio set,
+ * and re-tapping must do nothing or the one control meaning "everything"
+ * becomes a way to lose your selection.
+ *
+ * ⚠️ Derived from the registry rather than declared beside it, and swept: the
+ * rule is "the default is not among the options", not a flag someone maintains.
+ */
+const retapRows = RIDE_FILTERS.map(
+  (f) => `${f.key}:${clearsOnRetap(f.key) ? "toggle" : "radio"}`,
+);
+check(
+  "a chips filter clears on re-tap only where it has no 'all' option",
+  retapRows.join(" "),
+  clearsOnRetap("client") &&
+    !clearsOnRetap("status") &&
+    !clearsOnRetap("pickupTime") &&
+    // ⛔ No `list` filter ever toggles — its sub-sheet has an `Any` row.
+    RIDE_FILTERS.filter((f) => f.control === "list").every((f) => !clearsOnRetap(f.key)),
+);
+/** ⛔ ...and `client` really is rendered in full, not behind an `Edit ›`. */
+check(
+  "...and Client is pills, because a driver has one or two of them",
+  `client control ${rideFilter("client").control}, ` +
+    `${rideFilter("client").options(mockUpcomingTrips).length} option(s); ` +
+    `no 'all' option ${!rideFilter("client").options(mockUpcomingTrips).some((o) => o.value === "")}`,
+  rideFilter("client").control === "chips" &&
+    !rideFilter("client").options(mockUpcomingTrips).some((o) => o.value === ""),
 );
 
 /* --- 32f. One gate, for the whole feature -------------------------------- */
