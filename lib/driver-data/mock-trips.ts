@@ -218,6 +218,19 @@ export interface Trip {
    * ⛔ The value is invented, like every id in this seed.
    */
   standingOrderId?: string;
+  /**
+   * When the driver was TOLD Wingz cancelled this ride — `CAP-341`'s alert,
+   * in the seed's own `date · time` format.
+   *
+   * ⛔⛔ **Presence is the whole predicate**, and a cancelled ride is in NO
+   * tab. Production lists it nowhere: the only route to it is `Go to ride` on
+   * the alert, and dismissing that closes the only door.
+   *
+   * ⛔ NOT the driver reporting that a member declined — that is
+   * `rider-declined.ts`, and it runs the opposite way. The two must never be
+   * read as one thing.
+   */
+  clientCancelNoticeAt?: string;
 }
 
 export interface TripPill {
@@ -991,6 +1004,53 @@ export const mockUpcomingTrips: Trip[] = [
         address: "100 Test St, Atlanta, GA",
         county: "Fulton County",
         revenue: 10.80,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== A ride Wingz cancelled — `CAP-341` / `CAP-342` =====
+  //
+  // ⛔⛔ **Seeded in `mockUpcomingTrips` and shown in NO tab.** That is not a
+  // contradiction, it is the finding: the ride exists, its screen exists, and
+  // `listableRides` keeps it out of every list because production does. The
+  // only way to it is the alert's `Go to ride`.
+  //
+  // ⚠️ Invented name and addresses, like every other seeded ride. The capture's
+  // own are placeholders (`RiderFirst RiderLast`, `4567 Test Dr`) and copying
+  // either would put test data in the mirror.
+  {
+    id: "1049800450",
+    date: "Fri, May 8, 2026",
+    rider: "CORDELIA VANTERPOOL",
+    client: "Verida",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 26.53,
+    notes: "",
+    clientCancelNoticeAt: "Wed, May 6, 2026 · 1:46 PM",
+    legs: [
+      {
+        id: "1049800450",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "2:46 AM",
+        address: "587 Kin Folks Rd, Lonoke, AR 72086",
+        county: "Lonoke County",
+        revenue: 26.53,
+      },
+      {
+        id: "1049800450-b",
+        type: "appointment",
+        label: "Est Drop-off Time",
+        time: "3:35 AM",
+        address: "224 E South St, Cave City, AR 72521",
+        county: "Sharp County",
+        revenue: 0,
       },
     ],
     status: "upcoming",

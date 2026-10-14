@@ -40,6 +40,17 @@ import {
   SWIPE_TOO_FAR_TITLE, refusesDropOffSwipe,
 } from "../lib/driver-data/swipe-refusal";
 import {
+  cancelAlertBody,
+  isClientCancelled,
+  listableRides,
+  CANCEL_ALERT_DISMISS,
+  CANCEL_ALERT_GO,
+  CANCEL_ALERT_TITLE,
+  CANCELLED_BANNER_BODY,
+  CANCELLED_BANNER_TITLE,
+  CANCELLED_SUBTITLE,
+} from "../lib/driver-data/client-cancellation";
+import {
   DECLINED_BODY, DECLINED_CHAT_SUPPORT, DECLINED_TITLE, DECLINED_WALK_BACK,
   ZENDESK_COMPOSER_PLACEHOLDER, ZENDESK_DECLINE_INTRO, ZENDESK_DECLINE_LABELS,
   ZENDESK_SENT_STATUS, declinableLegIds, zendeskDeclineMessage,
@@ -930,6 +941,133 @@ check(
   "the swipe CTA consults the rule and mounts the dialog",
   `refusesDropOffSwipe ${(detailSrc.match(/refusesDropOffSwipe\(/g) ?? []).length}x, <SwipeTooFarDialog ${(detailSrc.match(/<SwipeTooFarDialog[\s/>]/g) ?? []).length}x`,
   /refusesDropOffSwipe\(/.test(detailSrc) && /<SwipeTooFarDialog[\s/>]/.test(detailSrc),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n11. A ride Wingz cancelled (CAP-341 / CAP-342)");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **Two captures, and the second only exists because of the first's second
+ * button.** `CAP-341`'s alert offers `OK` and `Go to ride`; `Go to ride` opens
+ * `CAP-342`. `OK` is terminal, and the ride is then in no tab at all — which is
+ * the whole finding, and the thing these checks have to keep true.
+ */
+
+/** The one seeded cancellation, found through the rule rather than by id. */
+const CANCELLED_RIDE = mockUpcomingTrips.find(isClientCancelled)!;
+
+/** Transcribed from the captures at fold-in. ⛔ Never re-derive from the module. */
+const CAP_341_TITLE = "Wingz Driver";
+const CAP_341_BODY =
+  "Trip: 20261013134622G scheduled for 2026-10-18 at 01:46 PM was canceled.";
+const CAP_342_TITLE = "Cancelled by Wingz";
+const CAP_342_BODY = "This ride was cancelled by Wingz. No action is required.";
+
+/**
+ * ⛔⛔ **Production spells it BOTH ways.** The alert has one L, the banner two.
+ * The obvious improvement is to normalise them, and that would be this mirror
+ * quietly disagreeing with the photographs it is derived from.
+ */
+check(
+  "the alert keeps production's one-L spelling, the banner its two",
+  `alert "…${CAP_341_BODY.slice(-14)}" / banner "${CANCELLED_BANNER_TITLE}"`,
+  /\bcanceled\b/.test(CAP_341_BODY) &&
+    !/\bcancelled\b/i.test(CAP_341_BODY) &&
+    CANCELLED_BANNER_TITLE === CAP_342_TITLE &&
+    CANCELLED_BANNER_BODY === CAP_342_BODY &&
+    /\bcancelled\b/i.test(CANCELLED_BANNER_BODY),
+);
+check(
+  "...and the alert's copy is CAP-341's, rendered for a seeded ride",
+  `"${cancelAlertBody(CANCELLED_RIDE)}"`,
+  CANCEL_ALERT_TITLE === CAP_341_TITLE &&
+    CANCEL_ALERT_DISMISS === "OK" &&
+    CANCEL_ALERT_GO === "Go to ride" &&
+    // ⚠️ Compared as a SHAPE, not to the capture's own sentence — that one
+    // names a trip this seed does not have, and copying its id in would put
+    // test data in the mirror.
+    /^Trip: \d+ scheduled for \d{4}-\d{2}-\d{2} at \d{2}:\d{2} (AM|PM) was canceled\.$/.test(
+      cancelAlertBody(CANCELLED_RIDE),
+    ),
+);
+/** ⛔ The subtitle is the capture's, not the `Will-Call Ride` this app hardcodes. */
+check(
+  "the cancelled ride's subtitle is CAP-342's",
+  `"${CANCELLED_SUBTITLE}"`,
+  CANCELLED_SUBTITLE === "Ride",
+);
+
+/**
+ * ⛔⛔ **The ride is in NO tab**, and both halves are measured: it exists in the
+ * seed, and every list leaves it out. A mirror that simply did not seed one
+ * would pass a "not listed" check without demonstrating anything.
+ */
+const cancelledSeeded = mockUpcomingTrips.filter(isClientCancelled);
+check(
+  "a cancelled ride is seeded, and it is exactly one",
+  `${cancelledSeeded.length} of ${mockUpcomingTrips.length} upcoming ride(s)`,
+  cancelledSeeded.length === 1,
+);
+check(
+  "...and no list shows it — which is the finding, not an omission",
+  `upcoming lists ${listableRides(mockUpcomingTrips).length} of ${mockUpcomingTrips.length}; ` +
+    `cancelled visible: ${listableRides(mockUpcomingTrips).filter(isClientCancelled).length}`,
+  listableRides(mockUpcomingTrips).length === mockUpcomingTrips.length - 1 &&
+    listableRides(mockUpcomingTrips).every((trip) => !isClientCancelled(trip)),
+);
+/** ⛔ ...and the page reads that rule, rather than the raw array. */
+const MY_RIDES = readFileSync("app/my-rides/page.tsx", "utf8");
+check(
+  "...and My Rides counts and lists through the rule, not the seed",
+  `listableRides used ${(MY_RIDES.match(/listableRides\(/g) ?? []).length}x; ` +
+    `raw array returned ${/return mockUpcomingTrips;/.test(MY_RIDES)}`,
+  (MY_RIDES.match(/listableRides\(/g) ?? []).length === 2 &&
+    !/return mockUpcomingTrips;/.test(MY_RIDES) &&
+    !/count: mockUpcomingTrips\.length/.test(MY_RIDES),
+);
+/**
+ * ⛔⛔ **Nothing the sibling prototype proposes may arrive here.** Row 18 adds a
+ * filter, a Needs Action entry and an Acknowledge button; production has none
+ * of them, and this mirror's job is production.
+ */
+/**
+ * ⚠️ **Comments stripped, and a break test is why.** This file documents the
+ * things it forbids in comments right beside the code that avoids them — the
+ * layout's no-footer branch literally says *"the Acknowledge button does NOT
+ * belong here"*. A substring search cannot tell a USE from a MENTION, so the
+ * first version of this check failed against correct code. Same shape as the
+ * sibling's `entry.label` check passing on the comment explaining its deletion.
+ */
+function codeOnly(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+}
+const CC_SRC = codeOnly(readFileSync("lib/driver-data/client-cancellation.ts", "utf8"));
+const LAYOUT = codeOnly(readFileSync("components/driver/ride-detail-layout.tsx", "utf8"));
+const MY_RIDES_CODE = codeOnly(MY_RIDES);
+const PROPOSALS = ["Acknowledge", "acknowledg", "RidesFilter", "showsCancelledRides", "DemoFocus"];
+const proposalLeaks = PROPOSALS.filter(
+  (word) => CC_SRC.includes(word) || MY_RIDES_CODE.includes(word) || LAYOUT.includes(word),
+);
+check(
+  "no part of the sibling's proposal came across with the replication",
+  `${proposalLeaks.length} of ${PROPOSALS.length} proposal marker(s) present${proposalLeaks.length ? ": " + proposalLeaks.join(", ") : ""}`,
+  proposalLeaks.length === 0,
+);
+/**
+ * ⛔ And the two cancellation concepts stay apart. `rider-declined.ts` is the
+ * driver REPORTING a decline nobody has acted on; this is Wingz having already
+ * cancelled. Opposite directions, nearly the same words.
+ */
+check(
+  "...and it never borrows the rider-declined flow's wording",
+  `shared string: ${[CANCELLED_BANNER_TITLE, CANCELLED_BANNER_BODY].some((a) => a.includes(DECLINED_TITLE))}`,
+  ![CANCELLED_BANNER_TITLE, CANCELLED_BANNER_BODY].some((a) =>
+    a.includes(DECLINED_TITLE),
+  ) &&
+    !CC_SRC.includes("DECLINED_"),
 );
 
 // ---------------------------------------------------------------------------

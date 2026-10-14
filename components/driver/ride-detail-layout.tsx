@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
+  Ban,
   ChevronLeft,
   RefreshCw,
   AlertTriangle,
@@ -20,6 +21,11 @@ import {
   ChevronRight,
   Hourglass,
 } from "lucide-react";
+import {
+  CANCELLED_BANNER_BODY,
+  CANCELLED_BANNER_TITLE,
+  CANCELLED_SUBTITLE,
+} from "@/lib/driver-data/client-cancellation";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
@@ -40,7 +46,12 @@ import { ReachRiderModal } from "@/components/driver/reach-rider-modal";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import { refusesDropOffSwipe } from "@/lib/driver-data/swipe-refusal";
 
-type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
+type DetailState =
+  | "cancelled"
+  | "before-taken"
+  | "in-progress"
+  | "needs-action"
+  | "completed";
 
 /** Driver-facing label + display order for each swipe mark. */
 const SWIPE_ROWS: Array<{ key: keyof LegSwipeProgress; label: string }> = [
@@ -323,13 +334,17 @@ export function RideDetailLayout({
   }
 
   const subtitle =
-    state === "before-taken"
-      ? "Will-Call Ride"
-      : state === "in-progress"
-        ? getInProgressSubtitle(activeStage)
-        : state === "completed"
-          ? "Completed Ride"
-          : "Accepted Ride";
+    // ⛔ `Ride`, bare — CAP-342's own subtitle. Not "Cancelled Ride", which the
+    // capture does not say; the banner says that instead.
+    state === "cancelled"
+      ? CANCELLED_SUBTITLE
+      : state === "before-taken"
+        ? "Will-Call Ride"
+        : state === "in-progress"
+          ? getInProgressSubtitle(activeStage)
+          : state === "completed"
+            ? "Completed Ride"
+            : "Accepted Ride";
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -361,12 +376,39 @@ export function RideDetailLayout({
           "flex-1 overflow-y-auto",
           state === "before-taken"
             ? "pb-28"
-            : state === "completed"
+            // ⛔ `cancelled` pads like `completed` — both end with no footer,
+            // and padding for one that is not there leaves a dead strip under
+            // the last row.
+            : state === "completed" || state === "cancelled"
               ? "pb-8"
               : "pb-44"
         )}
       >
         {banner}
+
+        {/*
+          ⭐⭐ `CAP-342`'s banner, verbatim, directly under the map.
+
+          ⛔ It must never reuse `rider-declined.ts`'s wording. That flow is the
+          driver REPORTING a decline nobody has acted on; this is Wingz having
+          already cancelled. Opposite directions, and the copy says so.
+        */}
+        {state === "cancelled" && (
+          <div className="mx-4 mt-4 rounded-xl bg-[#FEE2E2] p-4">
+            <div className="flex items-start gap-3">
+              <Ban className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#991B1B]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#991B1B]">
+                  {CANCELLED_BANNER_TITLE}
+                </p>
+                <p className="mt-0.5 text-sm text-[#991B1B]">
+                  {CANCELLED_BANNER_BODY}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Map preview */}
         <div className="relative h-64 w-full bg-[#1e3a4c]">
           <iframe
@@ -428,7 +470,10 @@ export function RideDetailLayout({
 
         {/* Leg details section */}
         <div className="p-4">
-          <div className="ml-1">
+          {/* ⛔ `CAP-342` greys the whole timeline on a cancelled ride while the
+              trip card above stays black. After the banner it is the clearest
+              thing on that screen: the leg is not going to happen. */}
+          <div className={cn("ml-1", state === "cancelled" && "opacity-45")}>
             {trip.legs.map((leg, index) => (
               <LegCard
                 key={leg.id}
@@ -498,6 +543,17 @@ export function RideDetailLayout({
             </div>
           )}
 
+          {/* ⛔ The banner in a smaller font, in the slot the other phases use.
+              A cancelled ride with no chip here would read as having no status
+              at all once the banner scrolled away. */}
+          {state === "cancelled" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
+                {CANCELLED_BANNER_TITLE}
+              </span>
+            </div>
+          )}
+
           {state === "needs-action" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
@@ -518,7 +574,19 @@ export function RideDetailLayout({
       </div>
 
       {/* Bottom region — varies by state */}
-      {state === "before-taken" ? (
+      {/*
+        ⛔⛔ **A cancelled ride has NO footer, and this branch says so out loud.**
+
+        It would fall through to the `null` at the end of this chain anyway,
+        which is the problem: "no footer" reached by accident is
+        indistinguishable from "nobody got to it yet". `CAP-342` shows no action
+        bar — there is nothing to do to a ride Wingz has already cancelled, and
+        the banner above says exactly that.
+
+        ⛔ The sibling prototype's Acknowledge button does NOT belong here. It
+        is catalogue row 18's proposal, flagged `"ours"` there.
+      */}
+      {state === "cancelled" ? null : state === "before-taken" ? (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <div className="relative flex h-14 items-center justify-center overflow-hidden rounded-full">
             <div className="absolute inset-y-0 left-0 w-1/2 bg-[#F472B6]" />

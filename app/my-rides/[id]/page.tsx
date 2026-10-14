@@ -12,6 +12,7 @@ import {
   mockRequestTrips,
 } from "@/lib/driver-data/mock-trips";
 import { getPenaltyForTrip } from "@/lib/data/wallet";
+import { isClientCancelled } from "@/lib/driver-data/client-cancellation";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -50,8 +51,19 @@ function MyRideDetailContent({ id }: { id: string }) {
   //   before-taken — an offer the driver has not accepted
   //   in-progress  — accepted; the swipe sequence drives the rest
   //   needs-action — accepted but unconfirmed
-  let state: "before-taken" | "in-progress" | "needs-action" | "completed";
-  if (isSentBack || trip.status === "completed") {
+  //   cancelled    — Wingz cancelled it; read-only, a banner, no footer
+  let state:
+    | "cancelled"
+    | "before-taken"
+    | "in-progress"
+    | "needs-action"
+    | "completed";
+  // ⛔⛔ FIRST in the chain. A cancelled ride's `status` is still `"upcoming"`,
+  // so anything lower hands it the accept/decline swipe — and anything on the
+  // END meets the `else` below, which absorbs an unrecognised state silently.
+  if (isClientCancelled(trip)) {
+    state = "cancelled";
+  } else if (isSentBack || trip.status === "completed") {
     state = "completed";
   } else if (trip.status === "upcoming") {
     state = "before-taken";
