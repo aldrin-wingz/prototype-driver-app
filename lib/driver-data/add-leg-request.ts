@@ -434,6 +434,20 @@ export function riderHomeAddress(legs: GroupLeg[]): string {
 }
 
 /** Every leg the form asks about in full, in the order they will run. */
+/**
+ * The field group the NEW leg's questions belong to.
+ *
+ * ⛔ A constant, not the string `"new"` written at each site. The picker row,
+ * the block and the fields all have to name the same group, and three literals
+ * is three chances to mistype one into an editor that opens empty.
+ */
+export const ADD_LEG_GROUP = "add-leg-new";
+
+/** The group a block's fields belong to — its trip, or the new leg's own id. */
+export function addLegBlockGroup(block: Pick<AddLegBlock, "tripId">): string {
+  return block.tripId ?? ADD_LEG_GROUP;
+}
+
 export function addLegBlocks(
   legs: GroupLeg[],
   slot: number,

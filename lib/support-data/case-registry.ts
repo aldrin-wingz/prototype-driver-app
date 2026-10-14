@@ -11,6 +11,7 @@ import {
   ISSUE_ADD_LEG_REQUEST,
 } from "./issue-types";
 import { toTimeInputValue } from "@/lib/support/prefill";
+import { addLegBlockGroup } from "@/lib/driver-data/add-leg-request";
 import {
   DECLINE_CHANNELS,
   DECLINE_CHANNEL_OPTIONS,
@@ -1119,7 +1120,21 @@ export function buildSupportFormCase({
        * is the contradiction the slot rows already had once.
        */
       ...(addLeg
-        ? (addLeg.blocks.flatMap((block) => [
+        ? (addLeg.blocks.flatMap((block) =>
+            /*
+              ⛔⛔ **Every field here carries the block's group**, so none of
+              them renders in the main scroll — they are reached by tapping the
+              leg's own row in the picker, which opens a second view over the
+              form. Add Leg reached 4.6 screens with ONE pushed leg, and the
+              summary the driver reviews against was scrolled off by the time
+              they were filling anything in. (User direction, 2026-10-15.)
+
+              ⚠️ Applied by a `.map` at the end rather than written on each
+              field: seven field shapes each repeating `group:` is seven
+              chances to leave one ungrouped, and an ungrouped field appears in
+              the main scroll with no label saying which leg it belongs to.
+            */
+            ([
             /**
              * ⛔ The tick box sits BEFORE the address it fills, so the tick
              * explains the value that appears rather than appearing to comment
@@ -1218,7 +1233,10 @@ export function buildSupportFormCase({
                */
               showIf: ONLY_ADD_LEG,
             },
-          ]) as SupportCaseDefinition["fields"])
+          ] as SupportCaseDefinition["fields"]).map((field) => ({
+              ...field,
+              group: { id: addLegBlockGroup(block), label: `Leg ${block.letter}` },
+            }))) as SupportCaseDefinition["fields"])
         : []),
       /**
        * ⭐ The one place a `notice` is the RIGHT answer rather than a trap.

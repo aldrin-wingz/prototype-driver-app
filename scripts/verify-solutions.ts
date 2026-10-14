@@ -130,6 +130,9 @@ import {
   tripContextFor,
 } from "../lib/support-data/trip-context";
 import {
+  ISSUE_MISSED_SWIPE,
+  ISSUE_CANCEL_AT_DOOR,
+  ISSUE_RIDER_NO_SHOW,
   ISSUE_AUTO_ASSIGN_REQUEST,
   ISSUE_CANNOT_REACH_MEMBER,
   SUPPORT_ISSUE_TYPES,
@@ -339,6 +342,7 @@ import {
   RIDE_FILTER_ICONS,
 } from "../components/driver/ride-filter-icon";
 import { legOptionFor } from "../lib/support-data/leg-options";
+import { ADD_LEG_GROUP } from "../lib/driver-data/add-leg-request";
 import { fieldChange } from "../lib/support/field-rules";
 import { toTimeInputValue } from "../lib/support/prefill";
 import type { SupportField } from "../types/support";
@@ -11983,6 +11987,150 @@ check(
     // ⛔ ...and it renders exactly one line, from the resolved object.
     (FIELD_RENDERER_SRC.match(/change\.before/g) ?? []).length === 1 &&
     (FIELD_RENDERER_SRC.match(/change\.after/g) ?? []).length === 1,
+);
+
+/* === 35. Add Leg: the leg list IS the form =============================== */
+/**
+ * ⭐⭐ **Measured before it was changed: 2,806px in a 612px window — 4.6
+ * screens — with ONE pushed leg**, growing by four fields per extra one. The
+ * slot picker is a good summary of the trip and the driver said so; the problem
+ * was that it had scrolled off by the time they were filling anything in, so
+ * there was nothing to review against.
+ *
+ * Each leg's questions now live behind its own row. The main form is 2.55
+ * screens and each leg editor is exactly 1. (User direction, 2026-10-15: "a 2nd
+ * slider opens upon clicking each leg".)
+ */
+console.log("\n35. Add Leg: the leg list is the form");
+
+const ADD_LEG_CASE = buildAddLegCase(leg19a, ADD_LEG_VALUES);
+const groupedFields = ADD_LEG_CASE.fields.filter((field) => field.group);
+const blockFieldIds = new Set(
+  rf34Blocks.flatMap((block) => [
+    block.fields.pickupAddress,
+    block.fields.pickupTime,
+    block.fields.dropoffAddress,
+    block.fields.dropoffTime,
+    ...(block.fields.sameAsPrevious ? [block.fields.sameAsPrevious] : []),
+    ...(block.fields.dropoffIsHome ? [block.fields.dropoffIsHome] : []),
+  ]),
+);
+const ungrouped = ADD_LEG_CASE.fields.filter(
+  (field) => blockFieldIds.has(field.id) && !field.group,
+);
+check(
+  "every one of a leg's questions carries that leg's group",
+  `${groupedFields.length} grouped of ${ADD_LEG_CASE.fields.length} field(s); ` +
+    `${ungrouped.length} block field(s) left ungrouped`,
+  ungrouped.length === 0 && groupedFields.length >= blockFieldIds.size,
+);
+/**
+ * ⛔⛔ **The rows and the fields must name the SAME group**, or tapping a leg
+ * opens an empty editor — which looks exactly like a leg with nothing to fill
+ * in. Asserted in BOTH directions: no row points at a group with no fields, and
+ * no group of fields is unreachable from any row.
+ */
+const legOrderField = ADD_LEG_CASE.fields.find((field) => field.type === "leg-order");
+const pickerConfig = legOrderField?.legOrder;
+const fieldGroups = new Set(groupedFields.map((field) => field.group!.id));
+const rowGroups = new Set(
+  [
+    ...(pickerConfig?.rows ?? []).map((row) => row.groupId),
+    pickerConfig?.newLegGroupId,
+  ].filter((id): id is string => Boolean(id)),
+);
+const rf35Unreachable = [...fieldGroups].filter((id) => !rowGroups.has(id));
+check(
+  "...and every group of questions is reachable from a row in the list",
+  `${fieldGroups.size} field group(s), ${rowGroups.size} row group(s); ` +
+    `${rf35Unreachable.length} unreachable${rf35Unreachable.length ? ": " + rf35Unreachable.join(", ") : ""}`,
+  rf35Unreachable.length === 0 &&
+    fieldGroups.size > 1 &&
+    pickerConfig?.newLegGroupId === ADD_LEG_GROUP &&
+    // ⛔ ...and the NEW leg's own group is one of them, which is the row a
+    // driver reaches first and the only one with no trip id to key on.
+    fieldGroups.has(ADD_LEG_GROUP),
+);
+/** ⛔ Each group names itself, so the editor's heading cannot be derived wrong. */
+const badLabels = groupedFields.filter(
+  (field) => !/^Leg [A-Z]$/.test(field.group?.label ?? ""),
+);
+check(
+  "...and each group carries its own name for the editor's heading",
+  `${badLabels.length} bad of ${groupedFields.length}; ` +
+    `labels: ${[...new Set(groupedFields.map((f) => f.group!.label))].join(", ")}`,
+  badLabels.length === 0 &&
+    // ⛔ One label per group id — two would be a heading that changes with
+    // whichever field happened to be first.
+    new Set(groupedFields.map((f) => `${f.group!.id}=${f.group!.label}`)).size ===
+      fieldGroups.size,
+);
+/**
+ * ⛔⛔ **Grouping is OPT-IN**, so every other form renders exactly as it did. A
+ * sheet that treated an absent group as a group would put every field in one
+ * unnamed editor behind a chevron that does not exist.
+ */
+const OTHER_ISSUES = [
+  ISSUE_RIDER_NO_SHOW,
+  ISSUE_CANCEL_AT_DOOR,
+  ISSUE_MISSED_SWIPE,
+  ISSUE_CANNOT_REACH_MEMBER,
+  ISSUE_AUTO_ASSIGN_REQUEST,
+  ISSUE_SEND_BACK_REASON,
+  ISSUE_RIDER_DECLINED,
+  ISSUE_TRIP_CHANGE_REQUEST,
+];
+let otherFieldsSeen = 0;
+const otherGrouped: string[] = [];
+for (const issue of OTHER_ISSUES) {
+  for (const field of buildSupportFormCase({ includeIssues: [issue] }).fields) {
+    otherFieldsSeen += 1;
+    if (field.group) otherGrouped.push(`${issue}/${field.id}`);
+  }
+}
+check(
+  "no other case groups anything, so no other form changed",
+  `${otherGrouped.length} grouped field(s) outside Add Leg, of ${otherFieldsSeen} across ${OTHER_ISSUES.length} case(s)`,
+  otherGrouped.length === 0 && otherFieldsSeen > 50,
+);
+/**
+ * ⛔⛔ **ONE drawer, TWO views.** Two vaul drawers in one phone frame STACK —
+ * this project has paid for that once already — so the leg editor REPLACES the
+ * form's content rather than opening over it.
+ */
+check(
+  "the leg editor replaces the sheet's content rather than opening a second one",
+  `drawers ${(FORM_SHEET_SRC.match(/<Drawer\b/g) ?? []).length}, ` +
+    `contents ${(FORM_SHEET_SRC.match(/<DrawerContent/g) ?? []).length}, ` +
+    `main scroll reads ungroupedFields ${/ungroupedFields\.map\(/.test(FORM_SHEET_SRC)}`,
+  (FORM_SHEET_SRC.match(/<Drawer\b/g) ?? []).length === 1 &&
+    (FORM_SHEET_SRC.match(/<DrawerContent/g) ?? []).length === 1 &&
+    // ⛔ The main scroll renders only the UNGROUPED fields, or a leg's
+    // questions appear twice — once in the list and once inline.
+    /ungroupedFields\.map\(/.test(FORM_SHEET_SRC) &&
+    !/visibleFields\.map\(/.test(FORM_SHEET_SRC) &&
+    /editingFields\.map\(/.test(FORM_SHEET_SRC),
+);
+/**
+ * ⛔⛔ **A row shows the PROPOSED time where the insertion moves it.** Walked
+ * and found: a pushed Leg C read `3:00 PM → 3:50 PM` on its row while the field
+ * behind it held `3:35 PM` — the summary contradicting the request it
+ * summarises, on the one surface built for reviewing it.
+ */
+const pushedRow = (pickerConfig?.rows ?? []).find(
+  (row) => row.groupId && rf34PushedBlocks.some((block) => block.tripId === row.groupId),
+);
+check(
+  "a pushed leg's row reads the time the request asks for, not the manifest's",
+  `row ${pushedRow?.letter}: fields ${pushedRow?.pickupTimeField} / ${pushedRow?.dropoffTimeField}`,
+  Boolean(pushedRow?.pickupTimeField) &&
+    Boolean(pushedRow?.dropoffTimeField) &&
+    // ⛔ ...and they are the SAME ids the block writes, or the row reads a
+    // field nothing fills and silently falls back to the old label.
+    pushedRow?.pickupTimeField ===
+      rf34PushedBlocks.find((b) => b.tripId === pushedRow?.groupId)?.fields.pickupTime &&
+    pushedRow?.dropoffTimeField ===
+      rf34PushedBlocks.find((b) => b.tripId === pushedRow?.groupId)?.fields.dropoffTime,
 );
 
 // ---------------------------------------------------------------------------

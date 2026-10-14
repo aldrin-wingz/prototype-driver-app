@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { GripVertical, Lock, Plus } from "lucide-react";
+import { ChevronRight, GripVertical, Lock, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fromTimeInputValue } from "@/lib/support/prefill";
 import type { LegOrderConfig } from "@/types/support";
@@ -31,11 +31,32 @@ export function LegOrderField({
   value,
   values,
   onChange,
+  onEditGroup,
+  groupStatus,
 }: {
   config: LegOrderConfig;
   value: string;
   values: Record<string, string>;
   onChange: (value: string) => void;
+  /**
+   * Open a leg's own questions. Absent on a case whose fields are not grouped,
+   * and then no row is tappable.
+   *
+   * ⭐⭐ **This is what makes the list the whole form.** Add Leg reached 4.6
+   * screens with one pushed leg, and the summary the driver reviews against was
+   * scrolled off by the time they were filling anything in. Now the questions
+   * live behind the leg they are about. (User direction, 2026-10-15.)
+   */
+  onEditGroup?: (group: string) => void;
+  /**
+   * How many of that leg's questions are still unanswered.
+   *
+   * ⛔ Asked of the sheet, not counted here. The sheet holds the values and
+   * `countFieldsLeft` holds the rule; a list that counted for itself would be
+   * a second reader, and a leg reading "all done" under a Submit that
+   * disagrees is the defect.
+   */
+  groupStatus?: (group: string) => { total: number; left: number };
 }) {
   const slot = Number(value);
   // ⚠️ Falls back to the FIRST allowed slot, never to 0 — zero is the one slot
@@ -145,6 +166,7 @@ export function LegOrderField({
           {pickup || "—"} → {dropoff || "—"}
         </span>
       </span>
+      {editAffordance(config.newLegGroupId, "#047857")}
     </div>
   );
 
@@ -165,6 +187,41 @@ export function LegOrderField({
         Put it here
       </button>
     );
+  }
+
+  /**
+   * The chevron that opens a leg's questions.
+   *
+   * ⛔ Renders NOTHING for a leg with no group, or with no fields in it. A leg
+   * this insertion does not push has nothing to fill in, and a chevron leading
+   * to an empty editor is worse than no chevron. Whether a leg has fields is
+   * `groupStatus`'s answer, never a second copy of the "which legs are pushed"
+   * rule.
+   */
+  function editAffordance(group: string | undefined, tint: string) {
+    if (!group || !onEditGroup || !groupStatus) return null;
+    const status = groupStatus(group);
+    if (status.total === 0) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => onEditGroup(group)}
+        aria-label={`Fill in this leg's details`}
+        className="flex flex-shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold"
+        style={{ color: status.left > 0 ? "#B45309" : tint }}
+      >
+        {status.left > 0 ? `${status.left} left` : "Edit"}
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    );
+  }
+
+  /** A row's time as the form now holds it, or `null` where it holds none. */
+  function liveTime(field: string | undefined): string | null {
+    if (!field) return null;
+    const stored = values[field] ?? "";
+    if (!stored.trim()) return null;
+    return fromTimeInputValue(stored) || null;
   }
 
   const items: React.ReactNode[] = [];
@@ -191,8 +248,14 @@ export function LegOrderField({
           <span className="block text-base font-semibold text-gray-900">
             Leg {row.letter}
           </span>
+          {/* ⛔ The PROPOSED times where this insertion moves them, the
+              manifest's where it does not. A row showing the old time beside a
+              field holding the new one is the summary contradicting the
+              request — found by walking, on a pushed Leg C reading 3:50 PM
+              over a field holding 3:35 PM. */}
           <span className="block text-sm text-gray-600">
-            {row.pickupLabel} → {row.dropoffLabel}
+            {liveTime(row.pickupTimeField) ?? row.pickupLabel} →{" "}
+            {liveTime(row.dropoffTimeField) ?? row.dropoffLabel}
           </span>
           <span className="block truncate text-xs text-gray-400">
             {row.address}
@@ -203,6 +266,7 @@ export function LegOrderField({
             </span>
           )}
         </span>
+        {editAffordance(row.groupId, "#047857")}
       </div>
     );
   }

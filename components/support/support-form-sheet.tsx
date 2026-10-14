@@ -9,7 +9,7 @@ import { SupportFieldRenderer } from "./support-field-renderer";
 import { TripSummaryBanner } from "./trip-summary-banner";
 import { findLegOption, type LegOption } from "@/lib/support-data/leg-options";
 import { SUPPORT_FORM_TITLE } from "@/lib/support-data/issue-types";
-import { deriveFromLeg } from "@/lib/support/prefill";
+import { countFieldsLeft, deriveFromLeg } from "@/lib/support/prefill";
 import {
   fieldChange,
   canSubmitCase,
@@ -198,6 +198,47 @@ export function SupportFormSheet({
   );
 
   /**
+   * Fields that belong to a group, and the one being edited.
+   *
+   * ⛔⛔ **A grouped field is NOT in the main scroll.** It is reached by
+   * tapping its leg in the picker, which swaps this sheet to a second view.
+   * Add Leg reached 4.6 screens with one pushed leg and grows by four fields
+   * per extra one, so the summary the driver reviews against was scrolled off
+   * by the time they were filling anything in. (User direction, 2026-10-15.)
+   *
+   * ⛔⛔ **One drawer, two views — never a second drawer.** Two vaul drawers in
+   * one phone frame STACK, which this project has already paid for once. The
+   * leg editor replaces this sheet's content and animates in the same frame,
+   * which is what "a second slider" looks like without being one.
+   *
+   * ⚠️ Every other case has no groups, so `ungroupedFields` is the whole list
+   * and nothing about those forms changes.
+   */
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
+  const ungroupedFields = visibleFields.filter((field) => !field.group);
+  const groupFields = (group: string) =>
+    visibleFields.filter((field) => field.group?.id === group);
+  /**
+   * How much of one leg is still unanswered, for the chevron row.
+   *
+   * ⛔ `countFieldsLeft` — the same rule the Submit button's own counter uses,
+   * so a leg reading "all done" cannot sit under a Submit that disagrees.
+   */
+  const groupStatus = (group: string) => {
+    const fields = groupFields(group);
+    return { total: fields.length, left: countFieldsLeft(fields, values) };
+  };
+  // ⛔ A group the case no longer has — the slot moved and that leg stopped
+  // being pushed — closes the editor rather than showing an empty one.
+  const editingFields = editingGroup ? groupFields(editingGroup) : [];
+  /**
+   * ⛔ The group's OWN label, never derived from a field. The first field in a
+   * block is a checkbox, so taking the first word of the first label made the
+   * heading read "Start" — the opening word of "Start where Leg A finishes".
+   */
+  const editingLabel = editingFields[0]?.group?.label ?? "";
+
+  /**
    * The one field the context block follows.
    *
    * ⛔⛔ Exactly one id, never a predicate evaluated per row. A predicate like
@@ -206,8 +247,8 @@ export function SupportFormSheet({
    * block rendered twice, one of them against the wrong leg.
    */
   const bannerAfterId =
-    visibleFields.find((field) => field.type === "leg-picker")?.id ??
-    visibleFields[0]?.id;
+    ungroupedFields.find((field) => field.type === "leg-picker")?.id ??
+    ungroupedFields[0]?.id;
 
   /**
    * Cautions about the times entered, keyed by field.
@@ -286,20 +327,55 @@ export function SupportFormSheet({
         <div className="mx-auto flex w-full min-h-0 max-w-md flex-col">
           <div className="flex flex-shrink-0 items-start justify-between pt-2">
             <DrawerTitle className="text-2xl font-bold text-gray-900">
-              {title}
+              {/* ⛔ The leg's own name while its editor is open, so the heading
+                  says where you are. The sheet's one title is restored the
+                  moment it closes — see `SUPPORT_FORM_TITLE`. */}
+              {editingGroup && editingFields.length ? editingLabel : title}
             </DrawerTitle>
             <button
               type="button"
-              onClick={handleClose}
-              aria-label="Close"
+              onClick={() =>
+                editingGroup && editingFields.length
+                  ? setEditingGroup(null)
+                  : handleClose()
+              }
+              aria-label={editingGroup && editingFields.length ? "Back" : "Close"}
               className="-mr-2 -mt-1 p-2 text-gray-400"
             >
               <X className="h-6 w-6" />
             </button>
           </div>
 
+          {/*
+            ⛔⛔ ONE drawer, TWO views. The leg editor REPLACES the form rather
+            than stacking over it: two vaul drawers in one phone frame stack,
+            and this project has paid for that once already. The swap animates
+            in the same frame, which is what a second sheet looks like without
+            being one.
+          */}
+          {editingGroup && editingFields.length ? (
+            <div className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
+              {editingFields.map((field) => (
+                <div key={field.id} className="space-y-3">
+                  <SupportFieldRenderer
+                    field={field}
+                    value={values[field.id] ?? ""}
+                    locked={
+                      Boolean(field.lockWhenPrefilled) &&
+                      appSupplied.has(field.id)
+                    }
+                    warning={warnings[field.id] ?? field.warning}
+                    change={fieldChange(field, values[field.id] ?? "")}
+                    onChange={(value) => setValue(field.id, value)}
+                    values={values}
+                    setValue={setValue}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
-            {visibleFields.map((field) => (
+            {ungroupedFields.map((field) => (
               <div key={field.id} className="space-y-3">
                 <SupportFieldRenderer
                   field={field}
@@ -314,6 +390,10 @@ export function SupportFormSheet({
                   warning={warnings[field.id] ?? field.warning}
                   /* ⛔ The rule, not a comparison written here. */
                   change={fieldChange(field, values[field.id] ?? "")}
+                  /* ⛔ Passed straight through to the leg list — see
+                     `editingGroup`. The renderer holds no group state. */
+                  onEditGroup={setEditingGroup}
+                  groupStatus={groupStatus}
                   onChange={(value) => setValue(field.id, value)}
                   values={values}
                   setValue={setValue}
@@ -331,7 +411,24 @@ export function SupportFormSheet({
               </div>
             ))}
           </div>
+          )}
 
+          {/* ⛔ The leg editor's own footer is a single Done — it commits
+              nothing, because the fields write straight into the same values
+              map the form holds. A Cancel here would have to undo edits the
+              rest of the sheet has already seen, which is a second kind of
+              draft and a second thing to get wrong. */}
+          {editingGroup && editingFields.length ? (
+            <div className="mt-6 flex-shrink-0 border-t border-gray-100 pt-5">
+              <Button
+                type="button"
+                onClick={() => setEditingGroup(null)}
+                className="h-14 w-full rounded-xl bg-[#10B981] text-base font-bold text-white hover:bg-[#0EA371]"
+              >
+                Done
+              </Button>
+            </div>
+          ) : (
           <div className="mt-6 grid flex-shrink-0 grid-cols-[1fr_1.4fr] gap-4 border-t border-gray-100 pt-5">
             <Button
               type="button"
@@ -350,6 +447,7 @@ export function SupportFormSheet({
               {activeCase.submitLabel}
             </Button>
           </div>
+          )}
         </div>
       </DrawerContent>
     </Drawer>

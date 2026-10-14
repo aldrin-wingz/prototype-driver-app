@@ -21,6 +21,7 @@ import {
   newLegLetter,
   newLegMinutes,
   rowLetterWithInsertion,
+  legDropoffTimeFieldId,
   shiftFieldId,
   slotOrderWarning,
   timeInputToMinutes,
@@ -33,6 +34,7 @@ import {
   ADD_PICKUP_TIME_FIELD,
   riderHomeAddress,
   SLOT_BLOCKED_REASON,
+  ADD_LEG_GROUP,
   SLOT_FIELD,
   type AddLegBlock,
   type GroupLeg,
@@ -45,6 +47,25 @@ function legOrderConfig(legs: GroupLeg[], slot: number): LegOrderConfig {
   return {
     rows: legs.map((leg) => ({
       index: leg.index,
+      /**
+       * ⛔⛔ The leg's own trip id, which is exactly what `addLegBlocks` uses
+       * for `tripId` and what the block's fields are grouped under. The row and
+       * the fields must name the same group or tapping a leg opens an empty
+       * editor — a check pairs every row against the fields it claims.
+       *
+       * ⚠️ Present on EVERY row, including ones this insertion does not push.
+       * A leg with no block simply has no fields to edit, and the control shows
+       * no chevron on it; deciding that here would be a second copy of the
+       * "which legs are pushed" rule.
+       */
+      groupId: leg.trip.id,
+      /**
+       * ⛔ Built from the same id helpers `addLegBlocks` uses, so the row and
+       * the block cannot read different fields. A leg with no block simply has
+       * no values at these ids and the row falls back to its own labels.
+       */
+      pickupTimeField: shiftFieldId(leg.trip.id),
+      dropoffTimeField: legDropoffTimeFieldId(leg.trip.id),
       // ⛔ The letter AFTER the insertion, not the one the leg has now. See
       // `rowLetterWithInsertion` — this printed "New leg B" above "Leg B" until
       // a walk caught it.
@@ -61,6 +82,8 @@ function legOrderConfig(legs: GroupLeg[], slot: number): LegOrderConfig {
     })),
     allowedSlots: allowedSlots(legs),
     newLegLabel: `New leg ${newLegLetter(slot)}`,
+    /** ⛔ Matches `addLegBlocks`' own id for the new block, which has no trip. */
+    newLegGroupId: ADD_LEG_GROUP,
     pickupTimeField: ADD_PICKUP_TIME_FIELD,
     dropoffTimeField: ADD_DROPOFF_TIME_FIELD,
   };

@@ -136,6 +136,27 @@ export interface LegOrderRow {
   /** Position in the group. The field's VALUE is an insertion index like these. */
   index: number;
   letter: string;
+  /**
+   * The field group this row edits, when the case groups its fields.
+   *
+   * ⛔ The row and the fields must name the SAME group or tapping a leg opens
+   * an empty editor. A check pairs every row against the fields it claims.
+   */
+  groupId?: string;
+  /**
+   * Field ids this row's times should be read from, when the insertion moves
+   * them.
+   *
+   * ⛔⛔ **The list is the review surface, so it must show the PROPOSAL and not
+   * the manifest.** Walked and found: a pushed Leg C read `3:00 PM → 3:50 PM`
+   * on its row while the field behind it held the pushed `3:35 PM`. The driver
+   * reviewing the summary would have seen a time the request does not ask for.
+   *
+   * ⚠️ Absent on a leg this insertion does not push — it has no such fields,
+   * and `pickupLabel` is then the truth.
+   */
+  pickupTimeField?: string;
+  dropoffTimeField?: string;
   pickupLabel: string;
   dropoffLabel: string;
   address: string;
@@ -162,6 +183,8 @@ export interface LegOrderConfig {
   allowedSlots: number[];
   /** What the new row is called while it is being placed. */
   newLegLabel: string;
+  /** The field group the NEW leg's own questions belong to. */
+  newLegGroupId?: string;
   /** Field ids the new row's times are read from, so it previews live. */
   pickupTimeField: string;
   dropoffTimeField: string;
@@ -218,6 +241,26 @@ export interface SupportField {
    * `"15:35"`; `fieldChange` is what turns both ends into clock faces.
    */
   previousValue?: string;
+  /**
+   * The field group this question belongs to — one leg, on Add Leg.
+   *
+   * ⛔⛔ **A grouped field is NOT rendered in the main scroll.** It is reached
+   * by tapping its row in the leg list, which opens a second view over the
+   * form. Add Leg reached 4.6 screens with one pushed leg and grows by four
+   * fields per extra one, so the summary the driver reviews against was always
+   * scrolled off by the time they were filling anything in. (User direction,
+   * 2026-10-15: "a 2nd slider opens upon clicking each leg".)
+   *
+   * ⚠️ Absent on every other case, which therefore renders exactly as before.
+   * Grouping is opt-in, not a mode the sheet has to be told about.
+   *
+   * ⛔⛔ An id AND its label, together. The editor's heading has to say which
+   * leg you are in, and deriving it from a field was wrong the first time it
+   * was tried: the first field in a block is a checkbox, so the heading read
+   * "Start" — the first word of "Start where Leg A finishes". A label carried
+   * beside the id cannot be derived from the wrong thing.
+   */
+  group?: { id: string; label: string };
   required?: boolean;
   /**
    * Required in the real flow, but not enforced here.

@@ -488,6 +488,8 @@ export function SupportFieldRenderer({
   locked = false,
   warning,
   change,
+  onEditGroup,
+  groupStatus,
   onChange,
   values,
   setValue,
@@ -513,6 +515,16 @@ export function SupportFieldRenderer({
    * drift is the one with no test around it.
    */
   change?: FieldChange | null;
+  /**
+   * Open one field group's questions, and read how many are left.
+   *
+   * ⛔ Both come from the sheet and are simply passed through to the leg list.
+   * This renderer holds no group state and counts nothing — the sheet owns the
+   * values, and a second counter is a second chance to disagree with the one
+   * the Submit button uses.
+   */
+  onEditGroup?: (group: string) => void;
+  groupStatus?: (group: string) => { total: number; left: number };
   onChange: (value: string) => void;
   /**
    * The whole form's values, for composite types only.
@@ -624,6 +636,8 @@ export function SupportFieldRenderer({
           value={value}
           values={values}
           onChange={onChange}
+          onEditGroup={onEditGroup}
+          groupStatus={groupStatus}
         />
       )}
 
