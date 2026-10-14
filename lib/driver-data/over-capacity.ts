@@ -1,3 +1,4 @@
+import { clockMinutes } from "./ride-date";
 import type { Trip } from "./mock-trips";
 
 /**
@@ -130,4 +131,165 @@ export function overCapacityHeadline(trip: Trip): string {
  */
 export function dispatchDialHref(): string {
   return `tel:${OVER_CAPACITY_DISPATCH_PHONE.replace(/[^0-9]/g, "")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Catalogue row 13 — the exception request that replaces the phone number
+// ---------------------------------------------------------------------------
+/**
+ * ⭐⭐ **The user's answer to the question rows 11 and 12 left open**, given
+ * 2026-10-15: *"instead of swipe and then it will call make it a submit form
+ * where it will show the trips that are blocking them from taking it and then
+ * them to give a reason why they can take another"*.
+ *
+ * That settles a question that had been open since 2026-10-14 — whether the
+ * over-capacity case is an exception for ONE trip, a correction to the stored
+ * vehicle capacity, or a form that branches on which. It is **the one-trip
+ * exception**, and the correction falls out of it: a driver whose answer is
+ * *"my van seats seven, the record says five"* has just reported the data
+ * error row 11 proposes to clean, without having to know that is what they
+ * did.
+ *
+ * ⛔⛔ **Submitting changes NOTHING about the request.** It stays unacceptable
+ * until Support acts, exactly as Update Trip Details leaves the ride's times
+ * alone and Add Leg adds nothing to the manifest. What it removes is the phone
+ * call, not the block.
+ */
+
+/**
+ * How many seats the driver's record says they have.
+ *
+ * ⛔⛔ **Ours, and the first seat count this prototype has ever held.** The
+ * driver app has no vehicle record — `ID_BADGE` is the only screen that names
+ * the vehicle at all, and a badge carries no capacity. So the number is seeded
+ * fiction, and it is seeded LOW on purpose: five against a request for four
+ * plus three already aboard is the shape of the call, and it is also the shape
+ * of row 11's data error, which is what makes one form serve both.
+ *
+ * ⚠️ The vehicle DESCRIPTION is deliberately not duplicated here — it is read
+ * off `ID_BADGE.vehicle`, the app's only statement about what the driver
+ * drives. Two screens disagreeing about the vehicle is the exact failure a
+ * second copy invites.
+ */
+export const VEHICLE_SEATS_ON_RECORD = 5;
+
+/** One accepted trip holding seats while the request would be running. */
+export interface SeatBlock {
+  trip: Trip;
+  /** Passengers this trip has aboard. */
+  seats: number;
+  /** Minutes past midnight, for the overlap arithmetic. */
+  from: number;
+  to: number;
+  /** The seed's own clock faces, for the screen. */
+  fromLabel: string;
+  toLabel: string;
+}
+
+/**
+ * The window a trip occupies, in minutes past midnight.
+ *
+ * ⛔ First leg's time to LAST leg's time, not first to second. A three-leg
+ * trip's middle leg is inside the window by construction, and a window that
+ * stopped at leg two would under-report every multi-leg ride — which here
+ * means under-reporting the seats it holds.
+ *
+ * ⚠️ `null` when either end has no readable clock. `clockMinutes` returns -1
+ * for `Will-Call` and for a blank, and a will-call trip genuinely has no
+ * window: it starts when the member rings. Treating -1 as midnight would put
+ * every will-call ride on top of every early-morning request.
+ */
+export function tripWindow(trip: Trip): { from: number; to: number } | null {
+  const first = clockMinutes(trip.legs[0]?.time);
+  const last = clockMinutes(trip.legs[trip.legs.length - 1]?.time);
+  if (first < 0 || last < 0) return null;
+  return { from: Math.min(first, last), to: Math.max(first, last) };
+}
+
+/**
+ * The accepted trips whose window overlaps this request's, same day.
+ *
+ * ⛔⛔ **Touching ends do NOT overlap.** A trip that drops off at 9:05 and a
+ * request that picks up at 9:05 share a boundary, not a passenger — the seat
+ * is free the moment the first one ends. Using `<=` here would invent a
+ * blocking trip the driver can see is finished, which is the one thing a
+ * screen like this must never do.
+ *
+ * ⚠️ Same `date` STRING, not a parsed day. The seed's dates are the headings
+ * the app prints, and two rides on one day always carry the identical string;
+ * parsing would add a failure mode without adding an answer.
+ */
+export function blockingTrips(request: Trip, accepted: readonly Trip[]): SeatBlock[] {
+  const window = tripWindow(request);
+  if (!window) return [];
+  return accepted
+    .filter((trip) => trip.id !== request.id && trip.date === request.date)
+    .flatMap((trip) => {
+      const other = tripWindow(trip);
+      if (!other) return [];
+      if (other.to <= window.from || other.from >= window.to) return [];
+      return [
+        {
+          trip,
+          seats: trip.passengerCount,
+          from: other.from,
+          to: other.to,
+          fromLabel: trip.legs[0]?.time ?? "",
+          toLabel: trip.legs[trip.legs.length - 1]?.time ?? "",
+        },
+      ];
+    })
+    .sort((a, b) => a.from - b.from);
+}
+
+/**
+ * The most seats held at any one moment inside the request's own window.
+ *
+ * ⛔⛔ **A peak, never a sum.** Two blocking trips that do not overlap EACH
+ * OTHER never share the vehicle, so adding their passengers would report seats
+ * that are never occupied at once — and the request would be refused for a
+ * conflict that does not exist. Walked minute by minute over the boundaries
+ * inside the window, which is exact for intervals and needs no clock.
+ *
+ * ⚠️ Boundaries only, not every minute. Occupancy changes only where a trip
+ * starts, so sampling each block's `from` (clamped into the window) visits
+ * every distinct level there is.
+ */
+export function peakSeatsHeld(request: Trip, blocks: readonly SeatBlock[]): number {
+  const window = tripWindow(request);
+  if (!window || blocks.length === 0) return 0;
+  const samples = [window.from, ...blocks.map((b) => Math.max(b.from, window.from))];
+  return Math.max(
+    ...samples.map((at) =>
+      blocks
+        .filter((b) => b.from <= at && b.to > at)
+        .reduce((total, b) => total + b.seats, 0),
+    ),
+  );
+}
+
+/** Seats the vehicle would need to carry this request on top of what it holds. */
+export function seatsNeeded(request: Trip, blocks: readonly SeatBlock[]): number {
+  return request.passengerCount + peakSeatsHeld(request, blocks);
+}
+
+/** How many seats short the record is. Zero or less means it is not short. */
+export function seatsOver(request: Trip, blocks: readonly SeatBlock[]): number {
+  return seatsNeeded(request, blocks) - VEHICLE_SEATS_ON_RECORD;
+}
+
+/**
+ * Does the ARITHMETIC agree that this request is over capacity?
+ *
+ * ⛔⛔ **Not a replacement for `isOverCapacity`, and must never become one.**
+ * Production decides over-capacity server-side against rules this prototype
+ * does not have — wheelchair positions, ambulatory seats, client policy — and
+ * the app is simply told. `isOverCapacity` stays seeded because that is the
+ * shape of the real thing. This exists so a check can assert the seed and the
+ * story the FORM tells agree: a screen that says "three seats held, four
+ * needed, five on record" while the server's flag came from somewhere else
+ * would be a screen explaining a refusal that had a different reason.
+ */
+export function arithmeticSaysOver(request: Trip, accepted: readonly Trip[]): boolean {
+  return seatsOver(request, blockingTrips(request, accepted)) > 0;
 }

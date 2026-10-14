@@ -867,7 +867,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 37;  // ⭐ +13 on 2026-10-15: row 19's manifest — 10 still on, 3 cancelled
+const EXPECTED_SCENARIO_RIDES = 39;  // ⭐ +13 on 2026-10-15: row 19's manifest — 10 still on, 3 cancelled; +2: row 13's blocking rides
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -10518,12 +10518,13 @@ check(
 /** ⛔ Every ride sits under exactly one heading, and no heading is empty. */
 const days = groupByRideDay(mockUpcomingTrips);
 /**
- * ⭐ Eight: the four days row 19 seeds, plus `UP-001` on Aug 7 and the three
- * rides `lib/data/payout.ts` pins to April and May and that therefore cannot be
- * re-dated. The focused demo filters those three out; only the plain mirror
- * shows them.
+ * ⭐ Nine: the four days row 19 seeds, `UP-001` on Aug 7, the three rides
+ * `lib/data/payout.ts` pins to April and May and that therefore cannot be
+ * re-dated, and Sep 24 — the day row 13's two blocking rides share with the
+ * over-capacity request. The focused demo filters the pinned three out; only
+ * the plain mirror shows them.
  */
-const EXPECTED_UPCOMING_DAYS = 8;
+const EXPECTED_UPCOMING_DAYS = 9;  // ⭐ +1 on 2026-10-15: Sep 24, row 13's two blocking rides
 check(
   "every ride sits under exactly one date heading",
   `${days.length} day(s) over ${mockUpcomingTrips.length} ride(s): ${days.map((d) => `${d.label.replace(/^\w{3}, /, "")}=${d.trips.length}`).join(", ")}`,

@@ -1314,6 +1314,114 @@ export const mockRequestTrips: Trip[] = [
 // `UP-CURRENT-*` are within the current pay period (Apr 28–May 4, 2026).
 // `UP-FUTURE-*` are within the upcoming pay period (May 5–11, 2026).
 export const mockUpcomingTrips: Trip[] = [
+  /**
+   * ⭐⭐ Catalogue row 13's two blocking rides — the accepted trips already
+   * holding seats while `REQ-OVERCAP-001` would be running.
+   *
+   * ⛔⛔ **They are the whole demonstration.** The user's design is *"show the
+   * trips that are blocking them from taking it"*, and a screen that said so
+   * with nothing to list would be a screen asserting a conflict it cannot
+   * name. `13a` runs 8:40 → 9:30 with two aboard; `13b` runs 9:20 → 10:05 with
+   * one. The request wants four, 9:05 → 9:54.
+   *
+   * ⭐ The numbers only work because they OVERLAP EACH OTHER between 9:20 and
+   * 9:30: peak held is 3, needed is 7, and the record says 5. Move either ride
+   * clear of the other and the peak drops to 2, the need to 6, and the request
+   * is over by one instead of two — which is exactly what `peakSeatsHeld` is
+   * for, and why a sum would be wrong.
+   *
+   * ⛔ No `progress` on any leg — `leg-options.ts` filters on it, and one
+   * added here would put two more legs in every support form's leg picker.
+   * ⛔ No `tripGroup`: these are two unrelated members, not a round trip.
+   * ⚠️ Invented members, and Arkansas addresses matching the request's own
+   * counties.
+   *
+   * ⛔ NOT `silent`, unlike row 19's manifest. That row silenced its pills
+   * because ten of thirteen rides said the same thing and drowned the one that
+   * did not. Here there are two rides and they say DIFFERENT things — which
+   * seats, and when — and that is exactly what the driver is being asked to
+   * reason about. Silence is for a backdrop; these are the evidence.
+   */
+  {
+    id: "1049800430",
+    date: "Thu, Sep 24, 2026",
+    rider: "ODESSA BRANTLEY",
+    client: "Verida",
+    passengerCount: 2,
+    distance: "",
+    totalRevenue: 31.80,
+    notes: "Member travels with an escort",
+    legs: [
+      {
+        id: "1049800430",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "8:40 AM",
+        address: "118 W Front St, Lonoke, AR 72086",
+        county: "Lonoke County",
+        revenue: 31.80,
+      },
+      {
+        id: "1049800430-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:30 AM",
+        address: "1515 Dialysis Center Dr, Cabot, AR 72023",
+        county: "Lonoke County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "13a",
+      label: "Holding two seats, 8:40 - 9:30",
+      solutions: ["over-capacity-exception"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800431",
+    date: "Thu, Sep 24, 2026",
+    rider: "THEO MARCHETTI",
+    client: "TCI",
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 24.10,
+    notes: "",
+    legs: [
+      {
+        id: "1049800431",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:20 AM",
+        address: "905 Hickory Ln, Cave City, AR 72521",
+        county: "Sharp County",
+        revenue: 24.10,
+      },
+      {
+        id: "1049800431-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:05 AM",
+        address: "640 E South St, Cave City, AR 72521",
+        county: "Sharp County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "13b",
+      label: "Holding one seat, 9:20 - 10:05",
+      solutions: ["over-capacity-exception"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
   {
     id: "UP-CURRENT-001",
     date: "Wed, Apr 29, 2026",
