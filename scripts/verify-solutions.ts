@@ -10611,6 +10611,58 @@ check(
     /showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE),
 );
 /**
+ * ⛔⛔ **One pill and a sheet, not a row of pills** — production's own Requests
+ * filter shape, reused (user direction, 2026-10-15). Three properties, because
+ * any one alone passes on a half-build:
+ *
+ *   · the pill shows the CURRENT value, so the state is readable without a tap;
+ *   · the sheet edits a DRAFT that `Update` applies, or `Update` is decorative
+ *     and `Clear` is ambiguous;
+ *   · `Clear` returns to the default without closing — clearing and applying
+ *     are two decisions, which is what production does.
+ */
+const FILTER_SRC = codeOnly(
+  readFileSync(join(ROOT, "components/driver/rides-filter-bar.tsx"), "utf8"),
+);
+check(
+  "the filter is one pill carrying its current value, opening a sheet",
+  `pill reads the value ${/ridesFilterLabel\(value\)/.test(FILTER_SRC)}; ` +
+    `opens a dialog ${/role="dialog"/.test(FILTER_SRC)}`,
+  /ridesFilterLabel\(value\)/.test(FILTER_SRC) &&
+    /aria-haspopup="dialog"/.test(FILTER_SRC) &&
+    /role="dialog"/.test(FILTER_SRC),
+);
+check(
+  "...and the sheet edits a draft that Update applies",
+  `draft state ${/const \[draft, setDraft\]/.test(FILTER_SRC)}; ` +
+    `onChange calls ${(FILTER_SRC.match(/onChange\(/g) ?? []).length}`,
+  /const \[draft, setDraft\] = useState<RidesFilter>/.test(FILTER_SRC) &&
+    // ⛔ Exactly one, and it is Update's. An option that applied on tap would
+    // call it from the chip as well.
+    (FILTER_SRC.match(/onChange\(/g) ?? []).length === 1 &&
+    /onChange\(draft\)/.test(FILTER_SRC),
+);
+/**
+ * ⛔⛔ **The sheet sits ABOVE the bottom nav**, and a walk is what found this.
+ * The nav is `fixed bottom-0 z-50` and comes later in the document, so at an
+ * equal z-index it wins — and what it covers is the `Update` button. The sheet
+ * opened, looked correct in a screenshot, and could not be applied.
+ */
+const NAV_SRC = codeOnly(readFileSync(join(ROOT, "components/driver/bottom-nav.tsx"), "utf8"));
+const navZ = Number(/z-\[?(\d+)\]?/.exec(NAV_SRC)?.[1] ?? "0");
+const sheetZ = Number(/fixed inset-0 z-\[(\d+)\]/.exec(FILTER_SRC)?.[1] ?? "0");
+check(
+  "the filter sheet outranks the bottom nav, which covers its Update button",
+  `sheet z-${sheetZ} vs nav z-${navZ}`,
+  sheetZ > navZ && navZ > 0,
+);
+check(
+  "...and Clear resets the draft to the default without closing",
+  `setDraft(DEFAULT_RIDES_FILTER) ${/setDraft\(DEFAULT_RIDES_FILTER\)/.test(FILTER_SRC)}`,
+  /setDraft\(DEFAULT_RIDES_FILTER\)/.test(FILTER_SRC) &&
+    !/setDraft\(DEFAULT_RIDES_FILTER\);\s*setOpen\(false\)/.test(FILTER_SRC),
+);
+/**
  * ⛔⛔ **Two pill maps, composed, never merged.** Both write `statusPills`, and
  * one map that could write either is where the two cancellation concepts merge.
  * A ride that is both shows the Wingz pill, which composition order decides.
