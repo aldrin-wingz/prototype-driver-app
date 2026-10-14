@@ -37,12 +37,11 @@ import {
   ADD_PICKUP_TIME_FIELD,
   ADD_SOURCE_FIELD,
   ADD_SOURCE_OPTIONS,
-  ADD_TIMING_FIELD,
   ESTIMATE_HELP,
   OVERNIGHT_WARNING,
   SLOT_FIELD,
   shiftFieldId,
-  type LegShift,
+  type AddLegBlock,
 } from "@/lib/driver-data/add-leg-request";
 import {
   CHANGE_NOTES_FIELD,
@@ -349,8 +348,17 @@ export function buildSupportFormCase({
   addLeg?: {
     legOrder: LegOrderConfig;
     estimateSource: "group" | "default";
-    shifts: LegShift[];
-    timingLabel: string;
+    /**
+     * The new leg and every existing leg the insertion pushes, in running
+     * order — each asked the same four questions.
+     *
+     * ⛔ Replaced `shifts: LegShift[]`, which carried only a time per pushed
+     * leg. The block still carries that time's proposal and its warning; what
+     * it adds is the three fields a pushed leg never had.
+     */
+    blocks: AddLegBlock[];
+    /** The trip's original pick-up — what the "rider's home" tick box copies. */
+    homeAddress: string;
     overnight: boolean;
     /** Set when the chosen slot contradicts the pick-up time. */
     slotWarning?: string;
@@ -431,12 +439,17 @@ export function buildSupportFormCase({
        * insertion pushes, in the order they would happen. A driver who edits a
        * proposed time backwards gets the same warning row 01 already built.
        */
+      /**
+       * ⛔⛔ Every block's two times, in the order the legs RUN — sorted by
+       * position, not by the order the blocks were generated in. The new leg
+       * comes first out of `addLegBlocks` whatever slot it took, so reading
+       * them unsorted would declare a leg that runs third as happening first
+       * and warn about a schedule that is correct.
+       */
       addLeg
-        ? [
-            ADD_PICKUP_TIME_FIELD,
-            ADD_DROPOFF_TIME_FIELD,
-            ...addLeg.shifts.map((shift) => shiftFieldId(shift.tripId)),
-          ]
+        ? [...addLeg.blocks]
+            .sort((a, b) => a.position - b.position)
+            .flatMap((block) => [block.fields.pickupTime, block.fields.dropoffTime])
         : tripChange
         ? tripChange.anchors.map((anchor) => changeTimeFieldId(anchor.index))
         : cannotReach || autoAssign || sendBack || riderDeclined
@@ -1048,6 +1061,25 @@ export function buildSupportFormCase({
       ...(addLeg
         ? ([
             {
+              id: ADD_SOURCE_FIELD,
+              type: "select",
+              /**
+               * ⛔ **First, not last** (user direction, 2026-10-14). A driver
+               * does not invent a leg — somebody asked for it, and that is the
+               * thing Support needs before any of the detail means anything. It
+               * sat under the times until now, which made it read as a footnote
+               * to a schedule rather than the reason there is a request at all.
+               */
+              label: "Who asked for this leg?",
+              shortLabel: "who asked",
+              placeholder: "Select:",
+              required: true,
+              // ⛔ FOUR options, not row 20's five. A driver can notice a wrong
+              // address; nobody notices a leg that does not exist.
+              options: [...ADD_SOURCE_OPTIONS],
+              showIf: ONLY_ADD_LEG,
+            },
+            {
               id: SLOT_FIELD,
               type: "leg-order",
               label: "Where does the new leg go?",
@@ -1059,71 +1091,112 @@ export function buildSupportFormCase({
               warning: addLeg.slotWarning,
               showIf: ONLY_ADD_LEG,
             },
-            {
-              id: ADD_PICKUP_TIME_FIELD,
-              type: "time",
-              // ⭐ The ONE time the driver has to supply. Everything below is
-              // worked out from it and shown back for checking.
-              label: "New leg pick-up time",
-              shortLabel: "the new leg's pick-up time",
-              required: true,
-              showIf: ONLY_ADD_LEG,
-            },
-            {
-              id: ADD_PICKUP_ADDRESS_FIELD,
-              type: "text",
-              label: "New leg pick-up address",
-              shortLabel: "the new leg's pick-up address",
-              required: true,
-              maxLength: 160,
-              showIf: ONLY_ADD_LEG,
-            },
-            {
-              id: ADD_DROPOFF_ADDRESS_FIELD,
-              type: "text",
-              label: "New leg drop-off address",
-              shortLabel: "the new leg's drop-off address",
-              required: true,
-              maxLength: 160,
-              showIf: ONLY_ADD_LEG,
-            },
-            {
-              id: ADD_DROPOFF_TIME_FIELD,
-              type: "time",
-              label: "New leg drop-off time",
-              shortLabel: "the new leg's drop-off time",
-              /**
-               * ⚠️ **Computed and shown, not asked** — user direction is that
-               * the driver only types the pick-up. It stays EDITABLE anyway,
-               * because an estimate the driver knows is wrong is worse than no
-               * estimate, and ⛔ it is not `required`: a figure the app supplied
-               * cannot be something the driver failed to provide.
-               */
-              showIf: ONLY_ADD_LEG,
-            },
           ] as SupportCaseDefinition["fields"])
         : []),
       /**
-       * One editable time per existing leg the insertion would push later.
+       * One block of four questions per leg the request touches.
        *
-       * ⭐ **A leg with slack is not here at all**, and its absence is the
-       * feature: a driver inserting a morning leg into an afternoon round trip
-       * must not be shown the return as "changed". `cascadeShifts` decides.
+       * ⛔⛔ **Generated from `addLegBlocks`, never written out twice.** The new
+       * leg and a pushed leg are asked the same four things in the same order —
+       * where it starts, when, where it ends, when — and two hand-written
+       * field sets would be two chances for them to drift. Before 2026-10-14 a
+       * pushed leg had exactly ONE field, its new pick-up time, so the driver
+       * could say when it now starts but not where.
+       *
+       * ⚠️ The letters are POST-insertion throughout, from the one rule
+       * (`rowLetterWithInsertion`) the slot picker uses. A block labelled for
+       * the letter a leg has today, above a picker calling it something else,
+       * is the contradiction the slot rows already had once.
        */
       ...(addLeg
-        ? (addLeg.shifts.map((shift) => ({
-            id: shiftFieldId(shift.tripId),
-            type: "time" as const,
-            label: `Leg ${shift.letter} pick-up moves to`,
-            shortLabel: `leg ${shift.letter}'s new pick-up time`,
+        ? (addLeg.blocks.flatMap((block) => [
             /**
-             * ⚠️ A `warning`, not help text. It is not describing the question —
-             * it is saying that a leg already on the manifest has stopped
-             * fitting, which is the reason this field exists at all.
+             * ⛔ The tick box sits BEFORE the address it fills, so the tick
+             * explains the value that appears rather than appearing to comment
+             * on one the driver typed.
+             *
+             * ⚠️ Offered only when something runs in front of this leg AND that
+             * leg has a drop-off to copy. A box that copies an empty string is
+             * a box that silently does nothing.
              */
-            warning: `Leg ${shift.letter} is scheduled for ${shift.fromLabel}, which no longer fits. Change this if the member can manage something else.`,
-            showIf: ONLY_ADD_LEG,
-          })) as SupportCaseDefinition["fields"])
+            ...(block.fields.sameAsPrevious && block.previous
+              ? ([
+                  {
+                    id: block.fields.sameAsPrevious,
+                    type: "checkbox",
+                    label: `Start where Leg ${block.previous.letter} finishes`,
+                    shortLabel: `leg ${block.letter} starts at leg ${block.previous.letter}'s drop-off`,
+                    showIf: ONLY_ADD_LEG,
+                  },
+                ] as SupportCaseDefinition["fields"])
+              : []),
+            {
+              id: block.fields.pickupAddress,
+              type: "text",
+              label: `Leg ${block.letter} pick-up address`,
+              shortLabel: `leg ${block.letter}'s pick-up address`,
+              required: true,
+              maxLength: 160,
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: block.fields.pickupTime,
+              type: "time",
+              label: `Leg ${block.letter} pick-up time`,
+              shortLabel: `leg ${block.letter}'s pick-up time`,
+              required: true,
+              /**
+               * ⚠️ A `warning`, not help text. It is not describing the
+               * question — it is saying that a leg already on the manifest has
+               * stopped fitting, which is the reason this block exists at all.
+               */
+              warning:
+                block.kind === "existing"
+                  ? `Leg ${block.letter} is scheduled for ${block.shiftedFrom}, which no longer fits. Change this if the member can manage something else.`
+                  : undefined,
+              showIf: ONLY_ADD_LEG,
+            },
+            ...(block.fields.dropoffIsHome
+              ? ([
+                  {
+                    id: block.fields.dropoffIsHome,
+                    type: "checkbox",
+                    /**
+                     * ⛔ Only ever on the group's LAST leg, and it copies the
+                     * trip's ORIGINAL first pick-up — not the first pick-up
+                     * after the insertion. A new leg placed at the front does
+                     * not relocate the member's home.
+                     */
+                    label: "Finish back at the rider's home address",
+                    shortLabel: `leg ${block.letter} finishes at home`,
+                    showIf: ONLY_ADD_LEG,
+                  },
+                ] as SupportCaseDefinition["fields"])
+              : []),
+            {
+              id: block.fields.dropoffAddress,
+              type: "text",
+              label: `Leg ${block.letter} drop-off address`,
+              shortLabel: `leg ${block.letter}'s drop-off address`,
+              required: true,
+              maxLength: 160,
+              showIf: ONLY_ADD_LEG,
+            },
+            {
+              id: block.fields.dropoffTime,
+              type: "time",
+              label: `Leg ${block.letter} drop-off time`,
+              shortLabel: `leg ${block.letter}'s drop-off time`,
+              /**
+               * ⚠️ **Computed and shown, not asked.** The driver types the
+               * pick-up; this follows from it and stays EDITABLE, because an
+               * estimate the driver knows is wrong is worse than no estimate.
+               * ⛔ Not `required`: a figure the app supplied cannot be
+               * something the driver failed to provide.
+               */
+              showIf: ONLY_ADD_LEG,
+            },
+          ]) as SupportCaseDefinition["fields"])
         : []),
       /**
        * ⭐ The one place a `notice` is the RIGHT answer rather than a trap.
@@ -1150,38 +1223,14 @@ export function buildSupportFormCase({
         : []),
       ...(addLeg
         ? ([
-            {
-              id: ADD_TIMING_FIELD,
-              type: "text",
-              /**
-               * The catalogue's *"tagged critical when it is same-day or the
-               * driver has already started"*.
-               *
-               * ⛔⛔ The field states the CONDITION, never the verdict. The word
-               * "critical" is a promise about what Support does with the
-               * request and nobody has agreed one; what the app can say without
-               * inventing anything is the date and whether a leg is under way.
-               * Locked, because it is a fact about the trip rather than an
-               * answer — and `lockedBadge: null` since a badge explaining why
-               * a never-editable field is locked states the obvious.
-               */
-              label: "Timing",
-              lockWhenPrefilled: true,
-              lockedBadge: null,
-              showIf: ONLY_ADD_LEG,
-            },
-            {
-              id: ADD_SOURCE_FIELD,
-              type: "select",
-              label: "Who asked for this leg?",
-              shortLabel: "who asked",
-              placeholder: "Select:",
-              required: true,
-              // ⛔ FOUR options, not row 20's five. A driver can notice a wrong
-              // address; nobody notices a leg that does not exist.
-              options: [...ADD_SOURCE_OPTIONS],
-              showIf: ONLY_ADD_LEG,
-            },
+            /**
+             * ⛔ `Timing` is GONE (user direction, 2026-10-14: *"not sure what
+             * the Timing is for, you can remove that"*). It was a locked line
+             * restating the trip's date and whether a leg was under way — both
+             * of which the context block above now prints. The rule that
+             * computed it went with it; a rule nothing reads is a rule that
+             * cannot be wrong and cannot be right.
+             */
             {
               id: ADD_NOTES_FIELD,
               type: "textarea",

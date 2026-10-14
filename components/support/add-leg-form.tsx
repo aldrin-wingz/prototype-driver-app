@@ -5,9 +5,10 @@ import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_ADD_LEG_REQUEST } from "@/lib/support-data/issue-types";
 import { buildPrefilledValues } from "@/lib/support/prefill";
+import { ticked } from "@/lib/support/field-rules";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
-  addLegTiming,
+  addLegBlocks,
   allowedSlots,
   cascadeShifts,
   earliestSlot,
@@ -29,10 +30,10 @@ import {
   ADD_LEG_SUBMIT_TOAST,
   ADD_PICKUP_ADDRESS_FIELD,
   ADD_PICKUP_TIME_FIELD,
-  ADD_TIMING_FIELD,
+  riderHomeAddress,
   SLOT_BLOCKED_REASON,
   SLOT_FIELD,
-  TIMING_LABEL,
+  type AddLegBlock,
   type GroupLeg,
   type LegShift,
 } from "@/lib/driver-data/add-leg-request";
@@ -108,7 +109,8 @@ export function addLegPlan(trip: Trip, values: Record<string, string>) {
     dropoffMinutes,
     shifts: cascade.shifts,
     overnight: cascade.overnight,
-    timing: addLegTiming(legs, isTripToday(trip)),
+    blocks: addLegBlocks(legs, slot, cascade.shifts),
+    homeAddress: riderHomeAddress(legs),
   };
 }
 
@@ -123,8 +125,8 @@ export function buildAddLegCase(
     addLeg: {
       legOrder: legOrderConfig(plan.legs, plan.slot),
       estimateSource: plan.estimate.source,
-      shifts: plan.shifts,
-      timingLabel: TIMING_LABEL[plan.timing],
+      blocks: plan.blocks,
+      homeAddress: plan.homeAddress,
       overnight: plan.overnight,
       slotWarning: slotOrderWarning(plan.legs, plan.slot, plan.pickupMinutes),
     },
@@ -148,7 +150,6 @@ export function buildAddLeg(trip: Trip, leg: TripLeg | undefined) {
     ...buildPrefilledValues(supportCase, trip, leg),
     ...openingValues,
     issue: ISSUE_ADD_LEG_REQUEST,
-    [ADD_TIMING_FIELD]: TIMING_LABEL[addLegTiming(legs, isTripToday(trip))],
   };
   return { supportCase, initialValues, legs };
 }
@@ -166,53 +167,143 @@ export function buildAddLeg(trip: Trip, leg: TripLeg | undefined) {
 export function addLegDerive(trip: Trip, values: Record<string, string>) {
   /**
    * ⛔⛔ **Planned with the drop-off STRIPPED**, which is not the same as
-   * planning from `values`. This function runs exactly when the slot or the
-   * pick-up has just changed, so whatever drop-off is sitting in `values` is a
-   * proposal for a schedule that no longer exists — and `addLegPlan` treats an
-   * entered drop-off as authoritative, which is right everywhere except here.
+   * planning from `values`. This function runs exactly when the slot, the
+   * pick-up or a tick box has just changed, so whatever drop-off is sitting in
+   * `values` is a proposal for a schedule that no longer exists — and
+   * `addLegPlan` treats an entered drop-off as authoritative, which is right
+   * everywhere except here.
    *
-   * ⚠️ Found by the second half of the same walk defect: re-proposing the
-   * drop-off was not enough, because the stale one was still driving the
-   * cascade, so Leg C went on showing a knock-on that had been undone.
+   * ⚠️ Found by the second half of a walk defect: re-proposing the drop-off was
+   * not enough, because the stale one was still driving the cascade, so Leg C
+   * went on showing a knock-on that had been undone.
    */
   const plan = addLegPlan(trip, { ...values, [ADD_DROPOFF_TIME_FIELD]: "" });
   const patch: Record<string, string> = {};
+  const seeded = new Map(plan.legs.map((leg) => [leg.trip.id, leg]));
+
   /**
    * ⛔⛔ **Written unconditionally, and the first version of this was wrong.**
    *
-   * It used to write only into an EMPTY drop-off, so that a figure the driver
-   * typed would survive. But the app's own write fills the same field, so after
-   * the first keystroke the guard was always false — and a walk caught it:
-   * changing the pick-up from 2:30 PM to 1:00 PM left the drop-off at 3:20 PM
-   * and the knock-on for Leg C still on screen. From `values` alone an
-   * app-written figure and a driver-typed one are indistinguishable.
+   * It used to write only into an EMPTY drop-off, so a figure the driver typed
+   * would survive. But the app's own write fills the same field, so after the
+   * first keystroke the guard was always false — and a walk caught it: changing
+   * the pick-up from 2:30 PM to 1:00 PM left the drop-off at 3:20 PM and the
+   * knock-on for Leg C still on screen. From `values` alone an app-written
+   * figure and a driver-typed one are indistinguishable.
    *
-   * ⭐ The KEY is what protects an override instead, and it already did. The
-   * effect only runs when the slot or the pick-up changes, so a drop-off the
-   * driver edits survives every render until they move the leg or its start —
-   * at which point the whole proposal is stale and recomputing it is right.
-   * Exactly how the shift fields below already behaved.
+   * ⭐ The KEY is what protects an override instead. The effect only runs when
+   * the slot, the pick-up or a tick box changes, so a drop-off the driver edits
+   * survives every render until the proposal is stale anyway.
    */
   if (plan.proposedDropoff !== null) {
     patch[ADD_DROPOFF_TIME_FIELD] = minutesToTimeInput(plan.proposedDropoff);
   }
-  for (const shift of plan.shifts) {
-    patch[shiftFieldId(shift.tripId)] = minutesToTimeInput(shift.toMinutes);
+
+  for (const block of plan.blocks) {
+    if (block.kind !== "existing" || !block.tripId) continue;
+    const leg = seeded.get(block.tripId);
+    const shift = plan.shifts.find((s) => s.tripId === block.tripId);
+    // The cascade's proposal, same contract as the new leg's drop-off above.
+    if (shift) patch[block.fields.pickupTime] = minutesToTimeInput(shift.toMinutes);
+    if (!leg) continue;
+    /**
+     * ⛔ The three fields a pushed leg gained open with what it HOLDS today —
+     * written only into an empty field, never over one. The driver is
+     * correcting a leg already on their manifest; four blanks would be the
+     * retyping this project exists to remove, and an unconditional write would
+     * discard their correction the moment they nudged the slot.
+     *
+     * ⚠️ Unlike the times above, these are facts rather than proposals, so the
+     * stale-proposal argument for clobbering does not apply to them.
+     */
+    if (!values[block.fields.pickupAddress]) {
+      patch[block.fields.pickupAddress] = leg.address;
+    }
+    if (!values[block.fields.dropoffAddress]) {
+      patch[block.fields.dropoffAddress] = leg.dropoffAddress;
+    }
+    /**
+     * ⛔⛔ The pushed leg's DROP-OFF is a proposal, not a fact — so it is
+     * written unconditionally, exactly like its pick-up, and it comes from the
+     * cascade rather than from the seed.
+     *
+     * Walk-found 2026-10-14: prefilled with the time the leg holds today it
+     * read "Leg C pick-up 3:35 PM, drop-off 3:50 PM" — fifteen minutes for a
+     * fifty-minute leg — and nothing warned, because 3:50 PM is still after
+     * 3:35 PM. The leg keeps its own duration; what moves is when it starts.
+     */
+    if (shift?.toDropoffMinutes != null) {
+      patch[block.fields.dropoffTime] = minutesToTimeInput(shift.toDropoffMinutes);
+    } else if (!values[block.fields.dropoffTime] && leg.dropoffMinutes !== null) {
+      patch[block.fields.dropoffTime] = minutesToTimeInput(leg.dropoffMinutes);
+    }
   }
+
   /**
-   * ⛔⛔ The key is built from the driver's OWN inputs only. The patch writes
-   * the drop-off and the shift fields, none of which appear here — so applying
-   * the patch cannot change the key, and the effect cannot retrigger itself.
-   * `KEY_FIELDS` is exported so a check reads the same list this does.
+   * The tick boxes, applied LAST so they win over the seeded values above.
+   *
+   * ⛔⛔ **They write on tick and never clear on untick.** "Prefill upon
+   * checking" is what was asked for, and a box that also wiped the field would
+   * mean a driver who ticked, saw the address, unticked and corrected it lost
+   * their correction on the next render — because `derive` is stateless and
+   * cannot tell an untick from a field that was simply never ticked.
    */
+  for (const block of plan.blocks) {
+    const { sameAsPrevious, dropoffIsHome, pickupAddress, dropoffAddress } =
+      block.fields;
+    if (sameAsPrevious && ticked(values[sameAsPrevious]) && block.previous) {
+      /**
+       * ⛔ The leg in front may be one the driver is filling in RIGHT NOW — the
+       * user's own example: tick C's box and it takes the drop-off just given
+       * to the new leg B. So the source is a field id where there is one, and
+       * the seed's address only where the leg in front is not on this form.
+       */
+      const source = block.previous.fieldId
+        ? (values[block.previous.fieldId] ?? "")
+        : block.previous.address;
+      if (source) patch[pickupAddress] = source;
+    }
+    if (dropoffIsHome && ticked(values[dropoffIsHome]) && plan.homeAddress) {
+      patch[dropoffAddress] = plan.homeAddress;
+    }
+  }
+
+  /**
+   * ⛔⛔ The key is built from the driver's OWN inputs only — the slot, the new
+   * leg's pick-up, and every tick box. The patch writes addresses and times,
+   * none of which appear here, so applying the patch cannot change the key and
+   * the effect cannot retrigger itself.
+   *
+   * ⚠️ It is computed from the blocks rather than declared as a constant,
+   * because which tick boxes exist depends on where the new leg goes. A fixed
+   * list would stop covering them the moment the slot moved, and a tick would
+   * then do nothing at all.
+   */
+  const keyFields = addLegKeyFields(plan.blocks);
   return {
-    key: ADD_LEG_KEY_FIELDS.map((id) => values[id] ?? "").join("|"),
+    key: keyFields.map((id) => values[id] ?? "").join("|"),
     patch,
   };
 }
 
-/** The fields the recompute key is built from. Exported for the check. */
-export const ADD_LEG_KEY_FIELDS = [SLOT_FIELD, ADD_PICKUP_TIME_FIELD];
+/**
+ * The fields the recompute key is built from, for a given set of blocks.
+ *
+ * Exported so the check reads the same list `addLegDerive` does rather than a
+ * restatement of it — the defect this function was extracted for in the first
+ * place.
+ */
+export function addLegKeyFields(blocks: AddLegBlock[]): string[] {
+  return [
+    SLOT_FIELD,
+    ADD_PICKUP_TIME_FIELD,
+    ...blocks.flatMap((block) =>
+      [block.fields.sameAsPrevious, block.fields.dropoffIsHome].filter(
+        (id): id is string => Boolean(id)
+      )
+    ),
+  ];
+}
 
 export function AddLegForm({
   trip,

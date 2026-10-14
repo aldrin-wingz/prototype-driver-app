@@ -212,6 +212,7 @@ import {
   canSubmitCase,
   hasRequiredChange,
   isFieldVisible,
+  CHECKED,
 } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
 import {
@@ -226,7 +227,12 @@ import {
 import { legsInGroup } from "../lib/driver-data/rider-declined";
 import {
   addLegRefusal,
-  addLegTiming,
+  addLegBlocks,
+  minutesToTimeInput,
+  riderHomeAddress,
+  ADD_PICKUP_SAME_AS_PREVIOUS_FIELD,
+  legDropoffTimeFieldId,
+  ADD_DROPOFF_IS_HOME_FIELD,
   allowedSlots,
   canRequestAddLeg,
   cascadeShifts,
@@ -253,21 +259,19 @@ import {
   ADD_PICKUP_TIME_FIELD,
   ADD_SOURCE_FIELD,
   ADD_SOURCE_OPTIONS,
-  ADD_TIMING_FIELD,
   ESTIMATE_HELP,
   LEG_TURNAROUND_MINUTES,
   NEW_LEG_DEFAULT_MINUTES,
   OVERNIGHT_WARNING,
   SLOT_BLOCKED_REASON,
   SLOT_FIELD,
-  TIMING_LABEL,
 } from "../lib/driver-data/add-leg-request";
 import {
   addLegDerive,
   addLegPlan,
   buildAddLeg,
   buildAddLegCase,
-  ADD_LEG_KEY_FIELDS,
+  addLegKeyFields,
 } from "../components/support/add-leg-form";
 import { solutionHref } from "../lib/solutions/solution-context";
 import {
@@ -5205,14 +5209,28 @@ const built19 = buildAddLeg(leg19a, leg19a.legs[0]);
 const ids19 = built19.supportCase.fields
   .filter((f) => f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST))
   .map((f) => f.id);
+/**
+ * ⛔⛔ **The order is the user's, 2026-10-14**: who asked, then where it goes,
+ * then the new leg's four questions in the order the leg happens — where it
+ * starts, when, where it ends, when.
+ *
+ * ⚠️ `Timing` is not here and neither is its rule. It restated the trip's date
+ * and whether a leg was under way, both of which the context block now prints.
+ *
+ * ⚠️ At rest the new leg is placed FIRST on this group (`allowedSlots[0]` is 1,
+ * after the completed leg), so it has a leg in front of it and carries the
+ * "start where Leg A finishes" box. The home box is absent because the group's
+ * last leg is the existing one, not the new one — both asserted below rather
+ * than assumed from this list.
+ */
 const EXPECTED_ADD_FIELDS = [
+  ADD_SOURCE_FIELD,
   SLOT_FIELD,
-  ADD_PICKUP_TIME_FIELD,
+  ADD_PICKUP_SAME_AS_PREVIOUS_FIELD,
   ADD_PICKUP_ADDRESS_FIELD,
+  ADD_PICKUP_TIME_FIELD,
   ADD_DROPOFF_ADDRESS_FIELD,
   ADD_DROPOFF_TIME_FIELD,
-  ADD_TIMING_FIELD,
-  ADD_SOURCE_FIELD,
   ADD_NOTES_FIELD,
 ];
 check(
@@ -5220,6 +5238,12 @@ check(
   `${ids19.length}: ${ids19.join(", ")}`,
   ids19.length === EXPECTED_ADD_FIELDS.length &&
     EXPECTED_ADD_FIELDS.every((id, i) => ids19[i] === id),
+);
+/** ⛔ The removed field is removed, not merely absent from a list someone wrote. */
+check(
+  "no Timing field survives anywhere on the case",
+  `${built19.supportCase.fields.filter((f) => /timing/i.test(f.id) || f.label === "Timing").length} of ${built19.supportCase.fields.length} fields`,
+  !built19.supportCase.fields.some((f) => /timing/i.test(f.id) || f.label === "Timing"),
 );
 /**
  * ⭐⭐ The field set FOLLOWS the answers — the only case in the registry that
@@ -5251,12 +5275,57 @@ check(
   `${pushedCase.fields.length} vs ${slackCaseFields.fields.length}`,
   pushedCase.fields.length !== slackCaseFields.fields.length,
 );
-/** The time sequence follows the fields, so a backwards edit still warns. */
+/**
+ * The time sequence follows the fields, so a backwards edit still warns.
+ *
+ * ⛔⛔ **Both ends of every block, in the order the legs RUN.** It used to be
+ * the new leg's two ends followed by each shifted leg's pick-up; a pushed leg
+ * now has a drop-off too, and that drop-off bounds whatever follows it. ⚠️ The
+ * order is by POSITION, not by the order `addLegBlocks` emits: the new leg
+ * comes out first whatever slot it took, so an unsorted sequence would declare
+ * a leg that runs third as happening first and warn about a correct schedule.
+ */
 check(
-  "the derived time sequence names the new leg's ends then every shifted leg",
+  "the derived time sequence names both ends of every block, in running order",
   `${pushedCase.timeSequence?.join(", ")}`,
   (pushedCase.timeSequence ?? []).join(",") ===
-    [ADD_PICKUP_TIME_FIELD, ADD_DROPOFF_TIME_FIELD, shiftFieldId(ADD_LIVE)].join(","),
+    [
+      ADD_PICKUP_TIME_FIELD,
+      ADD_DROPOFF_TIME_FIELD,
+      shiftFieldId(ADD_LIVE),
+      legDropoffTimeFieldId(ADD_LIVE),
+    ].join(","),
+);
+/**
+ * ⛔ ...and the sequence is in running order on EVERY legal slot, not just the
+ * one above.
+ *
+ * ⚠️ **The sort in the registry is defensive and cannot currently be
+ * falsified**, and saying so is the point of this note. Every shifted leg sits
+ * at a position after the slot, so the new leg always has the lowest position
+ * and `addLegBlocks`' own order already matches. A check claiming to prove the
+ * sort would be a check that passes whether the sort is there or not — this one
+ * asserts the PROPERTY the sort exists to guarantee instead, which stays true
+ * and stays meaningful if a block is ever generated out of order.
+ */
+const seqWrong = allowedSlots(legs19).filter((slot) => {
+  const built = buildAddLegCase(leg19a, {
+    [SLOT_FIELD]: String(slot),
+    [ADD_PICKUP_TIME_FIELD]: "14:30",
+  });
+  const blocks = addLegPlan(leg19a, {
+    [SLOT_FIELD]: String(slot),
+    [ADD_PICKUP_TIME_FIELD]: "14:30",
+  }).blocks;
+  const expected = [...blocks]
+    .sort((a, b) => a.position - b.position)
+    .flatMap((b) => [b.fields.pickupTime, b.fields.dropoffTime]);
+  return (built.timeSequence ?? []).join(",") !== expected.join(",");
+});
+check(
+  "...in running order on every legal slot",
+  `${seqWrong.length} wrong of ${allowedSlots(legs19).length} slot(s)`,
+  seqWrong.length === 0 && allowedSlots(legs19).length > 1,
 );
 
 // ---- 16f · The leg-order control's payload -------------------------------
@@ -5360,10 +5429,26 @@ check(
   patchIds.includes(ADD_DROPOFF_TIME_FIELD) &&
     planned.shifts.every((shift) => patchIds.includes(shiftFieldId(shift.tripId))),
 );
+/**
+ * ⚠️ The key list is now COMPUTED from the blocks, because which tick boxes
+ * exist depends on where the new leg goes. Read through the same exported
+ * function `addLegDerive` calls — a restatement here is the defect this check
+ * was extracted for in the first place.
+ */
+const keyIds = addLegKeyFields(planned.blocks);
 check(
   "⛔⛔ nothing the patch writes appears in the key",
-  `key reads ${ADD_LEG_KEY_FIELDS.join(", ")} · patch writes ${patchIds.join(", ")}`,
-  patchIds.every((id) => !ADD_LEG_KEY_FIELDS.includes(id)),
+  `key reads ${keyIds.join(", ")} · patch writes ${patchIds.join(", ")}`,
+  patchIds.every((id) => !keyIds.includes(id)),
+);
+/** ⛔ ...and the key really does cover every tick box, or a tick does nothing. */
+const tickIds = planned.blocks.flatMap((b) =>
+  [b.fields.sameAsPrevious, b.fields.dropoffIsHome].filter(Boolean) as string[],
+);
+check(
+  "...and every tick box on the form is in the key",
+  `${tickIds.length} tick box(es), ${tickIds.filter((id) => keyIds.includes(id)).length} keyed`,
+  tickIds.length > 0 && tickIds.every((id) => keyIds.includes(id)),
 );
 /**
  * ⛔⛔ The direct proof, and the one a field-list comparison cannot give:
@@ -5428,48 +5513,216 @@ check(
     overridden.dropoffMinutes !== overridden.proposedDropoff,
 );
 
-// ---- 16h · The "tagged critical" clause ----------------------------------
+// ---- 16h · The blocks, the tick boxes, and what they copy ----------------
 /**
- * ⛔⛔ The catalogue asks for *"tagged critical"*. The prototype states the
- * CONDITION and never the verdict: "critical" is a promise about what Support
- * does with the request and nobody has agreed one.
+ * ⛔⛔ **The catalogue's "tagged critical" clause is no longer answered by a
+ * field.** `Timing` stated the CONDITION — the trip's date, whether a leg was
+ * under way — and never the verdict, because "critical" is a promise about
+ * what Support does and nobody has agreed one. The user removed it; the
+ * condition it stated is in the context block above the questions. ⚠️ The
+ * same-day fact itself is still computed, and still read against `MOCK_TODAY`.
  */
-check(
-  "⛔ no timing label promises a Support behaviour",
-  `${Object.values(TIMING_LABEL).join(" / ")}`,
-  !Object.values(TIMING_LABEL).some((t) =>
-    /critical|urgent|priorit|escalat|immediat/i.test(t),
-  ),
-);
-const TIMING_CASES: Array<[string, boolean, string]> = [
-  ["a finished leg today", true, "today-under-way"],
-  ["a trip on another day", false, "other-day"],
-];
-for (const [what, isToday, expected] of TIMING_CASES) {
-  check(
-    `timing for ${what}`,
-    `${addLegTiming(legs19, isToday)} (expected ${expected})`,
-    addLegTiming(legs19, isToday) === expected,
-  );
-}
-check(
-  "a same-day trip with nothing started is 'today', not 'under way'",
-  `${addLegTiming(legs19.map((l) => ({ ...l, activity: "pending" as const })), true)}`,
-  addLegTiming(
-    legs19.map((l) => ({ ...l, activity: "pending" as const })),
-    true,
-  ) === "today",
-);
-check(
-  "...so all three timing values are reachable",
-  `${new Set([...TIMING_CASES.map(([, , e]) => e), "today"]).size} of ${Object.keys(TIMING_LABEL).length}`,
-  new Set([...TIMING_CASES.map(([, , e]) => e), "today"]).size ===
-    Object.keys(TIMING_LABEL).length,
-);
 check(
   "the seeded trips are read against MOCK_TODAY, not the real clock",
   `19a ${isTripToday(leg19a)} · 19c ${isTripToday(leg19c)}`,
   isTripToday(leg19a) && isTripToday(leg19c),
+);
+
+/**
+ * ⛔⛔ **Every block asks the same four questions in the same order.** The new
+ * leg and a pushed leg are generated from one list, so the thing worth
+ * asserting is that neither has drifted — and that a pushed leg is asked all
+ * four, which before 2026-10-14 it was not: it had exactly one field, its new
+ * pick-up time.
+ */
+const pushedBlocks = addLegPlan(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+}).blocks;
+check(
+  "a pushed leg produces a block of its own, beside the new leg's",
+  `${pushedBlocks.length} block(s): ${pushedBlocks.map((b) => `${b.kind}/${b.letter}`).join(", ")}`,
+  pushedBlocks.length === 2 &&
+    pushedBlocks[0].kind === "new" &&
+    pushedBlocks[1].kind === "existing" &&
+    pushedBlocks[1].tripId === ADD_LIVE,
+);
+check(
+  "...and a pick-up with slack produces only the new leg's",
+  `${addLegPlan(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "13:00" }).blocks.length} block(s)`,
+  addLegPlan(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "13:00" })
+    .blocks.length === 1,
+);
+const pushedFields = buildAddLegCase(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+}).fields.map((f) => f.id);
+const liveBlock = pushedBlocks[1];
+const FOUR = [
+  liveBlock.fields.pickupAddress,
+  liveBlock.fields.pickupTime,
+  liveBlock.fields.dropoffAddress,
+  liveBlock.fields.dropoffTime,
+];
+check(
+  "⭐ the pushed leg is asked all four, not just its new time",
+  `${FOUR.filter((id) => pushedFields.includes(id)).length} of 4 rendered`,
+  FOUR.every((id) => pushedFields.includes(id)),
+);
+/** ⛔ ...and they sit in the order the leg happens, contiguously. */
+const positions = FOUR.map((id) => pushedFields.indexOf(id));
+check(
+  "...in the order the leg happens: where it starts, when, where it ends, when",
+  `${positions.join(" < ")}`,
+  positions.every((p, i) => i === 0 || p > positions[i - 1]),
+);
+/**
+ * ⛔⛔ **A pushed leg keeps its own duration.** Walk-found 2026-10-14: the
+ * block's drop-off was prefilled with the time the leg holds TODAY, so Leg C
+ * read "pick-up 3:35 PM, drop-off 3:50 PM" — fifteen minutes for a
+ * fifty-minute leg — and nothing warned, because 3:50 PM is still after
+ * 3:35 PM. ⚠️ Asserted as the SPAN, not as a literal clock face: a literal
+ * would have to be recomputed by hand every time the seed moves, and the
+ * property is that the leg's length survives, not that it lands at 4:25.
+ */
+const pushedShift = addLegPlan(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+}).shifts[0];
+const pushedLeg = legs19.find((l) => l.trip.id === ADD_LIVE)!;
+const originalSpan = pushedLeg.dropoffMinutes! - pushedLeg.pickupMinutes!;
+check(
+  "⭐ a pushed leg's drop-off moves with its pick-up, keeping the leg's length",
+  `${minutesToClock(pushedShift.toMinutes)} → ${minutesToClock(pushedShift.toDropoffMinutes!)} (${pushedShift.toDropoffMinutes! - pushedShift.toMinutes} min, was ${originalSpan})`,
+  pushedShift.toDropoffMinutes !== null &&
+    pushedShift.toDropoffMinutes - pushedShift.toMinutes === originalSpan &&
+    originalSpan > 0,
+);
+/** ⛔ ...and the patch writes that, not the time the leg holds today. */
+const pushedPatch = addLegDerive(leg19a, {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+}).patch;
+check(
+  "...and the form is filled with it, not with today's drop-off",
+  `${legDropoffTimeFieldId(ADD_LIVE)} = ${pushedPatch[legDropoffTimeFieldId(ADD_LIVE)]} (today's is ${minutesToTimeInput(pushedLeg.dropoffMinutes!)})`,
+  pushedPatch[legDropoffTimeFieldId(ADD_LIVE)] ===
+    minutesToTimeInput(pushedShift.toDropoffMinutes!) &&
+    pushedPatch[legDropoffTimeFieldId(ADD_LIVE)] !==
+      minutesToTimeInput(pushedLeg.dropoffMinutes!),
+);
+/**
+ * ⛔⛔ ...and the whole block is in order, which is what the defect broke and
+ * what the time-order checker could not see: it compares FIELDS, and before
+ * the pushed leg had a drop-off field there was nothing to compare it to.
+ */
+const pushedWarnings = getTimeOrderWarnings(
+  buildAddLegCase(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" }).fields,
+  { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30", ...pushedPatch },
+  buildAddLegCase(leg19a, { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" })
+    .timeSequence ?? [],
+);
+check(
+  "...so the proposal does not warn against itself",
+  Object.keys(pushedWarnings).join(", ") || "no warnings",
+  Object.keys(pushedWarnings).length === 0,
+);
+
+/**
+ * ⛔⛔ **The tick boxes exist exactly where there is something to copy.**
+ *
+ * `sameAsPrevious` needs a leg in front WITH a drop-off address; `dropoffIsHome`
+ * belongs to the group's last leg and nothing else. Both asserted as a sweep
+ * over every legal slot, with the counts declared — a box offered everywhere
+ * and a box offered nowhere both pass a spot check on one slot.
+ */
+const slotSweep = allowedSlots(legs19).map((slot) => {
+  const blocks = addLegPlan(leg19a, {
+    [SLOT_FIELD]: String(slot),
+    [ADD_PICKUP_TIME_FIELD]: "14:30",
+  }).blocks;
+  return { slot, blocks };
+});
+const homeWrong = slotSweep.flatMap(({ slot, blocks }) =>
+  blocks
+    .filter((b) => Boolean(b.fields.dropoffIsHome) !== b.isLast)
+    .map((b) => `slot ${slot} / ${b.letter}`),
+);
+check(
+  "the home tick box is on the last leg and no other",
+  `${homeWrong.length} wrong across ${slotSweep.length} slot(s), ${slotSweep.reduce((n, s) => n + s.blocks.length, 0)} block(s)`,
+  homeWrong.length === 0 && slotSweep.length === allowedSlots(legs19).length,
+);
+const sameWrong = slotSweep.flatMap(({ slot, blocks }) =>
+  blocks
+    .filter(
+      (b) =>
+        Boolean(b.fields.sameAsPrevious) !==
+        Boolean(b.previous && (b.previous.fieldId || b.previous.address)),
+    )
+    .map((b) => `slot ${slot} / ${b.letter}`),
+);
+check(
+  "...and the inherit box exists exactly where there is a drop-off to inherit",
+  `${sameWrong.length} wrong of ${slotSweep.reduce((n, s) => n + s.blocks.length, 0)} block(s)`,
+  sameWrong.length === 0,
+);
+/** ⛔ Both outcomes must occur, or the rule above is vacuous on this seed. */
+const allSweptBlocks = slotSweep.flatMap((s) => s.blocks);
+check(
+  "...and both outcomes are seen on this trip",
+  `${allSweptBlocks.filter((b) => b.fields.dropoffIsHome).length} with a home box, ${allSweptBlocks.filter((b) => !b.fields.dropoffIsHome).length} without`,
+  allSweptBlocks.some((b) => b.fields.dropoffIsHome) &&
+    allSweptBlocks.some((b) => !b.fields.dropoffIsHome),
+);
+/**
+ * ⛔⛔ **Ticking actually copies, and copies from the right place.** The user's
+ * own example: tick the pushed leg's box and it takes the drop-off the driver
+ * just gave the NEW leg — a value being typed right now, not one in the seed.
+ */
+const tickValues: Record<string, string> = {
+  [SLOT_FIELD]: "1",
+  [ADD_PICKUP_TIME_FIELD]: "14:30",
+  [ADD_DROPOFF_ADDRESS_FIELD]: "77 Example Clinic Dr",
+  [liveBlock.fields.sameAsPrevious!]: CHECKED,
+};
+const ticked19 = addLegDerive(leg19a, tickValues);
+check(
+  "⭐ ticking the pushed leg's box copies the NEW leg's drop-off, as typed",
+  `${liveBlock.fields.pickupAddress} = "${ticked19.patch[liveBlock.fields.pickupAddress]}"`,
+  ticked19.patch[liveBlock.fields.pickupAddress] === "77 Example Clinic Dr",
+);
+check(
+  "...and unticked it takes the leg's own address instead",
+  `"${addLegDerive(leg19a, { ...tickValues, [liveBlock.fields.sameAsPrevious!]: "" }).patch[liveBlock.fields.pickupAddress]}"`,
+  addLegDerive(leg19a, {
+    ...tickValues,
+    [liveBlock.fields.sameAsPrevious!]: "",
+  }).patch[liveBlock.fields.pickupAddress] ===
+    legs19.find((l) => l.trip.id === ADD_LIVE)!.address,
+);
+/** ⛔ The home box copies the trip's ORIGINAL first pick-up, whatever the slot. */
+const lastSlot = allowedSlots(legs19)[allowedSlots(legs19).length - 1];
+const homeBlocks = addLegPlan(leg19a, {
+  [SLOT_FIELD]: String(lastSlot),
+  [ADD_PICKUP_TIME_FIELD]: "16:30",
+}).blocks;
+const homeBlock = homeBlocks.find((b) => b.fields.dropoffIsHome)!;
+const homed = addLegDerive(leg19a, {
+  [SLOT_FIELD]: String(lastSlot),
+  [ADD_PICKUP_TIME_FIELD]: "16:30",
+  [homeBlock.fields.dropoffIsHome!]: CHECKED,
+});
+check(
+  "⭐ the home box copies the trip's own first pick-up",
+  `"${homed.patch[homeBlock.fields.dropoffAddress]}" vs leg A "${legs19[0].address}"`,
+  homed.patch[homeBlock.fields.dropoffAddress] === legs19[0].address &&
+    legs19[0].address.length > 0,
+);
+check(
+  "...and `riderHomeAddress` reads the seed's first leg, not the first after insertion",
+  `"${riderHomeAddress(legs19)}"`,
+  riderHomeAddress(legs19) === legs19[0].address,
 );
 
 // ---- 16i · Entry points and copy -----------------------------------------
@@ -5532,7 +5785,6 @@ const ADD_DRIVER_FACING = [
   OVERNIGHT_WARNING,
   ...Object.values(ADD_LEG_REFUSAL),
   ...Object.values(SLOT_BLOCKED_REASON),
-  ...Object.values(TIMING_LABEL),
   ...Object.values(ESTIMATE_HELP),
   ...ADD_SOURCE_OPTIONS.map((o) => o.label),
   ...built19.supportCase.fields

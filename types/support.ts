@@ -64,6 +64,15 @@ export type SupportFieldType =
    */
   | "leg-repeater"
   /**
+   * A single tick box whose label IS the question.
+   *
+   * ⛔ Its value is `"yes"` or `""` — a string, like every other field, so
+   * drafts, the submit gate and the submitted view all keep working without a
+   * second value shape. ⚠️ Never `required`: a tick box that must be ticked is
+   * not a question, it is a gate wearing a question's clothes.
+   */
+  | "checkbox"
+  /**
    * Not an input — a block of copy standing in for a field set that isn't built.
    *
    * An issue can be a real, registered support case while its questions are still

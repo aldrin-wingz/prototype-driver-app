@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getLegStatusLabel } from "@/lib/driver-data/mock-trips";
+import { CHECKED, ticked } from "@/lib/support/field-rules";
 import { findLegOption, searchLegOptions } from "@/lib/support-data/leg-options";
 import {
   findMemberOption,
@@ -527,6 +528,44 @@ export function SupportFieldRenderer({
           <p className="mt-0.5 text-sm text-gray-600">{field.helpText}</p>
         )}
       </div>
+    );
+  }
+
+  /**
+   * A tick box whose LABEL is the question, so it carries no separate label row
+   * above it.
+   *
+   * ⛔ Returned before the generic shape rather than rendered inside it — the
+   * shape below puts the label above the control, and a tick box with its
+   * question stacked above an unlabelled square reads as two things. ⚠️ The
+   * value is the same string every other field holds (`"yes"` or `""`), so
+   * drafts, the submit gate and the submitted view need no second value shape.
+   */
+  if (field.type === "checkbox") {
+    const checked = ticked(value);
+    return (
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        onClick={() => onChange(checked ? "" : CHECKED)}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left",
+          checked ? "border-[#10B981] bg-[#ECFDF5]" : "border-gray-200"
+        )}
+      >
+        <span
+          className={cn(
+            "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border-2",
+            checked ? "border-[#10B981] bg-[#10B981]" : "border-gray-300"
+          )}
+        >
+          {checked && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
+        </span>
+        <span className="text-base font-medium text-gray-900">
+          {field.label}
+        </span>
+      </button>
     );
   }
 

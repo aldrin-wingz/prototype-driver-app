@@ -1,5 +1,19 @@
 import type { SupportField } from "@/types/support";
 
+/**
+ * What a ticked `checkbox` holds.
+ *
+ * ⛔ One constant, read by the renderer AND by every rule that acts on a tick.
+ * A renderer writing `"yes"` beside a rule testing `"true"` is a tick box that
+ * visibly ticks and does nothing, and nothing about it looks wrong on screen.
+ */
+export const CHECKED = "yes";
+
+/** Whether a tick box is ticked. */
+export function ticked(value: string | undefined): boolean {
+  return value === CHECKED;
+}
+
 /** Whether a field should render, given the form's current values. */
 export function isFieldVisible(
   field: SupportField,

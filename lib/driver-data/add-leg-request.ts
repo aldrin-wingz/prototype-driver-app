@@ -48,7 +48,16 @@ export interface GroupLeg {
   dropoffMinutes: number | null;
   pickupLabel: string;
   dropoffLabel: string;
+  /** The leg's PICK-UP address. Named `address` since before there were two. */
   address: string;
+  /**
+   * The leg's drop-off address, or `""` on a leg the seed gives only one stop.
+   *
+   * ⛔ Needed by the *"same as the previous leg's drop-off"* tick box — the one
+   * thing that box copies. A leg with no second stop has no drop-off to inherit,
+   * and the box is not offered rather than offered and silently empty.
+   */
+  dropoffAddress: string;
 }
 
 /** "11:05 AM" → 665. `null` for anything unreadable, e.g. the `Will-Call` leg. */
@@ -133,6 +142,7 @@ export function groupLegs(trip: Trip): GroupLeg[] {
       pickupLabel: first?.time ?? "—",
       dropoffLabel: member.legs.length > 1 ? (last?.time ?? "—") : "—",
       address: first?.address ?? "",
+      dropoffAddress: member.legs.length > 1 ? (last?.address ?? "") : "",
     };
   });
 }
@@ -247,6 +257,21 @@ export interface LegShift {
   fromLabel: string;
   toLabel: string;
   toMinutes: number;
+  /**
+   * Where the leg's DROP-OFF lands once its pick-up moves, keeping the leg's
+   * own duration.
+   *
+   * ⛔⛔ Added 2026-10-14 with the four-question blocks. The walk caught it: a
+   * pushed leg's drop-off was prefilled with the time it holds TODAY, so Leg C
+   * read "pick-up 3:35 PM, drop-off 3:50 PM" — fifteen minutes for a
+   * fifty-minute leg, and no warning, because 3:50 PM is still after 3:35 PM.
+   * The span was already being computed here to walk the cascade forward; it
+   * just was not being handed back.
+   *
+   * ⚠️ `null` on a leg the seed gives only one stop, which therefore has no
+   * duration to preserve.
+   */
+  toDropoffMinutes: number | null;
 }
 
 /**
@@ -287,6 +312,7 @@ export function cascadeShifts(
     const span =
       leg.dropoffMinutes !== null ? leg.dropoffMinutes - leg.pickupMinutes : 0;
     if (earliest >= 1440) overnight = true;
+    const hasDropoff = leg.dropoffMinutes !== null;
     shifts.push({
       tripId: leg.trip.id,
       // ⛔ The letter AFTER the insertion. A leg that is B today becomes C once
@@ -297,6 +323,7 @@ export function cascadeShifts(
       fromLabel: minutesToClock(leg.pickupMinutes),
       toLabel: minutesToClock(earliest),
       toMinutes: earliest,
+      toDropoffMinutes: hasDropoff ? earliest + span : null,
     });
     previousDropoff = earliest + span;
   }
@@ -332,6 +359,147 @@ export function slotOrderWarning(
   return `Leg ${rowLetterWithInsertion(before.index, slot)} starts at ${before.pickupLabel}, which is after the ${minutesToClock(newPickupMinutes)} you have given the new leg. Move the new leg earlier in the list, or change its pick-up time.`;
 }
 
+/**
+ * One leg the form asks about in full — the new one, and every existing leg the
+ * insertion pushes.
+ *
+ * ⛔⛔ **Four questions per block, in the order the leg happens**: where it
+ * starts, when it starts, where it ends, when it ends. (User direction,
+ * 2026-10-14.) The old shape asked the new leg those four in a different order
+ * and asked a pushed leg only for a time.
+ *
+ * ⚠️ **"Impacted" means what `cascadeShifts` already means by it** — a leg with
+ * slack does not move and is not asked about. The alternative reading, "every
+ * leg after the insertion", would hand a driver inserting a morning leg into an
+ * afternoon round trip four questions about a return that has not changed.
+ */
+export interface AddLegBlock {
+  kind: "new" | "existing";
+  /** `null` on the new leg, which has no trip yet. */
+  tripId: string | null;
+  /** The letter this leg carries AFTER the insertion. */
+  letter: string;
+  /** Its position once the new leg is in, counting from 0. */
+  position: number;
+  /** The group's final leg, whichever it turns out to be. */
+  isLast: boolean;
+  /**
+   * The leg immediately in front of this one, and where to read its drop-off.
+   *
+   * ⛔ `fieldId` when that leg is itself a block on this form — its drop-off is
+   * something the driver is typing right now, not something the seed holds. The
+   * user's own example: tick C's box and it takes the drop-off the driver just
+   * gave the NEW leg B. `address` is the seed's value, used when the leg in
+   * front is one the form is not asking about.
+   */
+  previous: { letter: string; fieldId: string | null; address: string } | null;
+  /** What this leg is scheduled for today — existing legs only. */
+  shiftedFrom?: string;
+  /** What the cascade proposes instead — existing legs only. */
+  shiftedTo?: string;
+  fields: {
+    pickupAddress: string;
+    pickupTime: string;
+    dropoffAddress: string;
+    dropoffTime: string;
+    /** `null` when nothing runs in front of this leg, so there is nothing to copy. */
+    sameAsPrevious: string | null;
+    /** `null` unless this is the group's last leg. */
+    dropoffIsHome: string | null;
+  };
+}
+
+/**
+ * The trip's original pick-up — what "the rider's home address" means here.
+ *
+ * ⛔ The FIRST leg's pick-up as the seed holds it, never the first leg after the
+ * insertion. A new leg placed at the front does not relocate the member's home.
+ */
+export function riderHomeAddress(legs: GroupLeg[]): string {
+  return legs[0]?.address ?? "";
+}
+
+/** Every leg the form asks about in full, in the order they will run. */
+export function addLegBlocks(
+  legs: GroupLeg[],
+  slot: number,
+  shifts: LegShift[]
+): AddLegBlock[] {
+  const total = legs.length + 1;
+  const shifted = new Map(shifts.map((shift) => [shift.tripId, shift]));
+
+  const newBlock: AddLegBlock = {
+    kind: "new",
+    tripId: null,
+    letter: newLegLetter(slot),
+    position: slot,
+    isLast: slot === total - 1,
+    previous:
+      slot > 0 && legs[slot - 1]
+        ? {
+            letter: letterAt(slot - 1),
+            fieldId: null,
+            address: legs[slot - 1].dropoffAddress,
+          }
+        : null,
+    fields: {
+      pickupAddress: ADD_PICKUP_ADDRESS_FIELD,
+      pickupTime: ADD_PICKUP_TIME_FIELD,
+      dropoffAddress: ADD_DROPOFF_ADDRESS_FIELD,
+      dropoffTime: ADD_DROPOFF_TIME_FIELD,
+      sameAsPrevious:
+        slot > 0 && legs[slot - 1] && legs[slot - 1].dropoffAddress
+          ? ADD_PICKUP_SAME_AS_PREVIOUS_FIELD
+          : null,
+      dropoffIsHome: slot === total - 1 ? ADD_DROPOFF_IS_HOME_FIELD : null,
+    },
+  };
+
+  const existing: AddLegBlock[] = legs
+    .map((leg, index) => ({ leg, index }))
+    .filter(({ leg }) => shifted.has(leg.trip.id))
+    .map(({ leg, index }) => {
+      const position = index + 1; // every shifted leg sits at or after the slot
+      const shift = shifted.get(leg.trip.id)!;
+      /**
+       * ⛔ The leg in front is the NEW one exactly when this leg took the slot.
+       * Otherwise it is the existing leg before it, whose drop-off is a field
+       * only if that leg is itself being asked about.
+       */
+      const inFront = index === slot ? null : legs[index - 1];
+      const inFrontIsBlock = inFront ? shifted.has(inFront.trip.id) : true;
+      return {
+        kind: "existing" as const,
+        tripId: leg.trip.id,
+        letter: rowLetterWithInsertion(index, slot),
+        position,
+        isLast: position === total - 1,
+        previous: {
+          letter: letterAt(position - 1),
+          fieldId: inFront
+            ? inFrontIsBlock
+              ? legDropoffAddressFieldId(inFront.trip.id)
+              : null
+            : ADD_DROPOFF_ADDRESS_FIELD,
+          address: inFront ? inFront.dropoffAddress : "",
+        },
+        shiftedFrom: shift.fromLabel,
+        shiftedTo: shift.toLabel,
+        fields: {
+          pickupAddress: legPickupAddressFieldId(leg.trip.id),
+          pickupTime: shiftFieldId(leg.trip.id),
+          dropoffAddress: legDropoffAddressFieldId(leg.trip.id),
+          dropoffTime: legDropoffTimeFieldId(leg.trip.id),
+          sameAsPrevious: legSameAsPreviousFieldId(leg.trip.id),
+          dropoffIsHome:
+            position === total - 1 ? legDropoffIsHomeFieldId(leg.trip.id) : null,
+        },
+      };
+    });
+
+  return [newBlock, ...existing];
+}
+
 export const OVERNIGHT_WARNING =
   "These times would run past midnight. The app cannot work out which day they land on, so call Support for this one.";
 
@@ -342,13 +510,45 @@ export const ADD_PICKUP_TIME_FIELD = "addLegPickupTime";
 export const ADD_PICKUP_ADDRESS_FIELD = "addLegPickupAddress";
 export const ADD_DROPOFF_TIME_FIELD = "addLegDropoffTime";
 export const ADD_DROPOFF_ADDRESS_FIELD = "addLegDropoffAddress";
-export const ADD_TIMING_FIELD = "addLegTiming";
 export const ADD_SOURCE_FIELD = "addLegRequestedBy";
 export const ADD_NOTES_FIELD = "addLegNotes";
+/**
+ * ⛔ The new leg's two tick boxes. Both COPY an address the form already holds;
+ * neither is a question about the ride, which is why they are named for what
+ * they copy rather than for what they ask.
+ */
+export const ADD_PICKUP_SAME_AS_PREVIOUS_FIELD = "addLegPickupSameAsPrevious";
+export const ADD_DROPOFF_IS_HOME_FIELD = "addLegDropoffIsHome";
 
 /** Field id holding the proposed new pick-up for an existing leg. */
 export function shiftFieldId(tripId: string): string {
   return `addLegShift_${tripId}`;
+}
+/**
+ * The other three fields an impacted existing leg now carries.
+ *
+ * ⛔⛔ **An impacted leg is asked the same four questions as the new one.**
+ * Before 2026-10-14 it was asked exactly one — *"Leg C pick-up moves to"* — so
+ * a driver whose insertion pushed a leg could restate its time and nothing
+ * else, while the thing that usually changes with it (where it now starts, once
+ * the new leg drops the member somewhere different) had no field at all.
+ * ⚠️ `shiftFieldId` stays the pick-up TIME's id, unchanged, because the
+ * cascade's proposal is still written into it and three checks read it by name.
+ */
+export function legPickupAddressFieldId(tripId: string): string {
+  return `addLegPickupAddress_${tripId}`;
+}
+export function legDropoffAddressFieldId(tripId: string): string {
+  return `addLegDropoffAddress_${tripId}`;
+}
+export function legDropoffTimeFieldId(tripId: string): string {
+  return `addLegDropoffTime_${tripId}`;
+}
+export function legSameAsPreviousFieldId(tripId: string): string {
+  return `addLegSameAsPrevious_${tripId}`;
+}
+export function legDropoffIsHomeFieldId(tripId: string): string {
+  return `addLegDropoffIsHome_${tripId}`;
 }
 
 /**
@@ -371,54 +571,27 @@ export const ADD_SOURCE_OPTIONS: readonly SupportFieldOption[] = [
 // ---- The "tagged critical" clause ---------------------------------------
 
 /**
- * The catalogue asks for the request to be *"tagged critical when it is same-day
- * or the driver has already started"*.
- *
- * ⛔⛔ **The prototype states the CONDITION, never the verdict.** "Critical" is a
- * promise about what Support does with the request, and nobody has agreed one.
- * What the app can say without inventing anything is what is true: the date, and
- * whether a leg is under way. Support receives that and decides.
- *
- * ⚠️ Kept at all — unlike row 04's *"tag the number invalid"*, which was dropped
- * — because the ACTOR differs. Tagging a member's record is Support-side work
- * the driver does not perform; the urgency of a request is a property of the
- * request the driver is creating.
+ * ⛔ **`AddLegTiming`, `TIMING_LABEL` and `addLegTiming` are GONE** (user
+ * direction, 2026-10-14: *"not sure what the Timing is for, you can remove
+ * that"*). They computed a locked line restating the trip's date and whether a
+ * leg was under way — both of which the form's context block now prints two
+ * inches higher. ⚠️ `isTripToday` survives because the catalogue's own
+ * "same-day" claim is still asserted through it; nothing else is left.
  */
-export type AddLegTiming = "today-under-way" | "today" | "other-day";
-
-export const TIMING_LABEL: Record<AddLegTiming, string> = {
-  "today-under-way": "Today — you are already under way",
-  today: "Today",
-  /**
-   * ⛔ "A different day", NOT "a future date". The entry point includes
-   * COMPLETED rides, so the trip is at least as likely to be in the past as
-   * ahead — and the catalogue's condition is *same-day*, which "a different day"
-   * negates exactly while "a future date" would be false half the time it
-   * printed.
-   */
-  "other-day": "A different day",
-};
 
 /**
- * Is this trip's date the prototype's today?
+ * Whether the trip's date is the app's today.
  *
- * ⚠️ Compared against `MOCK_TODAY`, never the real clock. Every seeded ride is
- * dated `Thu, Jul 31, 2026`; a rule reading `new Date()` would call all of them
- * a future date and the same-day condition would never fire once — a check
- * passing on a condition that can never be true is a check that tests nothing.
+ * ⛔ Read against `MOCK_TODAY`, never `new Date()`. The seed is dated, so a
+ * real clock would call every trip a future date and the same-day condition
+ * would never fire once — a check passing on a condition that can never be
+ * true is a check that tests nothing.
  */
 export function isTripToday(trip: Trip): boolean {
   const parsed = new Date(trip.date.replace(/^\w{3},\s*/, ""));
   if (Number.isNaN(parsed.getTime())) return false;
   const iso = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
   return iso === MOCK_TODAY;
-}
-
-export function addLegTiming(legs: GroupLeg[], isToday: boolean): AddLegTiming {
-  if (!isToday) return "other-day";
-  return legs.some((leg) => leg.activity !== "pending")
-    ? "today-under-way"
-    : "today";
 }
 
 // ---- Entry points -------------------------------------------------------
