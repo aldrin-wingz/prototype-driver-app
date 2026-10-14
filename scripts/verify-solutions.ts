@@ -10802,6 +10802,84 @@ check(
   [...shownAt].sort().join(",") === [...EXPECTED_SHOWN].sort().join(","),
 );
 
+/* --- 31j. The tab row stays put -------------------------------------------- */
+/**
+ * ⛔⛔ **A sticky offset is a relationship between two files, so the check
+ * reads both.** The tab row pins at `top-14` because the header above it is
+ * `h-14`; nothing in `app/my-rides/page.tsx` says so, and a header that grew to
+ * `h-16` would leave a 8px strip of scrolling manifest showing through the gap
+ * with no error anywhere. The number is only correct relative to the other
+ * file, and this is the only place the two are compared.
+ *
+ * ⚠️ Tailwind's scale is shared by both utilities, so `h-14` and `top-14` are
+ * the same 3.5rem. The check compares the SCALE STEPS rather than converting —
+ * a conversion would be a third statement of the same fact.
+ */
+const HEADER_SRC = codeOnly(readFileSync(join(ROOT, "components/driver/header.tsx"), "utf8"));
+const headerTag = /<header className="([^"]*)"/.exec(HEADER_SRC)?.[1] ?? "";
+const headerHeight = /\bh-(\d+)\b/.exec(headerTag)?.[1] ?? "";
+const headerTop = /\btop-(\d+)\b/.exec(headerTag)?.[1] ?? "";
+const headerZ = Number(/\bz-\[?(\d+)\]?/.exec(headerTag)?.[1] ?? "0");
+const tabRowTag =
+  /<div className="(sticky [^"]*flex border-b border-gray-200 bg-white)"/.exec(PAGE_CODE)?.[1] ?? "";
+const tabRowTop = /\btop-(\d+)\b/.exec(tabRowTag)?.[1] ?? "";
+const tabRowZ = Number(/\bz-\[?(\d+)\]?/.exec(tabRowTag)?.[1] ?? "0");
+check(
+  "the tab row sticks at exactly the header's own declared height",
+  `header h-${headerHeight} at top-${headerTop}, tab row at top-${tabRowTop || "—"}`,
+  // ⛔ The header must itself be pinned at 0, or "its height" is not the offset.
+  headerTop === "0" && headerHeight !== "" && tabRowTop === headerHeight,
+);
+check(
+  "...and ranks under the header, which it meets on the scroll seam",
+  `header z-${headerZ} over tab row z-${tabRowZ}`,
+  tabRowZ > 0 && headerZ > tabRowZ,
+);
+/**
+ * ⛔⛔ **A z-index opens a stacking context, and that is what this check is
+ * about.** Anything mounted inside the sticky tab row tops out at the row's own
+ * `z-40`, whatever z-index it asks for — so the bottom nav (`fixed bottom-0
+ * z-50`, a SIBLING of the row) paints over it. That is how the filter sheet's
+ * Update button ended up unreachable once already, and moving the sheet into
+ * this box would reinstate the bug silently: the sheet still opens, still looks
+ * right in a screenshot, and still cannot be applied.
+ *
+ * ⚠️ The extent is tag-matched, not windowed. A fixed-size window past the
+ * opening tag is not an anchor — it would read into whatever follows the row
+ * and fail against correct code, which is a mistake this gate has made before.
+ */
+function jsxExtent(src: string, openTag: string): string {
+  const start = src.indexOf(openTag);
+  if (start < 0) return "";
+  let depth = 0;
+  for (let i = start; i < src.length; i++) {
+    if (src.startsWith("<div", i)) {
+      // ⛔ A SELF-CLOSING `<div … />` opens nothing. The active-tab underline
+      // is one, and counting it as an opener ran the extent 1,800 characters
+      // past the row and into the filter bar — the check then failed against
+      // correct code, which is the failure mode this gate keeps rediscovering.
+      const close = src.indexOf(">", i);
+      if (close > 0 && src[close - 1] !== "/") depth += 1;
+    } else if (src.startsWith("</div>", i)) {
+      depth -= 1;
+      if (depth === 0) return src.slice(start, i + 6);
+    }
+  }
+  return "";
+}
+const tabRowExtent = jsxExtent(PAGE_CODE, `<div className="${tabRowTag}"`);
+/** ⛔ Named literally. When the sheet becomes its own component, name that. */
+const MUST_STAY_OUTSIDE = ["RidesFilterBar", "fixed inset-0"];
+const trapped = MUST_STAY_OUTSIDE.filter((what) => tabRowExtent.includes(what));
+check(
+  "nothing that must outrank the bottom nav is mounted inside the sticky row",
+  tabRowExtent
+    ? `${tabRowExtent.length} chars, holds tabs.map ${tabRowExtent.includes("tabs.map(")}, ` +
+      `${trapped.length} of ${MUST_STAY_OUTSIDE.length} trapped${trapped.length ? ": " + trapped.join(", ") : ""}`
+    : "the sticky row could not be located",
+  tabRowExtent !== "" && tabRowExtent.includes("tabs.map(") && trapped.length === 0,
+);
+
 // ---------------------------------------------------------------------------
 console.log(
   failures === 0

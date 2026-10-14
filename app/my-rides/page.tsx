@@ -349,9 +349,29 @@ export default function MyRidesPage() {
   return (
     <div className="flex min-h-screen flex-col pb-20">
       <Header title="My Rides" showFilter={false} />
-      
-      {/* Tab row */}
-      <div className="flex border-b border-gray-200 bg-white">
+
+      {/*
+        Tab row — pinned under the header.
+
+        ⛔ `top-14` is not a measurement, it is the header's own declared
+        height (`h-14` in `components/driver/header.tsx`). A sticky offset
+        guessed from a screenshot drifts the moment that header changes; this
+        one cannot, and a check reads both files to keep the two in step.
+
+        ⛔ `z-40`, UNDER the header's `z-50`. The two never overlap — the
+        header occupies 0–56px and this row starts at 56px — but on the seam a
+        card passes between them, and the one that outranks the other is what
+        decides whether it disappears behind the tabs or behind the header.
+
+        ⛔⛔ **A z-index opens a stacking context, so nothing that has to
+        outrank the bottom nav may be rendered inside this box.** The nav is
+        `fixed bottom-0 z-50` and a sibling of this div; a sheet mounted in
+        here tops out at this box's `z-40` however large its own z-index is,
+        and the nav paints over its Update button — which is a bug this page
+        has already shipped once. The filter sheet is mounted at the page root
+        for exactly that reason.
+      */}
+      <div className="sticky top-14 z-40 flex border-b border-gray-200 bg-white">
         {tabs.map((tab) => (
           <button
             key={tab.value}
