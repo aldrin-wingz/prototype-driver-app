@@ -24,12 +24,12 @@ import {
  *
  * ⚠️ **It warns; it does not block.** A driver who genuinely cannot do the trip
  * still has to be able to return it — a hard block is exactly what sends them
- * to Support, which is the traffic row 13 exists to absorb. What was missing
+ * to Support, which is the traffic row 14 exists to absorb. What was missing
  * was never permission, it was the driver knowing what it costs.
  *
  * ⛔ Nothing here changes the penalty, and nothing here bypasses any block.
  * Both are out of scope by user direction — the Standing Order block is being
- * handled separately and the scoring policy is row 14's.
+ * handled separately and the scoring policy is row 15's.
  */
 export function StandingOrderWarningDialog({
   open,

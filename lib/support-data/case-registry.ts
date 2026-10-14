@@ -305,7 +305,7 @@ export function buildSupportFormCase({
    */
   autoAssign?: boolean;
   /**
-   * Build the send-back reason case — catalogue row 13.
+   * Build the send-back reason case — catalogue row 14.
    *
    * ⚠️ A plain boolean like `autoAssign`: the reason options are production's
    * own list and depend on nothing about the trip, so there is nothing for a
@@ -313,7 +313,7 @@ export function buildSupportFormCase({
    */
   sendBack?: boolean;
   /**
-   * Build the rider-declined case — catalogue row 16.
+   * Build the rider-declined case — catalogue row 17.
    *
    * ⚠️ Carries the LEGS this report could cover, like `cannotReach` carries the
    * numbers and for the same reason: they are a property of the trip and this
@@ -323,7 +323,7 @@ export function buildSupportFormCase({
    */
   riderDeclined?: { legOptions: SupportFieldOption[] };
   /**
-   * Build the Update Trip Details case — catalogue row 21.
+   * Build the Update Trip Details case — catalogue row 22.
    *
    * ⚠️ Carries the ride's own ANCHORS, because the field set is generated from
    * them: two fields per anchor, labelled with the anchor's own wording. A fixed
@@ -336,7 +336,7 @@ export function buildSupportFormCase({
    */
   tripChange?: { anchors: ChangeAnchor[] };
   /**
-   * Build the Add Leg to Trip case — catalogue row 20.
+   * Build the Add Leg to Trip case — catalogue row 21.
    *
    * ⚠️ Carries the whole placement picture, because every part of it is a rule
    * this builder has no way to work out: which slots are legal, what each leg's
@@ -345,7 +345,7 @@ export function buildSupportFormCase({
    *
    * ⛔ `shifts` is the field set's own shape — one editable time per existing leg
    * the insertion would push later — so it changes as the driver types. The
-   * caller rebuilds the case on every render, exactly as row 21's anchors do.
+   * caller rebuilds the case on every render, exactly as row 22's anchors do.
    */
   addLeg?: {
     legOrder: LegOrderConfig;
@@ -437,7 +437,7 @@ export function buildSupportFormCase({
        * there is on a drop-off being asked for at 10:30.
        */
       /**
-       * ⭐ Derived, like row 21's — the new leg's two ends, then every leg the
+       * ⭐ Derived, like row 22's — the new leg's two ends, then every leg the
        * insertion pushes, in the order they would happen. A driver who edits a
        * proposed time backwards gets the same warning row 01 already built.
        */
@@ -840,7 +840,7 @@ export function buildSupportFormCase({
 
       // ---- Rider Declined the Trip ---------------------------------------
       //
-      // Catalogue row 16 — `Trip / Ride Cancellation`, 509 calls. The member
+      // Catalogue row 17 — `Trip / Ride Cancellation`, 509 calls. The member
       // says they no longer need the ride; production shows a sheet saying this
       // is NOT a cancellation and sends the driver to Support. This block is
       // what Support is asked for on that call, collected before it.
@@ -851,7 +851,7 @@ export function buildSupportFormCase({
       // `calc_same_day` send-backs were charged 100% of the time over fourteen
       // days. So a member who declines on the morning of the trip costs the
       // driver money if they use the app and nothing if they ring Support.
-      // Row 16 is the removal of a $25 reason to pick up the phone.
+      // Row 17 is the removal of a $25 reason to pick up the phone.
       ...(riderDeclined
         ? ([
             {
@@ -959,7 +959,7 @@ export function buildSupportFormCase({
 
       // ---- Update Trip Details -------------------------------------------
       //
-      // Catalogue row 21 — `Trip / Ride Modification`, 364 calls. The member's
+      // Catalogue row 22 — `Trip / Ride Modification`, 364 calls. The member's
       // appointment moved, or the address on the manifest is the front entrance
       // when they need the back one. Today that is a phone call, because there
       // is nothing in the app that can even state the request.
@@ -1050,7 +1050,7 @@ export function buildSupportFormCase({
               label: "Anything else Support should know?",
               shortLabel: "notes",
               placeholder: "Optional — what they told you, or why the details are wrong",
-              // ⚠️ Optional, following the user's own call on row 16: ask, never
+              // ⚠️ Optional, following the user's own call on row 17: ask, never
               // block. The required select already carries the thing Support
               // cannot proceed without.
               maxLength: 300,
@@ -1061,12 +1061,12 @@ export function buildSupportFormCase({
 
       // ---- Add Leg to Trip -----------------------------------------------
       //
-      // Catalogue row 20 — `Trip / Ride Modification`, 364 calls, and the LAST
+      // Catalogue row 21 — `Trip / Ride Modification`, 364 calls, and the LAST
       // of the ten form rows. The member needs one more ride on the same trip,
       // most often said at the door seconds after the drop-off swipe.
       //
       // ⛔⛔ "Leg" here is a `Trip` in a `tripGroup`, not an anchor on one
-      // trip's timeline — the opposite of row 21's sense of the same word. See
+      // trip's timeline — the opposite of row 22's sense of the same word. See
       // `lib/driver-data/trip-groups.ts`, which names both and says why only one
       // of them can carry a new leg's id, revenue and swipes.
       ...(addLeg
@@ -1085,7 +1085,7 @@ export function buildSupportFormCase({
               shortLabel: "who asked",
               placeholder: "Select:",
               required: true,
-              // ⛔ FOUR options, not row 21's five. A driver can notice a wrong
+              // ⛔ FOUR options, not row 22's five. A driver can notice a wrong
               // address; nobody notices a leg that does not exist.
               options: [...ADD_SOURCE_OPTIONS],
               showIf: ONLY_ADD_LEG,
@@ -1241,7 +1241,7 @@ export function buildSupportFormCase({
       /**
        * ⭐ The one place a `notice` is the RIGHT answer rather than a trap.
        *
-       * ⛔⛔ Row 21 learned that a visible notice blocks Submit outright, and
+       * ⛔⛔ Row 22 learned that a visible notice blocks Submit outright, and
        * treated that as a hazard. Here it is exactly the behaviour wanted: the
        * values map holds no date beside a time, so a schedule running past
        * midnight is one the app genuinely cannot work out. Refusing and saying
@@ -1403,13 +1403,13 @@ export function buildSupportFormCase({
 
       // ---- Why you sent this trip back ----------------------------------
       //
-      // Catalogue row 13 — `Send-back`, 609 calls. A step inside the send-back
+      // Catalogue row 14 — `Send-back`, 609 calls. A step inside the send-back
       // flow rather than a case the driver picks: tapping Send Back Trip is
       // already the driver saying what they want to do.
       //
       // ⛔⛔ **Scoped down by the user on 2026-10-12 and the scoping is the
       // design.** The catalogue says "...that can bypass the Standing Order
-      // block"; the SO block is the user's to handle. Row 14 would weight the
+      // block"; the SO block is the user's to handle. Row 15 would weight the
       // penalty by reason; the scoring policy is skipped. What is left is the
       // part that applies to every send-back: say why.
       //

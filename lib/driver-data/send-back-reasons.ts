@@ -162,7 +162,7 @@ export function isShortNoticeSendBack(trip: Trip): boolean {
  *
  * ⚠️ Presence of the id, nothing more. The prototype does not resolve the
  * order, know its pattern or list its other trips — that is
- * `Project - Standing Order Offers`, and row 13 is not it.
+ * `Project - Standing Order Offers`, and row 14 is not it.
  */
 export function isStandingOrder(trip: Trip): boolean {
   return Boolean(trip.standingOrderId);
@@ -229,7 +229,7 @@ export const SEND_BACK_SOLUTIONS: readonly string[] = ["send-back-reason-form"];
  * > this trip, please call into support for assistance.
  *
  * ⛔ It is TERMINAL. Nothing is sent back, the trip stays on the manifest, and
- * the sentence ends at *call into support* — which is the support call row 13
+ * the sentence ends at *call into support* — which is the support call row 14
  * exists to absorb.
  *
  * ⚠️ Per the user, it arrives **after** an earlier pop-up, so the driver is at
@@ -247,7 +247,7 @@ export function sendBackSteps(trip: Trip, focus: DemoFocus): SendBackStep[] {
   /**
    * ⛔⛔ **Production's path, and it is shorter in both directions.**
    *
-   * It has no reason form — that is the whole of row 13's proposal — and for a
+   * It has no reason form — that is the whole of row 14's proposal — and for a
    * standing order it does not finish at all: `CAP-330` refuses and the trip
    * stays. So Now is not "the proposal minus one screen"; for a standing order
    * it is a flow that cannot succeed.
@@ -274,7 +274,7 @@ export function sendBackSteps(trip: Trip, focus: DemoFocus): SendBackStep[] {
    * DECISION, not an oversight.** User direction, 2026-10-14: *"leave it, the
    * proposal is about reasons not permissions."*
    *
-   * Production refuses outright (`CAP-330`). Row 13 proposes collecting a
+   * Production refuses outright (`CAP-330`). Row 14 proposes collecting a
    * reason on every send-back; it does not propose lifting the block, and a
    * prototype that quietly lifted it would be arguing for a change nobody
    * asked for — on the row whose whole point is a smaller one.

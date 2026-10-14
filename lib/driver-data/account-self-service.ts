@@ -1,7 +1,7 @@
 import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 
 /**
- * Catalogue row 15 — self-service email / password / phone. 567 calls.
+ * Catalogue row 16 — self-service email / password / phone. 567 calls.
  *
  * ⭐ User direction, 2026-10-13: *"it must be allowed in both the sign in/login
  * and in the settings."* Two halves, and the driver is in a different state in
@@ -251,10 +251,10 @@ export const RECOVERY_IDENTITY_PROOFS: readonly ProofFactor[] = [
 /**
  * ⛔ **Every step here is REPLICATED. None is a proposal.**
  *
- * With the recovery flow parked, `/login` carries nothing of row 15's — it
+ * With the recovery flow parked, `/login` carries nothing of row 16's — it
  * exists because the captured Logout row lands on it, which is what production
  * does. That is replication catching up, not a feature, and it is why the route
- * is not row 15's entry point any more.
+ * is not row 16's entry point any more.
  */
 export type LoginStep =
   /** CAP-122. */

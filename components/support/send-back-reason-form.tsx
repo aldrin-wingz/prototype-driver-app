@@ -8,7 +8,7 @@ import { buildPrefilledValues } from "@/lib/support/prefill";
 import type { Trip } from "@/lib/driver-data/mock-trips";
 
 /**
- * Build the send-back reason case — catalogue row 13.
+ * Build the send-back reason case — catalogue row 14.
  *
  * Exported so the check builds the case the app builds, rather than a second
  * copy that can agree with the spec while disagreeing with the screen.

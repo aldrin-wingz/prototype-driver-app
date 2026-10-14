@@ -16,11 +16,11 @@ import {
 } from "@/lib/driver-data/send-back-reasons";
 
 /**
- * ⭐⭐ Production's refusal — catalogue row 13's Now side. `CAP-330`, verbatim.
+ * ⭐⭐ Production's refusal — catalogue row 14's Now side. `CAP-330`, verbatim.
  *
  * ⛔ **Terminal, and that is the whole point.** One button, no way forward, and
  * the sentence ends at *call into support*. The driver is at least two taps in
- * before the app says no — and what they do next is make the phone call row 13
+ * before the app says no — and what they do next is make the phone call row 14
  * exists to absorb.
  *
  * ⛔ Every word is production's. Nothing is softened, nothing is added, and

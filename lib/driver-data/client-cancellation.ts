@@ -2,7 +2,7 @@ import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import type { Trip } from "./mock-trips";
 
 /**
- * Catalogue row 18 — a ride Wingz cancelled, and whether the driver can find it.
+ * Catalogue row 19 — a ride Wingz cancelled, and whether the driver can find it.
  *
  * ## What production does (`CAP-341`, `CAP-342`)
  *

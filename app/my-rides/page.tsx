@@ -48,7 +48,7 @@ type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
 /**
  * Whether production's cancellation alert has already been raised this session.
  *
- * ⛔⛔ **Scaffolding, and the only part of row 18's Now side that is.** In
+ * ⛔⛔ **Scaffolding, and the only part of row 19's Now side that is.** In
  * production a push raises this the moment Wingz cancels; the prototype has no
  * push, so something has to stand in for one. A module-level flag rather than
  * state because it must survive a remount — and because React's double-invoked
@@ -117,7 +117,7 @@ export default function MyRidesPage() {
   /**
    * ⛔⛔ **A sent-back trip is GONE, from every tab.**
    *
-   * Catalogue row 13. This is the first thing in the prototype that removes a
+   * Catalogue row 14. This is the first thing in the prototype that removes a
    * ride rather than annotating one, and the removal has to happen HERE rather
    * than on the ride's own screen: a driver who sends a trip back is returned
    * to this list, and a trip still sitting in it would read as the send-back
@@ -133,18 +133,18 @@ export default function MyRidesPage() {
   const withoutPending = visible;
 
   /**
-   * Catalogue row 16 — the card has to say it too.
+   * Catalogue row 17 — the card has to say it too.
    *
    * ⛔ Ride Details spells the cancellation out, but a driver scanning My Rides
    * sees a ride that still looks like any other unconfirmed one. That is the
-   * state that makes them ring back, which is row 17's whole subject area.
+   * state that makes them ring back, which is row 18's whole subject area.
    *
    * ⚠️ `statusPills`, not `pills`, for the reason the Pending block below gives:
    * a scenario ride replaces its seeded pills with its identifier, and this
    * marker has to outlive that swap.
    */
   /**
-   * Catalogue row 18 — a ride Wingz cancelled says so on its card.
+   * Catalogue row 19 — a ride Wingz cancelled says so on its card.
    *
    * ⛔⛔ **A SEPARATE map from `withCancellation` below, and they must stay
    * separate.** Both write `statusPills`, and one map that could write either
@@ -212,7 +212,7 @@ export default function MyRidesPage() {
     }));
 
   /**
-   * Catalogue row 18 — the manifest, and the task list.
+   * Catalogue row 19 — the manifest, and the task list.
    *
    * ⛔⛔ **The filter order has exactly one correct sequence**, and a wrong one
    * still renders a plausible list:
@@ -368,12 +368,12 @@ export default function MyRidesPage() {
     activeTab === "upcoming" && currentTrips.length === 0 && upcomingVisible.length > 0;
 
   /**
-   * ⭐⭐ Production's cancellation alert — `CAP-341`, row 18's Now side.
+   * ⭐⭐ Production's cancellation alert — `CAP-341`, row 19's Now side.
    *
    * ⛔ **The ALERT is ungated; only its TRIGGER is scoped.** What the alert says
    * and does is production's on both sides of the toggle — the proposal does
    * not remove it, it adds somewhere to find the ride afterwards. But a push
-   * does not exist here, so the stand-in fires only while row 18 is the row
+   * does not exist here, so the stand-in fires only while row 19 is the row
    * being demonstrated. Raising a modal about a cancelled ride at every
    * reviewer who happens to open My Rides would be the scaffolding making a
    * claim the capture does not.

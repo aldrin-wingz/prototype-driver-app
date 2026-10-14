@@ -133,7 +133,7 @@ const OTHER_SLICE_RIDES = new Set([
   "1049800381",
   "1049800382",
   /**
-   * ⚠️ Row 13's advance send-back ride (`13b`), added 2026-10-12. It carries no
+   * ⚠️ Row 14's advance send-back ride (`13b`), added 2026-10-12. It carries no
    * `locationRecords` at all, so the no-show walk finds nothing in its lookback
    * and falls through to the form — the same shape as the Missed Swipe seeds
    * and for the same reason. Nobody files a no-show on it; it exists to show a
@@ -146,7 +146,7 @@ const OTHER_SLICE_RIDES = new Set([
    */
   "1049800395",
   /**
-   * ⚠️ Row 13's standing-order ride (`13c`), added 2026-10-13 — same shape as
+   * ⚠️ Row 14's standing-order ride (`13c`), added 2026-10-13 — same shape as
    * `13b`: no `locationRecords`, so the no-show walk finds nothing and falls
    * through to the form. Nobody files a no-show on it; it exists to show what
    * sending back a standing order costs.
@@ -934,7 +934,7 @@ if (CAD_RIDE) {
 // ── 9f · a stranger's focus shows production too ─────────────────────────
 /**
  * ⚠️ "A proposal belongs to its own build", applied here. A reviewer walking
- * row 20 who wanders into Member No-Show must not meet rows 01/02's proposal on
+ * row 21 who wanders into Member No-Show must not meet rows 01/02's proposal on
  * the way past.
  */
 const leakedToStranger = tagged.filter(

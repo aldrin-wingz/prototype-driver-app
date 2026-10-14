@@ -43,6 +43,13 @@ import type { Trip } from "./mock-trips";
 export const OVER_CAPACITY_SOLUTIONS: readonly string[] = [
   "vehicle-capacity-cleanse",
   "vehicle-capacity-backend",
+  /**
+   * ⭐ Row 13, added 2026-10-15 — the in-app request that replaces the phone
+   * number. It stands on the SAME screen as the two above, so it claims the
+   * same scenario ride: focusing it has to land on the request whose accept
+   * control is missing, or there is nothing to propose a fix for.
+   */
+  "over-capacity-exception",
 ];
 
 /** The swipe's first line, before the trip number. `CAP-340`, verbatim. */

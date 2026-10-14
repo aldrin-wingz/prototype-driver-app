@@ -17,13 +17,13 @@ import {
 /**
  * The sign-in screens — **replication only**.
  *
- * ⏸️ Row 15's pre-auth proposal was built here and then removed on 2026-10-13
+ * ⏸️ Row 16's pre-auth proposal was built here and then removed on 2026-10-13
  * by user direction: *"lets remove the flow in the sign in for now."* What is
  * left is four screens copied from captures, carrying nothing of their own:
  * `signin-phone` (CAP-122), `signin-email` (CAP-126), `otp` (CAP-123/124/125)
  * and `reset` (CAP-127).
  *
- * ⛔ **So this route is no longer row 15's entry point.** It exists because the
+ * ⛔ **So this route is no longer row 16's entry point.** It exists because the
  * CAPTURED Logout row lands on a sign-in screen in production, and until this
  * slice there was nowhere for it to go. That is replication catching up.
  *
@@ -35,7 +35,7 @@ import {
  * ⛔⛔ CAP-127's dead end is therefore replicated WITHOUT its answer. Reset
  * Password still promises instructions sent to an inbox the driver may have
  * lost, and nothing on the screen offers a way round it. That is what
- * production does today, and it is where row 15's 567 calls start.
+ * production does today, and it is where row 16's 567 calls start.
  */
 export default function LoginPage() {
   const router = useRouter();

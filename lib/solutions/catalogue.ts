@@ -1,7 +1,7 @@
 import { DEFAULT_DEMO_MODE, type DemoMode } from "./demo-mode";
 
 /**
- * The 26 proposed features from the support call analysis, made executable.
+ * The 28 proposed features from the support call analysis, made executable.
  *
  * Source: `References/Support Call Volume by Subject Area - Problems and
  * Proposed Features.xlsx`. One entry per row of that table, so the prototype
@@ -75,7 +75,7 @@ export interface SolutionEntry {
 /**
  * Where the app lands when a focused solution has nowhere of its own to go.
  *
- * ⛔ 21 of the 26 rows have no entry point, and `focus()` used to just rewrite
+ * ⛔ 15 of the 28 rows have no entry point, and `focus()` used to just rewrite
  * the query string for those — leaving whoever switched standing on the
  * PREVIOUS solution's ride detail screen, reading a briefing about something
  * else, with that ride filtered out of its own list. Switching has to move the
@@ -90,7 +90,7 @@ export const SOLUTION_HOME = "/my-rides";
 
 export interface Solution {
   id: string;
-  /** 1-26, call-volume order — the order the phases are built in. */
+  /** 1-28, call-volume order — the order the phases are built in. */
   order: number;
   subjectArea: string;
   /** The SUBJECT AREA's call total. Shared across that area's rows. */
@@ -112,7 +112,7 @@ export interface Solution {
    * ⭐ Added rather than substituted. `proposedFeature` runs to 535 characters
    * on row 03 because the spreadsheet says that much; a cell that long turns
    * the table into a wall of prose and the prototype is standing right beside
-   * it, saying the same thing better. ⚠️ Rows 17 and 19 carry the SAME
+   * it, saying the same thing better. ⚠️ Rows 18 and 20 carry the SAME
    * sentence, because they carry the same `proposedFeature` — one tray, listed
    * twice in the source. A check asserts that is the only pair.
    */
@@ -464,15 +464,57 @@ export const SOLUTIONS: Solution[] = [
     noSurfaceReason:
       "A backend path that keeps stored capacity correct when a vehicle changes. No driver-facing surface.",
   },
+  /**
+   * ⭐⭐ **A THIRD proposal for the same problem, and the first with a driver
+   * surface.** Rows 11 and 12 are the spreadsheet's two answers to
+   * over-capacity — clean the stored capacity, then keep it clean — and both
+   * are backend work with nothing for the app to show. This row is the user's
+   * answer, given 2026-10-15: *"instead of swipe and then it will call make it
+   * a submit form where it will show the trips that are blocking them from
+   * taking it and then them to give a reason why they can take another"*.
+   *
+   * ⛔⛔ **A new row, NOT a flip of row 11 or 12.** Marking either
+   * `in-prototype` would claim we built a data cleanse or a backend path. We
+   * built neither. This is the same call E1 made about the requests tray, and
+   * for the same reason: `buildState` is a claim about what exists.
+   *
+   * ⚠️ **Not in the source spreadsheet yet.** `problem`, `useCase`,
+   * `subjectArea` and `calls` are rows 11/12's own, so the merged cells still
+   * reconstruct and `COVERED_CALLS` is untouched; `proposedFeature` is ours
+   * until the user adds the row to the file § 1 mirrors. Recorded in the
+   * Working Plan so the audit does not read it as the spreadsheet's wording.
+   */
+  {
+    id: "over-capacity-exception",
+    order: 13,
+    // ⛔ Rows 11, 12 and 14 must stay ADJACENT and carry byte-identical
+    // `subjectArea`, `problem` and `useCase` text, or `tableRows()` splits one
+    // merged cell into two runs and the three §18 span checks fail.
+    subjectArea: "Trip / Ride Assignment",
+    calls: 610,
+    problem: "Driver blocked by over-capacity logic",
+    useCase: "Driver tries to take a trip → blocked by over-capacity → calls Support",
+    proposedFeature:
+      "An in-app over-capacity request in place of the dispatch phone number: the screen names the accepted trips already holding the vehicle's seats, asks the driver why this one still fits, and sends that to Support",
+    tableSummary: "Name what is holding the seats, and ask why this one fits.",
+    klass: "form",
+    buildState: "not-yet",
+    entry: null,
+    nowEntry: {
+      route: "/requests/REQ-OVERCAP-001",
+      label:
+        "Open the over-capacity request. Production offers no way to accept it — where SWIPE TO ACCEPT would be there is a pink swipe that dials dispatch, and a reference number that appears nowhere else on the screen.",
+    },
+  },
   {
     id: "send-back-reason-form",
-    order: 13,
+    order: 14,
     subjectArea: "Send-back",
     calls: 609,
     problem: "Send-backs denied, specifically Standing Orders",
     useCase: "Driver needs to send back an SO → denied → calls Support",
     proposedFeature:
-      "In-app send-back reason form on every send-back, plus an explicit warning when the trip is a standing order — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 14's scoring decision and still open",
+      "In-app send-back reason form on every send-back, plus an explicit warning when the trip is a standing order — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 15's scoring decision and still open",
     tableSummary: "Every send-back collects a reason, and says when the trip is a standing order.",
     klass: "form",
     buildState: "in-prototype",
@@ -498,7 +540,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "send-back-scoring",
-    order: 14,
+    order: 15,
     subjectArea: "Send-back",
     calls: 609,
     problem: "Drivers avoid in-app send-back to dodge a penalty",
@@ -513,7 +555,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "account-self-service",
-    order: 15,
+    order: 16,
     subjectArea: "Other / not listed (catch-all)",
     calls: 567,
     problem: "Driver cannot update their own account details in the app",
@@ -531,7 +573,7 @@ export const SOLUTIONS: Solution[] = [
       logged in."*
 
       ⛔ `/login` still exists, but it is NOT listed here any more: with the
-      proposal gone it is pure replication, carrying nothing of row 15's. It
+      proposal gone it is pure replication, carrying nothing of row 16's. It
       stays because the CAPTURED Logout row lands on a sign-in screen in
       production and until this slice there was nowhere for it to go.
 
@@ -564,7 +606,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "rider-initiated-cancellation",
-    order: 16,
+    order: 17,
     subjectArea: "Trip / Ride Cancellation",
     calls: 509,
     problem:
@@ -585,14 +627,14 @@ export const SOLUTIONS: Solution[] = [
           route: "/my-rides/1049800399",
           short: "Filed from the return leg",
           label:
-            "The SAME decline filed from the return leg. The outbound is offered too — untick it to say the family drove her there and she still needs the ride home. ⛔ Neither filing cancels anything: the ride stays on the manifest marked 'Cancellation requested', because the client owns the cancellation and row 17's tray is what would tell the driver when it lands.",
+            "The SAME decline filed from the return leg. The outbound is offered too — untick it to say the family drove her there and she still needs the ride home. ⛔ Neither filing cancels anything: the ride stays on the manifest marked 'Cancellation requested', because the client owns the cancellation and row 18's tray is what would tell the driver when it lands.",
         },
       ],
     },
   },
   {
     id: "requests-tray",
-    order: 17,
+    order: 18,
     subjectArea: "Trip / Ride Cancellation",
     calls: 509,
     problem: "Driver cannot easily see whether the cancellation went through",
@@ -603,16 +645,16 @@ export const SOLUTIONS: Solution[] = [
     tableSummary: "One tray listing every request the driver has submitted, and its state.",
     klass: "surface",
     buildState: "not-yet",
-    // ⚠️ Added 2026-10-09. Row 19 has always pointed here; this never pointed
+    // ⚠️ Added 2026-10-09. Row 20 has always pointed here; this never pointed
     // back, so the relationship existed in one direction only. Invisible while
     // the picker's label was hardcoded — it printed "17" regardless of which
-    // row you opened, which is the right answer for row 19 and the reason
-    // nobody noticed row 17 was silent.
+    // row you opened, which is the right answer for row 20 and the reason
+    // nobody noticed row 18 was silent.
     sharedBuildWith: "requests-tray-modifications",
     entry: null,
   },
   /**
-   * ⛔⛔ **Inserted 2026-10-15, which is why rows 19-27 moved.** It had to take
+   * ⛔⛔ **Inserted 2026-10-15, which is why rows 20-28 moved.** It had to take
    * an `order` INSIDE the `Trip / Ride Cancellation` run, and that is what
    * forced the renumber — not where it sits in this array.
    *
@@ -625,14 +667,14 @@ export const SOLUTIONS: Solution[] = [
    * Three §1 checks, and the first version of this comment blamed the wrong
    * one of the two.
    *
-   * ⚠️ Not a flip of row 17. That one is the requests TRAY — a list of
+   * ⚠️ Not a flip of row 18. That one is the requests TRAY — a list of
    * submitted requests — and six built forms depend on it being unbuilt. This
    * is the opposite direction: a cancellation nobody submitted, arriving from
    * Wingz, which the driver can reach exactly once.
    */
   {
     id: "my-rides-cancelled",
-    order: 18,
+    order: 19,
     subjectArea: "Trip / Ride Cancellation",
     calls: 509,
     problem:
@@ -660,7 +702,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "requests-tray-modifications",
-    order: 19,
+    order: 20,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem:
@@ -677,7 +719,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "add-leg-request",
-    order: 20,
+    order: 21,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem: "A leg needs to be added",
@@ -715,7 +757,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "change-pickup-dropoff",
-    order: 21,
+    order: 22,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem: "A leg's pick-up/drop-off address or time needs changing",
@@ -742,7 +784,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "eta-send-back-explicit",
-    order: 22,
+    order: 23,
     subjectArea: "ETA Request",
     calls: 196,
     problem: "Driver needs the member told about a changed arrival",
@@ -757,7 +799,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "compliance-status",
-    order: 23,
+    order: 24,
     subjectArea: "Compliance Related",
     calls: 167,
     problem: "Driver confirming their requirements were received",
@@ -772,7 +814,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "dispatch-chat",
-    order: 24,
+    order: 25,
     subjectArea: "Trip Requests",
     calls: 156,
     problem: "Driver asking for more trips — not Support's role",
@@ -786,7 +828,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "distribution-restriction",
-    order: 25,
+    order: 26,
     subjectArea: "Payment Issues",
     calls: 146,
     problem: "Driver wants to know when they will get paid",
@@ -801,7 +843,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "technical-issues",
-    order: 26,
+    order: 27,
     subjectArea: "Technical Issues",
     calls: 127,
     problem: "Generic and varied — no single recurring cause",
@@ -817,7 +859,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "otp-exclusion",
-    order: 27,
+    order: 28,
     subjectArea: "OTP",
     calls: 123,
     problem: "Drivers are dinged for lateness even when the delay was legitimate",

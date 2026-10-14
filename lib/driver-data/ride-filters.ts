@@ -15,7 +15,7 @@ import { clockMinutes, parseRideDate } from "./ride-date";
  * The My Rides filter — a FEATURE, not a filter.
  *
  * ⭐⭐ **The point of this module is that adding the eighth filter is one
- * object literal and nothing else.** Catalogue row 18 shipped a single
+ * object literal and nothing else.** Catalogue row 19 shipped a single
  * `All | Active | Cancelled` control, and the next question was immediately
  * "can it also filter by rider, by client, by day…". Answering that one
  * control at a time gives seven pieces of state on the page, seven places the
@@ -23,7 +23,7 @@ import { clockMinutes, parseRideDate } from "./ride-date";
  * disagree. One registry, and the page knows only `RideFilterValues`.
  *
  * ⚠️ **Production's My Rides has no filter at all** — `CAP-341` photographs it,
- * and it is tabs then rides. So all of this is row 18's proposal and all of it
+ * and it is tabs then rides. So all of this is row 19's proposal and all of it
  * is gated; see `applicableRideFilters`. What is replicated is the SHAPE, from
  * the Requests screen, which does have one.
  *
@@ -362,7 +362,7 @@ export const RIDE_FILTERS: readonly RideFilterDefinition[] = [
     defaultValue: DEFAULT_RIDES_FILTER,
     options: () => MY_RIDES_FILTERS.map((f) => ({ value: f.key, label: f.label })),
     /**
-     * ⛔⛔ **Delegated, never restated.** `applyRidesFilter` is row 18's own
+     * ⛔⛔ **Delegated, never restated.** `applyRidesFilter` is row 19's own
      * rule and `verify-solutions` §31e drives it directly; a second copy of
      * `!isClientCancelled(trip)` here would be a rule that agrees until one of
      * the two is edited. Running it over a one-ride array is the cheapest way
@@ -684,7 +684,7 @@ export function narrowedRangeOptions(
 /**
  * The filters that actually apply, once the proposal is taken back out.
  *
- * ⛔⛔ **ONE gate for the whole feature, and it is row 18's own.** Production's
+ * ⛔⛔ **ONE gate for the whole feature, and it is row 19's own.** Production's
  * My Rides has no filter, so in `"now"` there is nothing to show, nothing to
  * count and nothing to undo — and every value has to strip, not just the
  * status one. A second predicate here that happened to agree today is the
@@ -735,5 +735,5 @@ export const RIDE_FILTER_PROVENANCE = {
   /** The behaviour — narrowing, the badge's rule, absent-not-greyed. */
   contract: "Project - Map Request View/Help Articles/The Requests Map.md, Part 5",
   /** That My Rides has one at all. */
-  feature: "ours — catalogue row 18",
+  feature: "ours — catalogue row 19",
 } as const;

@@ -7,7 +7,7 @@ import { fromTimeInputValue } from "@/lib/support/prefill";
 import type { LegOrderConfig } from "@/types/support";
 
 /**
- * Place a new leg among a trip's existing ones — catalogue row 20.
+ * Place a new leg among a trip's existing ones — catalogue row 21.
  *
  * ⛔⛔ **This control decides nothing.** Which slots are allowed, which rows are
  * blocked and why, and what the letters are all arrive on `config` from

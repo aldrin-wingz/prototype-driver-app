@@ -68,7 +68,7 @@ interface ReachOption {
  *
  * ⛔⛔ **The fourth option is a PROPOSAL and belongs to its own build.** It is
  * rows 04/05, and it used to render on every focus — so a reviewer walking
- * row 16's decline met it on the way past, and two proposals in one flow read
+ * row 17's decline met it on the way past, and two proposals in one flow read
  * as one feature. `buildGridTiles` has applied this rule to the More Options
  * grid since Phase 6; the modal was missed. The three PRODUCTION options are
  * never filtered: they are what the screen does today, whatever is in focus.
@@ -169,7 +169,7 @@ export function ReachRiderModal({
       case "declined":
         // ⛔ No trip state change HERE — production's own behaviour, and it is
         // still true: the sheet that opens next says in as many words that this
-        // is not a cancellation. What changed in row 16 is where its primary
+        // is not a cancellation. What changed in row 17 is where its primary
         // button goes.
         close();
         // ⚠️ Deferred — see `SHEET_SWAP_MS`. Two vaul drawers opened in one

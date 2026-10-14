@@ -289,16 +289,16 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   // at all, so the trail has nothing to challenge the drop-off with, which is
   // the same reason `1049800376` is quiet.
   "1049800393": "none",   // no trail
-  // ⚠️ Row 13's two send-back rides (`13a` short-notice, `13b` advance). Both
+  // ⚠️ Row 14's two send-back rides (`13a` short-notice, `13b` advance). Both
   // accepted and unstarted with no `locationRecords`, so the next swipe is the
   // START and there is no trail to challenge it with. Declared rather than left
   // to fall through — an undeclared ride here is one whose swipe behaviour
   // nobody decided.
   "1049800394": "none",
   "1049800395": "none",
-  // Row 13's standing-order ride (`13c`) — same shape as the two above.
+  // Row 14's standing-order ride (`13c`) — same shape as the two above.
   "1049800396": "none",
-  // ⚠️ Row 21's second scenario ride (`20b`), the one with the pick-up already
+  // ⚠️ Row 22's second scenario ride (`20b`), the one with the pick-up already
   // made. It carries no `locationRecords`, so the trail has nothing to challenge
   // the drop-off with. Declared rather than left to fall through — an undeclared
   // ride here is one whose swipe behaviour nobody decided.
@@ -1297,7 +1297,7 @@ check("the proposal is reachable only from row 03 and the plain mirror",
   borrowed.length === 0,
   `${borrowed.length} of ${sweepCount} wrong — ${borrowed.slice(0, 5).join(", ")}`);
 check("...and that sweep is the size it claims",
-  sweepCount === FOCUS_ROWS.length * DEMO_MODES.length * 2 && FOCUS_ROWS.length === 28,  // ⭐ 27 catalogue rows + the plain mirror
+  sweepCount === FOCUS_ROWS.length * DEMO_MODES.length * 2 && FOCUS_ROWS.length === 29,  // ⭐ 28 catalogue rows + the plain mirror
   `${FOCUS_ROWS.length} focus(es) x ${DEMO_MODES.length} mode(s) x 2 swipe(s) = ${sweepCount}`);
 /** ⛔ ...and every other row sees production's refusal, not nothing at all. */
 const strangerRoutes = new Set(

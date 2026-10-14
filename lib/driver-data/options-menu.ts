@@ -18,7 +18,7 @@ export type OptionsRowId =
   | "ride-history" | "driver-dashboard" | "id-badge" | "contact-support"
   | "driver-notes" | "default-map-service" | "location" | "privacy-policy"
   | "driver-terms" | "check-for-updates" | "logout"
-  /** ⚠️ PROPOSED — catalogue row 15. Not in the capture. See `ACCOUNT_ROW`. */
+  /** ⚠️ PROPOSED — catalogue row 16. Not in the capture. See `ACCOUNT_ROW`. */
   | "account";
 
 export interface OptionsRow {
@@ -79,7 +79,7 @@ export const DRIVER_NOTES_COPY = {
 } as const;
 
 /* -------------------------------------------------------------------------- */
-/* Catalogue row 15 — the proposed twelfth row                                 */
+/* Catalogue row 16 — the proposed twelfth row                                 */
 /* -------------------------------------------------------------------------- */
 
 /**

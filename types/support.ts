@@ -219,7 +219,7 @@ export interface SupportField {
    *
    * ⛔ For a contradiction `getTimeOrderWarnings` structurally cannot see: it
    * compares FIELDS, so it is blind to anything that conflicts with a value the
-   * form is not collecting. Row 19's slot-versus-pick-up is exactly that.
+   * form is not collecting. Row 20's slot-versus-pick-up is exactly that.
    */
   warning?: string;
   /**

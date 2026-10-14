@@ -18,7 +18,7 @@ import {
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 
 /**
- * Build the Update Trip Details case for one ride — catalogue row 21.
+ * Build the Update Trip Details case for one ride — catalogue row 22.
  *
  * Exported so `scripts/verify-solutions.ts` can build the same case both entry
  * points do. Two entry points assembling two subtly different forms is the
@@ -56,7 +56,7 @@ export function buildTripChange(trip: Trip, leg: TripLeg | undefined) {
 }
 
 /**
- * The Update Trip Details form — catalogue row 21.
+ * The Update Trip Details form — catalogue row 22.
  *
  * ⛔⛔ **Nothing this form does changes the ride.** The driver types over the
  * ride's own times and addresses, which looks exactly like editing it, and it is
@@ -64,7 +64,7 @@ export function buildTripChange(trip: Trip, leg: TripLeg | undefined) {
  * goes on showing its old values with a `Change requested` banner saying what
  * was asked for.
  *
- * ⚠️ `appTracksStatus: false`, like rows 05, 09, 13 and 16. Whether the client
+ * ⚠️ `appTracksStatus: false`, like rows 05, 09, 14 and 17. Whether the client
  * accepts the new time never comes back to the app, so a Pending pill would
  * promise a status nothing can fill in.
  */
@@ -102,7 +102,7 @@ export function TripChangeForm({
           issue: ISSUE_TRIP_CHANGE_REQUEST,
           // ⛔ Passed explicitly. This case carries no leg picker — the anchor
           // fields are its subject — so `resolveTripContext` finds nothing and
-          // would file a trip-less request. Same hand-off as row 16.
+          // would file a trip-less request. Same hand-off as row 17.
           tripId: trip.id,
           legId: leg?.id,
           values,

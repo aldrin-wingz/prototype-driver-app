@@ -96,7 +96,7 @@ export function showsProposal(
   // focus, so it has no side to be on — asking it for a mode would make every
   // proposal in the app vanish the moment `DEFAULT_DEMO_MODE` became reachable.
   if (focus.solutionId === null) return options?.inPlainMirror ?? true;
-  // A proposal belongs to its own build: a reviewer walking row 16 must not
+  // A proposal belongs to its own build: a reviewer walking row 17 must not
   // meet row 05's option on the way past, because two proposals in one flow
   // read as one feature.
   if (!owners.includes(focus.solutionId)) return false;

@@ -11,11 +11,11 @@ import type { SupportFieldOption } from "@/types/support";
  * can: what it produces is a request, and the ride goes on showing its old
  * values until the client acts.
  *
- * ⛔⛔ **"Leg" means two things in this app and row 21 uses the one the code does
+ * ⛔⛔ **"Leg" means two things in this app and row 22 uses the one the code does
  * not.** Driver-facing, "A Leg" / "B Leg" are the outbound ride and the return —
- * two `Trip` objects tied by `tripGroup`, which is what row 16's checklist walks.
+ * two `Trip` objects tied by `tripGroup`, which is what row 17's checklist walks.
  * In the data model `Trip.legs[]` is something else entirely: the **time anchors**
- * on ONE ride's timeline. Row 21 is about the first sense, so there is no
+ * on ONE ride's timeline. Row 22 is about the first sense, so there is no
  * checklist here and no round-trip question — the form is about the ride the
  * driver opened, and the anchors are its two ends.
  */
@@ -134,9 +134,9 @@ export function editableAnchors(trip: Trip): ChangeAnchor[] {
  * Ride states the entry points appear on.
  *
  * ⛔ `before-taken` is deliberately absent. That is an offer the driver has not
- * accepted, and "I would take it if it were an hour later" is **row 22** — the
+ * accepted, and "I would take it if it were an hour later" is **row 23** — the
  * ETA row, whose proposal is that a driver who cannot accommodate the timing
- * sends the trip back. Offering this form there would answer row 22 without
+ * sends the trip back. Offering this form there would answer row 23 without
  * specifying it.
  *
  * ⛔ `completed` likewise. A finished ride's times are history, and correcting
@@ -340,7 +340,7 @@ export const TRIP_CHANGE_REQUESTED_DETAIL =
   // ⛔ Not "the ride below". Copy cannot see layout — this banner's position is
   // decided in `ride-detail-layout.tsx` and the sentence lives here — so a line
   // that points at a neighbouring block is making a claim it is in no position
-  // to make. Row 16 shipped three of these before a check caught them.
+  // to make. Row 17 shipped three of these before a check caught them.
   "Support has your request. This ride still shows what the client has — it will not change until they update it.";
 export const TRIP_CHANGE_SUBMIT_TOAST =
   "Support has what you asked for. The ride still shows the old details until the client updates them.";
@@ -350,10 +350,10 @@ export const TRIP_CHANGE_SUBMIT_TOAST =
  *
  * The client owns the manifest. Whether they accept the new time never comes
  * back down to the driver's app, so this case files with `appTracksStatus:
- * false` like rows 05, 09, 13 and 16 — and what the ride shows claims only what
+ * false` like rows 05, 09, 14 and 17 — and what the ride shows claims only what
  * we did, never what happened next.
  *
- * Knowing the outcome is **catalogue row 17**, the requests tray, 509 calls and
- * specified nowhere. Row 21 is the fifth build leaning on it.
+ * Knowing the outcome is **catalogue row 18**, the requests tray, 509 calls and
+ * specified nowhere. Row 22 is the fifth build leaning on it.
  */
 export const TRIP_CHANGE_TRACKED_BY_APP = false;

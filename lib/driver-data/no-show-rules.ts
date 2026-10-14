@@ -680,7 +680,7 @@ export const NO_SHOW_AS_IS_PAIR: Record<NoShowDemoRow, NoShowDemoRow> = {
  * `PRODUCTION_TREATMENT`.
  *
  * ⛔ The focus gate is `showsProposal`, so a ride visited while ANOTHER row is
- * focused also shows production. A reviewer walking row 20 who wanders into
+ * focused also shows production. A reviewer walking row 21 who wanders into
  * Member No-Show must not meet rows 01/02's proposal on the way past — the same
  * rule the More Options grid and the Reach Rider modal follow.
  */

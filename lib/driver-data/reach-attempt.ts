@@ -114,7 +114,7 @@ export const CANNOT_REACH_LABEL = "I can't reach the member";
  * grid shows that solution's proposed tiles and no others, because two
  * proposals side by side read as one feature. The Reach Rider modal's fourth
  * option is the same kind of thing and was MISSED: it showed on every focus,
- * so a reviewer walking row 16 met "I can't reach the member" on the way to a
+ * so a reviewer walking row 17 met "I can't reach the member" on the way to a
  * flow it has nothing to do with. Found by the user, 2026-10-13.
  *
  * ⚠️ Named here rather than inside the modal so the rule sits beside the label

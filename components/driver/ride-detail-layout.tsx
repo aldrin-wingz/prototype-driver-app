@@ -262,7 +262,7 @@ function LegCard({
   isLast: boolean;
   state: DetailState;
   /**
-   * Catalogue row 21 — open Update Trip Details for this anchor.
+   * Catalogue row 22 — open Update Trip Details for this anchor.
    *
    * ⛔ Optional, and the decision of whether to pass it is NOT taken here. Which
    * anchors can be changed, whether the ride's state admits a request at all and
@@ -398,7 +398,7 @@ export function RideDetailLayout({
   const trip = applySessionSwipes(seededTrip);
   const pendingRequest = getPendingRequest(trip.id);
   /**
-   * The member declined and Support has the report — catalogue row 16.
+   * The member declined and Support has the report — catalogue row 17.
    *
    * ⛔ NOT a cancellation. The ride is still here and still on the manifest;
    * what changes is that nobody is waiting on the driver any more.
@@ -406,7 +406,7 @@ export function RideDetailLayout({
   const cancellationRequested = isCancellationRequested(trip.id);
 
   /**
-   * Catalogue row 21 — the change this ride is waiting on, if any.
+   * Catalogue row 22 — the change this ride is waiting on, if any.
    *
    * ⛔ The ride below still shows its OLD times and addresses, because nothing
    * about it has changed and nothing will until the client acts. That is exactly
@@ -453,7 +453,7 @@ export function RideDetailLayout({
   );
 
   /**
-   * Catalogue row 20 — the leg this TRIP GROUP is waiting on, if any.
+   * Catalogue row 21 — the leg this TRIP GROUP is waiting on, if any.
    *
    * ⛔ Looked up by GROUP, so the sibling leg the driver was not looking at when
    * they filed also says that its own pick-up time is part of a request.
@@ -820,7 +820,7 @@ export function RideDetailLayout({
           direction and would be false here: nobody reported anything, and there
           is nothing to chase.
 
-          ⛔ Pink/red, not the amber the row-16 banner uses. Amber in this app
+          ⛔ Pink/red, not the amber the row-17 banner uses. Amber in this app
           means "waiting on someone"; this is settled.
         */}
         {state === "cancelled" && (
@@ -1020,7 +1020,7 @@ export function RideDetailLayout({
             ))}
           </div>
 
-          {/* ⭐ Catalogue row 20's third entry point, and the only action a
+          {/* ⭐ Catalogue row 21's third entry point, and the only action a
               COMPLETED ride offers. In the BODY, under the timeline, never in a
               footer — the completed state deliberately renders no footer at all
               and the capture has none, so putting it there would rewrite
@@ -1151,12 +1151,12 @@ export function RideDetailLayout({
         bar: there is nothing to do to a ride Wingz has already cancelled, and
         production says so in the banner above.
 
-        ⭐ Row 18's PROPOSAL is the one thing that does render here, gated —
+        ⭐ Row 19's PROPOSAL is the one thing that does render here, gated —
         see below.
       */}
       {state === "cancelled" ? (
         /**
-         * ⭐⭐ Catalogue row 18's proposal: a way to say "I have seen this".
+         * ⭐⭐ Catalogue row 19's proposal: a way to say "I have seen this".
          *
          * ⛔ **Gated, and it is the ONLY gated thing on this screen.** The
          * banner, the greyed timeline and the missing footer are all

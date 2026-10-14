@@ -293,7 +293,7 @@ const TRIP_CHANGE_TILE: OptionTile = {
  * reserved for the two tiles that report something going wrong.
  *
  * ⚠️ Ahead of `trip-change` in `PROPOSED_TILES`, because that array is in
- * CATALOGUE order and row 20 precedes row 21 — not in the order they were built.
+ * CATALOGUE order and row 21 precedes row 22 — not in the order they were built.
  * The two Trip / Ride Modification rows end up adjacent either way.
  * ⛔ Anchored to the production tile `calendar` like its neighbour, because
  * `after` names a PRODUCTION tile — anchoring a proposal to another proposal
@@ -701,7 +701,7 @@ export function MoreOptionsScreen({
        */
       /**
        * ⛔⛔ **The ENTRY is gated too, not just the handler below.** The reason
-       * form is row 13's whole proposal, so production's path never opens it —
+       * form is row 14's whole proposal, so production's path never opens it —
        * it goes straight to the confirmation, and for a standing order that
        * confirmation is followed by a refusal.
        *

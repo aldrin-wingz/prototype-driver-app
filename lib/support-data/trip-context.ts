@@ -74,7 +74,7 @@ export const NOT_SUPPLIED = "—";
  * would list the Appointment Time row as a leg, and `leg-options` is explicit
  * that a destination is not a leg you can file against.
  *
- * ⚠️ `ALL_POOLS`, not `LIVE_POOLS`. Row 16 excludes completed trips because you
+ * ⚠️ `ALL_POOLS`, not `LIVE_POOLS`. Row 17 excludes completed trips because you
  * cannot CANCEL a leg already ridden; this block only SHOWS them, and a driver
  * filing after the fact on a finished round trip should still see both.
  */

@@ -24,7 +24,7 @@ export type DetailState =
    * ⛔⛔ **Not gated on the demo focus.** Production already has this screen —
    * `CAP-342` is a photograph of it, reached from the alert's `Go to ride` —
    * so gating it would make the prototype claim production has no cancelled
-   * view, which the capture disproves. What row 18 proposes is a way to reach
+   * view, which the capture disproves. What row 19 proposes is a way to reach
    * it other than the alert, and an acknowledgement; both live elsewhere.
    */
   | "cancelled"

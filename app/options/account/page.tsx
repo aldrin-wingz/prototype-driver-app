@@ -15,9 +15,9 @@ import {
 } from "@/lib/driver-data/account-self-service";
 
 /**
- * Catalogue row 15, half B — the post-auth half.
+ * Catalogue row 16, half B — the post-auth half.
  *
- * Reached from the PROPOSED twelfth Options row, which only exists while row 15
+ * Reached from the PROPOSED twelfth Options row, which only exists while row 16
  * is the focused solution. ⚠️ Nothing here is captured: the Options menu has no
  * account row and there is no settings screen for email, phone or password
  * anywhere in the vault. CAP-237/238 are named "Profile" and are the

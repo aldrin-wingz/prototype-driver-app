@@ -194,7 +194,7 @@ interface RideFlowValue {
   sendBackTrip: (tripId: string) => void;
   isTripSentBack: (tripId: string) => boolean;
 
-  // ---- Rider Declined (catalogue row 16) -------------------------------
+  // ---- Rider Declined (catalogue row 17) -------------------------------
   /**
    * Rides the driver has reported as declined by the member this session.
    *
@@ -212,7 +212,7 @@ interface RideFlowValue {
   requestCancellation: (tripIds: string[]) => void;
   isCancellationRequested: (tripId: string) => boolean;
 
-  // ---- Cancelled by Wingz (catalogue row 18) ----------------------------
+  // ---- Cancelled by Wingz (catalogue row 19) ----------------------------
   /**
    * Cancellations the driver has acknowledged having SEEN this session.
    *
@@ -234,7 +234,7 @@ interface RideFlowValue {
   acknowledgeClientCancellation: (tripId: string) => void;
   isClientCancellationAcknowledged: (tripId: string) => boolean;
 
-  // ---- Update Trip Details (catalogue row 21) ---------------------------
+  // ---- Update Trip Details (catalogue row 22) ---------------------------
   /**
    * The change the driver has asked Support for, per ride.
    *
@@ -244,7 +244,7 @@ interface RideFlowValue {
    * the entry points refuse while one stands.
    *
    * ⚠️ The cost is real and named in the spec: there is no way to WITHDRAW or
-   * amend from inside the app. That is **catalogue row 17**, the requests tray,
+   * amend from inside the app. That is **catalogue row 18**, the requests tray,
    * 509 calls, specified nowhere — and this is the fifth build leaning on it.
    *
    * ⚠️ Holds the CHANGES, not just a flag, because the ride has to print them:
@@ -255,11 +255,11 @@ interface RideFlowValue {
   requestTripChange: (tripId: string, changes: TripChange[]) => void;
   tripChangeRequest: (tripId: string) => TripChange[] | undefined;
 
-  // ---- Add Leg to Trip (catalogue row 20) -------------------------------
+  // ---- Add Leg to Trip (catalogue row 21) -------------------------------
   /**
    * The leg the driver has asked Support to add, per **trip group**.
    *
-   * ⛔⛔ **Keyed by GROUP, not by ride** — the one difference from row 21's
+   * ⛔⛔ **Keyed by GROUP, not by ride** — the one difference from row 22's
    * record, and it is load-bearing. A new leg is a claim about the whole
    * sequence, so every leg of the group has to show it, including the one the
    * driver was not looking at when they filed. Keying by ride would show the
@@ -268,7 +268,7 @@ interface RideFlowValue {
    *
    * ⛔ One open request per group. A second would reach Support as two tickets
    * disagreeing about the same running order. ⚠️ Nothing can withdraw or amend
-   * it from inside the app — **row 17**, and this is the sixth build leaning on
+   * it from inside the app — **row 18**, and this is the sixth build leaning on
    * it.
    */
   addLegRequests: Record<string, AddLegRequest>;

@@ -55,7 +55,7 @@ export default function OptionsPage() {
   const [notesOpen, setNotesOpen] = useState(false);
 
   /*
-    ⚠️ ELEVEN captured rows, plus a twelfth only while catalogue row 15 is the
+    ⚠️ ELEVEN captured rows, plus a twelfth only while catalogue row 16 is the
     focused solution. The insertion rule lives in `options-menu.ts` so a check
     can read the array rather than grep this file for a label.
   */
@@ -123,9 +123,9 @@ export default function OptionsPage() {
                     ⚠️ Wired, not proposed. Logout is one of the CAPTURED eleven
                     and in production it lands on the sign-in screen — it toasted
                     only because no such screen existed in this prototype until
-                    row 15 built one. So this is replication catching up, and it
+                    row 16 built one. So this is replication catching up, and it
                     is deliberately NOT gated: an unfocused run lands on the
-                    plain replicated sign-in, with row 15's proposed recovery
+                    plain replicated sign-in, with row 16's proposed recovery
                     link absent, which is exactly production's behaviour.
                   */
                   if (row.id === "logout") { router.push("/login"); return; }

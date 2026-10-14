@@ -42,14 +42,14 @@ export function buildRiderDeclined(trip: Trip, leg: TripLeg | undefined) {
 }
 
 /**
- * The Rider Declined the Trip form — catalogue row 16.
+ * The Rider Declined the Trip form — catalogue row 17.
  *
  * ⚠️ `appTracksStatus: false`, like Can't Reach Member and Rider No-Show. The
  * CANCELLATION is the client's to make and the app cannot read it back, so a
  * Pending pill here would promise a status nothing can fill in. What the ride
  * shows instead is `Cancellation requested`, which claims only what we did.
  *
- * ⛔ Knowing whether it went through is **catalogue row 17**, the requests tray,
+ * ⛔ Knowing whether it went through is **catalogue row 18**, the requests tray,
  * 509 calls in this same subject area and specified nowhere. Building a status
  * here would quietly consume that row while answering none of it.
  */

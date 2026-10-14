@@ -334,7 +334,7 @@ export interface Trip {
    * never derived.
    *
    * Absent means a one-way ride, which is the honest answer for most of the
-   * seed — only catalogue row 16 needs the grouping, because production's own
+   * seed — only catalogue row 17 needs the grouping, because production's own
    * decline template removes several leg ids at once (`CAP-225`).
    */
   tripGroup?: string;
@@ -411,7 +411,20 @@ export interface Trip {
  * than failing, which is the quietest possible way to break a walkthrough.
  */
 export interface TripScenario {
-  /** Short, stable handle shown first on the pill, e.g. "03a". */
+  /**
+   * Short, **stable** handle shown first on the pill, e.g. "03a".
+   *
+   * ⛔⛔ **Minted from the catalogue row number once, and never re-minted.**
+   * Inserting a row renumbers every row after it, and the handles deliberately
+   * do NOT follow: they are printed on pills, quoted in four check scripts and
+   * used as identifiers, and a handle that moves is a handle nobody can cite.
+   * After the 2026-10-15 insertion at order 13, `13a`–`13c` belong to row 14,
+   * `16a`/`16b` to row 17, `18a`–`18m` to row 19, `19a`–`19f` to row 20 and
+   * `20a`/`20b` to row 21.
+   *
+   * ⛔ So the handle is NOT the link to the catalogue. `solutions` below is,
+   * and it is keyed by id — which no renumber touches.
+   */
   code: string;
   /** What this ride is the case OF, in a few words. */
   label: string;
@@ -420,7 +433,7 @@ export interface TripScenario {
   /**
    * Tagged for the solution, but carrying NO demo pill.
    *
-   * ⛔⛔ **For a row whose demo is the LIST, not any one ride in it.** Row 18's
+   * ⛔⛔ **For a row whose demo is the LIST, not any one ride in it.** Row 19's
    * argument is thirteen rides of which three are cancelled; each ride is the
    * backdrop, not the exhibit. Labelling every card `18a · Still on` put the
    * same sentence on ten cards and competed with the one pill that carries the
@@ -472,7 +485,11 @@ export const mockRequestTrips: Trip[] = [
     scenario: {
       code: "11a",
       label: "Over capacity — no way to accept, only a number to call",
-      solutions: ["vehicle-capacity-cleanse", "vehicle-capacity-backend"],
+      solutions: [
+        "vehicle-capacity-cleanse",
+        "vehicle-capacity-backend",
+        "over-capacity-exception",
+      ],
     },
     legs: [
       {
@@ -1405,7 +1422,7 @@ export const mockUpcomingTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 18a-18m — catalogue row 18, cancelled rides in the manifest =====
+  // ===== 18a-18m — catalogue row 19, cancelled rides in the manifest =====
   //
   // Thirteen rides over four dates: **ten still on and three cancelled by
   // Wingz**, the cancellations spread across three of the four days so that
@@ -1414,7 +1431,7 @@ export const mockUpcomingTrips: Trip[] = [
   //
   // ⛔⛔ **All thirteen carry a `scenario`, including the ten that are fine.**
   // `ridesForSolution` filters to scenario rides whenever anything is focused,
-  // and it runs first — tag only the three cancellations and focusing row 18
+  // and it runs first — tag only the three cancellations and focusing row 19
   // gives a three-ride Upcoming list with a filter bar that has nothing to
   // filter. The demo collapses into its own punchline.
   //
@@ -2210,7 +2227,7 @@ export const mockNeedsActionTrips: Trip[] = [
 
   // ===== 16a / 16b — the member declined, and it is a ROUND TRIP =====
   //
-  // Catalogue row 16. TWO rides sharing one `tripGroup`, because that is what
+  // Catalogue row 17. TWO rides sharing one `tripGroup`, because that is what
   // the case is about: `CAP-225`'s decline template lists TWO leg ids, and a
   // member who is not going has usually dropped the return as well. A one-way
   // seed would have demonstrated a checklist with one box on it.
@@ -2402,7 +2419,7 @@ export const mockNeedsActionTrips: Trip[] = [
   //
   // Catalogue row **19**. The other half of this group, `1049800402`, is
   // COMPLETED and lives in `mockCompletedTrips` — which is the whole point:
-  // `groupMembers(trip, ALL_POOLS)` finds it, and row 16's `legsInGroup` on
+  // `groupMembers(trip, ALL_POOLS)` finds it, and row 17's `legsInGroup` on
   // `LIVE_POOLS` deliberately does not.
   //
   // ⭐ 3:00 PM is chosen, not arbitrary. The estimate off this group's own legs
@@ -3088,7 +3105,7 @@ export const mockInProgressTrips: Trip[] = [
 
   // ===== 13a — a SHORT-NOTICE send-back, which attracts the penalty =====
   //
-  // Catalogue row 13. `sameDay: true` is what makes production's step 2 penalty
+  // Catalogue row 14. `sameDay: true` is what makes production's step 2 penalty
   // popup appear at all — per the story's AC, "The popup appears only for
   // short-notice trip send backs."
   //
@@ -3335,7 +3352,7 @@ export const mockCompletedTrips: Trip[] = [
   // "actually, I also need the pharmacy".
   //
   // ⛔⛔ Seeded in the COMPLETED pool with a `tripGroup`, which `legsInGroup`
-  // (row 16, `LIVE_POOLS`) cannot see and `groupLegs` (row 20, `ALL_POOLS`)
+  // (row 17, `LIVE_POOLS`) cannot see and `groupLegs` (row 21, `ALL_POOLS`)
   // must. Two cases, two pools, one matcher — see `trip-groups.ts`.
   {
     id: "1049800402",

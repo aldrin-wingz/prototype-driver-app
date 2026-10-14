@@ -4,7 +4,7 @@ import { groupMembers, LIVE_POOLS } from "./trip-groups";
 import type { SupportFieldOption } from "@/types/support";
 
 /**
- * "The rider declined the trip" — the rules behind catalogue row 16.
+ * "The rider declined the trip" — the rules behind catalogue row 17.
  *
  * Named here rather than worked out inside the modal or the form, because FIVE
  * surfaces read them: the declined sheet, the form's field set, the ride's
@@ -127,7 +127,7 @@ export function declinedSheetFor(focus: DemoFocus): DeclinedSheet {
  * and captured in `CAP-327`, where it sits above `Sent · Just now` with an
  * empty composer under it.
  *
- * That is what "what happens now" means for row 16: a ticket is filed for you,
+ * That is what "what happens now" means for row 17: a ticket is filed for you,
  * and then you wait. Nothing appears on the ride, because the app never learns
  * the outcome — which is why the proposal's `CANCELLATION_TRACKED_BY_APP` is
  * also `false`.
@@ -347,7 +347,7 @@ export function legsInGroup(trip: Trip): Trip[] {
   /**
    * ⛔⛔ **`LIVE_POOLS`, and the exclusion is load-bearing.** It leaves out
    * completed trips, because a member cannot decline a leg they have already
-   * ridden. Row 20 calls the same matcher with `ALL_POOLS` for the opposite
+   * ridden. Row 21 calls the same matcher with `ALL_POOLS` for the opposite
    * reason. The pools are declared separately in `trip-groups.ts` precisely so
    * neither case can be widened into the other's by accident.
    */
@@ -434,7 +434,7 @@ export const CANCELLATION_REQUESTED_PILL = "CANCELLATION REQUESTED";
 /**
  * ⛔⛔ Deliberately NOT said anywhere in the driver-facing copy: "cancelled",
  * "removed", "off your manifest". The client has not done it yet and the app
- * cannot see when they do — that is catalogue row 17, the requests tray, and it
+ * cannot see when they do — that is catalogue row 18, the requests tray, and it
  * is still specified nowhere. Promising an outcome we cannot read back is the
  * failure `appTracksStatus: false` exists to prevent.
  */
