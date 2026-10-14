@@ -643,8 +643,20 @@ export const SOLUTIONS: Solution[] = [
       "Cancelled rides kept in My Rides — in Upcoming on their own date behind an All / Active / Cancelled filter, and in Needs Action until the driver acknowledges having seen it",
     tableSummary: "Keep cancelled rides in the manifest, filtered and acknowledged.",
     klass: "surface",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides",
+      label:
+        "My Rides, with the row focused. In Now, production's alert fires over the Upcoming tab — tap Go to ride and the cancelled ride is there, banner and all; tap OK and it is in no tab at all, which is the dead end. Flip to Proposed without leaving the tab and three rides appear in place, in date order, each marked Cancelled, with an All / Active / Cancelled bar above them.",
+      alternates: [
+        {
+          route: "/my-rides/1049800412",
+          short: "The ride the alert opens",
+          label:
+            "The cancelled ride itself — production's screen, unchanged on both sides: subtitle Ride, a pink Cancelled by Wingz banner and a greyed-out leg. The one thing the proposal adds is the Acknowledge button in the footer, which clears it from Needs Action and deliberately leaves it in the manifest.",
+        },
+      ],
+    },
   },
   {
     id: "requests-tray-modifications",

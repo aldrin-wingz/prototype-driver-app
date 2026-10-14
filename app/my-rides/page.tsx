@@ -20,11 +20,21 @@ import {
   ridesForSolution,
 } from "@/lib/solutions/scenario-rides";
 import { ClientCancellationAlert } from "@/components/driver/client-cancellation-alert";
+import { RidesFilterBar } from "@/components/driver/rides-filter-bar";
 import {
-  CLIENT_CANCELLATION_SOLUTIONS,
+  applicableRidesFilter,
+  applyRidesFilter,
+  cancelledRides,
   isClientCancelled,
+  needsAcknowledgement,
+  showsCancelledRides,
+  upcomingRides,
+  CLIENT_CANCELLATION_SOLUTIONS,
+  CLIENT_CANCELLED_PILL,
+  DEFAULT_RIDES_FILTER,
+  type RidesFilter,
 } from "@/lib/driver-data/client-cancellation";
-import { sortByRideDate } from "@/lib/driver-data/ride-date";
+import { groupByRideDay, sortByRideDate } from "@/lib/driver-data/ride-date";
 
 type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
 
@@ -61,8 +71,9 @@ export default function MyRidesPage() {
     isTripMemberSignatureMissing,
     sentBackTrips,
     isCancellationRequested,
+    acknowledgedClientCancellations,
   } = useRideFlow();
-  const { active } = useSolution();
+  const { active, demo } = useSolution();
 
   /**
    * While a solution is focused, this list holds ONLY the rides that
@@ -125,6 +136,27 @@ export default function MyRidesPage() {
    * a scenario ride replaces its seeded pills with its identifier, and this
    * marker has to outlive that swap.
    */
+  /**
+   * Catalogue row 18 — a ride Wingz cancelled says so on its card.
+   *
+   * ⛔⛔ **A SEPARATE map from `withCancellation` below, and they must stay
+   * separate.** Both write `statusPills`, and one map that could write either
+   * is where the two cancellation concepts merge. A ride that is both — the
+   * driver filed a decline, Wingz then cancelled — shows THIS pill: it is the
+   * outcome of the thing the other one is waiting for.
+   */
+  const withClientCancellation = (trips: Trip[]) =>
+    trips.map((trip) =>
+      isClientCancelled(trip)
+        ? {
+            ...trip,
+            statusPills: [
+              { label: CLIENT_CANCELLED_PILL, variant: "danger" as const },
+            ],
+          }
+        : trip
+    );
+
   const withCancellation = (trips: Trip[]) =>
     trips.map((trip) =>
       isCancellationRequested(trip.id)
@@ -172,6 +204,57 @@ export default function MyRidesPage() {
       ],
     }));
 
+  /**
+   * Catalogue row 18 — the manifest, and the task list.
+   *
+   * ⛔⛔ **The filter order has exactly one correct sequence**, and a wrong one
+   * still renders a plausible list:
+   *
+   *     focused() → withoutPending() → upcomingRides(…, demo)
+   *               → applyRidesFilter → sortByRideDate → groupByRideDay
+   *
+   * Applying the filter before the Now-strip would let `cancelled` select rides
+   * that Now says do not exist, so the bar would populate a list the mode had
+   * just emptied.
+   */
+  const [ridesFilter, setRidesFilter] = useState<RidesFilter>(DEFAULT_RIDES_FILTER);
+  // ⛔ ONE answer, read by the list, the tab count and the bar — see
+  // `applicableRidesFilter`. Reading `ridesFilter` directly anywhere below is
+  // how row 10 shipped a feed narrowed by a filter nobody could see.
+  const appliedFilter = applicableRidesFilter(ridesFilter, demo);
+  const showsFilterBar = showsCancelledRides(demo);
+
+  const upcomingVisible = upcomingRides(withoutPending(mockUpcomingTrips), demo);
+  const upcomingList = applyRidesFilter(upcomingVisible, appliedFilter);
+
+  /**
+   * ⛔⛔ **A cancellation is in TWO tabs, and that is deliberate.**
+   *
+   * The rule this page already states — *"a ride waiting on Support MOVES to
+   * Pending; otherwise the driver cannot tell which rides still need them"* —
+   * is about two TASK lists. Upcoming is the manifest: it answers "what does my
+   * day hold", and a cancelled ride is part of that answer. Needs Action is the
+   * task list, and it counts only the cancellations the driver has not yet
+   * acknowledged, so it still drains to zero.
+   *
+   * ⚠️ The cost, named: the tab counts now sum to more than the number of
+   * distinct rides. That is new, and it is what the original rule was
+   * protecting.
+   *
+   * ⛔ Cancellations go FIRST — they are the newest thing that happened to the
+   * day, and this tab is read top-down.
+   */
+  const unacknowledged = cancelledRides(
+    withoutPending(mockUpcomingTrips),
+    demo
+  ).filter((trip) =>
+    needsAcknowledgement(trip, acknowledgedClientCancellations, demo)
+  );
+  const needsActionList = [
+    ...unacknowledged,
+    ...withoutPending(mockNeedsActionTrips),
+  ];
+
   const tabs: TabConfig[] = [
     {
       value: "in-progress",
@@ -181,12 +264,14 @@ export default function MyRidesPage() {
     {
       value: "needs-action",
       label: "Needs Action",
-      count: withoutPending(mockNeedsActionTrips).length,
+      // ⛔ The same list the tab renders, not a second count of its own. The
+      // badge and the body disagreeing is row 10's defect exactly.
+      count: needsActionList.length,
     },
     {
       value: "upcoming",
       label: "Upcoming",
-      count: withoutPending(mockUpcomingTrips).length,
+      count: upcomingList.length,
     },
     { value: "pending", label: "Pending", count: pendingTrips.length },
   ];
@@ -196,14 +281,21 @@ export default function MyRidesPage() {
       case "in-progress":
         return withoutPending(mockInProgressTrips);
       case "needs-action":
-        return withoutPending(mockNeedsActionTrips);
+        return needsActionList;
       case "upcoming":
-        return withoutPending(mockUpcomingTrips);
+        return upcomingList;
       case "pending":
         return pendingTrips;
       default:
         return [];
     }
+  };
+
+  /** What each option would show, so the bar and the list cannot disagree. */
+  const filterCounts: Record<RidesFilter, number> = {
+    all: applyRidesFilter(upcomingVisible, "all").length,
+    active: applyRidesFilter(upcomingVisible, "active").length,
+    cancelled: applyRidesFilter(upcomingVisible, "cancelled").length,
   };
 
   /**
@@ -287,6 +379,17 @@ export default function MyRidesPage() {
         ))}
       </div>
       
+      {/* ⛔ Only on Upcoming, and only in Proposed. A bar offering `Cancelled`
+          on a tab that cannot hold one, or in a mode where none exists, is a
+          control that can never match anything. */}
+      {showsFilterBar && activeTab === "upcoming" && (
+        <RidesFilterBar
+          value={appliedFilter}
+          onChange={setRidesFilter}
+          counts={filterCounts}
+        />
+      )}
+
       <main className="flex-1 space-y-4 p-4">
         {currentTrips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -299,15 +402,37 @@ export default function MyRidesPage() {
             </p>
           </div>
         ) : (
-          withCancellation(currentTrips).map((trip) => (
-            <RideCard
-              key={trip.id}
-              trip={trip}
-              revenueColor="green"
-              showDistance={false}
-              onClick={() => router.push(`/my-rides/${trip.id}`)}
-            />
-          ))
+          (() => {
+            const cards = withClientCancellation(withCancellation(currentTrips));
+            const card = (trip: Trip) => (
+              <RideCard
+                key={trip.id}
+                trip={trip}
+                revenueColor="green"
+                showDistance={false}
+                onClick={() => router.push(`/my-rides/${trip.id}`)}
+              />
+            );
+            /**
+             * ⛔ Headings on UPCOMING only. It is the only tab that spans days
+             * — In Progress and Needs Action are today's work, and Pending is
+             * a queue — so grouping the others would put one heading over one
+             * ride and call it a manifest.
+             *
+             * ⚠️ Not sticky. A sticky heading here needs a measured three-layer
+             * offset stack behind the tab row and the filter bar, and this page
+             * does not stick either of those today. Deferred on purpose.
+             */
+            if (activeTab !== "upcoming") return cards.map(card);
+            return groupByRideDay(cards).map((day) => (
+              <section key={day.label} className="space-y-4">
+                <h2 className="text-[13px] font-bold uppercase tracking-wide text-gray-500">
+                  {day.label}
+                </h2>
+                {day.trips.map(card)}
+              </section>
+            ));
+          })()
         )}
       </main>
       

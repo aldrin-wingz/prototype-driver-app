@@ -212,6 +212,28 @@ interface RideFlowValue {
   requestCancellation: (tripIds: string[]) => void;
   isCancellationRequested: (tripId: string) => boolean;
 
+  // ---- Cancelled by Wingz (catalogue row 18) ----------------------------
+  /**
+   * Cancellations the driver has acknowledged having SEEN this session.
+   *
+   * ⛔⛔ **The opposite direction to `cancellationRequests` twelve lines above,
+   * and the two must never be read as one.** That list is the driver asking for
+   * a trip to come off, which nobody has granted. This one is Wingz having
+   * already cancelled, and the driver ticking it off — `CAP-341`/`CAP-342`.
+   *
+   * ⛔ Acknowledging clears the ride from **Needs Action only**. It stays in
+   * Upcoming, because the manifest's job is to say what the day holds and a
+   * cancelled ride is part of that answer. `upcomingRides` is never given this
+   * list, so it cannot do otherwise by accident.
+   *
+   * ⚠️ Needs Action here means *you have not seen this yet*, not *this ride
+   * needs work* — production's own banner says no action is required, and the
+   * proposal does not argue with it.
+   */
+  acknowledgedClientCancellations: string[];
+  acknowledgeClientCancellation: (tripId: string) => void;
+  isClientCancellationAcknowledged: (tripId: string) => boolean;
+
   // ---- Update Trip Details (catalogue row 21) ---------------------------
   /**
    * The change the driver has asked Support for, per ride.
@@ -290,6 +312,9 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [sentBack, setSentBack] = useState<string[]>([]);
   // Trips the member declined — annotated in My Rides, never removed.
   const [cancelRequested, setCancelRequested] = useState<string[]>([]);
+  // Wingz cancellations the driver has ticked off — cleared from Needs Action,
+  // kept in the manifest. ⛔ NOT the list above; see the interface.
+  const [ackedCancellations, setAckedCancellations] = useState<string[]>([]);
   const [tripChanges, setTripChanges] = useState<Record<string, TripChange[]>>(
     {}
   );
@@ -385,6 +410,14 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         ]),
       isCancellationRequested: (tripId) => cancelRequested.includes(tripId),
 
+      acknowledgedClientCancellations: ackedCancellations,
+      acknowledgeClientCancellation: (tripId) =>
+        setAckedCancellations((previous) =>
+          previous.includes(tripId) ? previous : [...previous, tripId]
+        ),
+      isClientCancellationAcknowledged: (tripId) =>
+        ackedCancellations.includes(tripId),
+
       tripChangeRequests: tripChanges,
       requestTripChange: (tripId, changes) =>
         setTripChanges((previous) => ({ ...previous, [tripId]: changes })),
@@ -406,6 +439,7 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       preferredOptOuts,
       sentBack,
       cancelRequested,
+      ackedCancellations,
       tripChanges,
       addLegs,
     ]

@@ -296,6 +296,7 @@ import {
   cancelAlertBody,
   cancelledRides,
   needsAcknowledgement,
+  showsCancelledRides,
   upcomingRides,
   ACKNOWLEDGE_CANCELLATION_LABEL,
   CANCELLATION_ACKNOWLEDGED_PILL,
@@ -676,7 +677,7 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * reached from its live half — so the row demonstrates adding a leg to a trip
  * of one, two and three legs, which is what the user asked for.
  */
-const EXPECTED_ALTERNATES = 12;
+const EXPECTED_ALTERNATES = 13;  // ⭐ +1 on 2026-10-15: row 18's cancelled ride
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -954,9 +955,9 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 20;  // ⭐ +1: row 20's three-leg trip
+const EXPECTED_RIDE_ROUTES = 21;  // ⭐ +1 on 2026-10-15: row 18's cancelled ride
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
-const EXPECTED_SURFACE_ROUTES = 4;
+const EXPECTED_SURFACE_ROUTES = 5;  // ⭐ +1 on 2026-10-15: row 18's entry, /my-rides itself
 check(
   "...and the two kinds of route were counted as declared",
   `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
@@ -1109,9 +1110,43 @@ for (const [id, expected] of Object.entries(EXPECTED_NEEDS_ACTION)) {
     shown.length === expected,
   );
 }
+/**
+ * Scenario rides in the UPCOMING tab — new on 2026-10-15.
+ *
+ * ⛔⛔ **There was no such record until row 18, and that is the gap this fills.**
+ * Every built row up to now demonstrated on a live or a finished ride, so
+ * `declaredRows` only ever looked at In Progress and Needs Action. Row 18's
+ * demo is a manifest: thirteen upcoming rides, which is the whole argument.
+ * Without this entry the coverage check below would have been satisfied by a
+ * row that declared nothing anywhere.
+ */
+const EXPECTED_UPCOMING: Record<string, number> = {
+  // Ten still on and three cancelled — the manifest row 18 argues over.
+  "my-rides-cancelled": 13,
+};
+for (const [id, expected] of Object.entries(EXPECTED_UPCOMING)) {
+  const shown = ridesForSolution(mockUpcomingTrips, id);
+  check(
+    `focusing ${id} shows ${expected} Upcoming ride(s)`,
+    `${shown.length} of ${mockUpcomingTrips.length} — ${shown.filter((t) => t.clientCancelNoticeAt).length} cancelled`,
+    shown.length === expected,
+  );
+}
+/** ⛔ ...and no OTHER built row quietly demonstrates on the Upcoming tab. */
+const strayUpcoming = builtRows.filter(
+  (row) =>
+    !(row.id in EXPECTED_UPCOMING) &&
+    ridesForSolution(mockUpcomingTrips, row.id).length > 0,
+);
+check(
+  "no other built row hides rides in the Upcoming tab",
+  `${strayUpcoming.length} undeclared of ${builtRows.length} built row(s)`,
+  strayUpcoming.length === 0,
+);
 const declaredRows = new Set([
   ...Object.keys(EXPECTED_IN_PROGRESS),
   ...Object.keys(EXPECTED_NEEDS_ACTION),
+  ...Object.keys(EXPECTED_UPCOMING),
 ]);
 /** ⚠️ Same declared exemption as above — row 15's demo is not on a ride. */
 const countableRows = builtRows.filter((row) => !RIDELESS_ROWS.has(row.id));
@@ -1998,6 +2033,12 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
    * entry is still what opens.
    */
   "add-leg-request": "needs-action",
+  /**
+   * ⭐ **Upcoming, and it is the first row to land there.** The demo IS the
+   * manifest — thirteen rides over four days — so any other tab would be
+   * showing the argument's backdrop instead of the argument.
+   */
+  "my-rides-cancelled": "upcoming",
 };
 /**
  * ⚠️ Row 15 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
@@ -6565,6 +6606,8 @@ const GATES: Array<{
    * declaration and not to itself.
    */
   { name: "showsMemberFilter", owners: ["auto-assign-request", "request-feed-member-filter"], shown: (f) => showsMemberFilter(f) },
+  /** ⭐ Added 2026-10-15 — row 18. The lists, the bar and the Acknowledge button. */
+  { name: "showsCancelledRides", owners: ["my-rides-cancelled"], shown: (f) => showsCancelledRides(f) },
   { name: "buildOptionsRows", owners: ["account-self-service"], inPlainMirror: false, shown: (f) => buildOptionsRows(f).some((r) => r.proposed) },
   { name: "reachOptionsFor/standard", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(false, f).some((o) => o.proposed) },
   { name: "reachOptionsFor/same-day", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(true, f).some((o) => o.proposed) },
@@ -6600,7 +6643,7 @@ check(
   `${GATES.length} gate(s) x ${FOCUS_IDS.length} focus(es) x ${DEMO_MODES.length} mode(s)`,
   gateSweep === GATES.length * FOCUS_IDS.length * DEMO_MODES.length &&
     FOCUS_IDS.length === EXPECTED_ROWS + 1 &&
-    GATES.length === 13,
+    GATES.length === 14,
 );
 /**
  * ⛔ Non-vacuity: a sweep where every gate said `false` everywhere would agree
@@ -6668,7 +6711,7 @@ for (const want of PRE_B1) {
  * rest, and together they have to account for every gate. A gate in NEITHER is
  * a gate whose behaviour nothing here describes.
  */
-const ADDED_AFTER_B1 = ["showsMemberFilter"];
+const ADDED_AFTER_B1 = ["showsMemberFilter", "showsCancelledRides"];
 check(
   "with the mode pinned to fixed, every gate answers what it answered before B1",
   movedBehaviour.length
@@ -7112,8 +7155,8 @@ check(
  * one above stops being empty. Both edits, or the pair disagrees.
  */
 const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
-const EXPECTED_WITH_NOW = 12;
-const EXPECTED_BUILT = 12;
+const EXPECTED_WITH_NOW = 13;  // ⭐ +1 on 2026-10-15: row 18
+const EXPECTED_BUILT = 13;  // ⭐ +1 on 2026-10-15: row 18
 check(
   "...and every built row has a production side to compare against",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
@@ -7996,7 +8039,7 @@ check(
   unreachable.length === 0 &&
     reachableBy.size === EXPECTED_TABLE_ROWS &&
     // ⛔ Non-vacuity: the live set must not have quietly emptied.
-    liveRows.length === 14 &&
+    liveRows.length === 15 &&
     PROPOSED_CELL_TAG.length > 0 && !proposedMerges,
 );
 /**
@@ -8106,8 +8149,6 @@ const INERT_ROWS = [
   "coded-term-definitions",
   "send-back-scoring",
   "requests-tray",
-  // ⚠️ Inert only until its build lands — it is the row this slice exists for.
-  "my-rides-cancelled",
   "requests-tray-modifications",
   "eta-send-back-explicit",
   "compliance-status",
@@ -8286,7 +8327,7 @@ check(
     : `${INERT_ROWS.length} greyed, ${SINGLE_SIDED.length} one-sided, ` +
       `${SOLUTIONS.length - INERT_ROWS.length - SINGLE_SIDED.length} with both sides`,
   sidedDrift.length === 0 &&
-    INERT_ROWS.length + SINGLE_SIDED.length + 12 === EXPECTED_TABLE_ROWS,
+    INERT_ROWS.length + SINGLE_SIDED.length + 13 === EXPECTED_TABLE_ROWS,
 );
 /**
  * ⛔⛔ **A greyed row really has nothing** — not an entry, not a `nowEntry`,
@@ -8417,7 +8458,7 @@ check(
 const ALTERNATES = SOLUTIONS.flatMap((s) =>
   (s.entry?.alternates ?? []).map((a) => ({ id: s.id, ...a })),
 );
-const EXPECTED_SHORTS = 12;  // ⭐ +1 on 2026-10-14: row 20's three-leg trip
+const EXPECTED_SHORTS = 13;  // ⭐ +1 on 2026-10-15: row 18's cancelled ride
 const SHORT_MAX = 45;
 const SHORT_MIN = 20;
 const shortBad = ALTERNATES.filter(
@@ -9140,9 +9181,9 @@ check(
     `${SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length} can show one, ` +
     `${proposalVsPrototype.length} row(s) differ`,
   SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - 3 &&
-    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 12 &&
+    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 13 &&
     // ⭐ They must genuinely differ, or one is the other under a new name.
-    proposalVsPrototype.length === 12,
+    proposalVsPrototype.length === 11,
 );
 /**
  * ⛔ And the greying is driven by the rule, not by a second opinion in the
@@ -9227,6 +9268,29 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
   // The thirteen gates, by name.
   for (const gate of GATES) out[`gate:${gate.name}`] = String(gate.shown(focus));
 
+  /**
+   * Row 18 — the manifest, the task list, the bar and the acknowledgement.
+   *
+   * ⛔⛔ **Four surfaces, not one.** A row whose only moving part is its own
+   * gate is the "decorative" failure 28a exists to catch, wearing a new
+   * costume: `gate:showsCancelledRides` above already differs, and a row that
+   * added nothing else would pass on that alone.
+   */
+  out["cancelled-manifest"] = upcomingRides(mockUpcomingTrips, focus)
+    .map((t) => t.id)
+    .join(",");
+  out["cancelled-tasks"] = cancelledRides(mockUpcomingTrips, focus)
+    .map((t) => t.id)
+    .join(",");
+  // ⚠️ Shaped like the member filter's: what the bar offers, and what survives it.
+  out["rides-filter"] = `${showsCancelledRides(focus)}/${applicableRidesFilter("cancelled", focus)}`;
+  /**
+   * ⛔ The acknowledgement, which is the ONE gated thing on the cancelled
+   * screen. The screen itself is production's and must NOT appear here — if it
+   * did, this surface would differ for a reason that is not the proposal.
+   */
+  out["cancelled-acknowledge"] = String(showsCancelledRides(focus));
+
   // Rows 01 and 02 — the no-show treatment of every seeded ride.
   out["no-show"] = ALL_SEEDED.map((trip) => {
     const t = treatmentFor(trip, focus);
@@ -9285,7 +9349,13 @@ function changedSurfaces(row: Solution): string[] {
 }
 
 const SURFACE_COUNT = Object.keys(surfaceFingerprint(SOLUTIONS[0], "now")).length;
-const EXPECTED_SURFACES = GATES.length + 10;
+/**
+ * ⭐ `+14` since 2026-10-15, up from `+10`: row 18 adds four rules beside its
+ * gate — the manifest, the task list, the filter and the acknowledgement. A row
+ * whose only moving surface is its own gate is the "decorative" failure 28a
+ * exists to catch, so the four are what make it a build rather than a flag.
+ */
+const EXPECTED_SURFACES = GATES.length + 14;
 check(
   "the fingerprint covers every mode-sensitive surface in the app",
   `${SURFACE_COUNT} surface(s) — ${GATES.length} gate(s) + 10 rule(s), over ${ALL_SEEDED.length} seeded ride(s)`,
@@ -9302,7 +9372,7 @@ check(
   builtUnchanged.length
     ? `DECORATIVE on ${builtUnchanged.length} of ${builtRows.length}: ${builtUnchanged.map((r) => `${r.order} ${r.id}`).join(", ")}`
     : `${builtRows.length} of ${builtRows.length} built row(s) change something`,
-  builtUnchanged.length === 0 && builtRows.length === 12,
+  builtUnchanged.length === 0 && builtRows.length === 13,
 );
 /**
  * ⛔⛔ **The measurement against the list.** `ROWS_AWAITING_NOW` is a line
@@ -9339,7 +9409,7 @@ check(
   unbuiltThatMoved.length
     ? `MOVED: ${unbuiltThatMoved.map((r) => `${r.order} ${r.id} (${rowChanges.get(r.id)!.join(", ")})`).join("; ")}`
     : `0 of ${unbuiltRows.length} unbuilt row(s) move`,
-  unbuiltThatMoved.length === 0 && unbuiltRows.length === 15,
+  unbuiltThatMoved.length === 0 && unbuiltRows.length === 14,
 );
 /**
  * ⛔ And the plain mirror is on no side at all, so it cannot move either. This
@@ -10401,7 +10471,11 @@ const LAYOUT_CODE = codeOnly(LAYOUT_SRC);
 const CANCELLED_REGIONS: Array<[string, RegExp]> = [
   ["the banner", /\{state === "cancelled" && \([\s\S]{0,400}CANCELLED_BANNER_TITLE/],
   ["the greyed timeline", /state === "cancelled" && "opacity-/],
-  ["the no-footer branch", /\{state === "cancelled" \? null :/],
+  // ⛔ The branch is still NAMED, it just now holds the gated Acknowledge
+  // button instead of a bare `null`. What matters is that `cancelled` is
+  // decided here and not left to the chain's trailing catch-all.
+  ["the named footer branch", /\{state === "cancelled" \? \(/],
+  ["no footer in Now", /showsCancelledRides\(demo\) \? \([\s\S]{0,1600}\) : null/],
 ];
 const missingRegions = CANCELLED_REGIONS.filter(([, re]) => !re.test(LAYOUT_CODE));
 check(
@@ -10456,6 +10530,104 @@ check(
   MY_RIDES_CODE.includes("CLIENT_CANCELLATION_SOLUTIONS") &&
     MY_RIDES_CODE.includes("<ClientCancellationAlert") &&
     !/showsCancelledRides\([\s\S]{0,80}setCancelAlertTrip/.test(MY_RIDES_CODE),
+);
+
+/* --- 31h. The PAGE's wiring, not just the rules ------------------------- */
+/**
+ * ⛔⛔ **Every check above drives the rules; none of them could see the page
+ * wiring them up wrongly — and five break tests proved it.** Breaking the tab
+ * count so it stopped reading the list it renders, applying the filter before
+ * the Now-strip, feeding the bar the raw filter instead of the applicable one,
+ * and collapsing the two pill maps into one all left §31 entirely green.
+ *
+ * The rules being in `lib/` is what makes them checkable. It does not make
+ * their COMPOSITION checkable, and the composition is where row 10's defect
+ * lived: a feed, a badge and a sheet that each answered for themselves.
+ */
+const PAGE_CODE = codeOnly(readFileSync(join(ROOT, "app/my-rides/page.tsx"), "utf8"));
+/**
+ * ⛔ The tab counts read the SAME lists the tabs render. A count computed from
+ * the raw seed beside a body computed from the filtered one is the badge
+ * claiming a number the list cannot show.
+ */
+const COUNT_BINDINGS: Array<[string, RegExp]> = [
+  ["needs action", /label: "Needs Action",[\s\S]{0,80}count: needsActionList\.length/],
+  ["upcoming", /label: "Upcoming",[\s\S]{0,80}count: upcomingList\.length/],
+];
+const looseCounts = COUNT_BINDINGS.filter(([, re]) => !re.test(PAGE_CODE));
+check(
+  "each tab count is the length of the list that tab renders",
+  looseCounts.length
+    ? `${looseCounts.map(([what]) => what).join(", ")} counts something else`
+    : `${COUNT_BINDINGS.length} of ${COUNT_BINDINGS.length} tab(s)`,
+  looseCounts.length === 0,
+);
+/** ⛔ ...and `getTripsForTab` hands back those same two lists. */
+check(
+  "...and the tab bodies are those same two lists",
+  `needs-action → needsActionList ${/case "needs-action":\s*return needsActionList;/.test(PAGE_CODE)}, ` +
+    `upcoming → upcomingList ${/case "upcoming":\s*return upcomingList;/.test(PAGE_CODE)}`,
+  /case "needs-action":\s*return needsActionList;/.test(PAGE_CODE) &&
+    /case "upcoming":\s*return upcomingList;/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **The filter runs AFTER the Now-strip, and the order is the property.**
+ * Reversed, `cancelled` selects rides Now says do not exist — so the bar
+ * populates a list the mode had just emptied, and every count still looks
+ * plausible. Asserted on the composition, which is the only place it exists.
+ */
+const stripThenFilter =
+  /upcomingRides\(withoutPending\(mockUpcomingTrips\), demo\)[\s\S]{0,120}applyRidesFilter\(upcomingVisible, appliedFilter\)/;
+check(
+  "the Now-strip runs before the filter, never after",
+  stripThenFilter.test(PAGE_CODE)
+    ? "upcomingRides(…) → applyRidesFilter(…)"
+    : "REVERSED or rewritten — a `cancelled` filter would select rides Now hides",
+  stripThenFilter.test(PAGE_CODE) &&
+    // ⛔ ...and the filter is never handed the raw seed, which is the same bug
+    // written another way.
+    !/applyRidesFilter\(withoutPending\(mockUpcomingTrips\)/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **One answer, four readers.** The bar's value, the list, the counts and
+ * the bar's own visibility must all come from `applicableRidesFilter` /
+ * `showsCancelledRides` — never from the raw `ridesFilter` state. Feeding the
+ * bar the raw value leaves a `cancelled` selection lit in a mode that has no
+ * cancellations, which is row 10's half-truth exactly.
+ */
+check(
+  "the bar is fed the applicable filter, never the raw state",
+  `value={appliedFilter} ${/value=\{appliedFilter\}/.test(PAGE_CODE)}; ` +
+    `raw state read elsewhere ${(PAGE_CODE.match(/\bridesFilter\b/g) ?? []).length - 1}x`,
+  /value=\{appliedFilter\}/.test(PAGE_CODE) &&
+    !/value=\{ridesFilter\}/.test(PAGE_CODE) &&
+    /const appliedFilter = applicableRidesFilter\(ridesFilter, demo\)/.test(PAGE_CODE),
+);
+/** ⛔ ...and the bar only renders where it can match something. */
+check(
+  "...and the bar renders only on Upcoming, and only where cancellations exist",
+  `guard: ${/showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE)}`,
+  /const showsFilterBar = showsCancelledRides\(demo\)/.test(PAGE_CODE) &&
+    /showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **Two pill maps, composed, never merged.** Both write `statusPills`, and
+ * one map that could write either is where the two cancellation concepts merge.
+ * A ride that is both shows the Wingz pill, which composition order decides.
+ */
+check(
+  "both pill maps run, with the Wingz one outermost",
+  `composed: ${/withClientCancellation\(withCancellation\(currentTrips\)\)/.test(PAGE_CODE)}`,
+  /withClientCancellation\(withCancellation\(currentTrips\)\)/.test(PAGE_CODE) &&
+    /const withClientCancellation = /.test(PAGE_CODE) &&
+    /const withCancellation = /.test(PAGE_CODE),
+);
+/** ⛔ Date headings on Upcoming only — the only tab that spans days. */
+check(
+  "date headings group the manifest, and no other tab",
+  `guard: ${/activeTab !== "upcoming"\) return cards\.map\(card\)/.test(PAGE_CODE)}`,
+  /activeTab !== "upcoming"\) return cards\.map\(card\)/.test(PAGE_CODE) &&
+    /groupByRideDay\(cards\)/.test(PAGE_CODE),
 );
 
 // ---------------------------------------------------------------------------
