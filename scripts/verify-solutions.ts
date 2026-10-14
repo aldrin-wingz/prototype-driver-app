@@ -310,6 +310,24 @@ import {
   MY_RIDES_FILTERS,
   type RidesFilter,
 } from "../lib/driver-data/client-cancellation";
+import {
+  addedFilterCount,
+  applicableRideFilters,
+  applyRideFilters,
+  chipRowKeys,
+  chipText,
+  isFilterSet,
+  narrowedOptions,
+  rideFilter,
+  setFilterKeys,
+  showsRidesFilter,
+  withRideFilter,
+  NO_RIDE_FILTERS,
+  PICKUP_TIME_BANDS,
+  RIDE_FILTERS,
+  type RideFilterKey,
+  type RideFilterValues,
+} from "../lib/driver-data/ride-filters";
 import { detailStateFor } from "../lib/driver-data/ride-detail-state";
 import {
   groupByRideDay,
@@ -10878,6 +10896,436 @@ check(
       `${trapped.length} of ${MUST_STAY_OUTSIDE.length} trapped${trapped.length ? ": " + trapped.join(", ") : ""}`
     : "the sticky row could not be located",
   tabRowExtent !== "" && tabRowExtent.includes("tabs.map(") && trapped.length === 0,
+);
+
+/* === 32. The My Rides filter feature ====================================== */
+/**
+ * ⛔⛔ **A FEATURE, so the checks are about the registry and not about seven
+ * filters.** Row 18 shipped one `All | Active | Cancelled` control and the next
+ * question was whether it could also filter by rider, client, day, time and
+ * county. Seven hand-written filters is seven pieces of page state and seven
+ * chances for the list and the chips to disagree; one registry is one rule
+ * driven over every entry, with a denominator that grows when the eighth
+ * arrives.
+ *
+ * Everything below sweeps `RIDE_FILTERS` rather than naming a filter, except
+ * where the point IS a particular filter.
+ */
+console.log("\n32. My Rides filter — the registry, the narrowing and the gate");
+
+/* --- 32a. The registry is what it claims to be --------------------------- */
+/** ⛔ Declared as a literal so the sweeps below have a denominator. */
+const EXPECTED_FILTER_KEYS: RideFilterKey[] = [
+  "status",
+  "rider",
+  "client",
+  "pickupDay",
+  "pickupTime",
+  "pickupLocation",
+  "dropoffLocation",
+];
+check(
+  "the registry holds the seven filters the driver asked for, in order",
+  RIDE_FILTERS.map((f) => f.key).join(" → "),
+  RIDE_FILTERS.map((f) => f.key).join(",") === EXPECTED_FILTER_KEYS.join(",") &&
+    new Set(RIDE_FILTERS.map((f) => f.key)).size === EXPECTED_FILTER_KEYS.length,
+);
+/**
+ * ⛔⛔ **Exactly one filter is always on the chip row**, and which one is the
+ * driver's own instruction: status, because it answers "is this ride still on"
+ * — the question the whole row exists for. Two would be production's Requests
+ * screen (day and time); zero would be a chip row that vanishes.
+ */
+const alwaysShown = RIDE_FILTERS.filter((f) => f.alwaysOnChipRow);
+check(
+  "...and exactly one of them is on the chip row whether set or not",
+  `${alwaysShown.length} of ${RIDE_FILTERS.length}: ${alwaysShown.map((f) => f.key).join(", ") || "none"}`,
+  alwaysShown.length === 1 && alwaysShown[0].key === "status",
+);
+/**
+ * ⛔ A filter that offers nothing is a control the driver can open and not use.
+ * Every definition must find real values in the manifest it will be given.
+ */
+const emptyOptionSets = RIDE_FILTERS.filter((f) => {
+  const options = f.options(mockUpcomingTrips);
+  return options.length < 2 || options.some((o) => !o.value || !o.label);
+});
+check(
+  "every filter offers at least two real values over the seeded manifest",
+  RIDE_FILTERS.map((f) => `${f.key}=${f.options(mockUpcomingTrips).length}`).join(", "),
+  emptyOptionSets.length === 0,
+);
+/**
+ * ⛔⛔ **Non-vacuity, per filter.** A `matches` that returned true for
+ * everything would pass every composition check below perfectly and narrow
+ * nothing. Each filter must have at least one option that leaves SOME rides and
+ * excludes others — proven over the seed, with both halves counted.
+ */
+const inertFilters = RIDE_FILTERS.filter((f) => {
+  const pool = mockUpcomingTrips;
+  return !f.options(pool).some((o) => {
+    const hit = pool.filter((t) => f.matches(t, o.value)).length;
+    return hit > 0 && hit < pool.length;
+  });
+});
+check(
+  "...and every filter has a value that really divides the manifest",
+  inertFilters.length
+    ? `inert: ${inertFilters.map((f) => f.key).join(", ")}`
+    : `${RIDE_FILTERS.length} of ${RIDE_FILTERS.length} divide it`,
+  inertFilters.length === 0,
+);
+
+/* --- 32b. Set, unset, and the chip row ----------------------------------- */
+/**
+ * ⛔⛔ **"Not set" has exactly one spelling.** A default stored as a value
+ * would leave `isFilterSet`, the chip row, the badge and the sheet each having
+ * to know both forms. Driven over every filter: writing its default removes the
+ * key outright.
+ */
+const defaultStored = RIDE_FILTERS.filter((f) => {
+  const after = withRideFilter(NO_RIDE_FILTERS, f.key, f.defaultValue);
+  return f.key in after || isFilterSet(f.key, after);
+});
+check(
+  "writing a filter's default unsets it rather than storing the default",
+  defaultStored.length
+    ? `stored: ${defaultStored.map((f) => f.key).join(", ")}`
+    : `${RIDE_FILTERS.length} of ${RIDE_FILTERS.length} unset cleanly`,
+  defaultStored.length === 0,
+);
+/** ⛔ ...and a real value does set it, or the check above passes on a no-op. */
+const realValue = (key: RideFilterKey): string => {
+  const def = rideFilter(key);
+  return def.options(mockUpcomingTrips).find((o) => o.value !== def.defaultValue)!.value;
+};
+const notStored = RIDE_FILTERS.filter(
+  (f) => !isFilterSet(f.key, withRideFilter(NO_RIDE_FILTERS, f.key, realValue(f.key))),
+);
+check(
+  "...and a value that is not the default does set it",
+  notStored.length
+    ? `lost: ${notStored.map((f) => f.key).join(", ")}`
+    : `${RIDE_FILTERS.length} of ${RIDE_FILTERS.length} stored`,
+  notStored.length === 0,
+);
+/**
+ * ⛔ At rest the chip row is the always-shown filter and nothing else; setting
+ * any other filter adds exactly one chip, and the badge counts exactly the ones
+ * beyond the always-shown. Three properties swept together because each alone
+ * passes on a half-build.
+ */
+const chipWrong: string[] = [];
+for (const f of RIDE_FILTERS) {
+  const values = withRideFilter(NO_RIDE_FILTERS, f.key, realValue(f.key));
+  const chips = chipRowKeys(values);
+  const wantChips = f.alwaysOnChipRow ? 1 : 2;
+  const wantBadge = f.alwaysOnChipRow ? 0 : 1;
+  if (chips.length !== wantChips) chipWrong.push(`${f.key} chips ${chips.length}≠${wantChips}`);
+  if (!chips.includes("status")) chipWrong.push(`${f.key} dropped the always-shown chip`);
+  if (addedFilterCount(values) !== wantBadge)
+    chipWrong.push(`${f.key} badge ${addedFilterCount(values)}≠${wantBadge}`);
+}
+check(
+  "the chip row carries the always-shown filter plus whatever is set",
+  `at rest ${chipRowKeys(NO_RIDE_FILTERS).join(",")} badge ${addedFilterCount(NO_RIDE_FILTERS)}; ` +
+    `${chipWrong.length} wrong of ${RIDE_FILTERS.length * 3} property checks` +
+    (chipWrong.length ? ` — ${chipWrong.slice(0, 3).join("; ")}` : ""),
+  chipRowKeys(NO_RIDE_FILTERS).join(",") === "status" &&
+    addedFilterCount(NO_RIDE_FILTERS) === 0 &&
+    chipWrong.length === 0,
+);
+/** ⛔ ...and the always-shown chip reads its value even when nothing is set. */
+check(
+  "...and the always-shown chip reads a value rather than a placeholder",
+  `at rest it says "${chipText("status", NO_RIDE_FILTERS)}"`,
+  chipText("status", NO_RIDE_FILTERS) === "All" &&
+    chipText("status", { status: "cancelled" }) === "Cancelled",
+);
+
+/* --- 32c. Applying ------------------------------------------------------- */
+/** ⛔ No filters is the whole manifest, in the same order. */
+const unfiltered = applyRideFilters(mockUpcomingTrips, NO_RIDE_FILTERS);
+check(
+  "no filters leaves the manifest whole and in order",
+  `${unfiltered.length} of ${mockUpcomingTrips.length} ride(s)`,
+  unfiltered.map((t) => t.id).join(",") === mockUpcomingTrips.map((t) => t.id).join(","),
+);
+/**
+ * ⛔⛔ **Composition is intersection, and it is swept over every PAIR.** Seven
+ * filters compose 21 ways, and a `reduce` that dropped all but the last value
+ * would still look plausible on screen — the list narrows, just by the wrong
+ * rule. Each pair is compared against the intersection of the two applied
+ * alone, with a denominator.
+ */
+let pairsSwept = 0;
+const pairDisagreements: string[] = [];
+for (let i = 0; i < RIDE_FILTERS.length; i++) {
+  for (let j = i + 1; j < RIDE_FILTERS.length; j++) {
+    const a = RIDE_FILTERS[i];
+    const b = RIDE_FILTERS[j];
+    const va = realValue(a.key);
+    const vb = realValue(b.key);
+    const both = applyRideFilters(mockUpcomingTrips, { [a.key]: va, [b.key]: vb });
+    const onlyA = applyRideFilters(mockUpcomingTrips, { [a.key]: va });
+    const onlyB = applyRideFilters(mockUpcomingTrips, { [b.key]: vb });
+    const wanted = onlyA.filter((t) => onlyB.some((x) => x.id === t.id));
+    pairsSwept += 1;
+    if (both.map((t) => t.id).join(",") !== wanted.map((t) => t.id).join(","))
+      pairDisagreements.push(`${a.key}+${b.key}`);
+  }
+}
+check(
+  "two filters applied together are the intersection of the two applied alone",
+  `${pairDisagreements.length} wrong of ${pairsSwept} pair(s)` +
+    (pairDisagreements.length ? ` — ${pairDisagreements.slice(0, 4).join(", ")}` : ""),
+  pairDisagreements.length === 0 &&
+    pairsSwept === (RIDE_FILTERS.length * (RIDE_FILTERS.length - 1)) / 2,
+);
+/**
+ * ⛔ ...and at least one of those pairs really narrowed, or the intersection
+ * above was proven on twenty-one copies of the whole manifest.
+ */
+const narrowingPairs = (() => {
+  let n = 0;
+  for (let i = 0; i < RIDE_FILTERS.length; i++)
+    for (let j = i + 1; j < RIDE_FILTERS.length; j++) {
+      const a = RIDE_FILTERS[i];
+      const b = RIDE_FILTERS[j];
+      const both = applyRideFilters(mockUpcomingTrips, {
+        [a.key]: realValue(a.key),
+        [b.key]: realValue(b.key),
+      });
+      if (both.length < mockUpcomingTrips.length) n += 1;
+    }
+  return n;
+})();
+check(
+  "...and those pairs really narrow the manifest, so the comparison is not vacuous",
+  `${narrowingPairs} of ${pairsSwept} pair(s) returned fewer than ${mockUpcomingTrips.length} rides`,
+  narrowingPairs === pairsSwept,
+);
+/** ⛔ Every survivor of a filter satisfies it — swept over every value. */
+let survivorsSwept = 0;
+const survivorFailures: string[] = [];
+for (const f of RIDE_FILTERS) {
+  for (const option of f.options(mockUpcomingTrips)) {
+    const kept = applyRideFilters(mockUpcomingTrips, { [f.key]: option.value });
+    survivorsSwept += 1;
+    if (!kept.every((t) => f.matches(t, option.value)))
+      survivorFailures.push(`${f.key}=${option.value}`);
+    if (kept.length > mockUpcomingTrips.length) survivorFailures.push(`${f.key} grew the pool`);
+  }
+}
+check(
+  "every ride a filter keeps satisfies that filter, over every value it offers",
+  `${survivorFailures.length} wrong of ${survivorsSwept} value(s)`,
+  survivorFailures.length === 0 && survivorsSwept > RIDE_FILTERS.length,
+);
+
+/* --- 32d. Filters narrow each other -------------------------------------- */
+/**
+ * ⛔⛔ **The counts beside each option are computed against the OTHER filters,
+ * never against the whole pool.** Production's contract is explicit: *"options
+ * such as pickup day and pickup county only offer what is still possible under
+ * the filters you have already applied"*, and *"if you set the pickup county to
+ * County A and County B does not appear under drop-off, that means no trip that
+ * day runs from A to B"*. Counting against the whole pool renders the same
+ * sheet with numbers that promise rides the Update button cannot deliver.
+ *
+ * ⚠️ Swept over every (filter, other-filter, value) triple, each count compared
+ * against actually applying both.
+ */
+let countSwept = 0;
+const countWrong: string[] = [];
+for (const outer of RIDE_FILTERS) {
+  const context: RideFilterValues = { [outer.key]: realValue(outer.key) };
+  for (const inner of RIDE_FILTERS) {
+    if (inner.key === outer.key) continue;
+    for (const choice of narrowedOptions(inner.key, mockUpcomingTrips, context)) {
+      countSwept += 1;
+      const real = applyRideFilters(mockUpcomingTrips, {
+        ...context,
+        [inner.key]: choice.value,
+      }).length;
+      if (choice.count !== real)
+        countWrong.push(`${outer.key}→${inner.key}=${choice.value}: ${choice.count}≠${real}`);
+    }
+  }
+}
+check(
+  "each option's count is what selecting it would actually leave",
+  `${countWrong.length} wrong of ${countSwept} option(s)` +
+    (countWrong.length ? ` — ${countWrong.slice(0, 3).join("; ")}` : ""),
+  countWrong.length === 0 && countSwept > 50,
+);
+/**
+ * ⛔⛔ **A value with nothing behind it is ABSENT, not greyed** — and the pair
+ * the contract names is the one tested. Every seeded Lee County pick-up ends in
+ * Lee County, so with the pick-up set to Lee the drop-off filter must offer Lee
+ * and nothing else. The control is the same list with no pick-up set, which
+ * offers four.
+ */
+const dropoffsUnfiltered = narrowedOptions("dropoffLocation", mockUpcomingTrips, NO_RIDE_FILTERS);
+const dropoffsFromLee = narrowedOptions("dropoffLocation", mockUpcomingTrips, {
+  pickupLocation: "Lee County",
+});
+check(
+  "a drop-off no trip reaches from here is absent from the sheet, not greyed",
+  `from Lee County: ${dropoffsFromLee.map((o) => o.label).join(", ")} ` +
+    `(unfiltered: ${dropoffsUnfiltered.map((o) => o.label).join(", ")})`,
+  dropoffsFromLee.map((o) => o.label).join(",") === "Lee County" &&
+    // ⛔ ...and the control really was wider, or the narrowing proved nothing.
+    dropoffsUnfiltered.length > dropoffsFromLee.length &&
+    dropoffsUnfiltered.every((o) => o.count > 0),
+);
+/**
+ * ⛔ Two values survive a zero count on purpose, and only two: the filter's own
+ * default (or there is no way back to "all") and the value currently SET (or
+ * the sheet omits a control the chip row is still showing). Swept.
+ */
+let zeroSwept = 0;
+const zeroWrong: string[] = [];
+for (const f of RIDE_FILTERS) {
+  const context: RideFilterValues = { rider: "ROSALIND ACHTERBERG" };
+  for (const choice of narrowedOptions(f.key, mockUpcomingTrips, context)) {
+    zeroSwept += 1;
+    if (choice.count === 0 && choice.value !== f.defaultValue && choice.value !== context[f.key])
+      zeroWrong.push(`${f.key}=${choice.value}`);
+  }
+}
+check(
+  "...and a zero-count option survives only as the default or the current value",
+  `${zeroWrong.length} stray zero(s) of ${zeroSwept} option(s)` +
+    (zeroWrong.length ? ` — ${zeroWrong.slice(0, 3).join(", ")}` : ""),
+  zeroWrong.length === 0 && zeroSwept > RIDE_FILTERS.length,
+);
+
+/* --- 32e. The pick-up time bands ----------------------------------------- */
+/**
+ * ⛔⛔ **Production shows five chips and never says what they mean**, so the
+ * boundaries are declared rather than guessed at in a renderer. The three
+ * disjoint ones must partition the day exactly; `Before noon` and `Morning`
+ * overlap on purpose, because production lists both.
+ */
+const disjointBands = ["before-noon", "afternoon", "evening"];
+const bandCounts = disjointBands.map(
+  (v) => applyRideFilters(mockUpcomingTrips, { pickupTime: v }).length,
+);
+check(
+  "the three disjoint pick-up bands partition the manifest",
+  `before noon ${bandCounts[0]} + afternoon ${bandCounts[1]} + evening ${bandCounts[2]} ` +
+    `= ${bandCounts.reduce((a, b) => a + b, 0)} of ${mockUpcomingTrips.length}`,
+  bandCounts.reduce((a, b) => a + b, 0) === mockUpcomingTrips.length &&
+    bandCounts.every((n) => n > 0),
+);
+check(
+  "...and Morning sits inside Before noon, which is production's own overlap",
+  `morning ${applyRideFilters(mockUpcomingTrips, { pickupTime: "morning" }).length} ⊆ ` +
+    `before noon ${bandCounts[0]}; bands declared ${PICKUP_TIME_BANDS.length}`,
+  PICKUP_TIME_BANDS.length === 5 &&
+    PICKUP_TIME_BANDS[0].value === "all-day" &&
+    applyRideFilters(mockUpcomingTrips, { pickupTime: "morning" }).every((t) =>
+      applyRideFilters(mockUpcomingTrips, { pickupTime: "before-noon" }).some(
+        (x) => x.id === t.id,
+      ),
+    ),
+);
+/**
+ * ⛔⛔ **A ride with no readable clock is in NO band but All day.** The parser
+ * returns `-1` for a will-call leg, which is smaller than midnight — so a band
+ * test written as `minutes <= band.to` files every one of them under
+ * `Before noon`. Driven over a synthetic ride rather than the seed, because the
+ * seed happens to have none and the check would otherwise be vacuous.
+ */
+const clocklessRide = {
+  ...mockUpcomingTrips[0],
+  id: "clockless",
+  legs: [{ ...mockUpcomingTrips[0].legs[0], time: "Wait For Call" }],
+} as Trip;
+const bandsHit = PICKUP_TIME_BANDS.filter((b) =>
+  rideFilter("pickupTime").matches(clocklessRide, b.value),
+).map((b) => b.value);
+check(
+  "a ride with no readable pick-up clock falls in no band but All day",
+  `bands matched: ${bandsHit.join(", ") || "none"}`,
+  bandsHit.join(",") === "all-day",
+);
+/**
+ * ⛔ ...and the reason it does is that NO BAND STARTS BEFORE MIDNIGHT, which
+ * is the only thing standing between the `-1` sentinel and `Before noon`.
+ * Asserted separately because the check above passes for the right reason only
+ * while this one holds.
+ */
+const badFloors = PICKUP_TIME_BANDS.filter((b) => b.from < 0 || b.to < b.from);
+check(
+  "...because no band starts before midnight, which is what excludes the sentinel",
+  `${badFloors.length} bad of ${PICKUP_TIME_BANDS.length} band(s): ` +
+    PICKUP_TIME_BANDS.map((b) => `${b.value} ${b.from}-${b.to}`).join(", "),
+  badFloors.length === 0,
+);
+
+/* --- 32f. One gate, for the whole feature -------------------------------- */
+/**
+ * ⛔⛔ **Production's My Rides has no filter at all**, so in `"now"` every
+ * value has to strip — not just the status one. The obvious build gates the
+ * status filter, which it inherited from row 18, and leaves a manifest narrowed
+ * to one rider by state with no control to clear it. That is row 10's defect,
+ * written in the new feature's vocabulary.
+ *
+ * ⚠️ Driven with ALL SEVEN set, over every focus and both modes, with a
+ * denominator.
+ */
+const everythingSet: RideFilterValues = Object.fromEntries(
+  RIDE_FILTERS.map((f) => [f.key, realValue(f.key)]),
+);
+let rf32GateSwept = 0;
+const rf32GateWrong: string[] = [];
+for (const id of FOCUS_IDS) {
+  for (const mode of DEMO_MODES) {
+    const focus = demoFocus(id, mode);
+    const offered = showsRidesFilter(focus);
+    const applied = applicableRideFilters(everythingSet, focus);
+    rf32GateSwept += 1;
+    const kept = setFilterKeys(applied).length;
+    if (offered ? kept !== RIDE_FILTERS.length : kept !== 0)
+      rf32GateWrong.push(`${id ?? "no focus"}/${mode}: ${kept} kept, offered ${offered}`);
+  }
+}
+check(
+  "where the filter is not offered, every value strips — not only the status one",
+  `${rf32GateWrong.length} wrong of ${rf32GateSwept} focus/mode pair(s)` +
+    (rf32GateWrong.length ? ` — ${rf32GateWrong.slice(0, 3).join("; ")}` : ""),
+  rf32GateWrong.length === 0 && rf32GateSwept === FOCUS_IDS.length * DEMO_MODES.length,
+);
+/**
+ * ⛔⛔ **One gate, two callers, proven never to diverge.** `applicableRideFilters`
+ * and row 18's own `applicableRidesFilter` both decide whether a selection
+ * survives, and a second predicate that happened to agree today is exactly the
+ * shape a hidden filter ships in. Compared at every focus, in both modes.
+ */
+let rf32AgreeSwept = 0;
+const rf32GateDisagreements: string[] = [];
+for (const id of FOCUS_IDS) {
+  for (const mode of DEMO_MODES) {
+    const focus = demoFocus(id, mode);
+    const viaFeature =
+      applicableRideFilters({ status: "cancelled" }, focus).status ?? DEFAULT_RIDES_FILTER;
+    const viaRow18 = applicableRidesFilter("cancelled", focus);
+    rf32AgreeSwept += 1;
+    if (viaFeature !== viaRow18)
+      rf32GateDisagreements.push(`${id ?? "no focus"}/${mode}: ${viaFeature} vs ${viaRow18}`);
+  }
+}
+check(
+  "...and the feature's gate and row 18's never give different answers",
+  `${rf32GateDisagreements.length} disagreement(s) of ${rf32AgreeSwept} pair(s)` +
+    (rf32GateDisagreements.length ? ` — ${rf32GateDisagreements.slice(0, 3).join("; ")}` : ""),
+  rf32GateDisagreements.length === 0 &&
+    rf32AgreeSwept === FOCUS_IDS.length * DEMO_MODES.length &&
+    // ⛔ ...and both outcomes really occur, or the two agreed on a constant.
+    FOCUS_IDS.some((id) => showsRidesFilter(demoFocus(id, "fixed"))) &&
+    FOCUS_IDS.some((id) => !showsRidesFilter(demoFocus(id, "fixed"))),
 );
 
 // ---------------------------------------------------------------------------

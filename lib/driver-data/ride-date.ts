@@ -62,15 +62,22 @@ export function sortByRideDate<T extends { date: string; legs: Array<{ time: str
 }
 
 /**
- * `"2:46 PM"` → minutes past midnight.
+ * `"2:46 PM"` → minutes past midnight, or **`-1`** when there is no readable
+ * clock.
  *
- * ⚠️ Local to this module rather than imported from `add-leg-request.ts`, which
- * has its own `clockToMinutes` returning `null`. That one's null is load-bearing
- * — a will-call leg has no clock and must not be ordered against one. Here an
- * unreadable time sorts to the top of its own day, which is the same "it has no
- * claim on a position" answer in a context that cannot express null.
+ * ⚠️ Not imported from `add-leg-request.ts`, which has its own `clockToMinutes`
+ * returning `null`. That one's null is load-bearing — a will-call leg has no
+ * clock and must not be ordered against one. Here an unreadable time sorts to
+ * the top of its own day, which is the same "it has no claim on a position"
+ * answer in a context that cannot express null.
+ *
+ * ⛔⛔ **`-1` is not a time, and a caller that forgets is wrong quietly.** It
+ * is smaller than midnight, so a band test written as `minutes < 720` puts
+ * every unreadable clock in the morning. `ride-filters.ts` checks for it
+ * before asking which half of the day a ride falls in; exported rather than
+ * copied so there is one parser and one sentinel.
  */
-function clockMinutes(clock: string | undefined): number {
+export function clockMinutes(clock: string | undefined): number {
   const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((clock ?? "").trim());
   if (!match) return -1;
   const hour = Number(match[1]) % 12;
