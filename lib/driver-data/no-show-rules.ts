@@ -454,6 +454,16 @@ export interface NoShowTreatment {
   /** Offer the support form as a way forward. */
   offerForm: boolean;
   /**
+   * Dismissing the refusal asks the driver to confirm, instead of a bare `OK`.
+   *
+   * ⛔⛔ **Gated, because production's refusal is CAPTURED.** `s-06c` and
+   * `s-06d` show one button and it says `OK`; a driver who taps it is simply
+   * returned to the screen. Renaming it and putting a consequence in front of
+   * it is a proposal, and an ungated version would have row 01 demonstrating
+   * its own fix as the status quo — the mistake row 02 shipped.
+   */
+  confirmLeaving: boolean;
+  /**
    * Whether the universal pick-up-time boundary is enforced for this ride.
    *
    * ⚠️ Unlike every other flag here, this one changes the OUTCOME rather than the
@@ -487,6 +497,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
+    confirmLeaving: false,
     pickupTimeGate: true,
   },
   /**
@@ -500,6 +511,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: true,
     offerForm: false,
+    confirmLeaving: true,
     pickupTimeGate: true,
   },
 
@@ -509,6 +521,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
+    confirmLeaving: false,
     pickupTimeGate: true,
   },
   /** Proposal: copy that is true for this driver, and a way forward. */
@@ -516,6 +529,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "revised",
     showTimer: false,
     offerForm: true,
+    confirmLeaving: true,
     pickupTimeGate: true,
   },
 
@@ -530,6 +544,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "revised",
     showTimer: false,
     offerForm: true,
+    confirmLeaving: true,
     pickupTimeGate: true,
   },
 
@@ -546,6 +561,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
+    confirmLeaving: false,
     // The row's entire point: no pick-up-time gate, so it files.
     pickupTimeGate: false,
   },
@@ -561,6 +577,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "revised",
     showTimer: true,
     offerForm: false,
+    confirmLeaving: true,
     pickupTimeGate: true,
   },
 
@@ -570,6 +587,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "production",
     showTimer: false,
     offerForm: false,
+    confirmLeaving: false,
     pickupTimeGate: true,
   },
   /** Proposal: countdown, and both rules named rather than just the window. */
@@ -577,6 +595,7 @@ export const NO_SHOW_TREATMENTS: Record<NoShowDemoRow, NoShowTreatment> = {
     copy: "revised",
     showTimer: true,
     offerForm: false,
+    confirmLeaving: true,
     pickupTimeGate: true,
   },
 };
@@ -594,6 +613,7 @@ export const FINALISED_TREATMENT: NoShowTreatment = {
   copy: "production",
   showTimer: false,
   offerForm: false,
+  confirmLeaving: false,
   pickupTimeGate: true,
 };
 
@@ -614,6 +634,7 @@ export const PRODUCTION_TREATMENT: NoShowTreatment = {
   copy: "production",
   showTimer: false,
   offerForm: false,
+  confirmLeaving: false,
   pickupTimeGate: false,
 };
 
@@ -668,6 +689,81 @@ export function treatmentFor(trip: Trip, focus: DemoFocus): NoShowTreatment {
   if (showsProposal(focus, NO_SHOW_SOLUTIONS)) return tagged ?? FINALISED_TREATMENT;
   if (!trip.noShowDemo) return PRODUCTION_TREATMENT;
   return NO_SHOW_TREATMENTS[NO_SHOW_AS_IS_PAIR[trip.noShowDemo]];
+}
+
+/* ===========================================================================
+   Leaving the pick-up — what the driver is giving up by dismissing
+   =========================================================================== */
+
+/**
+ * Clients whose contract sets a different wait from the standard one.
+ *
+ * ⛔⛔ **Empty, and the emptiness is the finding.** Wait requirements are
+ * contractual, so the SHAPE is per-client — but the measured rule is
+ * `NO_SHOW_WAIT_MINUTES` for every client in the seed, and nobody has evidence
+ * of one that differs. An entry invented to make the copy look specific would
+ * be this prototype asserting a contract term it has never seen.
+ *
+ * ⚠️ A map with a default rather than a boolean "does this client have a
+ * special wait?", for the reason `postPickupThresholdMinutes` gives two hundred
+ * lines up: a boolean encodes *"Indiana does this, others do not"*, which is
+ * exactly the shape that stops being true — and did. One code path, one lookup,
+ * and the day a real number arrives it is one line.
+ */
+export const CLIENT_WAIT_MINUTES: Record<string, number> = {};
+
+/**
+ * How long this trip's client requires the driver to be at the pick-up.
+ *
+ * ⚠️ Named here rather than interpolating `NO_SHOW_WAIT_MINUTES` into the
+ * sentence, because the sentence ATTRIBUTES the number to the client. Copy that
+ * says "Verida requires ten minutes" where the code only knows "everyone
+ * requires ten minutes" is a claim with no rule behind it; this is the rule.
+ */
+export function requiredWaitMinutes(trip: Trip): number {
+  return CLIENT_WAIT_MINUTES[trip.client] ?? NO_SHOW_WAIT_MINUTES;
+}
+
+/**
+ * The confirmation raised when a driver dismisses the refusal.
+ *
+ * ⭐ The refusal tells the driver they cannot file yet. Production's `OK` then
+ * returns them to the screen having said nothing about what walking away costs
+ * — and walking away is the thing that actually loses the payment. This names
+ * it at the one moment the driver is deciding.
+ *
+ * ⛔ It is a WARNING, not a block. Both answers close the refusal; one puts the
+ * countdown back in front of them and the other does not. A driver who really
+ * has to leave is not stopped, because the app cannot know why they are
+ * leaving.
+ */
+export const LEAVE_WARNING_TITLE = "Are you sure you don't want to wait?";
+export const LEAVE_WARNING_STAY = "Stay at the pick-up";
+export const LEAVE_WARNING_LEAVE = "Close anyway";
+
+export function leaveWarningBody(trip: Trip): string {
+  return (
+    `${trip.client} requires at least ${requiredWaitMinutes(trip)} minutes at the pick-up. ` +
+    `Leaving before then risks your no-show payment not being approved.`
+  );
+}
+
+/**
+ * What the refusal's dismissal is called.
+ *
+ * ⛔⛔ `OK` is CAPTURED — `s-06c` and `s-06d` both show it, and production's
+ * button does nothing but close. `Close` is honest only once the tap carries a
+ * confirmation behind it, so the label follows the same flag the confirmation
+ * does. Two constants, one rule, so they cannot drift into a `Close` that
+ * closes.
+ */
+export const REFUSAL_DISMISS_PRODUCTION = "OK";
+export const REFUSAL_DISMISS_PROPOSED = "Close";
+
+export function refusalDismissLabel(treatment: NoShowTreatment): string {
+  return treatment.confirmLeaving
+    ? REFUSAL_DISMISS_PROPOSED
+    : REFUSAL_DISMISS_PRODUCTION;
 }
 
 /** Whether Member No-Show is offered without a refusal. Kept for the tile's own check. */

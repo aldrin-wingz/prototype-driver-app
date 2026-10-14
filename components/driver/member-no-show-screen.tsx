@@ -26,9 +26,14 @@ import {
 import { RiderNoShowForm } from "@/components/support/rider-no-show-form";
 import { CancelAtDoorForm } from "@/components/support/cancel-at-door-form";
 import {
+  LEAVE_WARNING_LEAVE,
+  LEAVE_WARNING_STAY,
+  LEAVE_WARNING_TITLE,
   NO_SHOW_REFUSAL_COPY,
   NO_SHOW_TYPES,
+  leaveWarningBody,
   noShowFormFor,
+  refusalDismissLabel,
   resolveNoShow,
   treatmentFor,
   waivesPresenceWait,
@@ -87,6 +92,15 @@ export function MemberNoShowScreen({
   const [signed, setSigned] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [refusal, setRefusal] = useState<NoShowOutcome | null>(null);
+  /**
+   * The refusal the driver is dismissing, held while they confirm.
+   *
+   * ⛔ Held, not discarded — `Stay at the pick-up` has to put the SAME refusal
+   * back, countdown and all. Re-deriving it would re-run `resolveNoShow`
+   * against a clock that has moved, so the dialog that reappeared would be a
+   * different one from the one they dismissed.
+   */
+  const [leaving, setLeaving] = useState<NoShowOutcome | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [cancelAtDoorOpen, setCancelAtDoorOpen] = useState(false);
   /** Whether the app can place the driver at the pick-up — picks the variant. */
@@ -368,8 +382,74 @@ export function MemberNoShowScreen({
                 Submit support form
               </AlertDialogAction>
             )}
+            {/* ⛔⛔ `OK` is CAPTURED (`s-06c`, `s-06d`) and production's button
+                does nothing but close. `Close` and the confirmation behind it
+                are the proposal, so both follow `confirmLeaving` — and the
+                LABEL comes from the rule rather than a ternary here, so a
+                `Close` that merely closes is not expressible. */}
+            {treatment.confirmLeaving ? (
+              <AlertDialogAction
+                onClick={() => {
+                  // ⚠️ Carried across, not re-derived. See `leaving`.
+                  setLeaving(refusal);
+                  setRefusal(null);
+                }}
+                className="mt-0 h-12 w-full rounded-lg border border-gray-300 bg-white text-base font-bold text-gray-900 hover:bg-gray-50"
+              >
+                {refusalDismissLabel(treatment)}
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogCancel className="mt-0 h-12 w-full rounded-lg border-gray-300 text-base font-bold text-gray-900">
+                {refusalDismissLabel(treatment)}
+              </AlertDialogCancel>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/*
+        ⭐ What dismissing the refusal actually costs.
+
+        The refusal says the filing is not available yet. Production's `OK` then
+        returns the driver to the screen having said nothing about what walking
+        away does — and walking away is what loses the payment. This names it at
+        the one moment the driver is deciding.
+
+        ⛔ A WARNING, not a block. Both answers close the refusal; one puts the
+        countdown back in front of them and the other does not. A driver who
+        really has to leave is not stopped, because the app cannot know why.
+      */}
+      <AlertDialog
+        open={Boolean(leaving)}
+        onOpenChange={(open) => !open && setLeaving(null)}
+      >
+        <AlertDialogContent className="max-w-[20rem] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-gray-900">
+              {LEAVE_WARNING_TITLE}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-gray-700">
+              {leaveWarningBody(trip)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+            {/* ⛔ Staying is the PRIMARY and it puts the refusal back, so the
+                countdown the driver just dismissed is in front of them again.
+                A confirmation whose friendly answer is a dead end is a
+                confirmation nobody reads twice. */}
+            <AlertDialogAction
+              onClick={() => {
+                const back = leaving;
+                setLeaving(null);
+                setRefusal(back);
+              }}
+              className="h-12 w-full rounded-lg text-base font-bold text-white"
+              style={{ backgroundColor: DRIVER_TEAL }}
+            >
+              {LEAVE_WARNING_STAY}
+            </AlertDialogAction>
             <AlertDialogCancel className="mt-0 h-12 w-full rounded-lg border-gray-300 text-base font-bold text-gray-900">
-              OK
+              {LEAVE_WARNING_LEAVE}
             </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>

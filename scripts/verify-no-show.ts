@@ -36,6 +36,15 @@ import {
   treatmentFor,
   waivesPresenceWait,
   walkLocationRecords,
+  CLIENT_WAIT_MINUTES,
+  LEAVE_WARNING_LEAVE,
+  LEAVE_WARNING_STAY,
+  LEAVE_WARNING_TITLE,
+  REFUSAL_DISMISS_PRODUCTION,
+  REFUSAL_DISMISS_PROPOSED,
+  leaveWarningBody,
+  refusalDismissLabel,
+  requiredWaitMinutes,
   type NoShowDemoRow,
 } from "../lib/driver-data/no-show-rules";
 import { mockInProgressTrips } from "../lib/driver-data/mock-trips";
@@ -909,6 +918,177 @@ check(
   `${tagged.length - leakedToStranger.length} of ${tagged.length} ride(s) show production`
 );
 
+
+/* ===========================================================================
+   Dismissing the refusal — what it is called, and what it costs
+   =========================================================================== */
+
+/**
+ * ⛔⛔ **`OK` is a CAPTURED string.** `s-06c` and `s-06d` both show production's
+ * refusal with one button reading `OK`, and tapping it does nothing but close.
+ * Renaming it `Close` and putting a consequence behind it is row 01's proposal,
+ * so it is gated — and these checks are what stop it leaking onto the side of
+ * the comparison that is supposed to be today.
+ */
+const PROPOSAL_ROWS: NoShowDemoRow[] = ["3.1", "4.1", "5", "6.1", "WV1.1"];
+const AS_IS_ROWS = (Object.keys(NO_SHOW_TREATMENTS) as NoShowDemoRow[]).filter(
+  (row) => !PROPOSAL_ROWS.includes(row)
+);
+check(
+  "the matrix splits into as-is and proposal rows, and both exist",
+  AS_IS_ROWS.length === 4 &&
+    PROPOSAL_ROWS.length === 5 &&
+    AS_IS_ROWS.length + PROPOSAL_ROWS.length === Object.keys(NO_SHOW_TREATMENTS).length,
+  `${AS_IS_ROWS.length} as-is + ${PROPOSAL_ROWS.length} proposal of ${Object.keys(NO_SHOW_TREATMENTS).length}`
+);
+const confirmLeaks = AS_IS_ROWS.filter((row) => NO_SHOW_TREATMENTS[row].confirmLeaving);
+check(
+  "no as-is row asks the driver to confirm — production's OK just closes",
+  confirmLeaks.length === 0,
+  confirmLeaks.length ? confirmLeaks.join(", ") : `0 of ${AS_IS_ROWS.length} as-is rows`
+);
+const confirmMissing = PROPOSAL_ROWS.filter((row) => !NO_SHOW_TREATMENTS[row].confirmLeaving);
+check(
+  "...and every proposal row does, so the flag is not decorative",
+  confirmMissing.length === 0,
+  confirmMissing.length ? confirmMissing.join(", ") : `${PROPOSAL_ROWS.length} of ${PROPOSAL_ROWS.length}`
+);
+
+/** ⛔ The label follows the flag, and only the flag. Driven, not grepped. */
+const labelPairs = [false, true].map((confirmLeaving) =>
+  refusalDismissLabel({
+    copy: "production",
+    showTimer: false,
+    offerForm: false,
+    confirmLeaving,
+    pickupTimeGate: true,
+  })
+);
+check(
+  "the dismissal is OK without the confirmation and Close with it",
+  labelPairs[0] === REFUSAL_DISMISS_PRODUCTION &&
+    labelPairs[1] === REFUSAL_DISMISS_PROPOSED &&
+    // ⚠️ No `labelPairs[0] !== labelPairs[1]` here: TypeScript narrows both to
+    // literal types and rejects the comparison as having no overlap — which is
+    // itself the proof that the two constants differ.
+    REFUSAL_DISMISS_PRODUCTION === "OK",
+  `${labelPairs.join(" / ")}`
+);
+
+/**
+ * ⛔⛔ The sweep that matters: on the production side of the comparison, over
+ * every seeded ride, the button is still the captured one.
+ */
+const nowLabels = mockInProgressTrips.map((trip) => ({
+  id: trip.id,
+  label: refusalDismissLabel(treatmentFor(trip, { solutionId: "rider-no-show", mode: "now" })),
+}));
+const renamed = nowLabels.filter((r) => r.label !== REFUSAL_DISMISS_PRODUCTION);
+check(
+  "every ride still shows the captured OK on the production side",
+  renamed.length === 0,
+  renamed.length
+    ? renamed.map((r) => `${r.id}=${r.label}`).join(", ")
+    : `${nowLabels.length} of ${nowLabels.length} rides`
+);
+/** ...and the proposal side actually differs somewhere, or the gate is moot. */
+const fixedLabels = new Set(
+  tagged.map((trip) =>
+    refusalDismissLabel(treatmentFor(trip, { solutionId: "rider-no-show", mode: "fixed" }))
+  )
+);
+check(
+  "...and the proposal side renames it, so the gate is doing work",
+  fixedLabels.has(REFUSAL_DISMISS_PROPOSED),
+  `${tagged.length} tagged ride(s) → ${[...fixedLabels].join(", ")}`
+);
+
+/**
+ * The wait the warning attributes to the client.
+ *
+ * ⛔⛔ **The copy says "{Client} requires N minutes", so a RULE has to say it
+ * too.** Interpolating `NO_SHOW_WAIT_MINUTES` into a sentence that names the
+ * client would be a claim with nothing behind it. `CLIENT_WAIT_MINUTES` is the
+ * rule and it is deliberately EMPTY — the measured wait is the same for every
+ * client in the seed and nobody has evidence of one that differs.
+ */
+check(
+  "no client-specific wait has been invented",
+  Object.keys(CLIENT_WAIT_MINUTES).length === 0,
+  `${Object.keys(CLIENT_WAIT_MINUTES).length} override(s): ${Object.keys(CLIENT_WAIT_MINUTES).join(", ")}`
+);
+const clients = [...new Set(mockInProgressTrips.map((t) => t.client))];
+const oddWaits = mockInProgressTrips.filter(
+  (t) => requiredWaitMinutes(t) !== NO_SHOW_WAIT_MINUTES
+);
+check(
+  "every seeded client resolves to the standard wait",
+  oddWaits.length === 0 && clients.length > 1,
+  `${clients.length} client(s) — ${clients.join(", ")} — all at ${NO_SHOW_WAIT_MINUTES} min`
+);
+
+/**
+ * ⛔ The warning names THIS ride's client and THIS ride's number. A body that
+ * hardcoded either would pass a "does it mention a client" grep and be wrong on
+ * every ride but one.
+ */
+const bodyWrong = mockInProgressTrips.filter((trip) => {
+  const body = leaveWarningBody(trip);
+  return (
+    !body.includes(trip.client) ||
+    !body.includes(`${requiredWaitMinutes(trip)} minutes`)
+  );
+});
+check(
+  "the warning names the ride's own client and wait",
+  bodyWrong.length === 0,
+  bodyWrong.length
+    ? bodyWrong.map((t) => t.id).join(", ")
+    : `${mockInProgressTrips.length} of ${mockInProgressTrips.length} — e.g. "${leaveWarningBody(mockInProgressTrips[0])}"`
+);
+const distinctBodies = new Set(mockInProgressTrips.map(leaveWarningBody));
+check(
+  "...and it is not one fixed sentence for every ride",
+  distinctBodies.size > 1,
+  `${distinctBodies.size} distinct body(ies) across ${mockInProgressTrips.length} rides`
+);
+
+/**
+ * ⛔⛔ **A warning, not a block, and both ways out must exist.** One answer puts
+ * the refusal back — countdown and all — and the other closes. A confirmation
+ * whose friendly answer is a dead end is one nobody reads twice; a
+ * confirmation with no way past is a block the app has no grounds to impose.
+ */
+const SCREEN_CODE = SCREEN.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+check(
+  "stripping the screen's comments left the code behind",
+  SCREEN_CODE.includes("export function MemberNoShowScreen") && SCREEN_CODE.length > 2000,
+  `${SCREEN_CODE.length} chars after stripping, from ${SCREEN.length} raw`
+);
+check(
+  "the screen offers both ways out of the confirmation",
+  SCREEN_CODE.includes("{LEAVE_WARNING_STAY}") &&
+    SCREEN_CODE.includes("{LEAVE_WARNING_LEAVE}"),
+  `"${LEAVE_WARNING_STAY}" / "${LEAVE_WARNING_LEAVE}"`
+);
+/**
+ * ⛔ Staying must restore the SAME refusal. Re-deriving it would re-run
+ * `resolveNoShow` against a clock that has moved, so the dialog that came back
+ * would be a different one from the one dismissed — a countdown that jumped.
+ */
+check(
+  "...and staying restores the refusal it was holding, rather than re-deriving it",
+  /setLeaving\(refusal\)/.test(SCREEN_CODE) && /setRefusal\(back\)/.test(SCREEN_CODE),
+  "the refusal is rebuilt instead of carried across"
+);
+/** ⛔ No hand-written OK: the label is the rule's, on both sides. */
+check(
+  "the dismissal label comes from the rule, not from the markup",
+  /refusalDismissLabel\(treatment\)/.test(SCREEN_CODE) &&
+    !/>\s*OK\s*</.test(SCREEN_CODE) &&
+    SCREEN_CODE.includes("{LEAVE_WARNING_TITLE}"),
+  "a literal OK is still in the markup"
+);
 
 console.log(
   failures.length === 0
