@@ -10630,6 +10630,68 @@ check(
     /groupByRideDay\(cards\)/.test(PAGE_CODE),
 );
 
+/* --- 31i. Five surfaces, one answer, over every focus -------------------- */
+/**
+ * ⛔⛔ **The row-10 lesson, applied before it can be relearned.**
+ *
+ * That row shipped a feed narrowed by a member filter the driver could not
+ * see, open or clear, because three surfaces each answered for themselves. Row
+ * 18 has five: the manifest, the task list, the bar's visibility, the bar's
+ * value, and the Acknowledge button. Every one of them must come from
+ * `showsCancelledRides` and agree, at every focus and in both modes.
+ *
+ * ⚠️ Swept over all 28 focuses rather than spot-checked on the owner, with a
+ * denominator — a rule proven on one id cannot tell a gate from a coincidence.
+ */
+const CC_SURFACES: Array<[string, (f: DemoFocus) => boolean]> = [
+  ["manifest holds them", (f) => upcomingRides(mockUpcomingTrips, f).some(isClientCancelled)],
+  ["task list holds them", (f) => cancelledRides(mockUpcomingTrips, f).length > 0],
+  ["bar is offered", (f) => showsCancelledRides(f)],
+  ["bar keeps a cancelled selection", (f) => applicableRidesFilter("cancelled", f) === "cancelled"],
+  [
+    "a cancellation is still a task",
+    (f) => CANCELLED_SEED.some((t) => needsAcknowledgement(t, [], f)),
+  ],
+];
+let ccSweep = 0;
+const ccDisagreements: string[] = [];
+for (const id of FOCUS_IDS) {
+  for (const mode of DEMO_MODES) {
+    const focus = demoFocus(id, mode);
+    // ⛔ The one answer every surface must match, from the gate itself.
+    const want = showsCancelledRides(focus);
+    for (const [name, read] of CC_SURFACES) {
+      ccSweep += 1;
+      if (read(focus) !== want) {
+        ccDisagreements.push(`${id ?? "no focus"}/${mode}: ${name}`);
+      }
+    }
+  }
+}
+check(
+  "all five surfaces give the gate's answer, at every focus and in both modes",
+  `${ccDisagreements.length} wrong of ${ccSweep}${ccDisagreements.length ? " — " + ccDisagreements.slice(0, 4).join(", ") : ""}`,
+  ccDisagreements.length === 0 &&
+    ccSweep === FOCUS_IDS.length * DEMO_MODES.length * CC_SURFACES.length,
+);
+/**
+ * ⛔⛔ **Non-vacuity, and it is the half that matters.** Five surfaces that were
+ * all false everywhere would pass the sweep above perfectly. Both outcomes must
+ * occur, and they must occur on the rows the rule names: the owner in Proposed
+ * and the plain mirror, nowhere else.
+ */
+const shownAt = FOCUS_IDS.flatMap((id) =>
+  DEMO_MODES.filter((mode) => showsCancelledRides(demoFocus(id, mode))).map(
+    (mode) => `${id ?? "no focus"}/${mode}`,
+  ),
+);
+const EXPECTED_SHOWN = ["my-rides-cancelled/fixed", "no focus/now", "no focus/fixed"];
+check(
+  "...and they are shown exactly where the rule says, nowhere else",
+  `${shownAt.length} of ${ccSweep / CC_SURFACES.length} focus/mode pair(s): ${shownAt.join(", ")}`,
+  [...shownAt].sort().join(",") === [...EXPECTED_SHOWN].sort().join(","),
+);
+
 // ---------------------------------------------------------------------------
 console.log(
   failures === 0
