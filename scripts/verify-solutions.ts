@@ -4392,6 +4392,21 @@ check(
   toldByShown === SECOND_HAND_CHANNELS.length,
 );
 
+/**
+ * ⛔ The legs question names what the MEMBER did, not what Support should do
+ * about it. *"Which legs should come off?"* asked the driver to describe an
+ * outcome they do not decide — removing a leg from a manifest is Support's
+ * call, and a form that pre-states the remedy is a form whose answer is harder
+ * to disagree with. (User direction, 2026-10-14.)
+ */
+const legsField = declineCase.fields.find((f) => f.id === DECLINED_LEGS_FIELD);
+check(
+  "the legs question asks what the member did",
+  `"${legsField?.label}"`,
+  legsField?.label === "Which legs did the member decline?" &&
+    !/come off|remove/i.test(legsField?.label ?? ""),
+);
+
 /* --- 14f. The gate actually gates, and actually lets go ------------------ */
 
 /**
@@ -9221,20 +9236,29 @@ check(
 );
 
 /**
- * ⛔ The eight rows the leg section carries, in the order the leg happens —
+ * ⛔ The nine rows the leg section carries, in the order the leg happens —
  * each scheduled time beside the mark that was meant to match it.
  *
  * ⚠️ `Status` is gone (it was the pill in the heading, worded identically) and
- * so is the separate marks strip, which is now rows 4 and 7.
+ * so is the separate marks strip, which is now rows 4 and 8.
+ *
+ * ⭐ **Nine, not eight, since 2026-10-14.** `En-route time` was restored at
+ * index 3 — between the scheduled pick-up and the actual one, because that is
+ * when it happens. It had been dropped for not being in the requested list,
+ * and pruning the Missed Swipe form's recorded fields then took it off the
+ * screen entirely. ⛔ The index pairs below moved with it; a count that changed
+ * without the positions moving would mean a row was inserted at the end, which
+ * is the one place it must never go.
  */
-const EXPECTED_LEG_ROWS = 8;
+const EXPECTED_LEG_ROWS = 9;
 const FIXED_LABELS: Array<[number, string]> = [
   [0, "ID"],
   [1, "Pick-up location"],
-  [3, "Actual pick-up time"],
-  [4, "Pick-up odometer"],
-  [6, "Actual drop-off time"],
-  [7, "Drop-off odometer"],
+  [3, "En-route time"],
+  [4, "Actual pick-up time"],
+  [5, "Pick-up odometer"],
+  [7, "Actual drop-off time"],
+  [8, "Drop-off odometer"],
 ];
 const wrongShape = CONTEXT_LEGS.filter((option) => {
   const rows = tripContextFor(option).legRows;
@@ -9244,7 +9268,7 @@ const wrongShape = CONTEXT_LEGS.filter((option) => {
   );
 });
 check(
-  "every leg renders the same eight rows, in the same order",
+  "every leg renders the same nine rows, in the same order",
   wrongShape.length
     ? wrongShape.slice(0, 3).map((o) => o.legId).join(", ")
     : `${CONTEXT_LEGS.length} of ${CONTEXT_LEGS.length} legs, ${EXPECTED_LEG_ROWS} rows each`,
@@ -9269,6 +9293,96 @@ check(
   // that it has no scheduled pick-up time. The check was wrong, not the code.
   borrowed.length === 0 && scheduledLabels.size > 1,
 );
+/**
+ * ⛔⛔ **The en-route row must be able to say both things.** A row that is a
+ * dash on every seeded leg and a row that is a value on every seeded leg are
+ * both indistinguishable from a row wired to a constant. Swept with both
+ * counts declared, so a seed change that flattened it fails here.
+ */
+const enrouteRows = CONTEXT_LEGS.map((o) => ({
+  legId: o.legId,
+  row: tripContextFor(o).legRows[3],
+  startedAt: o.leg.progress?.startedAt ?? null,
+}));
+const enrouteWrong = enrouteRows.filter(
+  (r) => (r.startedAt === null) !== (r.row.absent === true),
+);
+check(
+  "the en-route row says what the leg holds, dash and value alike",
+  `${enrouteRows.filter((r) => r.row.absent).length} dash(es) and ${enrouteRows.filter((r) => !r.row.absent).length} value(s) of ${enrouteRows.length}; ${enrouteWrong.length} disagree`,
+  enrouteWrong.length === 0 &&
+    enrouteRows.some((r) => r.row.absent) &&
+    enrouteRows.some((r) => !r.row.absent),
+);
+/**
+ * ⛔⛔ **The block is drawn on the two forms that have no picker to hang it
+ * under.** Rider Declined and Add Leg are opened FROM a ride and pass their leg
+ * straight to `submitForm`, so neither carries a `leg-picker` — and the banner
+ * was mounted under the picker, which meant no picker, no block. A reviewer
+ * opening either saw the first question with no trip on screen at all. (User
+ * direction, 2026-10-14.)
+ *
+ * ⚠️ Asserted three ways, because any one alone passes on a half-wiring: the
+ * sheet takes a leg id, it decides ONE row to draw under, and both callers
+ * actually pass theirs.
+ */
+const FORM_SHEET_SRC = codeOnly(readFileSync(join(ROOT, "components/support/support-form-sheet.tsx"), "utf8"));
+check(
+  "the sheet can be told which leg to draw the block for",
+  `contextLegId: ${/contextLegId\?: string/.test(FORM_SHEET_SRC)}, resolved: ${/findLegOption\(contextLegId\)/.test(FORM_SHEET_SRC)}`,
+  /contextLegId\?: string/.test(FORM_SHEET_SRC) && /findLegOption\(contextLegId\)/.test(FORM_SHEET_SRC),
+);
+/**
+ * ⛔ ONE id, never a per-row predicate. "A picker, or the first field when
+ * there is no picker" evaluated per row is two rules that agree only until a
+ * second picker exists — and the failure is the block drawn twice, once against
+ * the wrong leg.
+ */
+check(
+  "...and exactly one row is chosen to draw it under",
+  `${(FORM_SHEET_SRC.match(/<TripSummaryBanner/g) ?? []).length} mount(s), ${(FORM_SHEET_SRC.match(/bannerAfterId/g) ?? []).length} reference(s) to the single id`,
+  (FORM_SHEET_SRC.match(/<TripSummaryBanner/g) ?? []).length === 1 &&
+    /field\.id === bannerAfterId/.test(FORM_SHEET_SRC) &&
+    // ⛔ The picker still wins where there is one, or a case with a picker
+    // would freeze the block on whatever leg it opened from.
+    /selectedLeg \?\? \(contextLegId/.test(FORM_SHEET_SRC),
+);
+const PICKERLESS_CALLERS: Array<[string, string]> = [
+  ["rider-declined-form.tsx", "row 16 — Rider Declined the Trip"],
+  ["add-leg-form.tsx", "row 19 — Add Leg to Trip"],
+];
+const notPassing = PICKERLESS_CALLERS.filter(
+  ([file]) =>
+    !/contextLegId=\{leg\?\.id\}/.test(
+      codeOnly(readFileSync(join(ROOT, "components/support", file), "utf8")),
+    ),
+);
+check(
+  "...and both pickerless forms pass the leg they were opened from",
+  `${notPassing.length} of ${PICKERLESS_CALLERS.length} not passing — ${notPassing.map(([, why]) => why).join(", ") || "none"}`,
+  notPassing.length === 0,
+);
+/**
+ * ⛔⛔ ...and the picker is not merely absent from the case — it is INVISIBLE
+ * for this issue, which is a different thing and the one that matters.
+ *
+ * The `legId` field is built on every case and gated by `showIf: ANY_LEG_CASE`,
+ * which `ISSUE_RIDER_DECLINED` is deliberately not in. `bannerAfterId` reads
+ * the VISIBLE fields, so a check that looked at `fields` alone would have said
+ * this case has a picker and been wrong about which row the block follows.
+ * (Found by running it: the first version failed here, and the code was right.)
+ */
+const declinedBuilt = buildRiderDeclined(declineRide, declineRide.legs[0]);
+const declinedVisible = declinedBuilt.supportCase.fields.filter((f) =>
+  isFieldVisible(f, declinedBuilt.initialValues),
+);
+check(
+  "...while the declined form shows no picker, so the block follows its first field",
+  `${declinedVisible.filter((f) => f.type === "leg-picker").length} visible picker(s); first visible field is "${declinedVisible[0]?.id}"`,
+  declinedVisible.filter((f) => f.type === "leg-picker").length === 0 &&
+    declinedVisible[0]?.id === "issue",
+);
+
 /** ⛔ Status is not a row — it is the pill, and two copies could disagree. */
 const statusRows = CONTEXT_LEGS.filter((o) =>
   tripContextFor(o).legRows.some((r) => r.label === "Status"),

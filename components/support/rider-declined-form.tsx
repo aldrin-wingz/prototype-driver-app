@@ -75,6 +75,11 @@ export function RiderDeclinedForm({
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}
+      // ⛔ This case carries no leg picker, so the context block has nothing
+      // to hang under. The leg is told to the sheet for the same reason it is
+      // told to `submitForm` below — the entry point is a ride, and the form
+      // has to show which one.
+      contextLegId={leg?.id}
       onSubmit={(values) => {
         onOpenChange(false);
 

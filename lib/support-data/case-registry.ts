@@ -842,7 +842,10 @@ export function buildSupportFormCase({
             {
               id: DECLINED_LEGS_FIELD,
               type: "leg-checklist",
-              label: "Which legs should come off?",
+              // ⚠️ Names what the MEMBER did, not what Support should do with
+              // it. "Which legs should come off?" asked the driver to describe
+              // an outcome they do not decide. (User direction, 2026-10-14.)
+              label: "Which legs did the member decline?",
               shortLabel: "legs to remove",
               required: true,
               options: riderDeclined.legOptions,

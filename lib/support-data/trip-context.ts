@@ -138,10 +138,15 @@ export function tripContextFor(option: LegOption): TripContext {
      *
      * ⛔ `Status` is gone: it was the same word as the pill in the heading.
      *
-     * ⚠️ **The EN-ROUTE mark is no longer shown.** It is not in the requested
-     * row list, and it is the one mark the app almost always holds — the missed
-     * swipe case calls it "the one mark we always have". One row to restore if
-     * that turns out to matter.
+     * ⭐ **The EN-ROUTE mark is back, 2026-10-14.** It was dropped because it
+     * was not in the eight requested rows, and the Missed Swipe form was the
+     * last place it appeared — so pruning that form's recorded fields took it
+     * off the screen entirely. It is the one mark the app almost always holds.
+     *
+     * ⛔ It sits between the scheduled pick-up and the actual one, because that
+     * is when it happens — not appended at the end where the order would stop
+     * being the order of the leg. A dash while the driver is still in member
+     * confirmation, like every other unsupplied value.
      */
     legRows: [
       row("ID", leg.legCode ? `${leg.legCode} · ${leg.id}` : leg.id),
@@ -152,6 +157,7 @@ export function tripContextFor(option: LegOption): TripContext {
        * where that is the difference the driver is being asked about.
        */
       row(leg.label, `${trip.date} · ${leg.time}`),
+      row("En-route time", progress?.startedAt ?? null),
       row("Actual pick-up time", progress?.pickedUpAt ?? null),
       row("Pick-up odometer", reading(progress?.pickedUpOdometer)),
       row(dropOff?.label ?? "Appointment Time", dropOff?.time ?? null),

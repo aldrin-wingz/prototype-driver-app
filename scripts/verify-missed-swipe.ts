@@ -571,18 +571,24 @@ for (const scenario of SCENARIOS) {
  * `Current leg details` block — so for every scenario, every value the form
  * stopped asking for must appear THERE, with its real value and not a dash.
  *
- * ⛔ `enRouteTime` is the exception, and it is a real gap rather than a pass:
- * the en-route mark is not one of the eight requested rows, so it is now shown
- * nowhere on this form. Declared as a literal so it is a decision on the record
- * rather than a hole the check cannot see.
+ * ⭐ **`enRouteTime` is no longer an exception.** It briefly was: dropping the
+ * recorded fields took the en-route mark off this form entirely, because it was
+ * not one of the eight requested context rows. It was restored as the ninth
+ * (user direction, 2026-10-14), so every value this form stopped asking for is
+ * shown one block up and the list below is empty.
+ *
+ * ⛔ The list STAYS. An empty literal is the shape that makes the next gap
+ * visible; deleting it because there is nothing in it today is how the next one
+ * ships unnamed. A non-empty one fails the declaration check below.
  */
-const NOT_SHOWN_ANYWHERE = ["enRouteTime"];
+const NOT_SHOWN_ANYWHERE: string[] = [];
 /** Form field id → the `Current leg details` row that now carries it. */
 const CONTEXT_ROW_FOR: Record<string, string> = {
   pickupTime: "Actual pick-up time",
   pickupOdometer: "Pick-up odometer",
   dropOffTime: "Actual drop-off time",
   dropoffOdometer: "Drop-off odometer",
+  enRouteTime: "En-route time",
 };
 /**
  * ⚠️ **1a's drop-off is recorded by the swipe the driver just made**, not by
@@ -614,12 +620,27 @@ for (const scenario of SCENARIOS) {
 resetSessionSwipes();
 /** ⛔ Non-vacuity: the loop above must have had something to look for. */
 check("...and the context check actually examined some values",
-  contextChecked === 4,
+  contextChecked === 7,
   `${contextChecked} recorded value(s) across ${SCENARIOS.length} scenario(s)`);
-check("the one mark shown nowhere is declared, and it is the en-route mark",
-  NOT_SHOWN_ANYWHERE.length === 1 && NOT_SHOWN_ANYWHERE[0] === "enRouteTime" &&
-    SCENARIOS.every((s) => s.absent.includes("enRouteTime")),
-  NOT_SHOWN_ANYWHERE.join(","));
+/**
+ * ⛔⛔ The claim moved to the measured side when the list emptied. "Every value
+ * this form stopped asking for is shown above" passes vacuously over an empty
+ * exemption list only if nothing is exempt AND something was checked — the
+ * count below is the second half.
+ */
+check("nothing this form stopped asking for is hidden",
+  NOT_SHOWN_ANYWHERE.length === 0,
+  `exempt: ${NOT_SHOWN_ANYWHERE.join(",") || "none"}`);
+check("...and the en-route mark in particular is in the context block",
+  SCENARIOS.every((sc) => {
+    const option = getLegOptions("in-progress").find(
+      (o) => o.legId === firstLeg(sc.rideId).id
+    );
+    const rows = option ? tripContextFor(option).legRows : [];
+    const row = rows.find((r) => r.label === "En-route time");
+    return Boolean(row) && row!.absent !== true;
+  }),
+  "the en-route row is missing or blank on a Missed Swipe ride");
 
 // ═══════════════════════════════════════════════════════════════════
 section("5. Prefill — times proposed, odometers never invented");

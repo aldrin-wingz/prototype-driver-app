@@ -40,6 +40,7 @@ export function SupportFormSheet({
   open,
   onOpenChange,
   onSubmit,
+  contextLegId,
   recompute,
 }: {
   supportCase: SupportCaseDefinition;
@@ -62,6 +63,21 @@ export function SupportFormSheet({
    * of them produces a form that either renders fields nobody filled or fills
    * fields nobody renders.
    */
+  /**
+   * The leg to show the context block against, when the case has no picker.
+   *
+   * ⛔⛔ **Two forms were filing against a trip and showing nothing about it.**
+   * Rider Declined and Add Leg are both opened FROM a ride and pass their
+   * `legId` straight to `submitForm`, so neither carries a `leg-picker` — and
+   * the banner was mounted under the picker, which meant no picker, no block.
+   * A reviewer opening either one saw "Which legs did the member decline?" with
+   * no trip on screen at all. (User direction, 2026-10-14.)
+   *
+   * ⚠️ A leg ID, not an option: the sheet already resolves one through
+   * `findLegOption`, and two resolvers are two chances to show a different leg
+   * from the one the request is filed against.
+   */
+  contextLegId?: string;
   recompute?: {
     /** Rebuild the case from the current answers. */
     case: (values: Record<string, string>) => SupportCaseDefinition;
@@ -140,6 +156,14 @@ export function SupportFormSheet({
   );
   const legValue = legField ? (values[legField.id] ?? "") : "";
   const selectedLeg = legValue ? findLegOption(legValue) : undefined;
+  /**
+   * The leg the block is drawn for, and where it is drawn.
+   *
+   * ⛔ The picker's own selection always wins — a case that has one is a case
+   * where the driver can change which leg this is about, and a `contextLegId`
+   * passed alongside would freeze the block on the leg they started from.
+   */
+  const bannerLeg = selectedLeg ?? (contextLegId ? findLegOption(contextLegId) : undefined);
 
   useEffect(() => {
     if (!selectedLeg) return;
@@ -168,6 +192,18 @@ export function SupportFormSheet({
   const visibleFields = activeCase.fields.filter((field) =>
     isFieldVisible(field, values)
   );
+
+  /**
+   * The one field the context block follows.
+   *
+   * ⛔⛔ Exactly one id, never a predicate evaluated per row. A predicate like
+   * *"a picker, or the first field when there is no picker"* is two rules that
+   * agree only as long as nobody adds a second picker — and the failure is the
+   * block rendered twice, one of them against the wrong leg.
+   */
+  const bannerAfterId =
+    visibleFields.find((field) => field.type === "leg-picker")?.id ??
+    visibleFields[0]?.id;
 
   /**
    * Cautions about the times entered, keyed by field.
@@ -276,9 +312,15 @@ export function SupportFormSheet({
                   values={values}
                   setValue={setValue}
                 />
-                {/* The summary sits directly under the picker that produced it. */}
-                {field.type === "leg-picker" && selectedLeg && (
-                  <TripSummaryBanner option={selectedLeg} />
+                {/*
+                  The summary sits directly under the picker that produced it —
+                  or, on a case with no picker, under the first field, which is
+                  always the issue type. ⛔ `bannerAfterId` is computed once from
+                  the visible fields rather than tested per row, so exactly one
+                  row can ever match and the block cannot render twice.
+                */}
+                {field.id === bannerAfterId && bannerLeg && (
+                  <TripSummaryBanner option={bannerLeg} />
                 )}
               </div>
             ))}
