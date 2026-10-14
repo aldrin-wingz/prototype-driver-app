@@ -12,6 +12,7 @@ import {
   mockRequestTrips,
 } from "@/lib/driver-data/mock-trips";
 import { getPenaltyForTrip } from "@/lib/data/wallet";
+import { detailStateFor } from "@/lib/driver-data/ride-detail-state";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -45,21 +46,10 @@ function MyRideDetailContent({ id }: { id: string }) {
 
   const penalty = isSentBack ? getPenaltyForTrip(id) : undefined;
 
-  // Four states, one per Ride Details phase:
-  //   completed    — sent back, or a finished ride; read-only, no footer
-  //   before-taken — an offer the driver has not accepted
-  //   in-progress  — accepted; the swipe sequence drives the rest
-  //   needs-action — accepted but unconfirmed
-  let state: "before-taken" | "in-progress" | "needs-action" | "completed";
-  if (isSentBack || trip.status === "completed") {
-    state = "completed";
-  } else if (trip.status === "upcoming") {
-    state = "before-taken";
-  } else if (trip.status === "in-progress") {
-    state = "in-progress";
-  } else {
-    state = "needs-action";
-  }
+  // ⛔ The phase is a RULE, and it lives in `lib/` so a check can drive it over
+  // every seeded ride. It used to be an if/else chain right here, which is
+  // exactly the shape §28 cannot reach.
+  const state = detailStateFor(trip, { isSentBack });
 
   const banner = isSentBack ? (
     <div className="mx-4 mt-4 rounded-lg border border-[#F87171] bg-[#FEE2E2] px-4 py-3">

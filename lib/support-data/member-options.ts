@@ -3,6 +3,7 @@ import {
   mockCompletedTrips,
   type Trip,
 } from "@/lib/driver-data/mock-trips";
+import { parseRideDate } from "@/lib/driver-data/ride-date";
 
 /** How far back a member counts as one the driver has recently driven. */
 export const MEMBER_WINDOW_DAYS = 30;
@@ -19,11 +20,12 @@ export interface MemberOption {
   searchText: string;
 }
 
-/** Parse a seeded ride date ("Mon, Jul 27, 2026") to a comparable timestamp. */
-function parseRideDate(rideDate: string): number {
-  const parsed = new Date(rideDate.replace(/^\w{3},\s*/, ""));
-  return parsed.getTime();
-}
+/**
+ * ⛔ Moved to `lib/driver-data/ride-date.ts` on 2026-10-15, when the Upcoming
+ * tab needed the same parse. Two parsers agree until the seed grows a date one
+ * of them cannot read, and this one was private so the second would have been
+ * written rather than found.
+ */
 
 function isInsideWindow(trip: Trip): boolean {
   const when = parseRideDate(trip.date);

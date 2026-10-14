@@ -289,6 +289,31 @@ import {
   type DemoMode,
 } from "../lib/solutions/demo-mode";
 import { focusParams, SOLUTION_PARAM } from "../lib/solutions/solution-context";
+import {
+  applicableRidesFilter,
+  applyRidesFilter,
+  isClientCancelled,
+  cancelAlertBody,
+  cancelledRides,
+  needsAcknowledgement,
+  upcomingRides,
+  ACKNOWLEDGE_CANCELLATION_LABEL,
+  CANCELLATION_ACKNOWLEDGED_PILL,
+  CANCELLED_BANNER_BODY,
+  CANCELLED_BANNER_TITLE,
+  CANCELLED_SUBTITLE,
+  CLIENT_CANCELLATION_PROVENANCE,
+  CLIENT_CANCELLATION_TRACKED_BY_APP,
+  CLIENT_CANCELLED_PILL,
+  DEFAULT_RIDES_FILTER,
+  MY_RIDES_FILTERS,
+  type RidesFilter,
+} from "../lib/driver-data/client-cancellation";
+import {
+  groupByRideDay,
+  parseRideDate,
+  sortByRideDate,
+} from "../lib/driver-data/ride-date";
 import { getLegOptions } from "../lib/support-data/leg-options";
 import {
   mockRequestTrips,
@@ -9948,11 +9973,19 @@ console.log("\n31. Row 18 — the manifest the cancellations sit in");
  * Both counts declared.
  */
 const ROW_18 = "my-rides-cancelled";
+/** `"2:46 PM"` → minutes, for the within-a-day order check below. */
+function minutesOfClock(clock: string): number {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((clock ?? "").trim());
+  if (!m) return -1;
+  const h = Number(m[1]) % 12;
+  return (m[3].toUpperCase() === "PM" ? h + 12 : h) * 60 + Number(m[2]);
+}
 const EXPECTED_ROW_18_RIDES = 13;
 const EXPECTED_ROW_18_CANCELLED = 3;
 const EXPECTED_ROW_18_DATES = 4;
 const row18 = ALL_SEEDED.filter((t) => t.scenario?.solutions.includes(ROW_18));
 const row18Cancelled = row18.filter((t) => Boolean(t.clientCancelNoticeAt));
+const CANCELLED_SEED = row18Cancelled;
 const row18Dates = [...new Set(row18.map((t) => t.date))];
 check(
   "row 18 is demonstrated on a whole manifest, not a pair of rides",
@@ -10024,6 +10057,280 @@ check(
   "...and every one was raised before its own pick-up",
   `${lateStamp.length} of ${row18Cancelled.length} raised late or unparseable`,
   lateStamp.length === 0,
+);
+
+/* --- 31b. The two concepts stay apart ----------------------------------- */
+/**
+ * ⛔⛔ **Two cancellations run in opposite directions and share almost every
+ * word.** `rider-declined.ts` is the DRIVER asking for a trip to come off,
+ * which nobody has granted. `client-cancellation.ts` is Wingz having already
+ * done it. Merge them and the app tells a driver their request was granted when
+ * it was not, or that a ride is gone when they only asked.
+ *
+ * Three mechanical defences, because a naming convention is not one.
+ */
+const CC_SRC = readFileSync(join(ROOT, "lib/driver-data/client-cancellation.ts"), "utf8");
+const RD_SRC = readFileSync(join(ROOT, "lib/driver-data/rider-declined.ts"), "utf8");
+check(
+  "the two cancellation modules never import each other",
+  `client-cancellation→rider-declined ${/from "\.\/rider-declined"/.test(codeOnly(CC_SRC))}, ` +
+    `rider-declined→client-cancellation ${/from "\.\/client-cancellation"/.test(codeOnly(RD_SRC))}`,
+  !/from "\.\/rider-declined"/.test(codeOnly(CC_SRC)) &&
+    !/from "\.\/client-cancellation"/.test(codeOnly(RD_SRC)),
+);
+check(
+  "...and their tracked-by-app constants disagree, which is the whole difference",
+  `client ${CLIENT_CANCELLATION_TRACKED_BY_APP} vs driver ${CANCELLATION_TRACKED_BY_APP}`,
+  CLIENT_CANCELLATION_TRACKED_BY_APP === true &&
+    CANCELLATION_TRACKED_BY_APP === false,
+);
+/** ⛔ ...and no string from one flow has been copied into the other. */
+const CLIENT_COPY = [
+  CANCELLED_BANNER_TITLE,
+  CANCELLED_BANNER_BODY,
+  CLIENT_CANCELLED_PILL,
+  ACKNOWLEDGE_CANCELLATION_LABEL,
+  CANCELLATION_ACKNOWLEDGED_PILL,
+];
+const DRIVER_COPY = [
+  CANCELLATION_REQUESTED_TITLE,
+  CANCELLATION_REQUESTED_DETAIL,
+  CANCELLATION_REQUESTED_PILL,
+];
+const crossed = CLIENT_COPY.filter((a) =>
+  DRIVER_COPY.some((b) => a.includes(b) || b.includes(a)),
+);
+check(
+  "...and neither flow's copy appears inside the other's",
+  `${crossed.length} of ${CLIENT_COPY.length} x ${DRIVER_COPY.length} string pair(s) overlap`,
+  crossed.length === 0 && CLIENT_COPY.length === 5 && DRIVER_COPY.length === 3,
+);
+
+/* --- 31c. Production's copy, including its own inconsistency ------------- */
+/**
+ * ⛔⛔ **Production spells it BOTH ways and this is the check that stops the
+ * tidy-up.** `CAP-341`'s alert says "was **canceled**" (one L); `CAP-342`'s
+ * banner says "**Cancelled** by Wingz" (two). The obvious improvement is to
+ * normalise them, and that would be the prototype quietly disagreeing with the
+ * photographs it is derived from.
+ */
+const alertBody = cancelAlertBody(CANCELLED_SEED[0]);
+check(
+  "the alert keeps production's one-L spelling",
+  `"${alertBody}"`,
+  /\bcanceled\b/.test(alertBody) && !/\bcancelled\b/i.test(alertBody),
+);
+check(
+  "...and the banner keeps production's two-L spelling",
+  `"${CANCELLED_BANNER_TITLE}" / "${CANCELLED_BANNER_BODY}"`,
+  /\bCancelled\b/.test(CANCELLED_BANNER_TITLE) &&
+    /\bcancelled\b/.test(CANCELLED_BANNER_BODY) &&
+    !/\bcanceled\b/.test(`${CANCELLED_BANNER_TITLE} ${CANCELLED_BANNER_BODY}`),
+);
+/** ⛔ The banner says no action is required, and the proposal does not argue. */
+check(
+  "...and the banner still says no action is required",
+  `"${CANCELLED_BANNER_BODY}"`,
+  CANCELLED_BANNER_BODY.includes("No action is required"),
+);
+/** ⛔ The subtitle is the capture's, not the `Will-Call Ride` the app hardcodes. */
+check(
+  "the cancelled ride's subtitle is the one CAP-342 shows",
+  `"${CANCELLED_SUBTITLE}"`,
+  CANCELLED_SUBTITLE === "Ride",
+);
+/** ⚠️ ...and what is OURS is declared as ours, so a fold-in cannot mistake it. */
+check(
+  "the acknowledgement is recorded as proposed, not captured",
+  `alert ${CLIENT_CANCELLATION_PROVENANCE.alert} · screen ${CLIENT_CANCELLATION_PROVENANCE.screen} · acknowledgement ${CLIENT_CANCELLATION_PROVENANCE.acknowledgement}`,
+  CLIENT_CANCELLATION_PROVENANCE.alert === "CAP-341" &&
+    CLIENT_CANCELLATION_PROVENANCE.screen === "CAP-342" &&
+    CLIENT_CANCELLATION_PROVENANCE.acknowledgement === "ours",
+);
+
+/* --- 31d. Acknowledging clears Needs Action and nothing else ------------- */
+/**
+ * ⛔⛔ **Measured, not trusted.** The guarantee is enforced by `upcomingRides`
+ * never being GIVEN the acknowledged list — but a later edit could add the
+ * parameter and nothing would complain. Driven both ways over the real seed.
+ */
+const FIXED_18 = FIXED("my-rides-cancelled");
+const allIds = mockUpcomingTrips.map((t) => t.id);
+/**
+ * ⛔⛔ The PAIRING is the property, driven with everything acknowledged: the
+ * manifest still holds all three cancellations while the task list holds none.
+ *
+ * ⚠️ The first version of this compared `upcomingRides(...)` to itself and
+ * called the two results "before" and "after" — a restatement, passing on any
+ * implementation at all, which is the exact trap this file documents twice.
+ * `upcomingRides` cannot be driven both ways BECAUSE it has no such parameter;
+ * the check below reads its body for that, and this one measures the outcome.
+ */
+const manifestWhenAcknowledged = upcomingRides(mockUpcomingTrips, FIXED_18);
+const stillListed = manifestWhenAcknowledged.filter(isClientCancelled);
+const stillTasks = CANCELLED_SEED.filter((t) =>
+  needsAcknowledgement(t, allIds, FIXED_18),
+);
+check(
+  "acknowledging everything empties the task list and leaves the manifest whole",
+  `manifest ${manifestWhenAcknowledged.length} ride(s) incl. ${stillListed.length} cancelled; ${stillTasks.length} still a task`,
+  manifestWhenAcknowledged.length === mockUpcomingTrips.length &&
+    stillListed.length === EXPECTED_ROW_18_CANCELLED &&
+    stillTasks.length === 0,
+);
+/**
+ * ⛔⛔ The function's OWN body, sliced to the next `export`. The first version
+ * of this looked 400 characters past the declaration, which ran clean through
+ * `cancelledRides` and into `needsAcknowledgement`'s doc comment — so it
+ * reported the word present and failed against correct code. A window is not
+ * an anchor.
+ */
+const upcomingBody = (() => {
+  const code = codeOnly(CC_SRC);
+  const from = code.indexOf("export function upcomingRides");
+  const to = code.indexOf("export ", from + 1);
+  return code.slice(from, to === -1 ? undefined : to);
+})();
+check(
+  "...because the rule is never given the list — its own body says so",
+  `${upcomingBody.length} chars, mentions acknowledg*: ${/acknowledg/i.test(upcomingBody)}`,
+  upcomingBody.length > 80 && !/acknowledg/i.test(upcomingBody),
+);
+/** ⛔ The positive control: the rule that DOES take the list responds to it. */
+const ackSeen = CANCELLED_SEED.filter((t) => needsAcknowledgement(t, [], FIXED_18));
+const ackGone = CANCELLED_SEED.filter((t) => needsAcknowledgement(t, allIds, FIXED_18));
+check(
+  "...while the Needs Action rule drains to nothing once they are acknowledged",
+  `${ackSeen.length} unacknowledged → ${ackGone.length} acknowledged`,
+  ackSeen.length === EXPECTED_ROW_18_CANCELLED && ackGone.length === 0,
+);
+
+/* --- 31e. The Now side strips the list, never the app -------------------- */
+const NOW_18 = demoFocus("my-rides-cancelled", "now");
+check(
+  "in Now the cancellations are gone from the manifest",
+  `${upcomingRides(mockUpcomingTrips, NOW_18).length} of ${mockUpcomingTrips.length} ride(s), ` +
+    `${cancelledRides(mockUpcomingTrips, NOW_18).length} cancelled visible`,
+  upcomingRides(mockUpcomingTrips, NOW_18).length ===
+    mockUpcomingTrips.length - EXPECTED_ROW_18_CANCELLED &&
+    cancelledRides(mockUpcomingTrips, NOW_18).length === 0,
+);
+check(
+  "...and in Proposed they are back, in the same array",
+  `${upcomingRides(mockUpcomingTrips, FIXED_18).length} ride(s), ${cancelledRides(mockUpcomingTrips, FIXED_18).length} cancelled`,
+  upcomingRides(mockUpcomingTrips, FIXED_18).length === mockUpcomingTrips.length &&
+    cancelledRides(mockUpcomingTrips, FIXED_18).length === EXPECTED_ROW_18_CANCELLED,
+);
+/**
+ * ⛔⛔ **The ride is stripped from the LIST, not from the app** — which is what
+ * lets production's `Go to ride` still land in Now. A guard that removed it
+ * from the seed would answer "what happens today?" with a 404.
+ */
+check(
+  "...but the ride itself still resolves in Now, which is how Go to ride works",
+  `${CANCELLED_SEED.length} cancelled ride(s), ${CANCELLED_SEED.filter((t) => ALL_SEEDED.some((x) => x.id === t.id)).length} findable by id`,
+  CANCELLED_SEED.every((t) => ALL_SEEDED.some((x) => x.id === t.id)),
+);
+/** ⛔ The filter falls back rather than refusing, for the same reason. */
+const FILTER_CASES: Array<[RidesFilter, DemoFocus, RidesFilter]> = [
+  ["cancelled", FIXED_18, "cancelled"],
+  ["cancelled", NOW_18, "all"],
+  ["active", NOW_18, "all"],
+  ["all", FIXED_18, "all"],
+  ["cancelled", FIXED(null), "cancelled"],
+  ["cancelled", FIXED("rider-no-show"), "all"],
+];
+const filterWrong = FILTER_CASES.filter(
+  ([key, focus, want]) => applicableRidesFilter(key, focus) !== want,
+);
+check(
+  "the filter falls back to All wherever the bar is not offered",
+  `${filterWrong.length} wrong of ${FILTER_CASES.length} case(s)`,
+  filterWrong.length === 0,
+);
+check(
+  "...and the three options are declared, in order",
+  MY_RIDES_FILTERS.map((f) => `${f.key}:${f.label}`).join(" | "),
+  MY_RIDES_FILTERS.map((f) => f.key).join(",") === "all,active,cancelled" &&
+    DEFAULT_RIDES_FILTER === "all",
+);
+/** ⛔ ...and `applyRidesFilter` partitions the manifest, with both halves real. */
+const partition = (["all", "active", "cancelled"] as RidesFilter[]).map(
+  (k) => applyRidesFilter(mockUpcomingTrips, k).length,
+);
+check(
+  "...and the three options partition the manifest",
+  `all ${partition[0]} = active ${partition[1]} + cancelled ${partition[2]}`,
+  partition[0] === mockUpcomingTrips.length &&
+    partition[1] + partition[2] === partition[0] &&
+    partition[1] > 0 &&
+    partition[2] === EXPECTED_ROW_18_CANCELLED,
+);
+
+/* --- 31f. The ride order, and the headings over it ----------------------- */
+/**
+ * ⛔⛔ **Total and stable.** Date alone leaves same-day rides in seed order,
+ * which is how a manifest shows a 4 PM pick-up above a 7 AM one.
+ */
+const sortedManifest = sortByRideDate(mockUpcomingTrips);
+const manifestOutOfOrder = sortedManifest.filter((trip, i) => {
+  if (i === 0) return false;
+  const prev = sortedManifest[i - 1];
+  const a = parseRideDate(prev.date);
+  const b = parseRideDate(trip.date);
+  if (Number.isNaN(a) || Number.isNaN(b)) return false;
+  return b < a;
+});
+check(
+  "the manifest sorts by date, ascending and total",
+  `${manifestOutOfOrder.length} of ${sortedManifest.length} ride(s) out of order`,
+  manifestOutOfOrder.length === 0 && sortedManifest.length === mockUpcomingTrips.length,
+);
+/**
+ * ⛔⛔ **Driven over a SHUFFLED copy, and a break test is why.**
+ *
+ * Asserting the within-a-day order on `mockUpcomingTrips` as it stands is
+ * vacuous: the seed is already written in time order, so the check passes
+ * whether the comparator sorts on time or not. Degrading `sortByRideDate` to
+ * date-only left it green. Reversing each day first is what gives the
+ * comparator something to do.
+ */
+const shuffledManifest = [...mockUpcomingTrips].reverse();
+const dayOrder = (trips: readonly (typeof mockUpcomingTrips)[number][]) => {
+  const byDay = new Map<string, string[]>();
+  for (const t of trips) byDay.set(t.date, [...(byDay.get(t.date) ?? []), t.legs[0]?.time ?? ""]);
+  return [...byDay.values()];
+};
+const dayMisordered = dayOrder(sortByRideDate(shuffledManifest)).filter((times) =>
+  times.some((t, i) => i > 0 && minutesOfClock(times[i - 1]) > minutesOfClock(t)),
+);
+check(
+  "...and within a day, by pick-up time — proven on a reversed manifest",
+  `${dayMisordered.length} day(s) out of order of ${dayOrder(sortByRideDate(shuffledManifest)).length}; ` +
+    `e.g. ${dayOrder(sortByRideDate(shuffledManifest)).find((d) => d.length > 2)?.join(" → ")}`,
+  dayMisordered.length === 0 &&
+    // ⛔ ...and the control really was out of order to begin with, or the
+    // reversal proved nothing either.
+    dayOrder(shuffledManifest).some((times) =>
+      times.some((t, i) => i > 0 && minutesOfClock(times[i - 1]) > minutesOfClock(t)),
+    ),
+);
+/** ⛔ Every ride sits under exactly one heading, and no heading is empty. */
+const days = groupByRideDay(mockUpcomingTrips);
+/**
+ * ⭐ Eight: the four days row 18 seeds, plus `UP-001` on Aug 7 and the three
+ * rides `lib/data/payout.ts` pins to April and May and that therefore cannot be
+ * re-dated. The focused demo filters those three out; only the plain mirror
+ * shows them.
+ */
+const EXPECTED_UPCOMING_DAYS = 8;
+check(
+  "every ride sits under exactly one date heading",
+  `${days.length} day(s) over ${mockUpcomingTrips.length} ride(s): ${days.map((d) => `${d.label.replace(/^\w{3}, /, "")}=${d.trips.length}`).join(", ")}`,
+  days.length === EXPECTED_UPCOMING_DAYS &&
+    days.every((d) => d.trips.length > 0) &&
+    days.reduce((n, d) => n + d.trips.length, 0) === mockUpcomingTrips.length &&
+    new Set(days.map((d) => d.label)).size === days.length,
 );
 
 // ---------------------------------------------------------------------------
