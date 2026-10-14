@@ -195,23 +195,47 @@ export type MissedSwipeRoute =
   | { kind: "postpone" }
   /** Open the form, asking about exactly these ends of the leg. */
   | { kind: "form"; asks: SwipeAnchor[] }
+  /**
+   * The leg is still running. Close, record nothing, change nothing.
+   *
+   * ⛔⛔ **The drop-off's answer to 1a, and it is NOT `postpone`.** A driver who
+   * still has the member in the car has not dropped them anywhere, so there is
+   * no mark to reconstruct and nothing to unblock — the drop-off is already the
+   * offered swipe. The only honest outcome is to get out of their way.
+   */
+  | { kind: "not-yet" }
   /** Nothing is missing — there is no missed swipe to file. */
   | { kind: "nothing-missing" };
 
 /**
  * Route a missed swipe.
  *
- * `memberAboard` is `null` until the driver has been asked, and is only ever
- * asked when the pick-up is the missing mark — a missed DROP-OFF cannot have the
- * member still in the car, so asking would be asking a question whose answer is
- * already known and whose wrong answer makes no sense.
+ * ⛔⛔ **BOTH ends ask now, and the drop-off's version was added because the old
+ * reasoning was wrong.** This function used to take `memberAboard: boolean |
+ * null` and carried a comment saying the question *"is only ever asked when the
+ * pick-up is the missing mark — a missed DROP-OFF cannot have the member still
+ * in the car"*. That was written when the app raised the question by itself off
+ * the trail. The trigger is now **the swipe**, and a drop-off swiped from
+ * outside the fence has two perfectly ordinary causes:
+ *
+ *   - the drop-off already happened somewhere else and was never marked — the
+ *     member is long gone, and the leg needs reconstructing;
+ *   - the driver is still DRIVING, member aboard, and tapped early.
+ *
+ * The old rule sent the second one into a reconstruction form for a leg that
+ * had not finished. Asking is the fix, and the answer routes to `not-yet`.
+ *
+ * ⚠️ `memberAboard` is a plain `boolean` with no `null`: every path into this
+ * function now goes through the prompt, so "not asked" is not a state that can
+ * exist. A caller converted wrongly fails `typecheck` instead of silently
+ * taking the old unasked branch.
  */
 export function routeMissedSwipe({
   missing,
   memberAboard,
 }: {
   missing: SwipeAnchor[];
-  memberAboard: boolean | null;
+  memberAboard: boolean;
 }): MissedSwipeRoute {
   if (missing.length === 0) return { kind: "nothing-missing" };
 
@@ -225,8 +249,16 @@ export function routeMissedSwipe({
     return { kind: "form", asks: ["pickup", "dropoff"] };
   }
 
-  // Ride 2 — the pick-up was swiped properly and only the drop-off is missing,
-  // so the pick-up time and odometer are facts and stay read-only.
+  /**
+   * Only the drop-off is missing, so the pick-up time and odometer are facts
+   * and stay read-only in anything that follows.
+   *
+   * ⛔ The member is still in the car: the leg has not ended, so there is
+   * nothing to file. ⚠️ Deliberately NOT `postpone` — postponing unblocks a
+   * swipe that is already offered, and recording an unasked-for intention
+   * about a leg still in motion is how a correct record gets edited.
+   */
+  if (memberAboard === true) return { kind: "not-yet" };
   return { kind: "form", asks: ["dropoff"] };
 }
 
@@ -248,9 +280,14 @@ export function leavesMemberSignatureMissing(asks: SwipeAnchor[]): boolean {
   return asks.includes("dropoff");
 }
 
-/** Does this leg need the "is the member still with you?" question? */
+/**
+ * Does this leg need the "is the member still with you?" question?
+ *
+ * ⛔ Any missing anchor does, not just the pick-up — see `routeMissedSwipe`.
+ * The question is the same; what differs is the consequence of answering yes.
+ */
 export function asksMemberAboard(leg: TripLeg): boolean {
-  return getMissingAnchors(leg).includes("pickup");
+  return getMissingAnchors(leg).length > 0;
 }
 
 /**
@@ -358,16 +395,24 @@ export function swipeClockFor(leg: TripLeg): string | null {
  * Where tapping DROP OFF MEMBER goes.
  *
  * `"steps"` is the production sequence — odometer (Stage 04 Step 2), then both
- * signatures (Stage 05). `"missed-swipe-form"` reconstructs a leg whose
- * drop-off was never marked live.
+ * signatures (Stage 05). `"not-live"` means this tap is not a drop-off
+ * happening now.
+ *
+ * ⛔⛔ **It was called `"missed-swipe-form"` and the name had started to lie.**
+ * It used to be the only thing that happened next, so naming the destination
+ * was harmless. Now the drop-off asks the member-aboard question first and the
+ * form is only ONE of the two things that can follow — a name pointing straight
+ * at the form is an invitation to re-skip the question, which is the exact bug
+ * that question was added to fix. This value says what it knows: not live.
  *
  * ⛔⛔ **The member's signature is the whole reason this is a rule and not an
  * `if`.** Stage 05 takes a signature FROM THE MEMBER, so it can only run while
  * they are still in the car. A drop-off the location trail cannot place is a
- * drop-off that already happened somewhere else — the member is long gone — and
- * sending that swipe to the signature pad would ask the driver to produce a
- * signature from someone who is not there. The honest outcome there is that the
- * member's signature is missing for good, which is what the form records.
+ * drop-off that may already have happened somewhere else, and sending that
+ * swipe to the signature pad would ask the driver to produce a signature from
+ * someone who may not be there. ⚠️ **"May" is the correction** — the earlier
+ * wording said the member *is* long gone, which is what justified skipping the
+ * question. The trail cannot tell that apart from a driver still en route.
  *
  * ⚠️ `pickupPostponed` wins over everything, and that is not an oversight: the
  * driver has just told us in so many words that the member is in the car. It is
@@ -380,7 +425,7 @@ export function swipeClockFor(leg: TripLeg): string | null {
  * source. Counting call sites was always a proxy; what matters is that no path
  * reaches Stage 05 with the member gone, and that is a truth table.
  */
-export type DropOffRoute = "steps" | "missed-swipe-form";
+export type DropOffRoute = "steps" | "not-live";
 
 export function routeDropOffSwipe({
   pickupPostponed,
@@ -391,7 +436,7 @@ export function routeDropOffSwipe({
   trailChallengesDropOff: boolean;
 }): DropOffRoute {
   if (pickupPostponed) return "steps";
-  return trailChallengesDropOff ? "missed-swipe-form" : "steps";
+  return trailChallengesDropOff ? "not-live" : "steps";
 }
 
 /* ===========================================================================
@@ -493,10 +538,15 @@ export function swipeTooFarBody(anchor: SwipeAnchor): string {
 export type SwipeTapRoute =
   /** Production's alert. One OK, and the mark is not made. */
   | { kind: "production-refusal"; anchor: SwipeAnchor }
-  /** The proposal, 1a-or-1b: is the member still in the car? */
-  | { kind: "ask-member-aboard" }
-  /** The proposal: reconstruct a leg whose drop-off was never marked live. */
-  | { kind: "missed-swipe-form" }
+  /**
+   * The proposal, 1a-or-1b: is the member still in the car?
+   *
+   * ⛔ `anchor` is the WORDING, not the branch. What happens next is decided by
+   * what the leg is missing — `routeMissedSwipe` — so the two cannot disagree
+   * about a leg; this only says which end the driver just tapped, so the
+   * question can name it.
+   */
+  | { kind: "ask-member-aboard"; anchor: SwipeAnchor }
   /** The real drop-off sequence — odometer, then both signatures. */
   | { kind: "drop-off-steps" }
   /** Production's own action, which this prototype does not stand in for. */
@@ -523,15 +573,23 @@ export function routeSwipeTap({
   if (nextSwipe === "drop-off") {
     const route = routeDropOffSwipe({ pickupPostponed, trailChallengesDropOff });
     if (route === "steps") return { kind: "drop-off-steps" };
-    // The trail cannot place this drop-off and the member is long gone.
+    /**
+     * ⛔⛔ **This used to go STRAIGHT to the form, and that was the bug.** The
+     * trail cannot place this drop-off, which was read as "the member is long
+     * gone". It means no such thing on its own: a driver still on the road with
+     * the member aboard, tapping early, produces exactly the same reading — and
+     * got a reconstruction form for a leg that had not finished. Ask, the same
+     * way the pick-up asks; `routeMissedSwipe` turns the answer into either the
+     * form or getting out of the way.
+     */
     return proposing
-      ? { kind: "missed-swipe-form" }
+      ? { kind: "ask-member-aboard", anchor: "dropoff" }
       : { kind: "production-refusal", anchor: "dropoff" };
   }
 
   if (nextSwipe === "pick-up" && trailChallengesPickup) {
     return proposing
-      ? { kind: "ask-member-aboard" }
+      ? { kind: "ask-member-aboard", anchor: "pickup" }
       : { kind: "production-refusal", anchor: "pickup" };
   }
 

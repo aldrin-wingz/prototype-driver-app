@@ -462,7 +462,12 @@ export function RideDetailLayout({
   // change request — but a rule reading the seed would be answering about the
   // screen they were on a moment ago.
 
-  const [promptOpen, setPromptOpen] = useState(false);
+  /**
+   * ⛔ The ANCHOR is the open state, for the same reason the refusal dialog's
+   * is: the sheet names the end of the leg in its own sentence, so "open" and
+   * "which end" are one fact and a separate boolean could disagree with it.
+   */
+  const [promptAnchor, setPromptAnchor] = useState<SwipeAnchor | null>(null);
   /**
    * ⛔ Row 03's Now side. The ANCHOR is the open state — the dialog names the
    * end of the leg in its sentence, so "open" and "which end" are one fact and
@@ -520,8 +525,10 @@ export function RideDetailLayout({
    * ⚠️ Three paths, and the order matters:
    * 1. A postponed drop-off runs the real drop-off steps (odometer + signature).
    * 2. A pick-up swiped from outside the geofence asks 1a-or-1b.
-   * 3. A drop-off swiped from outside the geofence goes STRAIGHT to the drop-off
-   *    steps, with no question — there is only one thing it can mean.
+   * 3. ⭐ A drop-off swiped from outside the geofence now asks too. It used to
+   *    go straight to the form, on the reasoning that there was "only one thing
+   *    it can mean" — there are two, and the second is a driver still on the
+   *    road with the member aboard who tapped early.
    */
   function handleSwipeTap() {
     if (!activeLeg) return;
@@ -550,10 +557,7 @@ export function RideDetailLayout({
         setTooFarAnchor(route.anchor);
         return;
       case "ask-member-aboard":
-        setPromptOpen(true);
-        return;
-      case "missed-swipe-form":
-        fileMissedSwipe(activeLeg, null);
+        setPromptAnchor(route.anchor);
         return;
       case "drop-off-steps":
         setOdometerOpen(true);
@@ -577,33 +581,51 @@ export function RideDetailLayout({
    * WRONG on a postponed one, where the button says drop-off precisely because
    * the pick-up is still missing.
    */
-  function fileMissedSwipe(leg: TripLeg, memberAboard: boolean | null) {
-    const route = routeMissedSwipe({
-      missing: getMissingAnchors(leg),
-      memberAboard,
-    });
-    if (route.kind === "form") setMissedSwipeAsks(route.asks);
-  }
-
-  /** 1a or 1b — the one fact only the driver has. */
+  /**
+   * 1a or 1b — the one fact only the driver has.
+   *
+   * ⛔⛔ **Every outcome comes from `routeMissedSwipe`, including doing
+   * nothing.** This handler used to decide `member-aboard → postpone` itself,
+   * which was a second copy of the rule and was wrong the moment the drop-off
+   * started asking the same question: there, "the member is still with me"
+   * means carry on, not postpone a swipe that is already offered.
+   */
   function handleAnswer(answer: MissedSwipeAnswer) {
-    setPromptOpen(false);
+    setPromptAnchor(null);
     if (!activeLeg) return;
 
-    if (answer === "member-aboard") {
-      postponePickup(activeLeg.id);
-      toast({
-        title: "Drop them off as normal",
-        description:
-          "We'll ask you to confirm the pick-up once the drop-off is done.",
-      });
-      return;
-    }
+    const route = routeMissedSwipe({
+      missing: getMissingAnchors(activeLeg),
+      memberAboard: answer === "member-aboard",
+    });
 
-    // Defer by a tick: vaul reports the dismissal before the handler that caused
-    // it, and opening the next sheet inside that window leaves the first one's
-    // scroll lock on.
-    setTimeout(() => fileMissedSwipe(activeLeg, false), 0);
+    switch (route.kind) {
+      case "postpone":
+        postponePickup(activeLeg.id);
+        toast({
+          title: "Drop them off as normal",
+          description:
+            "We'll ask you to confirm the pick-up once the drop-off is done.",
+        });
+        return;
+      case "not-yet":
+        // ⛔ Nothing is recorded and nothing is postponed. The leg is still
+        // running, and the drop-off is already the offered swipe.
+        toast({
+          title: "No problem — carry on",
+          description:
+            "Swipe again once you've dropped them off and we'll record it then.",
+        });
+        return;
+      case "form":
+        // Defer by a tick: vaul reports the dismissal before the handler that
+        // caused it, and opening the next sheet inside that window leaves the
+        // first one's scroll lock on.
+        setTimeout(() => setMissedSwipeAsks(route.asks), 0);
+        return;
+      case "nothing-missing":
+        return;
+    }
   }
 
   /** Stage 04 Step 2 → Stage 05. The reading is held until both panels sign. */
@@ -1249,8 +1271,8 @@ export function RideDetailLayout({
         onOpenChange={(open) => { if (!open) setTooFarAnchor(null); }}
       />
       <MissedSwipePrompt
-        open={promptOpen}
-        onOpenChange={setPromptOpen}
+        anchor={promptAnchor}
+        onOpenChange={(open) => { if (!open) setPromptAnchor(null); }}
         onAnswer={handleAnswer}
       />
       <OdometerReadingDialog

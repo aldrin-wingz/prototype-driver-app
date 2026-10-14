@@ -3,6 +3,7 @@
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { PersonStanding, FileText } from "lucide-react";
+import type { SwipeAnchor } from "@/lib/driver-data/missed-swipe-rules";
 
 /**
  * What the driver says happened, when the app notices a swipe is owed.
@@ -41,7 +42,7 @@ interface Choice {
  * it needed a third "the member never came out" answer and a dismiss, or it
  * would make that driver claim a ride that never happened.
  *
- * Tapping PICK UP MEMBER *is* the driver saying they have the member. A no-show
+ * Tapping a swipe *is* the driver saying that end of the leg happened. A no-show
  * driver never taps it. The trigger does the work the extra options were doing,
  * and the question is back to the two states that can actually follow.
  */
@@ -64,29 +65,95 @@ const PICKUP_CHOICES: Choice[] = [
   },
 ];
 
+/**
+ * ⛔⛔ **The drop-off asks the same question for a different reason.**
+ *
+ * The trail cannot place this tap at the drop-off. That has two ordinary
+ * causes and the app cannot tell them apart: the drop-off already happened
+ * somewhere else and was never marked, or the driver is still on the road with
+ * the member and tapped early. Until this existed the second driver was handed
+ * a form asking them to reconstruct a leg they were still driving.
+ *
+ * ⚠️ The answers are the same two values as the pick-up's, and the CONSEQUENCES
+ * differ — `member-aboard` here means "carry on", not "postpone". That
+ * difference lives in `routeMissedSwipe`, never here; this file only says what
+ * the driver is being asked.
+ */
+const DROPOFF_CHOICES: Choice[] = [
+  {
+    answer: "member-aboard",
+    icon: PersonStanding,
+    title: "Yes — they're still in the car",
+    detail:
+      "No problem. Carry on, and swipe again once you've dropped them off.",
+    tone: "primary",
+  },
+  {
+    answer: "ride-over",
+    icon: FileText,
+    title: "No — I've already dropped them off",
+    detail:
+      "We'll ask you to confirm the drop-off, and fill in whatever we can.",
+    tone: "plain",
+  },
+];
+
+/**
+ * The question and its answers, per end of the leg.
+ *
+ * ⚠️ Exported so `verify-missed-swipe` can read the real lists rather than grep
+ * the markup for a line — the same reason `reachOptionsFor` is pure.
+ */
+export function promptChoices(anchor: SwipeAnchor): {
+  question: string;
+  reason: string;
+  choices: Choice[];
+} {
+  if (anchor === "pickup") {
+    return {
+      question: "Is the member still with you?",
+      reason:
+        "You're not at the pick-up any more, so we can't record this swipe where it happened.",
+      choices: PICKUP_CHOICES,
+    };
+  }
+  return {
+    question: "Is the member still with you?",
+    reason:
+      "You're not at the drop-off, so we can't record this swipe where it happened.",
+    choices: DROPOFF_CHOICES,
+  };
+}
+
 export function MissedSwipePrompt({
-  open,
+  anchor,
   onOpenChange,
   onAnswer,
 }: {
-  open: boolean;
+  /**
+   * `null` when the prompt is closed — the anchor IS the open state.
+   *
+   * ⛔ One value, not an `open` boolean beside it. Two fields can disagree, and
+   * the disagreement here is a sheet showing the pick-up's wording after a
+   * drop-off tap. The same shape `SwipeTooFarDialog` uses.
+   */
+  anchor: SwipeAnchor | null;
   onOpenChange: (open: boolean) => void;
   onAnswer: (answer: MissedSwipeAnswer) => void;
 }) {
-  const choices = PICKUP_CHOICES;
-  const question = "Is the member still with you?";
+  // ⚠️ Falls back to the pick-up copy only while the sheet animates closed,
+  // where it is not on screen. vaul keeps the content mounted for half a
+  // second after `open` goes false; reading `null` there would blank it.
+  const { question, reason, choices } = promptChoices(anchor ?? "pickup");
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={anchor !== null} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto max-w-md">
         <div className="px-5 pb-8 pt-2">
           <DrawerTitle className="text-lg font-bold text-[#303068]">
             {question}
           </DrawerTitle>
-          <p className="mt-2 text-sm text-gray-600">
-            You&apos;re not at the pick-up any more, so we can&apos;t record this
-            swipe where it happened.
-          </p>
+          <p className="mt-2 text-sm text-gray-600">{reason}</p>
 
           <div className="mt-6 flex flex-col gap-3">
             {choices.map((choice) => {

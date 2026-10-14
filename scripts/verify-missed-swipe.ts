@@ -13,6 +13,7 @@
  * here — never derived from the subject.
  */
 import { readFileSync } from "node:fs";
+import { promptChoices } from "../components/support/missed-swipe-prompt";
 import {
   anchorMatched,
   getMissingAnchors,
@@ -317,18 +318,30 @@ for (const id of ["1049800371", "1049800373"]) {
 // ═══════════════════════════════════════════════════════════════════
 section("3. Routing — three scenarios, declared as literals");
 
-const ROUTE_TABLE: Array<{ missing: SwipeAnchor[]; aboard: boolean | null; expect: string }> = [
-  { missing: [], aboard: null, expect: "nothing-missing" },
+/**
+ * ⛔⛔ **`aboard` has no `null` any more, and the drop-off row flipped.**
+ *
+ * This table used to carry three `null` rows for "the driver was not asked",
+ * and a `[dropoff] aboard=true → form:dropoff` row under a comment calling it
+ * *"nonsense the UI never asks — a missed drop-off cannot have the member still
+ * aboard"*. Both of those were consequences of the drop-off skipping the
+ * question. It does not skip it any more: the trail failing to place a drop-off
+ * means either the leg ended somewhere else OR the driver is still driving, and
+ * only the driver can say which. So `null` is unrepresentable and that last row
+ * is now the interesting one.
+ */
+const ROUTE_TABLE: Array<{ missing: SwipeAnchor[]; aboard: boolean; expect: string }> = [
+  { missing: [], aboard: false, expect: "nothing-missing" },
+  { missing: [], aboard: true, expect: "nothing-missing" },
   { missing: ["pickup", "dropoff"], aboard: true, expect: "postpone" },
   { missing: ["pickup", "dropoff"], aboard: false, expect: "form:pickup,dropoff" },
-  { missing: ["pickup", "dropoff"], aboard: null, expect: "form:pickup,dropoff" },
   { missing: ["pickup"], aboard: true, expect: "postpone" },
   { missing: ["pickup"], aboard: false, expect: "form:pickup,dropoff" },
-  { missing: ["dropoff"], aboard: null, expect: "form:dropoff" },
   { missing: ["dropoff"], aboard: false, expect: "form:dropoff" },
-  // ⚠️ Nonsense the UI never asks — a missed drop-off cannot have the member
-  // still aboard — and the rule must not quietly honour it.
-  { missing: ["dropoff"], aboard: true, expect: "form:dropoff" },
+  // ⭐ The leg is still running: nothing to reconstruct, nothing to unblock.
+  // ⛔ NOT `postpone` — postponing would unblock a swipe already on offer and
+  // write an intention about a leg still in motion.
+  { missing: ["dropoff"], aboard: true, expect: "not-yet" },
 ];
 const describe = (r: ReturnType<typeof routeMissedSwipe>) =>
   r.kind === "form" ? `form:${r.asks.join(",")}` : r.kind;
@@ -337,13 +350,27 @@ for (const row of ROUTE_TABLE) {
   check(`[${row.missing.join("+") || "none"}] aboard=${row.aboard} → ${row.expect}`,
     actual === row.expect, `got ${actual}`);
 }
-check("the route table is complete", ROUTE_TABLE.length === 9, `${ROUTE_TABLE.length}`);
-check("all three route kinds occur",
-  new Set(ROUTE_TABLE.map((r) => r.expect.split(":")[0])).size === 3, "");
-check("the member question changes the route",
-  describe(routeMissedSwipe({ missing: ["pickup"], memberAboard: true })) !==
-    describe(routeMissedSwipe({ missing: ["pickup"], memberAboard: false })),
-  "asking is theatre");
+check("the route table is complete", ROUTE_TABLE.length === 8, `${ROUTE_TABLE.length}`);
+check("all four route kinds occur",
+  new Set(ROUTE_TABLE.map((r) => r.expect.split(":")[0])).size === 4,
+  `${[...new Set(ROUTE_TABLE.map((r) => r.expect.split(":")[0]))].sort().join(", ")}`);
+/**
+ * ⛔⛔ **The question has to matter at BOTH ends.** It only ever mattered at the
+ * pick-up before, and this check only ever looked there — so the drop-off could
+ * have been wired to ask and then ignore the answer, and nothing here would
+ * have noticed.
+ */
+const ASK_MATTERS: SwipeAnchor[][] = [["pickup"], ["dropoff"]];
+const inert = ASK_MATTERS.filter(
+  (missing) =>
+    describe(routeMissedSwipe({ missing, memberAboard: true })) ===
+    describe(routeMissedSwipe({ missing, memberAboard: false })),
+);
+check("the member question changes the route at both ends of the leg",
+  inert.length === 0,
+  inert.length
+    ? `asking is theatre for: ${inert.map((m) => m.join("+")).join(", ")}`
+    : `${ASK_MATTERS.length} of ${ASK_MATTERS.length} ends branch on the answer`);
 
 /**
  * ⛔⛔ The signature outcome, per scenario — and it is TWO signatures.
@@ -742,8 +769,8 @@ const DROPOFF_ROUTES: Array<{
     why: "1a, trail disagreeing — a human already answered what it is guessing at",
   },
   {
-    pickupPostponed: false, trailChallengesDropOff: true, expect: "missed-swipe-form",
-    why: "ride 2 — the trail cannot place them, so the member is long gone",
+    pickupPostponed: false, trailChallengesDropOff: true, expect: "not-live",
+    why: "ride 2 — the trail cannot place them, so this tap is not a live drop-off",
   },
   {
     pickupPostponed: false, trailChallengesDropOff: false, expect: "steps",
@@ -760,7 +787,7 @@ for (const row of DROPOFF_ROUTES) {
 check("the routing table covers every input, and both outcomes occur",
   DROPOFF_ROUTES.length === 4 &&
     DROPOFF_ROUTES.some((r) => r.expect === "steps") &&
-    DROPOFF_ROUTES.some((r) => r.expect === "missed-swipe-form"),
+    DROPOFF_ROUTES.some((r) => r.expect === "not-live"),
   `${DROPOFF_ROUTES.length} of 4 combinations`);
 /**
  * ⛔⛔ **The guarantee itself**, stated once: there is NO input on which the
@@ -960,11 +987,11 @@ type TapCase = {
 };
 const TAP_CASES: TapCase[] = [
   { why: "⭐ pick-up, outside the fence, today", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: false, mode: "now", want: { kind: "production-refusal", anchor: "pickup" } },
-  { why: "⭐ pick-up, outside the fence, proposed", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: false, mode: "fixed", want: { kind: "ask-member-aboard" } },
+  { why: "⭐ pick-up, outside the fence, proposed", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: true, trailChallengesDropOff: false, mode: "fixed", want: { kind: "ask-member-aboard", anchor: "pickup" } },
   { why: "pick-up, inside the fence, today", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "now", want: { kind: "production-action" } },
   { why: "pick-up, inside the fence, proposed", nextSwipe: "pick-up", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "fixed", want: { kind: "production-action" } },
   { why: "⭐ drop-off, outside the fence, today", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "now", want: { kind: "production-refusal", anchor: "dropoff" } },
-  { why: "⭐ drop-off, outside the fence, proposed", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "fixed", want: { kind: "missed-swipe-form" } },
+  { why: "⭐ drop-off, outside the fence, proposed — ASKS now, it used to go straight to the form", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "fixed", want: { kind: "ask-member-aboard", anchor: "dropoff" } },
   { why: "an ordinary drop-off runs production's own steps, today", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "now", want: { kind: "drop-off-steps" } },
   { why: "...and on the proposal side too", nextSwipe: "drop-off", pickupPostponed: false, trailChallengesPickup: false, trailChallengesDropOff: false, mode: "fixed", want: { kind: "drop-off-steps" } },
   { why: "1a — a human vouched, so the trail does not matter", nextSwipe: "drop-off", pickupPostponed: true, trailChallengesPickup: false, trailChallengesDropOff: true, mode: "fixed", want: { kind: "drop-off-steps" } },
@@ -990,23 +1017,33 @@ check("every swipe tap routes where it is declared to",
  */
 const tapKinds = new Set(TAP_CASES.map((c) => c.want.kind));
 check("...and that table reaches every route, on both sides",
-  tapKinds.size === 5 &&
+  tapKinds.size === 4 &&
     tapKinds.has("production-refusal") &&
     tapKinds.has("ask-member-aboard") &&
-    tapKinds.has("missed-swipe-form") &&
     tapKinds.has("drop-off-steps") &&
     tapKinds.has("production-action") &&
     new Set(TAP_CASES.map((c) => c.mode)).size === DEMO_MODES.length,
-  `${tapKinds.size} of 5 route(s): ${[...tapKinds].sort().join(", ")}`);
-/** ⛔ Both ends of the leg are refused, not just the captured one. */
-const refusedAnchors = new Set(
-  TAP_CASES.filter((c) => c.want.kind === "production-refusal").map(
-    (c) => (c.want as { anchor: SwipeAnchor }).anchor,
-  ),
-);
-check("...and production refuses BOTH ends, not only the captured one",
-  refusedAnchors.size === 2 && refusedAnchors.has("pickup") && refusedAnchors.has("dropoff"),
-  `${[...refusedAnchors].join(", ")}`);
+  `${tapKinds.size} of 4 route(s): ${[...tapKinds].sort().join(", ")}`);
+/**
+ * ⛔ Both ends of the leg, on both sides of the comparison.
+ *
+ * ⚠️ `ask-member-aboard` joined this check when the drop-off started asking.
+ * Before that the proposal reached one anchor and production reached two, and
+ * a reader could have taken the asymmetry for a rule rather than a gap.
+ */
+const anchorsFor = (kind: SwipeTapRoute["kind"]) =>
+  new Set(
+    TAP_CASES.filter((c) => c.want.kind === kind).map(
+      (c) => (c.want as { anchor: SwipeAnchor }).anchor,
+    ),
+  );
+const bothEnds = (["production-refusal", "ask-member-aboard"] as const).filter((kind) => {
+  const a = anchorsFor(kind);
+  return a.size === 2 && a.has("pickup") && a.has("dropoff");
+});
+check("...and BOTH ends of the leg are refused today and asked about in the proposal",
+  bothEnds.length === 2,
+  `refusal: ${[...anchorsFor("production-refusal")].sort().join("+")} · ask: ${[...anchorsFor("ask-member-aboard")].sort().join("+")}`);
 
 /* --- 9c. Nobody else's row borrows this -------------------------------- */
 /**
@@ -1015,7 +1052,7 @@ check("...and production refuses BOTH ends, not only the captured one",
  * proposal shows. A gate that let row 01 open the missed-swipe prompt would
  * make a no-show demo show a swipe feature.
  */
-const OURS = new Set(["ask-member-aboard", "missed-swipe-form"]);
+const OURS = new Set(["ask-member-aboard"]);
 let sweepCount = 0;
 const borrowed: string[] = [];
 const FOCUS_ROWS: Array<string | null> = [...CATALOGUE_IDS, null];
@@ -1124,6 +1161,91 @@ check("the ride detail mounts it, and the prompt beside it",
 check("...and the screen asks the rule which side to show, rather than deciding",
   CODE.includes("focus: demo") && !/showsProposal\(/.test(CODE),
   "the screen re-decides the mode");
+
+// ═══════════════════════════════════════════════════════════════════
+section("10. The question is asked at both ends, and means different things");
+
+/**
+ * ⛔⛔ **The drop-off used to skip this question**, on the reasoning that a
+ * missed drop-off "can only mean one thing". It means two, and the app cannot
+ * tell them apart — so a driver still on the road with the member aboard, who
+ * tapped early, was handed a form asking them to reconstruct the leg they were
+ * driving. These checks are about the question existing at both ends AND the
+ * two ends not being the same screen with the same consequence.
+ */
+const ANCHORS: SwipeAnchor[] = ["pickup", "dropoff"];
+const prompts = ANCHORS.map((a) => ({ anchor: a, ...promptChoices(a) }));
+
+check("both ends of the leg have a question to ask",
+  prompts.length === 2 && prompts.every((p) => p.choices.length === 2),
+  prompts.map((p) => `${p.anchor}:${p.choices.length}`).join(" "));
+
+/** ⛔ The same two ANSWERS at both ends — the branch is the consequence. */
+const answerSets = prompts.map((p) => p.choices.map((c) => c.answer).sort().join("+"));
+check("...offering the same two answers, because the difference is what follows",
+  new Set(answerSets).size === 1 && answerSets[0] === "member-aboard+ride-over",
+  answerSets.join(" vs "));
+
+/**
+ * ⛔⛔ **Non-vacuity, and this is the one that matters.** Parameterising the
+ * sheet by anchor is decorative unless the two anchors actually read
+ * differently — a drop-off tap showing *"You're not at the pick-up any more"*
+ * is the bug the parameter exists to prevent, and it would pass every check
+ * above.
+ */
+const copyFor = (p: (typeof prompts)[number]) =>
+  [p.reason, ...p.choices.map((c) => `${c.title}|${c.detail}`)].join("¶");
+check("...and the two ends do not read the same",
+  copyFor(prompts[0]) !== copyFor(prompts[1]),
+  "both anchors render identical copy — the parameter is decorative");
+const pickupReason = promptChoices("pickup").reason;
+const dropoffReason = promptChoices("dropoff").reason;
+check("...each naming its OWN end of the leg",
+  pickupReason.includes("pick-up") && !pickupReason.includes("drop-off") &&
+    dropoffReason.includes("drop-off") && !dropoffReason.includes("pick-up"),
+  `pickup: "${pickupReason.slice(0, 40)}…" dropoff: "${dropoffReason.slice(0, 40)}…"`);
+
+/**
+ * ⛔ The sheet is opened BY the anchor, not by a boolean beside it. Two fields
+ * can disagree, and the disagreement here is the pick-up's wording after a
+ * drop-off tap — invisible to every check above, because the copy itself would
+ * still be correct.
+ */
+/**
+ * ⚠️ Comments stripped, the same way §8 does it — this file documents its own
+ * traps in comments right beside the code that avoids them, so a grep for an
+ * ABSENT string otherwise matches the paragraph explaining its absence.
+ */
+const PROMPT_SRC = readFileSync("components/support/missed-swipe-prompt.tsx", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+check("stripping the prompt's comments left the code behind",
+  PROMPT_SRC.includes("export function MissedSwipePrompt") && PROMPT_SRC.length > 800,
+  `${PROMPT_SRC.length} chars after stripping`);
+check("the prompt's open state IS the anchor",
+  /anchor: SwipeAnchor \| null/.test(PROMPT_SRC) &&
+    /open=\{anchor !== null\}/.test(PROMPT_SRC) &&
+    // ⚠️ Anchored to the start of a line: an unanchored `open: boolean` also
+    // matches `onOpenChange: (open: boolean) => void`, which is the callback's
+    // PARAMETER, not a prop. The first version of this check failed on it.
+    !/^\s*open\??: boolean/m.test(PROMPT_SRC),
+  "a separate open flag has come back");
+check("...and the screen passes one, rather than holding a boolean",
+  /<MissedSwipePrompt[\s\S]{0,120}anchor=\{promptAnchor\}/.test(CODE) &&
+    !/promptOpen/.test(CODE),
+  "the screen still carries promptOpen");
+
+/**
+ * ⛔⛔ The screen must not re-derive the consequence. It used to branch on
+ * `answer === "member-aboard"` itself and call `postponePickup` — a second copy
+ * of the rule, and one that is WRONG for the drop-off, where the same answer
+ * means carry on.
+ */
+check("the screen reads routeMissedSwipe for every outcome, including doing nothing",
+  /case "not-yet":/.test(CODE) &&
+    /case "postpone":/.test(CODE) &&
+    !/if \(answer === "member-aboard"\)/.test(CODE),
+  "the member-aboard branch is back in the screen");
 
 console.log(
   failures.length === 0
