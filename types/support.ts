@@ -271,21 +271,6 @@ export interface SupportField {
   lockedBadge?: string | null;
 }
 
-/** Tint of the context callout above the fields. */
-export type SupportCalloutTone = "danger" | "warning" | "info";
-
-/**
- * The context block at the top of the sheet — what the app already knows,
- * echoed back so the driver can confirm they're filing against the right thing.
- * In `s-02a` this is the pink "Scheduled time: 3:19 PM / 63 mins late" box.
- */
-export interface SupportCallout {
-  tone: SupportCalloutTone;
-  /** Bold first line. */
-  title: string;
-  /** Secondary line under it. */
-  detail?: string;
-}
 
 export type SupportResolutionPath = "auto-resolve" | "cs-queue" | "hybrid";
 

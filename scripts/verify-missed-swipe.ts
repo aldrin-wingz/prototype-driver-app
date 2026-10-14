@@ -849,25 +849,34 @@ check("confirmed answers are written back as marks",
 check("the MEMBER signature outcome is recorded on submit",
   FORM.includes("markMemberSignatureMissing(leg.id)"), "the outcome is never recorded");
 /**
- * ⛔ No context callout on this form, by decision (2026-10-09).
+ * ⛔⛔ **No context callout on ANY form, as of 2026-10-14.**
  *
- * It carried three variants explaining what the trail could and could not
- * confirm — and said at block level what the fields already say at field level:
- * each time input's own help text names whether it was placed from the trail or
- * left for the driver, and each odometer says outright that no reading exists.
- * The callout restated all of it in a tinted box above the form.
+ * Missed Swipe dropped its own in 2026-10-09 — three tinted variants restating
+ * at block level what the fields already said at field level — and this check
+ * asserted the other two cases KEPT theirs. They no longer do: the sheet's
+ * heading is now one constant with the Issue type field directly under it, so
+ * a tinted box between them is the thing that was removed.
  *
- * Asserted rather than merely absent, so re-adding one is a decision somebody
- * makes rather than a drift nobody notices. The other two cases keep theirs.
+ * ⚠️ Widened from "this form" to "every form" rather than deleted. The
+ * narrow version would now pass on a repo where the whole mechanism is gone,
+ * which is a check describing a decision nobody can break.
  */
-check("the Missed Swipe form renders no callout",
-  !/callout=/.test(FORM), "a callout is being passed again");
+const FORM_SOURCES = (
+  ["missed-swipe", "rider-no-show", "cancel-at-door", "cannot-reach-member",
+   "rider-declined", "send-back-reason", "auto-assign-request", "trip-change",
+   "add-leg"] as const
+).map((name) => `components/support/${name}-form.tsx`);
+const stillCalling = FORM_SOURCES.filter((f) => /callout=/.test(readFileSync(f, "utf8")));
+check("no support form passes a context callout",
+  stillCalling.length === 0 && FORM_SOURCES.length === 9,
+  stillCalling.length ? stillCalling.join(", ") : `0 of ${FORM_SOURCES.length} forms`);
+check("...and the sheet has no way to render one",
+  !/SupportCallout/.test(readFileSync("components/support/support-form-sheet.tsx", "utf8")) &&
+    !/SupportCallout/.test(readFileSync("types/support.ts", "utf8")),
+  "the callout type is still reachable");
 check("...while the field-level explanations survive",
   caseFor(["dropoff"], RIDE_2).fields.filter((f) => f.helpText).length >= 3,
   "the per-field copy went with it");
-check("...and the other cases keep theirs",
-  readFileSync("components/support/cancel-at-door-form.tsx", "utf8").includes("callout="),
-  "the removal leaked into Cancel at Door");
 
 check("Missed Swipe is the case that keeps Pending",
   FORM.includes("appTracksStatus: true"), "appTracksStatus is not true");

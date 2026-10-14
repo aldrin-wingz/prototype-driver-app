@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Clock, AlertTriangle, Info } from "lucide-react";
+import { X } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SupportFieldRenderer } from "./support-field-renderer";
 import { TripSummaryBanner } from "./trip-summary-banner";
 import { findLegOption } from "@/lib/support-data/leg-options";
-import {
-  getIssueDescription,
-  getIssueLabel,
-} from "@/lib/support-data/issue-types";
+import { SUPPORT_FORM_TITLE } from "@/lib/support-data/issue-types";
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
   canSubmitCase,
@@ -20,47 +17,25 @@ import {
   isFieldVisible,
 } from "@/lib/support/field-rules";
 import { getTimeOrderWarnings } from "@/lib/support/time-order";
-import type {
-  SupportCallout,
-  SupportCalloutTone,
-  SupportCaseDefinition,
-} from "@/types/support";
-
-const CALLOUT_TONE: Record<
-  SupportCalloutTone,
-  { bg: string; border: string; icon: string; Icon: typeof Clock }
-> = {
-  danger: {
-    bg: "bg-[#FEF2F2]",
-    border: "border-[#FECACA]",
-    icon: "text-[#EF4444]",
-    Icon: Clock,
-  },
-  warning: {
-    bg: "bg-[#FFFBEB]",
-    border: "border-[#FDE68A]",
-    icon: "text-[#D97706]",
-    Icon: AlertTriangle,
-  },
-  info: {
-    bg: "bg-[#EFF6FF]",
-    border: "border-[#BFDBFE]",
-    icon: "text-[#2563EB]",
-    Icon: Info,
-  },
-};
+import type { SupportCaseDefinition } from "@/types/support";
 
 /**
  * The base support-form sheet, replicating reference screenshot `s-02a`
  * ("Late pickup reason"). Every support case renders through this — the sheet is
  * the pattern, the case is the data.
  *
- * Anatomy, top to bottom: drag handle · title + close · context callout ·
- * fields · Cancel / primary action.
+ * Anatomy, top to bottom: drag handle · title + close · fields · Cancel /
+ * primary action.
+ *
+ * ⛔⛔ **One title for every case, and the Issue type field is the FIRST thing
+ * under it.** The sheet used to take the chosen issue's NAME as its heading and
+ * print that issue's purpose line beneath — so the driver read the case twice
+ * before reaching a question, and the heading changed depending on how they got
+ * in. The form is one form; which case it is, is an answer, and it is the first
+ * field. User direction 2026-10-14.
  */
 export function SupportFormSheet({
   supportCase,
-  callout,
   initialValues,
   open,
   onOpenChange,
@@ -68,7 +43,6 @@ export function SupportFormSheet({
   recompute,
 }: {
   supportCase: SupportCaseDefinition;
-  callout?: SupportCallout;
   /** Values the app already knows, so the driver only supplies what is new. */
   initialValues?: Record<string, string>;
   open: boolean;
@@ -184,24 +158,12 @@ export function SupportFormSheet({
     // Keyed on the leg id so this runs once per selection, not every render.
   }, [selectedLeg?.legId]);
 
-  // The chosen issue's purpose line wins over the case's own, since the issue is
-  // what determines which form the driver is actually filling in.
-  const description =
-    (values.issue ? getIssueDescription(values.issue) : undefined) ??
-    activeCase.description ??
-    activeCase.summary;
-
   /**
-   * When the issue was chosen for the driver, the sheet takes that issue's name.
-   *
-   * They tapped something that named it, so a different name at the top of the
-   * sheet reads like they landed on the wrong thing. The case's own title is the
-   * fallback for a form where the issue is still an open question.
+   * ⛔ One constant, for every case. See the anatomy note above — the heading
+   * is not a place to say which form this is, because the first field already
+   * does and the two could disagree.
    */
-  const title =
-    (appSupplied.has("issue") && values.issue
-      ? getIssueLabel(values.issue)
-      : undefined) ?? activeCase.title;
+  const title = SUPPORT_FORM_TITLE;
 
   const visibleFields = activeCase.fields.filter((field) =>
     isFieldVisible(field, values)
@@ -270,9 +232,6 @@ export function SupportFormSheet({
     reset();
   }
 
-  const tone = callout ? CALLOUT_TONE[callout.tone] : null;
-  const CalloutIcon = tone?.Icon;
-
   return (
     <Drawer
       open={open}
@@ -299,38 +258,7 @@ export function SupportFormSheet({
             </button>
           </div>
 
-          {/* Purpose reminder. Quiet grey body copy, deliberately NOT a callout —
-              the tinted callout below carries warnings, and the two must not read
-              as the same kind of thing. */}
-          {description && (
-            <p className="mt-2 flex-shrink-0 text-sm leading-relaxed text-gray-500">
-              {description}
-            </p>
-          )}
-
-          {callout && tone && CalloutIcon && (
-            <div
-              className={cn(
-                "mt-5 flex flex-shrink-0 items-start gap-3 rounded-xl border px-4 py-3.5",
-                tone.bg,
-                tone.border
-              )}
-            >
-              <CalloutIcon
-                className={cn("mt-0.5 h-5 w-5 flex-shrink-0", tone.icon)}
-              />
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-gray-900">
-                  {callout.title}
-                </p>
-                {callout.detail && (
-                  <p className="text-sm text-gray-600">{callout.detail}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
+          <div className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pb-2">
             {visibleFields.map((field) => (
               <div key={field.id} className="space-y-3">
                 <SupportFieldRenderer

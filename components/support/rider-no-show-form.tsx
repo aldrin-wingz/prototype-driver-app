@@ -11,7 +11,6 @@ import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { resolveNoShow } from "@/lib/driver-data/no-show-rules";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
-import type { SupportCallout } from "@/types/support";
 
 /**
  * Build the Rider No-Show case for one leg, plus the values the app can prefill.
@@ -53,41 +52,6 @@ export function buildRiderNoShow(
 }
 
 /**
- * What the app could not confirm, said plainly at the top of the sheet.
- *
- * The driver is being asked questions *because* a check failed, and a form that
- * opens without saying which one reads as the app being difficult. Naming the gap
- * also tells them what to write: "we only saw 4 minutes" and "we never placed you
- * there" call for different answers.
- */
-function buildCallout(
-  trip: Trip,
-  leg: TripLeg | undefined,
-  noShowType: string,
-  // ⚠️ A PARAMETER, not a hook read inside — this is a plain function, and
-  // keeping it pure is what lets a check build the real callout for each side.
-  focus: DemoFocus
-): SupportCallout | undefined {
-  // ⚠️ The type travels here too, so this form cannot disagree with the screen
-  // that opened it about whether the ride was fileable.
-  const outcome = resolveNoShow(trip, leg, focus, 0, noShowType);
-
-  // Only the form outcomes reach this sheet, and only they have
-  // something to explain. Anything else means the sheet was opened by a path
-  // that should not have — better to render no callout than to invent one.
-  if (outcome.kind !== "form") return undefined;
-
-  return {
-    tone: "warning",
-    title:
-      outcome.gap === "no_location_data"
-        ? "We can't see your location"
-        : "You're not at the pick-up",
-    detail: outcome.detail,
-  };
-}
-
-/**
  * The Rider No-Show form, with its submit wired up.
  *
  * One mount, so the required fields, the locks and the store write cannot differ
@@ -119,7 +83,6 @@ export function RiderNoShowForm({
   return (
     <SupportFormSheet
       supportCase={supportCase}
-      callout={buildCallout(trip, leg, noShowType ?? "", demo)}
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}

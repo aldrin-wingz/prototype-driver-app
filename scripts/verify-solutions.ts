@@ -127,6 +127,7 @@ import {
   ISSUE_AUTO_ASSIGN_REQUEST,
   ISSUE_CANNOT_REACH_MEMBER,
   SUPPORT_ISSUE_TYPES,
+  SUPPORT_FORM_TITLE,
 } from "../lib/support-data/issue-types";
 import {
   ASSIGNMENT_SCOPE_ALL,
@@ -8812,6 +8813,69 @@ check(
     SOLUTIONS.filter((row) => row.entry && row.nowEntry).length === 0,
 );
 
+
+// ---------------------------------------------------------------------------
+console.log("\n29. One heading, and the case is the first answer under it");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **The sheet used to be named after the case it was showing.**
+ *
+ * It took the chosen issue's LABEL as its heading and printed that issue's
+ * purpose line beneath it, then a tinted callout, and only then the first
+ * question. So the driver read what the form was for three times before
+ * answering anything — and the heading changed depending on which flow opened
+ * the sheet, on a form that is always the same form.
+ *
+ * Which case this is, is an ANSWER. It is the first field. (User direction,
+ * 2026-10-14.)
+ */
+const HEADING_SHEET_SRC = codeOnly(readFileSync(join(ROOT, "components/support/support-form-sheet.tsx"), "utf8"));
+check(
+  "the heading is one declared constant",
+  `"${SUPPORT_FORM_TITLE}"`,
+  SUPPORT_FORM_TITLE === "Wingz Support Form",
+);
+check(
+  "...and the sheet takes it from there, not from the case or the issue",
+  `SUPPORT_FORM_TITLE ${(HEADING_SHEET_SRC.match(/SUPPORT_FORM_TITLE/g) ?? []).length}x, getIssueLabel ${(HEADING_SHEET_SRC.match(/getIssueLabel/g) ?? []).length}x, activeCase.title ${(HEADING_SHEET_SRC.match(/activeCase\.title/g) ?? []).length}x`,
+  /const title = SUPPORT_FORM_TITLE;/.test(HEADING_SHEET_SRC) &&
+    !/getIssueLabel/.test(HEADING_SHEET_SRC) &&
+    !/activeCase\.title/.test(HEADING_SHEET_SRC),
+);
+/**
+ * ⛔ The preamble between the heading and the first question is gone — both
+ * halves of it. Asserted as ABSENT from the code, with comments stripped,
+ * because this file documents removals in comments right beside the code that
+ * performs them.
+ */
+check(
+  "nothing renders between the heading and the fields",
+  `description ${/\{description\}/.test(HEADING_SHEET_SRC) ? "STILL THERE" : "gone"}, callout ${/callout/i.test(HEADING_SHEET_SRC) ? "STILL THERE" : "gone"}`,
+  !/\{description\}/.test(HEADING_SHEET_SRC) && !/callout/i.test(HEADING_SHEET_SRC),
+);
+
+/**
+ * ⭐ And the field that replaced it is FIRST, in every case the app can build.
+ *
+ * ⚠️ Driven over real cases rather than grepped: the field order is assembled
+ * per case, so a case that quietly put something above the issue would read
+ * fine in the registry and wrong on screen.
+ */
+const HEADING_CASES: Array<{ why: string; built: ReturnType<typeof buildSupportFormCase> }> = [
+  { why: "cannot reach member", built: buildSupportFormCase({ includeIssues: [ISSUE_CANNOT_REACH_MEMBER] }) },
+  { why: "auto-assign request", built: buildSupportFormCase({ includeIssues: [ISSUE_AUTO_ASSIGN_REQUEST], autoAssign: true }) },
+  { why: "send-back reason", built: buildSupportFormCase({ includeIssues: [ISSUE_SEND_BACK_REASON], sendBack: true }) },
+  { why: "rider no-show", built: buildSupportFormCase({ askNoShowType: true, askSignature: true }) },
+  { why: "rider declined", built: buildSupportFormCase({ includeIssues: [ISSUE_RIDER_DECLINED], riderDeclined: { legOptions: [] } }) },
+];
+const notFirst = HEADING_CASES.filter((c) => c.built.fields[0]?.id !== "issue");
+check(
+  "Issue type is the first field of every case",
+  notFirst.length
+    ? notFirst.map((c) => `${c.why} → ${c.built.fields[0]?.id}`).join(", ")
+    : `${HEADING_CASES.length} of ${HEADING_CASES.length} cases, each ${HEADING_CASES[0].built.fields.length}+ fields`,
+  notFirst.length === 0 && HEADING_CASES.length === 5,
+);
 
 // ---------------------------------------------------------------------------
 console.log(

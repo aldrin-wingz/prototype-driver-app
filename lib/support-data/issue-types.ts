@@ -41,6 +41,18 @@ export interface SupportIssueType {
   note?: string;
 }
 
+/**
+ * The one heading every support form carries.
+ *
+ * ⛔⛔ **Not the case's name, and not the chosen issue's.** The sheet used to
+ * take the issue's label as its heading, so the same form was called four
+ * different things depending on which flow opened it — and the driver read the
+ * case twice before reaching a question. Which case this is, is an ANSWER: the
+ * Issue type field is the first thing under this heading. One constant so the
+ * heading and that field cannot disagree. (User direction, 2026-10-14.)
+ */
+export const SUPPORT_FORM_TITLE = "Wingz Support Form";
+
 /** The label suffix for an issue whose field set isn't built. */
 const NOT_YET_SUFFIX = " — ⚠️ not in prototype yet";
 

@@ -13,7 +13,6 @@ import {
   SPOKE_WITH_OPTIONS,
 } from "@/lib/driver-data/no-show-rules";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
-import type { SupportCallout } from "@/types/support";
 
 /** What the driver's answers resolved to, for the screen that opened this. */
 export type CancelAtDoorResolution = "filed" | "sent" | "waiver-refused";
@@ -44,37 +43,6 @@ export function buildCancelAtDoor(
   };
 
   return { supportCase, initialValues };
-}
-
-/**
- * Say why these two questions are being asked, in the driver's terms.
- *
- * ⚠️ The two variants are asked for OPPOSITE reasons and must not share copy.
- * At the pick-up the driver is being let THROUGH a rule — the questions are the
- * price of skipping the wait. Away from it they are being asked to reconstruct
- * something the app could not see. A single neutral sentence would misdescribe
- * one of them.
- */
-function buildCallout(atPickup: boolean): SupportCallout {
-  return atPickup
-    ? {
-        tone: "info",
-        title: "This can skip the 10-minute wait",
-        /**
-         * ⚠️ States the CONDITION, not the conclusion. The earlier wording —
-         * "The member came out and refused the ride, so the wait is already
-         * over" — told the driver what happened before asking them, on the one
-         * screen whose entire job is to find out whether it did.
-         */
-        detail:
-          "If someone came to the door and turned you away, the wait is already over. Two quick questions and we'll file it.",
-      }
-    : {
-        tone: "warning",
-        title: "You're not at the pick-up",
-        detail:
-          "We can't confirm the refusal from here, so tell us what happened and Support will take it from there.",
-      };
 }
 
 /** Readable label for a stored option value, for the confirmation copy. */
@@ -122,7 +90,6 @@ export function CancelAtDoorForm({
   return (
     <SupportFormSheet
       supportCase={supportCase}
-      callout={buildCallout(atPickup)}
       open={open}
       onOpenChange={onOpenChange}
       initialValues={initialValues}
