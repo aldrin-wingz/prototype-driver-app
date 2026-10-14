@@ -124,6 +124,11 @@ import { CANNOT_REACH_SOLUTIONS, showsCannotReachOption } from "../lib/driver-da
 import { buildGridTiles } from "../components/driver/more-options-screen";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
 import {
+  NOT_ON_THIS_TRIP,
+  contextLegs,
+  tripContextFor,
+} from "../lib/support-data/trip-context";
+import {
   ISSUE_AUTO_ASSIGN_REQUEST,
   ISSUE_CANNOT_REACH_MEMBER,
   SUPPORT_ISSUE_TYPES,
@@ -8875,6 +8880,132 @@ check(
     ? notFirst.map((c) => `${c.why} → ${c.built.fields[0]?.id}`).join(", ")
     : `${HEADING_CASES.length} of ${HEADING_CASES.length} cases, each ${HEADING_CASES[0].built.fields.length}+ fields`,
   notFirst.length === 0 && HEADING_CASES.length === 5,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n30. One context block — trip, then the leg being filed against");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ It was one flat card whose rows mixed the two — rider and client beside a
+ * leg id and a pick-up time — so nothing said which facts belonged to the trip
+ * and which to the leg being reported on. Two titled sections, trip first, the
+ * same on every form. (User direction, 2026-10-14.)
+ *
+ * ⚠️ Driven over EVERY selectable leg, because the block is assembled per leg
+ * and the interesting cases are the minority: 4 legs of 21 belong to a round
+ * trip, and 3 have no drop-off stop at all.
+ */
+const CONTEXT_LEGS = getLegOptions("all");
+const EXPECTED_CONTEXT_LEGS = 21;
+check(
+  "the context sweep covers every selectable leg",
+  `${CONTEXT_LEGS.length} of ${EXPECTED_CONTEXT_LEGS}`,
+  CONTEXT_LEGS.length === EXPECTED_CONTEXT_LEGS,
+);
+
+/** ⛔ The six rows the leg section carries, in order, on every leg. */
+const EXPECTED_LEG_ROWS = 6;
+const wrongShape = CONTEXT_LEGS.filter((option) => {
+  const rows = tripContextFor(option).legRows;
+  return (
+    rows.length !== EXPECTED_LEG_ROWS ||
+    rows[0].label !== "Leg ID" ||
+    rows[1].label !== "Status" ||
+    rows[3].label !== "Pick-up location" ||
+    rows[5].label !== "Drop-off location"
+  );
+});
+check(
+  "every leg renders the same six rows, in the same order",
+  wrongShape.length
+    ? wrongShape.slice(0, 3).map((o) => o.legId).join(", ")
+    : `${CONTEXT_LEGS.length} of ${CONTEXT_LEGS.length} legs, ${EXPECTED_LEG_ROWS} rows each`,
+  wrongShape.length === 0,
+);
+/** ⛔ And no row is ever blank — an absent fact is SAID. */
+const blanks = CONTEXT_LEGS.filter((option) =>
+  tripContextFor(option).legRows.some((row) => !row.value.trim()),
+);
+check(
+  "no row is ever empty",
+  blanks.length ? blanks.slice(0, 3).map((o) => o.legId).join(", ") : `0 of ${CONTEXT_LEGS.length} legs`,
+  blanks.length === 0,
+);
+
+/**
+ * ⛔⛔ Three seeded trips have no drop-off stop. Those rows are marked absent
+ * and say so; they are NOT dropped, or the block would stop being the same
+ * block on every form — which is the whole point of standardising it.
+ */
+const EXPECTED_ABSENT_LEGS = 3;
+const withAbsent = CONTEXT_LEGS.filter((option) =>
+  tripContextFor(option).legRows.some((row) => row.absent),
+);
+check(
+  "a trip with no drop-off stop says so, rather than rendering blank",
+  `${withAbsent.length} of ${CONTEXT_LEGS.length} legs — ${withAbsent.map((o) => o.legId).join(", ")}`,
+  withAbsent.length === EXPECTED_ABSENT_LEGS &&
+    withAbsent.every((o) =>
+      tripContextFor(o).legRows
+        .filter((r) => r.absent)
+        .every((r) => r.value === NOT_ON_THIS_TRIP),
+    ),
+);
+/** ⚠️ ...and the majority do carry one, so the check above is not the rule. */
+check(
+  "...while most legs carry a real drop-off",
+  `${CONTEXT_LEGS.length - withAbsent.length} of ${CONTEXT_LEGS.length} legs have both drop-off rows`,
+  CONTEXT_LEGS.length - withAbsent.length > withAbsent.length,
+);
+
+/**
+ * ⭐ The Legs list is the ROUND TRIP, which is the reading `trip-groups.ts`
+ * settles: the "leg" that has its own id, revenue and swipe state is a separate
+ * `Trip` sharing a `tripGroup`. The other reading — every row of `Trip.legs` —
+ * would list the Appointment Time row as a leg, and `leg-options` is explicit
+ * that a destination is not something a form can be filed against.
+ */
+const EXPECTED_GROUPED_LEGS = 4;
+const grouped = CONTEXT_LEGS.filter((o) => contextLegs(o).length > 1);
+check(
+  "the Legs list shows the round trip, not just this record",
+  `${grouped.length} of ${CONTEXT_LEGS.length} legs list a sibling — ${grouped.map((o) => o.legId).join(", ")}`,
+  grouped.length === EXPECTED_GROUPED_LEGS,
+);
+/**
+ * ⛔ **Sorted by leg letter.** Found by driving this: `groupMembers` returns
+ * POOL order, so the round trip came back B then A — telling the driver the
+ * return happened first.
+ */
+const misordered = grouped.filter((o) => {
+  const codes = contextLegs(o).map((l) => l.legCode ?? "");
+  return codes.join("") !== [...codes].sort().join("");
+});
+check(
+  "...in leg order, not pool order",
+  misordered.length
+    ? misordered.map((o) => `${o.legId}: ${contextLegs(o).map((l) => l.legCode).join("")}`).join(", ")
+    : grouped.map((o) => contextLegs(o).map((l) => l.legCode).join("")).join(" "),
+  misordered.length === 0,
+);
+/** ⛔ Exactly one leg is marked current, on every leg, grouped or not. */
+const badCurrent = CONTEXT_LEGS.filter(
+  (o) => contextLegs(o).filter((l) => l.current).length !== 1,
+);
+check(
+  "exactly one leg is marked as the one being filed against",
+  badCurrent.length ? badCurrent.slice(0, 3).map((o) => o.legId).join(", ") : `${CONTEXT_LEGS.length} of ${CONTEXT_LEGS.length}`,
+  badCurrent.length === 0,
+);
+
+/** ⛔ The component decides how it looks and nothing about what it says. */
+const BANNER_SRC = codeOnly(readFileSync(join(ROOT, "components/support/trip-summary-banner.tsx"), "utf8"));
+check(
+  "the block reads every value from the rule",
+  `tripContextFor ${(BANNER_SRC.match(/tripContextFor/g) ?? []).length}x`,
+  /tripContextFor\(option\)/.test(BANNER_SRC) &&
+    !/trip\.rider/.test(BANNER_SRC) &&
+    !/leg\.address/.test(BANNER_SRC),
 );
 
 // ---------------------------------------------------------------------------
