@@ -10705,17 +10705,30 @@ check(
     !/addedFilterCount\(rideFilters\)/.test(PAGE_CODE),
 );
 /**
- * ⛔ ...and the chip row AND the header icon appear only where the filter can
- * do something. An icon that opens a sheet whose every control is inert is
- * worse than no icon.
+ * ⛔⛔ **Both ways in share ONE condition, and the tab is part of it.** The
+ * filter narrows the manifest and nothing else, so on In Progress, Needs
+ * Action and Pending it can do nothing — and an icon that opens a sheet whose
+ * every control is inert is worse than no icon. (User-reported, 2026-10-15:
+ * the chip row was tab-scoped and the icon was not.)
+ *
+ * ⛔ The two halves are asserted separately because each alone passes on a
+ * half-build: a page could gate the row and not the icon — which is the state
+ * this check was written in response to — or name the rule once and then read
+ * `showsRidesFilter` again somewhere else.
  */
+const sharedGuard = /const showsFilter = showsRidesFilter\(demo\) && activeTab === "upcoming"/;
+const gateReads = (PAGE_CODE.match(/showsRidesFilter\(/g) ?? []).length;
 check(
-  "...and both ways in are offered only where the filter is",
-  `row guard ${/showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE)}, ` +
-    `icon guard ${/showFilter=\{showsFilterBar\}/.test(PAGE_CODE)}`,
-  /const showsFilterBar = showsRidesFilter\(demo\)/.test(PAGE_CODE) &&
-    /showsFilterBar && activeTab === "upcoming"/.test(PAGE_CODE) &&
-    /showFilter=\{showsFilterBar\}/.test(PAGE_CODE),
+  "...and both ways in are offered only on the tab the filter can act on",
+  `one rule ${sharedGuard.test(PAGE_CODE)}; ` +
+    `icon ${/showFilter=\{showsFilter\}/.test(PAGE_CODE)}, row ${/\{showsFilter && \(/.test(PAGE_CODE)}; ` +
+    `gate read ${gateReads}x`,
+  sharedGuard.test(PAGE_CODE) &&
+    /showFilter=\{showsFilter\}/.test(PAGE_CODE) &&
+    /\{showsFilter && \(/.test(PAGE_CODE) &&
+    // ⛔ Read ONCE. A second reader is the same rule stated twice, and the two
+    // drift the moment one of them gains a third condition.
+    gateReads === 1,
 );
 /**
  * ⛔⛔ **The sheet counts against the UNFILTERED manifest.** Handed

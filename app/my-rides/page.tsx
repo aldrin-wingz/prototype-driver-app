@@ -231,7 +231,27 @@ export default function MyRidesPage() {
   // see `applicableRideFilters`. Reading `rideFilters` directly anywhere below
   // is how row 10 shipped a feed narrowed by a filter nobody could see.
   const appliedFilters = applicableRideFilters(rideFilters, demo);
-  const showsFilterBar = showsRidesFilter(demo);
+  /**
+   * Whether the filter is offered at all — BOTH the header icon and the chip
+   * row, from one expression.
+   *
+   * ⛔⛔ **Two conditions, and the tab is one of them.** The filter narrows the
+   * manifest and nothing else, so on In Progress, Needs Action and Pending it
+   * can do nothing — and an icon that opens a sheet whose every control is
+   * inert is worse than no icon. (User direction, 2026-10-15: the chip row was
+   * already tab-scoped and the icon was not, which left the control visible on
+   * three tabs it could not act on.)
+   *
+   * ⛔ ONE name, read by both. Writing `showsRidesFilter(demo) && activeTab ===
+   * "upcoming"` at each site is the same rule stated twice, and the two drift
+   * the moment one of them gains a third condition — which is exactly what had
+   * just happened here. A check asserts `showsRidesFilter` is read once.
+   *
+   * ⚠️ The VALUES survive a tab change. A driver who filters Upcoming, reads
+   * Needs Action and comes back finds their filter still applied, which is why
+   * `rideFilters` is not cleared here.
+   */
+  const showsFilter = showsRidesFilter(demo) && activeTab === "upcoming";
   const openFilterSheet = (key: RideFilterKey | null) => {
     setFilterSheetKey(key);
     setFilterSheetOpen(true);
@@ -373,13 +393,12 @@ export default function MyRidesPage() {
   
   return (
     <div className="flex min-h-screen flex-col pb-20">
-      {/* ⛔ The icon is offered only where the filter is — an icon that opened
-          a sheet whose every control did nothing is worse than no icon. The
-          badge counts the filters BEYOND the always-shown chip; see
+      {/* ⛔ The icon and the chip row share one condition — see `showsFilter`.
+          The badge counts the filters BEYOND the always-shown chip; see
           `addedFilterCount` for why the status chip is not in it. */}
       <Header
         title="My Rides"
-        showFilter={showsFilterBar}
+        showFilter={showsFilter}
         onFilterClick={() => openFilterSheet(null)}
         filterBadge={addedFilterCount(appliedFilters)}
       />
@@ -436,7 +455,7 @@ export default function MyRidesPage() {
       {/* ⛔ Only on Upcoming, and only in Proposed. A bar offering `Cancelled`
           on a tab that cannot hold one, or in a mode where none exists, is a
           control that can never match anything. */}
-      {showsFilterBar && activeTab === "upcoming" && (
+      {showsFilter && (
         <RidesFilterBar
           values={appliedFilters}
           counts={filterCounts}
