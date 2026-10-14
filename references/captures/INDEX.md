@@ -13,7 +13,7 @@ capture is not one we have verified — it is one we have guessed at, and it car
 
 ⭐ **The index is the artifact; the image files stay where they are.** Each row carries the
 capture's SHA-256 and its vault-relative path, so a capture is addressable without copying
-~149.2 MB of binaries into a branch that every future prototype clones — and
+~150.6 MB of binaries into a branch that every future prototype clones — and
 without that cost growing with every shoot. Paths are relative to the vault root.
 
 | Field | Meaning |
@@ -58,7 +58,7 @@ and predates the build in any case. It is not a source.
 | **01 Home** | 30 | 13.9 | BAL-B1×21, BAL-B2×5, Apr-2026×3, DAB-2026-10-14×1 | 🕐 mostly stale — 6 of 30 current — ⛔ nothing for incentives |
 | **02 Requests** | 33 | 18.1 | MRV-B2×19, MRV-B1×11, Apr-2026×3 | ✅ 19 of 33 from a current shoot — richest section; has a prose contract |
 | **03 Planner** | 8 | 4.0 | DAB-2026-10-01×8 | ✅ 8 of 8 from a current shoot — multi-trip day and past days still unshot |
-| **04 My Rides** | 39 | 16.5 | Apr-2026×24, DAB-2026-10-13×7, DAB-2026-10-01×4, DAB-2026-10-14×3, MRV-B2×1 | 🕐 mostly stale — 15 of 39 current |
+| **04 My Rides** | 41 | 17.9 | Apr-2026×24, DAB-2026-10-13×7, DAB-2026-10-14×5, DAB-2026-10-01×4, MRV-B2×1 | 🕐 mostly stale — 17 of 41 current |
 | **05 Options** | 10 | 4.9 | DAB-2026-10-01×7, DAB-2026-10-14×3 | ✅ 10 of 10 from a current shoot — menu captured; most destinations behind its rows are not |
 | **06 Chat** | 15 | 7.0 | Sep-2026×10, MRV-B2×4, DAB-2026-10-13×1 | 🕐 mostly stale — 5 of 15 current — shipped surfaces only |
 | **07 Onboarding and Auth** | 37 | 20.2 | MRV-B3×16, MRV-B2×15, MRV-B1×6 | ✅ 31 of 37 from a current shoot — captured, not built (by decision) |
@@ -66,7 +66,7 @@ and predates the build in any case. It is not a source.
 | **_out-of-scope** | 15 | 4.0 | Apr-2026×10, DAB-2026-10-09×3, DAB-2026-10-13×2 | — excluded feature |
 | **_out-of-app** | 0 | 0.0 | — | — none |
 | **_unregistered** | 89 | 44.4 | MRV-B1-raw×32, unknown×18, unknown (undated shoot folder)×7, unknown (2026-09-15)×6, unknown (2026-09-17)×6, slack×5, unknown (2026-09-24)×4, unknown (2026-09-16)×3, unknown (2026-04-24)×2, unknown (2026-04-27)×2, unknown (2026-09-25)×2, unknown (2026-09-10)×1, unknown (2026-09-14)×1 | — untriaged — triage before citing |
-| **TOTAL** | **340** | **149.2** | | 475 files on disk, 340 unique |
+| **TOTAL** | **342** | **150.6** | | 477 files on disk, 342 unique |
 
 ---
 
@@ -265,8 +265,10 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 | CAP-074 | `04-03 - Ride History - Filter Options Open.png` | DAB-2026-10-01 | `3217717b762eefec` | 0 |  |
 | CAP-332 | `04-03 - Ride History - List With Late Leg.png` | DAB-2026-10-14 | `bd9baf61aa3b236a` | 0 |  |
 | CAP-323 | `04-04 - Confirm Flow - Rider Declined The Trip Sheet.png` | DAB-2026-10-13 | `ec81d22b5244a310` | 0 |  |
+| CAP-341 | `04-04 - My Rides - Client Cancellation Alert.png` | DAB-2026-10-14 | `1c529f2d5c7a434a` | 0 |  |
 | CAP-075 | `04-04 - Ride Details - Completed From History.png` | DAB-2026-10-01 | `fa8e467764d48a10` | 0 |  |
 | CAP-324 | `04-05 - More Options - Ready To Start Or En-Route Refusal.png` | DAB-2026-10-13 | `a430b7be517d8d4d` | 0 |  |
+| CAP-342 | `04-05 - Ride Details - Cancelled By Wingz.png` | DAB-2026-10-14 | `697fe8f17f68f0e7` | 0 |  |
 | CAP-325 | `04-06 - Ride Details - Pre-Check Confirmation.png` | DAB-2026-10-13 | `de90d6471d0c694c` | 0 |  |
 | CAP-326 | `04-07 - Ride Details - Drop-Off Swipe Too Far Refusal.jpg` | DAB-2026-10-13 | `a57e942e813afac8` | 0 |  |
 | CAP-076 | `04a - Ride Details - Before Taken - Top.png` | Apr-2026 | `aba024b50b98b74f` | 2 |  |
@@ -307,8 +309,10 @@ My Rides list, Ride Details across states, the swipe sequence (`s-01a/b/c`), the
 - `CAP-074` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-03 - Ride History - Filter Options Open.png`
 - `CAP-332` — `Project - Driver App Base/Captures/04 My Rides/2026-10-14/04-03 - Ride History - List With Late Leg.png`
 - `CAP-323` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-04 - Confirm Flow - Rider Declined The Trip Sheet.png`
+- `CAP-341` — `Project - Driver App Base/Captures/04 My Rides/2026-10-14/04-04 - My Rides - Client Cancellation Alert.png`
 - `CAP-075` — `Project - Driver App Base/Captures/04 My Rides/2026-10-01/04-04 - Ride Details - Completed From History.png`
 - `CAP-324` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-05 - More Options - Ready To Start Or En-Route Refusal.png`
+- `CAP-342` — `Project - Driver App Base/Captures/04 My Rides/2026-10-14/04-05 - Ride Details - Cancelled By Wingz.png`
 - `CAP-325` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-06 - Ride Details - Pre-Check Confirmation.png`
 - `CAP-326` — `Project - Driver App Base/Captures/04 My Rides/2026-10-13/04-07 - Ride Details - Drop-Off Swipe Too Far Refusal.jpg`
 - `CAP-076` — `Project - In-App Chat/prototype-driver-app-chat/references/screenshots/canonical/04a - Ride Details - Before Taken - Top.png`
