@@ -55,7 +55,7 @@ import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import {
-  OVER_CAPACITY_REQUEST_CTA,
+  OVER_CAPACITY_SWIPE_REQUEST,
   OVER_CAPACITY_SWIPE_LABEL,
   dispatchDialHref,
   isOverCapacity,
@@ -63,6 +63,10 @@ import {
   showsCapacityException,
 } from "@/lib/driver-data/over-capacity";
 import { OverCapacityForm } from "@/components/support/over-capacity-form";
+import {
+  REQUEST_SWIPE_ACCEPT,
+  REQUEST_SWIPE_REJECT,
+} from "@/lib/driver-data/request-swipe";
 import {
   CANCELLATION_REQUESTED_DETAIL,
   CANCELLATION_REQUESTED_PILL,
@@ -1229,13 +1233,40 @@ export function RideDetailLayout({
                 </span>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setCapacityFormOpen(true)}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#282828] text-sm font-bold uppercase tracking-wide text-white"
-              >
-                {OVER_CAPACITY_REQUEST_CTA}
-              </button>
+              /*
+                ⭐⭐ **Production's own pill, with ONE half replaced.** The
+                driver already knows this control — it is what every other
+                request offers — so the proposal changes the half that was
+                taken away rather than introducing a new shape. User direction
+                2026-10-15: *"swipe to request or swipe to reject. I think we
+                should still allow them to reject"*.
+
+                ⛔ The reject half is as INERT here as it is on every other
+                request screen in this app: the base replicates production's
+                control and has no accept or reject handler anywhere. Wiring it
+                only here would make over capacity the one screen in the
+                prototype where rejecting does something — a difference the
+                proposal does not claim. See `request-swipe.ts`.
+              */
+              <div className="relative flex h-14 items-center justify-center overflow-hidden rounded-full">
+                <div className="absolute inset-y-0 left-0 w-1/2 bg-[#F472B6]" />
+                <div className="absolute inset-y-0 right-0 w-1/2 bg-[#34D399]" />
+                <div className="absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md">
+                  <svg className="h-6 w-6 text-[#10B981]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none" />
+                  </svg>
+                </div>
+                <span className="relative z-10 pr-8 text-sm font-bold uppercase text-white">
+                  {REQUEST_SWIPE_REJECT}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCapacityFormOpen(true)}
+                  className="relative z-10 pl-8 text-sm font-bold uppercase text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                >
+                  {OVER_CAPACITY_SWIPE_REQUEST}
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -1269,10 +1300,10 @@ export function RideDetailLayout({
               </svg>
             </div>
             <span className="relative z-10 pr-8 text-sm font-bold uppercase text-white">
-              Swipe to Reject
+              {REQUEST_SWIPE_REJECT}
             </span>
             <span className="relative z-10 pl-8 text-sm font-bold uppercase text-white">
-              Swipe to Accept
+              {REQUEST_SWIPE_ACCEPT}
             </span>
           </div>
         </div>

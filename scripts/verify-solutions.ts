@@ -45,6 +45,7 @@ import {
   OVER_CAPACITY_PROVENANCE,
   OVER_CAPACITY_SOLUTIONS,
   OVER_CAPACITY_EXCEPTION_SOLUTIONS,
+  OVER_CAPACITY_SWIPE_REQUEST,
   OVER_CAPACITY_REASONS,
   OC_REASON_MORE_SEATS,
   OC_REASON_FINISHES_FIRST,
@@ -235,6 +236,10 @@ import {
 } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
 import { ID_BADGE } from "../lib/driver-data/id-badge";
+import {
+  REQUEST_SWIPE_ACCEPT,
+  REQUEST_SWIPE_REJECT,
+} from "../lib/driver-data/request-swipe";
 import { buildOverCapacityException } from "../components/support/over-capacity-form";
 import {
   ISSUE_ADD_LEG_REQUEST,
@@ -12615,6 +12620,80 @@ check(
     rf36Case.fields.filter(
       (f) => f.type === "seat-blocks" || f.id.startsWith("exception") || f.id === "actualSeats",
     ).length === 5,
+);
+
+/* --- 36d-2. The pill: one half replaced, the other kept ------------------ */
+/**
+ * ⭐⭐ **Production's own control comes back, with ONE half changed.** User
+ * direction 2026-10-15: *"swipe to request or swipe to reject. I think we
+ * should still allow them to reject"*. The first build put a full-width dark
+ * button there, which said the same thing while throwing away the control
+ * production has trained the driver on.
+ *
+ * ⭐ And it is a finding about production too: the over-capacity screen removes
+ * the WHOLE pill, so a driver who cannot take the trip cannot decline it
+ * either — it sits on their feed until it expires, and the only control is a
+ * telephone.
+ *
+ * ⛔⛔ The reject half must read production's own constant, not a second copy
+ * of the same words. Two screens draw this pill and a retyped label is how they
+ * start disagreeing about a word production owns.
+ */
+const ocRejectUses = [...OC_CODE.matchAll(/REQUEST_SWIPE_REJECT/g)].length;
+const ocAcceptUses = [...OC_CODE.matchAll(/REQUEST_SWIPE_ACCEPT/g)].length;
+const ocRequestUses = [...OC_CODE.matchAll(/OVER_CAPACITY_SWIPE_REQUEST/g)].length;
+check(
+  "the reject half is kept, and both footers read it from one place",
+  `REQUEST_SWIPE_REJECT x${ocRejectUses} (import + 2 pills), ` +
+    `REQUEST_SWIPE_ACCEPT x${ocAcceptUses} (import + 1 pill), ` +
+    `literal "Swipe to Reject": ${/"Swipe to Reject"|>\s*Swipe to Reject/.test(OC_CODE)}`,
+  // ⛔ Two pills draw the reject half: production's own, and row 13's.
+  ocRejectUses === 3 &&
+    // ⛔ ...and only ONE draws the accept half, because row 13 replaced it.
+    ocAcceptUses === 2 &&
+    ocRequestUses === 2 &&
+    // ⛔⛔ No retyped copy anywhere in the file, or the two can drift.
+    !/"Swipe to Reject"|>\s*Swipe to Reject/.test(OC_CODE) &&
+    // ⛔ And the words really are production's and ours respectively.
+    REQUEST_SWIPE_REJECT === "Swipe to Reject" &&
+    OVER_CAPACITY_SWIPE_REQUEST === "Swipe to Request",
+);
+/**
+ * ⛔⛔ **The REQUEST half is live; the reject half is as inert as the base's.**
+ *
+ * The base replicates production's pill with no accept handler and no reject
+ * handler — accepting a trip is not what any of these prototypes are about.
+ * Row 13 makes the request half work, because that IS the slice, and leaves
+ * reject exactly where it was. Wiring it only here would make over capacity
+ * the one screen in the prototype where rejecting does something.
+ *
+ * ⚠️ Measured by the ELEMENT each label sits in, not by counting handlers: a
+ * handler on the wrapping pill would pass a count and make both halves live.
+ */
+function rf36TagOf(src: string, token: string): string {
+  const at = src.indexOf(token);
+  if (at < 0) return "MISSING";
+  const open = Math.max(src.lastIndexOf("<button", at), src.lastIndexOf("<span", at), src.lastIndexOf("<a ", at));
+  // ⛔ Sliced to the TOKEN, not to the first `>`. An `onClick={() => …}` holds
+  // a `>` of its own, so cutting at the first one lost the handler and the
+  // check reported a button that opened nothing.
+  return open < 0 ? "NONE" : src.slice(open, at);
+}
+const rf36RequestTag = rf36TagOf(OC_CODE, "OVER_CAPACITY_SWIPE_REQUEST}");
+const rf36RejectTag = rf36TagOf(OC_CODE, "REQUEST_SWIPE_REJECT}");
+const rf36AcceptTag = rf36TagOf(OC_CODE, "REQUEST_SWIPE_ACCEPT}");
+check(
+  "the request half is a button; both reject halves and the base's accept are not",
+  `request: ${rf36RequestTag.slice(0, 7)} (opens the form: ${/setCapacityFormOpen/.test(rf36RequestTag)}), ` +
+    `reject: ${rf36RejectTag.slice(0, 5)}, base accept: ${rf36AcceptTag.slice(0, 5)}`,
+  rf36RequestTag.startsWith("<button") &&
+    /setCapacityFormOpen\(true\)/.test(rf36RequestTag) &&
+    // ⛔ Non-vacuity: the OTHER halves really are not buttons, or "is a button"
+    // is a property of every element in the file.
+    rf36RejectTag.startsWith("<span") &&
+    rf36AcceptTag.startsWith("<span") &&
+    !/onClick/.test(rf36RejectTag) &&
+    !/onClick/.test(rf36AcceptTag),
 );
 
 /* --- 36e. Submitting accepts nothing ------------------------------------- */

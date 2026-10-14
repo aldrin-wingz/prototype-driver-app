@@ -366,7 +366,24 @@ export function peakSeatWindow(
  * does not have. Kept together so the fold-in audit can see in one place that
  * none of it is a replication claim.
  */
-export const OVER_CAPACITY_REQUEST_CTA = "Request a capacity exception";
+/**
+ * The proposal's replacement for the ACCEPT half of production's pill.
+ *
+ * ⛔⛔ **It replaces the accept half and nothing else.** The reject half stays,
+ * reading production's own `REQUEST_SWIPE_REJECT` — user direction 2026-10-15:
+ * *"I think we should still allow them to reject"*. ⭐ That is a finding about
+ * production as much as a design choice: the over-capacity screen removes the
+ * WHOLE pill, so today a driver who cannot take the trip cannot decline it
+ * either. It sits on their feed until it expires, and the only control on the
+ * screen is a telephone.
+ *
+ * ⚠️ Deliberately parallel in shape to the two strings it sits beside —
+ * `Swipe to …` — because it occupies the same half of the same control. An
+ * earlier version read "Request a capacity exception" on a full-width button,
+ * which said the same thing while throwing away the control production has
+ * trained the driver on.
+ */
+export const OVER_CAPACITY_SWIPE_REQUEST = "Swipe to Request";
 export const OVER_CAPACITY_FORM_SUBMIT = "Send Request";
 export const OVER_CAPACITY_SEATS_TITLE = "What is holding the seats";
 export const OVER_CAPACITY_SEATS_HELP =

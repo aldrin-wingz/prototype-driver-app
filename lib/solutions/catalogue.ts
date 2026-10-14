@@ -495,7 +495,7 @@ export const SOLUTIONS: Solution[] = [
     problem: "Driver blocked by over-capacity logic",
     useCase: "Driver tries to take a trip → blocked by over-capacity → calls Support",
     proposedFeature:
-      "An in-app over-capacity request in place of the dispatch phone number: the screen names the accepted trips already holding the vehicle's seats, asks the driver why this one still fits, and sends that to Support",
+      "An in-app over-capacity request in place of the dispatch phone number: production's Reject | Accept pill comes back with the accept half replaced by Swipe to Request, which names the accepted trips already holding the vehicle's seats, asks the driver why this one still fits, and sends that to Support",
     tableSummary: "Name what is holding the seats, and ask why this one fits.",
     klass: "form",
     buildState: "in-prototype",
@@ -507,7 +507,7 @@ export const SOLUTIONS: Solution[] = [
     entry: {
       route: "/requests/REQ-OVERCAP-001",
       label:
-        "Open the over-capacity request. The telephone is gone: tap Request a capacity exception to see which accepted trips are holding the seats, how short the record is, and to say why this one still fits. ⛔ Sending it accepts nothing — the trip stays in Requests until Support releases it.",
+        "Open the over-capacity request. The telephone is gone and production's own pill is back, with one half changed: Swipe to Reject | Swipe to Request. Requesting shows which accepted trips are holding the seats, how short the record is, and asks why this one still fits. ⛔ Sending it accepts nothing — the trip stays in Requests until Support releases it.",
     },
     nowEntry: {
       route: "/requests/REQ-OVERCAP-001",
