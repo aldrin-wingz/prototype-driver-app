@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
+import { legOptionFor } from "@/lib/support-data/leg-options";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_AUTO_ASSIGN_REQUEST } from "@/lib/support-data/issue-types";
@@ -68,6 +69,7 @@ export function AutoAssignRequestForm({
 
   return (
     <SupportFormSheet
+      context={legOptionFor(trip)}
       supportCase={supportCase}
       open={open}
       onOpenChange={onOpenChange}

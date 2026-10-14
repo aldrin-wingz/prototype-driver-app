@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
+import { legOptionFor } from "@/lib/support-data/leg-options";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_TRIP_CHANGE_REQUEST } from "@/lib/support-data/issue-types";
@@ -86,6 +87,7 @@ export function TripChangeForm({
 
   return (
     <SupportFormSheet
+      context={legOptionFor(trip, leg)}
       supportCase={supportCase}
       open={open}
       onOpenChange={onOpenChange}

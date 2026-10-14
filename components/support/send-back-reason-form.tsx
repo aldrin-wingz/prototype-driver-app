@@ -1,5 +1,6 @@
 "use client";
 
+import { legOptionFor } from "@/lib/support-data/leg-options";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_SEND_BACK_REASON } from "@/lib/support-data/issue-types";
@@ -54,6 +55,7 @@ export function SendBackReasonForm({
 
   return (
     <SupportFormSheet
+      context={legOptionFor(trip)}
       supportCase={supportCase}
       open={open}
       onOpenChange={onOpenChange}

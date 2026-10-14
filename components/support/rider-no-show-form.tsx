@@ -3,6 +3,7 @@
 import { useToast } from "@/hooks/use-toast";
 import type { DemoFocus } from "@/lib/solutions/demo-mode";
 import { useSolution } from "@/lib/solutions/solution-context";
+import { legOptionFor } from "@/lib/support-data/leg-options";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_RIDER_NO_SHOW } from "@/lib/support-data/issue-types";
@@ -84,6 +85,7 @@ export function RiderNoShowForm({
 
   return (
     <SupportFormSheet
+      context={legOptionFor(trip, leg)}
       supportCase={supportCase}
       open={open}
       onOpenChange={onOpenChange}

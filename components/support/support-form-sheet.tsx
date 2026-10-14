@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SupportFieldRenderer } from "./support-field-renderer";
 import { TripSummaryBanner } from "./trip-summary-banner";
-import { findLegOption } from "@/lib/support-data/leg-options";
+import { findLegOption, type LegOption } from "@/lib/support-data/leg-options";
 import { SUPPORT_FORM_TITLE } from "@/lib/support-data/issue-types";
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
@@ -40,7 +40,7 @@ export function SupportFormSheet({
   open,
   onOpenChange,
   onSubmit,
-  contextLegId,
+  context,
   recompute,
 }: {
   supportCase: SupportCaseDefinition;
@@ -66,18 +66,21 @@ export function SupportFormSheet({
   /**
    * The leg to show the context block against, when the case has no picker.
    *
-   * ⛔⛔ **Two forms were filing against a trip and showing nothing about it.**
-   * Rider Declined and Add Leg are both opened FROM a ride and pass their
-   * `legId` straight to `submitForm`, so neither carries a `leg-picker` — and
-   * the banner was mounted under the picker, which meant no picker, no block.
-   * A reviewer opening either one saw "Which legs did the member decline?" with
-   * no trip on screen at all. (User direction, 2026-10-14.)
+   * ⛔⛔ **REQUIRED, with no default, and that is the point.** Every in-app form
+   * shows Trip details and Current leg details — user direction, 2026-10-15,
+   * after Update Trip Details was found rendering neither. It had been optional
+   * and only two of the nine call sites passed it, so a form that forgot looked
+   * exactly like a form that had nothing to show. A required prop makes
+   * forgetting a compile error.
    *
-   * ⚠️ A leg ID, not an option: the sheet already resolves one through
-   * `findLegOption`, and two resolvers are two chances to show a different leg
-   * from the one the request is filed against.
+   * ⛔⛔ **A resolved `LegOption`, not a leg ID.** The id version resolved
+   * through `findLegOption`, which searches `getLegOptions` — legs carrying
+   * `progress` only. A form filed against an upcoming ride or a Request Feed
+   * trip resolved to `undefined` and silently rendered no block, which is the
+   * second half of the same defect. Callers build it with `legOptionFor`, the
+   * one constructor `getLegOptions` itself maps through.
    */
-  contextLegId?: string;
+  context: LegOption;
   recompute?: {
     /** Rebuild the case from the current answers. */
     case: (values: Record<string, string>) => SupportCaseDefinition;
@@ -163,7 +166,7 @@ export function SupportFormSheet({
    * where the driver can change which leg this is about, and a `contextLegId`
    * passed alongside would freeze the block on the leg they started from.
    */
-  const bannerLeg = selectedLeg ?? (contextLegId ? findLegOption(contextLegId) : undefined);
+  const bannerLeg = selectedLeg ?? context;
 
   useEffect(() => {
     if (!selectedLeg) return;

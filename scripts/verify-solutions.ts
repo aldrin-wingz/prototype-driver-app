@@ -338,6 +338,7 @@ import {
   missingFilterIcons,
   RIDE_FILTER_ICONS,
 } from "../components/driver/ride-filter-icon";
+import { legOptionFor } from "../lib/support-data/leg-options";
 import { detailStateFor } from "../lib/driver-data/ride-detail-state";
 import {
   groupByRideDay,
@@ -9917,22 +9918,25 @@ check(
     enrouteRows.some((r) => !r.row.absent),
 );
 /**
- * ⛔⛔ **The block is drawn on the two forms that have no picker to hang it
- * under.** Rider Declined and Add Leg are opened FROM a ride and pass their leg
- * straight to `submitForm`, so neither carries a `leg-picker` — and the banner
- * was mounted under the picker, which meant no picker, no block. A reviewer
- * opening either saw the first question with no trip on screen at all. (User
- * direction, 2026-10-14.)
+ * ⛔⛔ **The block is drawn on EVERY form, and the sheet cannot be mounted
+ * without one.** It began as a fix for the two forms with no picker to hang it
+ * under — Rider Declined and Add Leg, opened FROM a ride (user direction,
+ * 2026-10-14) — and a walk later found Update Trip Details in the same state,
+ * because the prop was optional and only those two passed it. It is now
+ * required and a resolved `LegOption`; §33 sweeps the call sites.
  *
- * ⚠️ Asserted three ways, because any one alone passes on a half-wiring: the
- * sheet takes a leg id, it decides ONE row to draw under, and both callers
- * actually pass theirs.
+ * ⚠️ Asserted two ways here, because either alone passes on a half-wiring: the
+ * sheet takes a context, and it decides ONE row to draw under.
  */
 const FORM_SHEET_SRC = codeOnly(readFileSync(join(ROOT, "components/support/support-form-sheet.tsx"), "utf8"));
 check(
-  "the sheet can be told which leg to draw the block for",
-  `contextLegId: ${/contextLegId\?: string/.test(FORM_SHEET_SRC)}, resolved: ${/findLegOption\(contextLegId\)/.test(FORM_SHEET_SRC)}`,
-  /contextLegId\?: string/.test(FORM_SHEET_SRC) && /findLegOption\(contextLegId\)/.test(FORM_SHEET_SRC),
+  "the sheet is told which leg to draw the block for, and cannot be left untold",
+  `context: ${/\n  context: LegOption;/.test(FORM_SHEET_SRC)}, ` +
+    `optional: ${/context\?: /.test(FORM_SHEET_SRC)}`,
+  /\n  context: LegOption;/.test(FORM_SHEET_SRC) &&
+    // ⛔ No `?`. An optional context is how seven of nine callers came to omit
+    // it, and an omitted one looks exactly like having nothing to show.
+    !/context\?: /.test(FORM_SHEET_SRC),
 );
 /**
  * ⛔ ONE id, never a per-row predicate. "A picker, or the first field when
@@ -9947,22 +9951,7 @@ check(
     /field\.id === bannerAfterId/.test(FORM_SHEET_SRC) &&
     // ⛔ The picker still wins where there is one, or a case with a picker
     // would freeze the block on whatever leg it opened from.
-    /selectedLeg \?\? \(contextLegId/.test(FORM_SHEET_SRC),
-);
-const PICKERLESS_CALLERS: Array<[string, string]> = [
-  ["rider-declined-form.tsx", "row 16 — Rider Declined the Trip"],
-  ["add-leg-form.tsx", "row 20 — Add Leg to Trip"],
-];
-const notPassing = PICKERLESS_CALLERS.filter(
-  ([file]) =>
-    !/contextLegId=\{leg\?\.id\}/.test(
-      codeOnly(readFileSync(join(ROOT, "components/support", file), "utf8")),
-    ),
-);
-check(
-  "...and both pickerless forms pass the leg they were opened from",
-  `${notPassing.length} of ${PICKERLESS_CALLERS.length} not passing — ${notPassing.map(([, why]) => why).join(", ") || "none"}`,
-  notPassing.length === 0,
+    /selectedLeg \?\? context/.test(FORM_SHEET_SRC),
 );
 /**
  * ⛔⛔ ...and the picker is not merely absent from the case — it is INVISIBLE
@@ -11654,6 +11643,127 @@ check(
     // ⛔ ...and both outcomes really occur, or the two agreed on a constant.
     FOCUS_IDS.some((id) => showsRidesFilter(demoFocus(id, "fixed"))) &&
     FOCUS_IDS.some((id) => !showsRidesFilter(demoFocus(id, "fixed"))),
+);
+
+/* === 33. Every in-app form says which trip it is about =================== */
+/**
+ * ⛔⛔ **A 950-check gate could not see this, and a walk found it.** Update Trip
+ * Details rendered with no Trip details and no Current leg details — a form
+ * asking the driver to change a pick-up time, with nothing on screen saying
+ * whose. `contextLegId` was OPTIONAL and two of the nine call sites passed it,
+ * so a form that forgot looked exactly like a form with nothing to show.
+ *
+ * Two independent causes, and fixing either alone leaves the defect:
+ *
+ *   1. the prop was optional, so seven callers simply did not pass it;
+ *   2. it was a leg ID resolved through `findLegOption`, which searches
+ *      `getLegOptions` — legs carrying `progress` ONLY. A form filed against an
+ *      upcoming ride or a Request Feed trip resolved to `undefined` and
+ *      rendered nothing even where the id was passed.
+ *
+ * ⚠️ The prop is now required and a `LegOption`, so (1) is a compile error.
+ * These checks cover (2), and the sweep below is what stops a tenth form
+ * shipping without one.
+ */
+console.log("\n33. Every in-app form carries its trip and leg context");
+
+const FORM_DIR = join(ROOT, "components/support");
+const FORM_FILES = readdirSync(FORM_DIR).filter((name) => name.endsWith("-form.tsx"));
+/**
+ * ⛔ Declared as a literal. A sweep over whatever happens to be in the folder
+ * has no denominator — a glob that matched nothing would pass perfectly.
+ */
+const EXPECTED_FORM_FILES = 9;
+const mountsSheet = FORM_FILES.filter((name) =>
+  codeOnly(readFileSync(join(FORM_DIR, name), "utf8")).includes("<SupportFormSheet"),
+);
+const withoutContext = mountsSheet.filter((name) => {
+  const src = codeOnly(readFileSync(join(FORM_DIR, name), "utf8"));
+  return !/context=\{legOptionFor\(/.test(src);
+});
+check(
+  "every form that mounts the sheet passes a context built by legOptionFor",
+  `${mountsSheet.length} of ${FORM_FILES.length} form file(s) mount it; ` +
+    `${withoutContext.length} without a context${withoutContext.length ? ": " + withoutContext.join(", ") : ""}`,
+  FORM_FILES.length === EXPECTED_FORM_FILES &&
+    mountsSheet.length === EXPECTED_FORM_FILES &&
+    withoutContext.length === 0,
+);
+/**
+ * ⛔⛔ **One constructor.** `getLegOptions` and `legOptionFor` must map through
+ * the same `toLegOption`, or the picker and the context block describe the same
+ * leg differently — and the first thing a second constructor drops is
+ * `withSessionSwipes`, leaving a block that shows a swipe the driver has just
+ * made as still missing.
+ */
+const sampleOptions = getLegOptions();
+const rebuilt = sampleOptions.map((option) => legOptionFor(option.trip, option.leg));
+const drifted = sampleOptions.filter(
+  (option, i) =>
+    option.legId !== rebuilt[i].legId ||
+    option.searchText !== rebuilt[i].searchText ||
+    option.trip.id !== rebuilt[i].trip.id,
+);
+check(
+  "legOptionFor and the picker build the same option for the same leg",
+  `${drifted.length} differ of ${sampleOptions.length} leg(s)`,
+  drifted.length === 0 && sampleOptions.length > 10,
+);
+/**
+ * ⛔⛔ **The half `findLegOption` could not reach.** Every seeded ride must
+ * yield a context, including the ones whose legs carry no `progress` — those
+ * are precisely the trips `findLegOption` returned `undefined` for, and
+ * precisely where the form rendered nothing.
+ *
+ * ⚠️ Both numbers are reported, because the check is only interesting while the
+ * second is non-zero: if every seeded trip happened to have progress, this
+ * would pass without testing the thing it is named for.
+ */
+const everyTrip = [
+  ...mockInProgressTrips,
+  ...mockNeedsActionTrips,
+  ...mockUpcomingTrips,
+  ...mockCompletedTrips,
+  ...mockRequestTrips,
+].filter((trip) => trip.legs.length > 0);
+const unreachableByFind = everyTrip.filter(
+  (trip) => !trip.legs.some((leg) => leg.progress),
+);
+const noContext = everyTrip.filter((trip) => {
+  try {
+    const option = legOptionFor(trip);
+    return !option || !option.leg || !option.trip;
+  } catch {
+    return true;
+  }
+});
+check(
+  "every seeded trip yields a context, including those no picker would offer",
+  `${noContext.length} without one of ${everyTrip.length} trip(s); ` +
+    `${unreachableByFind.length} have no leg with progress and would have rendered nothing before`,
+  noContext.length === 0 &&
+    // ⛔ ...and the case this exists for really occurs in the seed.
+    unreachableByFind.length > 0,
+);
+/**
+ * ⛔ The block is drawn for the picker's selection when there is one, and for
+ * the passed context otherwise — never both, and never neither. Asserted on the
+ * sheet's own wiring, because the composition is the only place it exists.
+ */
+const SHEET_WIRING = codeOnly(
+  readFileSync(join(ROOT, "components/support/support-form-sheet.tsx"), "utf8"),
+);
+check(
+  "the picker's own selection wins, and the passed context is the fallback",
+  `bannerLeg ${/const bannerLeg = selectedLeg \?\? context;/.test(SHEET_WIRING)}; ` +
+    `required prop ${/\n  context: LegOption;/.test(SHEET_WIRING)}`,
+  /const bannerLeg = selectedLeg \?\? context;/.test(SHEET_WIRING) &&
+    // ⛔ REQUIRED, with no `?`. That is what makes a forgotten context a
+    // compile error rather than a form with nothing on it.
+    /\n  context: LegOption;/.test(SHEET_WIRING) &&
+    !/contextLegId/.test(SHEET_WIRING) &&
+    // ⛔ ...and exactly one mount of the block, after one computed anchor.
+    (SHEET_WIRING.match(/<TripSummaryBanner/g) ?? []).length === 1,
 );
 
 // ---------------------------------------------------------------------------

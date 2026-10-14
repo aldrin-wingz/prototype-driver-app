@@ -48,25 +48,63 @@ export function getLegOptions(scope: LegScope = "all"): LegOption[] {
       // reader of the seed, and a swipe the driver just made has to be visible
       // here or the form's re-derive silently undoes it. See `session-swipes`.
       .map(withSessionSwipes)
-      .map((leg) => ({
-        legId: leg.id,
-        trip,
-        leg,
-        searchText: [
-          leg.id,
-          leg.legCode,
-          trip.id,
-          trip.rider,
-          trip.client,
-          trip.date,
-          leg.time,
-          getLegStatusLabel(leg),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase(),
-      }))
+      .map((leg) => toLegOption(trip, leg))
   );
+}
+
+/**
+ * One leg, as an option.
+ *
+ * ⛔⛔ **The ONLY place a `LegOption` is built.** `getLegOptions` maps through
+ * it and so does `legOptionFor`, so the picker and a form's own context block
+ * cannot describe the same leg differently. An inline object literal in either
+ * place is a second constructor, and the first thing it would drop is
+ * `withSessionSwipes` — leaving a block that still shows a swipe the driver
+ * has just made as missing.
+ */
+function toLegOption(trip: Trip, leg: TripLeg): LegOption {
+  return {
+    legId: leg.id,
+    trip,
+    leg,
+    searchText: [
+      leg.id,
+      leg.legCode,
+      trip.id,
+      trip.rider,
+      trip.client,
+      trip.date,
+      leg.time,
+      getLegStatusLabel(leg),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase(),
+  };
+}
+
+/**
+ * The leg a form's context block is drawn for.
+ *
+ * ⛔⛔ **Not `findLegOption`, and the difference is the whole reason this
+ * exists.** That one searches `getLegOptions`, which offers only legs carrying
+ * `progress` — a leg you can swipe. A form can perfectly well be filed against
+ * a leg that has none: an upcoming ride, or a Request Feed trip the driver has
+ * not accepted. Looking those up returns `undefined`, and the form then renders
+ * with no Trip details and no Current leg details at all. That is exactly the
+ * defect this fixed, found by walking Update Trip Details.
+ *
+ * ⚠️ **A trip-scoped form falls back to the trip's first leg**, preferring one
+ * that has progress. Send-Back and Auto-Assign are about a whole trip and carry
+ * no leg of their own, and the block is leg-anchored — so the `Legs` row marks
+ * leg A as current where nothing else has a better claim. Named rather than
+ * silently defaulted: the alternative is those two forms being the only ones
+ * with no context at all, which is what the driver reported.
+ */
+export function legOptionFor(trip: Trip, leg?: TripLeg): LegOption {
+  const chosen =
+    leg ?? trip.legs.find((candidate) => candidate.progress) ?? trip.legs[0];
+  return toLegOption(trip, withSessionSwipes(chosen));
 }
 
 /**

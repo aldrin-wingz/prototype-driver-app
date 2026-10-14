@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
+import { legOptionFor } from "@/lib/support-data/leg-options";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_ADD_LEG_REQUEST } from "@/lib/support-data/issue-types";
@@ -324,6 +325,7 @@ export function AddLegForm({
 
   return (
     <SupportFormSheet
+      context={legOptionFor(trip, leg)}
       supportCase={supportCase}
       open={open}
       onOpenChange={onOpenChange}
@@ -332,7 +334,6 @@ export function AddLegForm({
       // to hang under. The leg is told to the sheet for the same reason it is
       // told to `submitForm` below — the entry point is a ride, and the form
       // has to show which one.
-      contextLegId={leg?.id}
       recompute={{
         case: (values) => buildAddLegCase(trip, values),
         // ⛔ The real function, not a copy — see `addLegDerive`.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/hooks/use-toast";
+import { legOptionFor } from "@/lib/support-data/leg-options";
 import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_CANCEL_AT_DOOR } from "@/lib/support-data/issue-types";
@@ -95,6 +96,7 @@ export function CancelAtDoorForm({
 
   return (
     <SupportFormSheet
+      context={legOptionFor(trip, leg)}
       supportCase={supportCase}
       open={open}
       onOpenChange={onOpenChange}
