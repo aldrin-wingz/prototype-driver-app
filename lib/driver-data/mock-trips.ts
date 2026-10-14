@@ -1800,6 +1800,118 @@ export const mockNeedsActionTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
+  // ===== 19d (legs B and C) — the three-leg group's live half =====
+  //
+  // ⛔ Both PENDING, and both tight against the leg before them: B's pick-up is
+  // 25 minutes after A's drop-off, C's is 35 after B's. `LEG_TURNAROUND_MINUTES`
+  // is 15, so an insertion at slot 1 of any realistic length pushes B, and B's
+  // push carries into C — the two-leg group can only ever push one.
+  {
+    id: "1049800406",
+    date: "Thu, Jul 31, 2026",
+    rider: "CORDELIA VANTERPOOL",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "4.2 mi",
+    totalRevenue: 24.80,
+    notes: "Second leg — dialysis to the pharmacy",
+    tripGroup: "rt-1049800405",
+    contacts: {
+      riderPhone: "(404) 555-0133",
+      pickupPhone: "(404) 555-0141",
+    },
+    legs: [
+      {
+        id: "1049800406",
+        legCode: "B",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:28 AM",
+        address: "1968 Peachtree Rd NW, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 24.80,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800406-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:03 AM",
+        address: "2625 Piedmont Rd NE, Atlanta, GA 30324",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "19e",
+      label: "The three-leg group's middle leg",
+      solutions: ["add-leg-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  {
+    id: "1049800407",
+    date: "Thu, Jul 31, 2026",
+    rider: "CORDELIA VANTERPOOL",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "9.8 mi",
+    totalRevenue: 29.40,
+    notes: "Last leg — the pharmacy home",
+    tripGroup: "rt-1049800405",
+    contacts: {
+      riderPhone: "(404) 555-0133",
+      pickupPhone: "(404) 555-0141",
+    },
+    legs: [
+      {
+        id: "1049800407",
+        legCode: "C",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "10:38 AM",
+        address: "2625 Piedmont Rd NE, Atlanta, GA 30324",
+        county: "Fulton County",
+        revenue: 29.40,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: null,
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+      },
+      {
+        id: "1049800407-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "11:18 AM",
+        address: "1150 Lakewood Ave SE, Atlanta, GA 30315",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "needs-action",
+    pills: [{ label: "Not Confirmed", variant: "danger" }],
+    scenario: {
+      code: "19f",
+      label: "The three-leg group's last leg — where the home tick box lands",
+      solutions: ["add-leg-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
 ];
 
 // ⚠️ SCENARIO_PILL_NOTE — every ride here carries a PROTOTYPE-ONLY pill naming
@@ -2609,6 +2721,73 @@ export const mockCompletedTrips: Trip[] = [
     scenario: {
       code: "19a",
       label: "Add a leg from a FINISHED leg — the entry point",
+      solutions: ["add-leg-request"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== 19d — a THREE-leg trip, the group's completed first leg =====
+  //
+  // ⭐ The third shape of the same case (user direction, 2026-10-14: *"give me
+  // a scenario for adding to a 1 leg trip, a 2 leg trip and a 3 leg trip"*).
+  // One-leg is `1049800404`, two-leg is the `rt-1049800402` group; this is the
+  // one where an insertion can land in the MIDDLE and push more than one leg.
+  //
+  // ⛔ Deliberately tight: B starts 25 minutes after A finishes and C 35 after
+  // B, so a new leg of any length dropped at slot 1 pushes BOTH — which is the
+  // only seeded way to see two blocks of four questions at once. A looser
+  // schedule would make the three-leg case demonstrate nothing the two-leg one
+  // does not.
+  //
+  // ⚠️ The rider's name is invented, like every other seeded name. Production
+  // captures carry real members' — copy the shape, never the name.
+  {
+    id: "1049800405",
+    date: "Thu, Jul 31, 2026",
+    rider: "CORDELIA VANTERPOOL",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "11.4 mi",
+    totalRevenue: 31.50,
+    notes: "Dialysis, then the pharmacy, then home",
+    tripGroup: "rt-1049800405",
+    contacts: {
+      riderPhone: "(404) 555-0133",
+      pickupPhone: "(404) 555-0141",
+    },
+    legs: [
+      {
+        id: "1049800405",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "8:15 AM",
+        address: "1150 Lakewood Ave SE, Atlanta, GA 30315",
+        county: "Fulton County",
+        revenue: 31.50,
+        progress: {
+          startedAt: "8:02 AM",
+          pickedUpAt: "8:17 AM",
+          droppedOffAt: "9:03 AM",
+        },
+      },
+      {
+        id: "1049800405-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:00 AM",
+        address: "1968 Peachtree Rd NW, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "completed",
+    pills: [],
+    scenario: {
+      code: "19d",
+      label: "Add a leg to a THREE-leg trip — the finished first leg",
       solutions: ["add-leg-request"],
     },
     incentiveTypes: [],

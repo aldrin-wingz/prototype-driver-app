@@ -578,7 +578,13 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  * below went back to 6 rather than being left at 7 with a row quietly failing
  * to supply its alternate.
  */
-const EXPECTED_ALTERNATES = 11;
+/**
+ * ⭐ 12 since 2026-10-14: row 19 gained a THIRD trip shape. Its three
+ * alternates are the one-leg trip, the three-leg trip, and the two-leg group
+ * reached from its live half — so the row demonstrates adding a leg to a trip
+ * of one, two and three legs, which is what the user asked for.
+ */
+const EXPECTED_ALTERNATES = 12;
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -732,7 +738,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 21;  // ⭐ +1 in B3f: rows 11/12's over-capacity request
+const EXPECTED_SCENARIO_RIDES = 24;  // ⭐ +3 on 2026-10-14: row 19's three-leg group
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -856,7 +862,7 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 19;
+const EXPECTED_RIDE_ROUTES = 20;  // ⭐ +1: row 19's three-leg trip
 /** `/requests` (row 10) ×2, plus row 15's `/options/account`. */
 const EXPECTED_SURFACE_ROUTES = 4;
 check(
@@ -954,12 +960,16 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   // still editable. See the note beside its In Progress entry above.
   "change-pickup-dropoff": 1,
   /**
-   * ⛔⛔ ONE of row 19's THREE scenario rides, and the other two are in a pool
-   * no My Rides tab counts — see `EXPECTED_COMPLETED_SCENARIOS` below. Row 19 is
-   * the first built row whose demo lives mostly outside the tabbed pools, so a
-   * number here that looked right would be hiding two thirds of it.
+   * ⛔⛔ THREE of row 19's SIX scenario rides, and the other three are in a
+   * pool no My Rides tab counts — see `EXPECTED_COMPLETED_SCENARIOS` below.
+   * Row 19 is the only built row whose demo lives half outside the tabbed
+   * pools, so a number here that looked right would be hiding half of it.
+   *
+   * ⭐ `19b` is the two-leg group's live half; `19e` and `19f` are the
+   * three-leg group's middle and last legs, added 2026-10-14 so the row can
+   * demonstrate adding to a one-, two- and three-leg trip.
    */
-  "add-leg-request": 1,
+  "add-leg-request": 3,
 };
 
 /**
@@ -972,8 +982,10 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
  * declare "1 ride" while demonstrating three.
  */
 const EXPECTED_COMPLETED_SCENARIOS: Record<string, number> = {
-  // `19a` the finished leg of the group, and `19c` the solo finished leg.
-  "add-leg-request": 2,
+  // `19a` the two-leg group's finished leg, `19c` the solo finished leg, and
+  // `19d` the three-leg group's finished first leg. Each is the ENTRY for one
+  // of the three trip shapes the row now demonstrates.
+  "add-leg-request": 3,
 };
 for (const [id, expected] of Object.entries(EXPECTED_COMPLETED_SCENARIOS)) {
   const shown = ridesForSolution(mockCompletedTrips, id);
@@ -5513,6 +5525,89 @@ check(
     overridden.dropoffMinutes !== overridden.proposedDropoff,
 );
 
+// ---- 16j · One, two and three legs — three trip shapes -------------------
+/**
+ * ⛔⛔ **The row demonstrates adding a leg to a trip of ONE, TWO and THREE
+ * legs** (user direction, 2026-10-14). The shapes are not decoration: each one
+ * reaches a different part of the rule. One leg has no sibling to average, so
+ * the estimate falls back to a declared default; two legs can push exactly one;
+ * three can push TWO, which is the only way to see more than one block of four
+ * questions at once.
+ *
+ * ⚠️ Read off the seed through `groupLegs`, with the sizes declared — counting
+ * the shapes and asserting "three of them" would pass on three trips that are
+ * all the same size.
+ */
+const SHAPES: Array<[string, number]> = [
+  ["1049800404", 1],
+  ["1049800402", 2],
+  ["1049800405", 3],
+];
+const shapeWrong = SHAPES.filter(([id, size]) => {
+  const trip = ALL_SEEDED.find((t) => t.id === id);
+  return !trip || groupLegs(trip).length !== size;
+});
+check(
+  "row 19 is demonstrated on a one-, two- and three-leg trip",
+  `${SHAPES.map(([id, n]) => `${id}:${ALL_SEEDED.find((t) => t.id === id) ? groupLegs(ALL_SEEDED.find((t) => t.id === id)!).length : "missing"}/${n}`).join(" · ")}`,
+  shapeWrong.length === 0 && new Set(SHAPES.map(([, n]) => n)).size === 3,
+);
+/** ⛔ ...and all three are reachable from the row, as the entry or an alternate. */
+const row19 = SOLUTIONS.find((r) => r.id === "add-leg-request")!;
+const row19Routes = [
+  row19.entry!.route,
+  ...(row19.entry!.alternates ?? []).map((a) => a.route),
+];
+const unreachableShapes = SHAPES.filter(
+  ([id]) => !row19Routes.some((route) => route.includes(id)),
+);
+check(
+  "...and every shape is reachable from the row itself",
+  `${row19Routes.length} route(s): ${row19Routes.join(", ")}`,
+  unreachableShapes.length === 0,
+);
+/**
+ * ⭐⭐ **The three-leg trip is the only one that can push TWO legs**, and that
+ * is the whole reason it exists. Asserted on both sides: it does, and the
+ * two-leg group cannot.
+ */
+const threeLeg = ALL_SEEDED.find((t) => t.id === "1049800405")!;
+const threeLegs = groupLegs(threeLeg);
+const pushTwo = addLegPlan(threeLeg, {
+  [SLOT_FIELD]: String(allowedSlots(threeLegs)[0]),
+  [ADD_PICKUP_TIME_FIELD]: "09:40",
+});
+check(
+  "⭐⭐ an insertion in the three-leg trip pushes BOTH following legs",
+  `${pushTwo.shifts.length} shift(s): ${pushTwo.shifts.map((sh) => `${sh.letter} ${sh.fromLabel}→${sh.toLabel}`).join(", ")}`,
+  pushTwo.shifts.length === 2,
+);
+check(
+  "...so two blocks of four questions appear at once, each with its own boxes",
+  `${pushTwo.blocks.length} block(s): ${pushTwo.blocks.map((b) => `${b.letter}${b.fields.sameAsPrevious ? "+inherit" : ""}${b.fields.dropoffIsHome ? "+home" : ""}`).join(", ")}`,
+  pushTwo.blocks.length === 3 &&
+    pushTwo.blocks.filter((b) => b.kind === "existing").length === 2 &&
+    pushTwo.blocks.every((b) => Boolean(b.fields.sameAsPrevious)) &&
+    pushTwo.blocks.filter((b) => b.fields.dropoffIsHome).length === 1,
+);
+check(
+  "...which the two-leg group cannot do, whatever is typed into it",
+  `${allowedSlots(legs19).map((slot) => addLegPlan(leg19a, { [SLOT_FIELD]: String(slot), [ADD_PICKUP_TIME_FIELD]: "14:30" }).shifts.length).join(", ")} shift(s) per slot`,
+  allowedSlots(legs19).every(
+    (slot) =>
+      addLegPlan(leg19a, {
+        [SLOT_FIELD]: String(slot),
+        [ADD_PICKUP_TIME_FIELD]: "14:30",
+      }).shifts.length <= 1,
+  ),
+);
+/**
+ * ⛔ The seeded rider's name is invented, like every other. Not asserted here:
+ * `verify-base.ts` §5 already sweeps the WHOLE seed against the known captured
+ * names and runs in this repo too. A second copy of that list here is a second
+ * chance for the two to disagree about which names are real.
+ */
+
 // ---- 16h · The blocks, the tick boxes, and what they copy ----------------
 /**
  * ⛔⛔ **The catalogue's "tagged critical" clause is no longer answered by a
@@ -8228,7 +8323,7 @@ check(
 const ALTERNATES = SOLUTIONS.flatMap((s) =>
   (s.entry?.alternates ?? []).map((a) => ({ id: s.id, ...a })),
 );
-const EXPECTED_SHORTS = 11;
+const EXPECTED_SHORTS = 12;  // ⭐ +1 on 2026-10-14: row 19's three-leg trip
 const SHORT_MAX = 45;
 const SHORT_MIN = 20;
 const shortBad = ALTERNATES.filter(
@@ -9480,7 +9575,7 @@ console.log("\n30. One context block — trip, then the leg being filed against"
  * trip, and 3 have no drop-off stop at all.
  */
 const CONTEXT_LEGS = getLegOptions("all");
-const EXPECTED_CONTEXT_LEGS = 21;
+const EXPECTED_CONTEXT_LEGS = 24;
 check(
   "the context sweep covers every selectable leg",
   `${CONTEXT_LEGS.length} of ${EXPECTED_CONTEXT_LEGS}`,
@@ -9695,7 +9790,11 @@ check(
  * would list the Appointment Time row as a leg, and `leg-options` is explicit
  * that a destination is not something a form can be filed against.
  */
-const EXPECTED_GROUPED_LEGS = 4;
+/**
+ * ⭐ 7 since 2026-10-14: the two legs of row 16's round trip, the two of row
+ * 19's two-leg group, and the three of its new three-leg group.
+ */
+const EXPECTED_GROUPED_LEGS = 7;
 const grouped = CONTEXT_LEGS.filter((o) => contextLegs(o).length > 1);
 check(
   "the Legs list shows the round trip, not just this record",

@@ -643,19 +643,25 @@ export const SOLUTIONS: Solution[] = [
     entry: {
       route: "/my-rides/1049800402",
       label:
-        "A FINISHED leg, and the one dedicated action a completed ride offers — the moment the member says they also need the pharmacy. The form places the new leg by drag or by tapping a gap; leg A is done so nothing can go before it. A 1:00 PM pick-up leaves leg B alone, a 2:30 PM one pushes it from 3:00 to 3:35 — the driver types only the pick-up time and the rest is worked out from this trip's own legs.",
+        "A TWO-leg trip, entered from its finished first leg — the one dedicated action a completed ride offers, and the moment the member says they also need the pharmacy. The form places the new leg by drag or by tapping a gap; leg A is done so nothing can go before it. A 1:00 PM pick-up leaves leg B alone; a 2:30 PM one pushes it from 3:00 to 3:35 and asks for that leg in full — where it now starts, when, where it ends and when.",
       alternates: [
+        {
+          route: "/my-rides/1049800404",
+          short: "A one-leg trip, nothing to push",
+          label:
+            "One finished leg and no round trip at all — the commonest real case. With no sibling there is no span to average, so the estimate falls back to a declared default. The new leg becomes B, nothing can be pushed, and it is the last leg — so it is the one that carries the \u201cfinish back at the rider\u2019s home address\u201d tick box.",
+        },
+        {
+          route: "/my-rides/1049800405",
+          short: "A three-leg trip, two legs pushed",
+          label:
+            "Three legs: dialysis, the pharmacy, then home. Tight enough that an insertion after the finished first leg pushes BOTH of the others \u2014 the only seeded trip where two blocks of four questions appear at once, each with its own \u201cstart where the leg before finishes\u201d tick box.",
+        },
         {
           route: "/my-rides/1049800403/more",
           short: "The same group, from its live half",
           label:
-            "The same group from its live half, through the Add Leg to Trip tile in More Options. Same form, same locked leg A — the entry point changes, the case does not.",
-        },
-        {
-          route: "/my-rides/1049800404",
-          short: "One finished leg, no round trip",
-          label:
-            "One finished leg and no round trip at all — the commonest real case. With no sibling there is no span to average, so the estimate falls back to a declared default and says so in different words. The new leg becomes B.",
+            "The two-leg group from its live half, through the Add Leg to Trip tile in More Options. Same form, same locked leg A — the entry point changes, the case does not.",
         },
       ],
     },
