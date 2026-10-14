@@ -339,6 +339,9 @@ import {
   RIDE_FILTER_ICONS,
 } from "../components/driver/ride-filter-icon";
 import { legOptionFor } from "../lib/support-data/leg-options";
+import { fieldChange } from "../lib/support/field-rules";
+import { toTimeInputValue } from "../lib/support/prefill";
+import type { SupportField } from "../types/support";
 import { detailStateFor } from "../lib/driver-data/ride-detail-state";
 import {
   groupByRideDay,
@@ -11764,6 +11767,222 @@ check(
     !/contextLegId/.test(SHEET_WIRING) &&
     // ⛔ ...and exactly one mount of the block, after one computed anchor.
     (SHEET_WIRING.match(/<TripSummaryBanner/g) ?? []).length === 1,
+);
+
+/* === 34. Before → after on a field that changes something ================ */
+/**
+ * ⭐⭐ **A form that opens full of the ride's own values gives the driver no way
+ * to see what they moved.** Update Trip Details prefills every anchor, so after
+ * retyping two fields of six there is nothing on screen saying which two. One
+ * line under each changed control answers it; an untouched field stays silent.
+ * (User direction, 2026-10-15.)
+ */
+console.log("\n34. Before → after on a field that changes something");
+
+/** ⛔ The four cases that must stay silent, and the one that must not. */
+const CHANGE_CASES: Array<[string, { type: SupportField["type"]; previousValue?: string }, string, boolean]> = [
+  ["no previous value", { type: "text" }, "something", false],
+  ["previous but empty now", { type: "text", previousValue: "old" }, "", false],
+  ["unchanged", { type: "text", previousValue: "same" }, "same", false],
+  ["whitespace only", { type: "text", previousValue: "same" }, " same ", false],
+  ["really changed", { type: "text", previousValue: "old" }, "new", true],
+];
+const changeWrong = CHANGE_CASES.filter(
+  ([, field, value, want]) => Boolean(fieldChange(field, value)) !== want,
+);
+check(
+  "a line appears only where something actually changed",
+  `${changeWrong.length} wrong of ${CHANGE_CASES.length} case(s)` +
+    (changeWrong.length ? ` — ${changeWrong.map(([what]) => what).join(", ")}` : ""),
+  changeWrong.length === 0,
+);
+/**
+ * ⛔⛔ **Both ends through ONE formatter.** A `time` field holds `"13:20"` and
+ * shows `1:20 PM`; a second formatter at the render site is how a line comes to
+ * read `1:20 PM → 14:05`. Asserted on the output, not on the code.
+ */
+const timeLine = fieldChange({ type: "time", previousValue: "13:20" }, "14:05");
+check(
+  "...and a time field reads as a clock face at both ends",
+  `"${timeLine?.before}" → "${timeLine?.after}"`,
+  timeLine?.before === "1:20 PM" &&
+    timeLine?.after === "2:05 PM" &&
+    // ⛔ ...and a text field is left exactly alone, or the formatter is
+    // reaching into values it has no business touching.
+    fieldChange({ type: "text", previousValue: "13:20" }, "14:05")?.before === "13:20",
+);
+
+/* --- 34b. Update Trip Details opens on the ride's own values -------------- */
+/**
+ * ⛔⛔ **Every anchor field opens NON-EMPTY, and the before → after line
+ * depends on it.** A field that opened blank would make its first keystroke
+ * look like a change from nothing. (User direction, 2026-10-15: "make sure they
+ * are all prefilled with the initial values first".)
+ *
+ * ⚠️ Swept over every seeded trip, not the two demo rides — the form is reached
+ * from More Options on any ride, and a trip shape nobody demoed is exactly
+ * where a blank would hide.
+ */
+const CHANGE_TRIPS = [
+  ...mockInProgressTrips,
+  ...mockNeedsActionTrips,
+  ...mockUpcomingTrips,
+  ...mockCompletedTrips,
+].filter((trip) => trip.legs.length > 0);
+let anchorFieldsSeen = 0;
+const blankAnchors: string[] = [];
+const willCallBlanks: string[] = [];
+const beforeMismatch: string[] = [];
+for (const trip of CHANGE_TRIPS) {
+  const { supportCase, initialValues, anchors } = buildTripChange(trip, trip.legs[0]);
+  for (const field of supportCase.fields) {
+    const anchorIndex = /^change(?:Time|Address)(\d+)$/.exec(field.id)?.[1];
+    if (anchorIndex === undefined) continue;
+    anchorFieldsSeen += 1;
+    const anchor = anchors[Number(anchorIndex)];
+    /*
+      ⛔⛔ **A will-call anchor has NO CLOCK, and blank is the honest answer.**
+      `time: "Will-Call"` — the member rings when they are ready — so there is
+      nothing to prefill and nothing to change it FROM. Filling it with an
+      invented time would be the form asserting a schedule the manifest does
+      not have, and the before → after line would then measure against a
+      fiction. Found by this check, which first stated the rule too broadly and
+      failed against correct code on one of 52 trips.
+    */
+    const isTimeField = field.id.startsWith("changeTime");
+    const hasClock = /\d/.test(anchor?.time ?? "");
+    if (isTimeField && !hasClock) {
+      if ((initialValues[field.id] ?? "").trim()) willCallBlanks.push(`${trip.id}/${field.id}`);
+      continue;
+    }
+    if (!(initialValues[field.id] ?? "").trim()) blankAnchors.push(`${trip.id}/${field.id}`);
+    // ⛔ ...and the declared `before` IS what the form opens with, or the first
+    // keystroke would print a change against a value the driver never saw.
+    if ((field.previousValue ?? "") !== (initialValues[field.id] ?? ""))
+      beforeMismatch.push(`${trip.id}/${field.id}`);
+  }
+}
+const willCallAnchors = CHANGE_TRIPS.flatMap((trip) =>
+  buildTripChange(trip, trip.legs[0]).anchors.filter((anchor) => !/\d/.test(anchor.time)),
+);
+check(
+  "every Update Trip Details anchor with a clock opens on the ride's own value",
+  `${blankAnchors.length} blank of ${anchorFieldsSeen} anchor field(s) over ${CHANGE_TRIPS.length} trip(s)` +
+    (blankAnchors.length ? ` — ${blankAnchors.slice(0, 3).join(", ")}` : ""),
+  blankAnchors.length === 0 && anchorFieldsSeen > CHANGE_TRIPS.length,
+);
+/**
+ * ⛔ ...and a will-call anchor opens BLANK, deliberately. Asserted with its own
+ * denominator so the exemption above cannot quietly become a hole: if the seed
+ * ever stopped carrying a will-call leg this check would fail rather than pass
+ * on an empty set.
+ */
+check(
+  "...and a will-call pick-up opens blank, because it has no time to open on",
+  `${willCallAnchors.length} will-call anchor(s) across the seed; ` +
+    `${willCallBlanks.length} wrongly prefilled`,
+  willCallBlanks.length === 0 && willCallAnchors.length > 0,
+);
+check(
+  "...and its declared before is that same value, so nothing changes on open",
+  `${beforeMismatch.length} disagree of ${anchorFieldsSeen}` +
+    (beforeMismatch.length ? ` — ${beforeMismatch.slice(0, 3).join(", ")}` : ""),
+  beforeMismatch.length === 0 &&
+    // ⛔ ...and a freshly opened form therefore shows NO lines at all.
+    CHANGE_TRIPS.every((trip) => {
+      const { supportCase, initialValues } = buildTripChange(trip, trip.legs[0]);
+      return supportCase.fields.every(
+        (field) => !fieldChange(field, initialValues[field.id] ?? ""),
+      );
+    }),
+);
+
+/* --- 34c. Add Leg: a pushed leg's before is NOT what it opens with -------- */
+/**
+ * ⛔⛔ **The trap this whole mechanism is built around.** A pushed leg's time
+ * field OPENS on its new time — that is the proposal. Inferring "before" from
+ * the value a form opened with would print `3:50 PM → 3:50 PM` on exactly the
+ * leg the driver most needs to check, and would have looked correct on Update
+ * Trip Details, where the two coincide.
+ *
+ * ⚠️ Driven on the three-leg demo ride with the slot that actually pushes, and
+ * the check reports how many blocks were pushed so a seed that stopped pushing
+ * would not quietly make this vacuous.
+ */
+const ADD_LEG_VALUES = { [SLOT_FIELD]: "1", [ADD_PICKUP_TIME_FIELD]: "14:30" };
+const rf34Blocks = addLegPlan(leg19a, ADD_LEG_VALUES).blocks;
+const rf34PushedBlocks = rf34Blocks.filter((block) => block.kind === "existing");
+const rf34NewBlocks = rf34Blocks.filter((block) => block.kind === "new");
+check(
+  "a pushed leg carries what it holds today, and the new leg carries nothing",
+  `${rf34PushedBlocks.length} pushed of ${rf34Blocks.length} block(s); ` +
+    `pushed with a before: ${rf34PushedBlocks.filter((b) => b.was).length}; ` +
+    `new with one: ${rf34NewBlocks.filter((b) => b.was).length}`,
+  rf34PushedBlocks.length > 0 &&
+    rf34PushedBlocks.every((block) => Boolean(block.was?.pickupTime)) &&
+    // ⛔ The new leg is a question being ASKED, not a value being changed.
+    rf34NewBlocks.length === 1 &&
+    rf34NewBlocks.every((block) => !block.was),
+);
+/** ⛔ ...and that before really differs from the time the field opens on. */
+const rf34SameBefore = rf34PushedBlocks.filter(
+  (block) => block.was?.pickupTime === toTimeInputValue(block.shiftedTo ?? ""),
+);
+check(
+  "...and it differs from the new time, or the line would say nothing",
+  rf34PushedBlocks
+    .map((b) => `leg ${b.letter}: ${b.shiftedFrom} → ${b.shiftedTo}`)
+    .join("; ") || "no pushed legs",
+  rf34SameBefore.length === 0 && rf34PushedBlocks.length > 0,
+);
+/**
+ * ⛔⛔ **And it reaches the FIELD**, which is the only place it can be seen. A
+ * block carrying `was` whose fields never declare a `previousValue` renders
+ * exactly like one that has none.
+ */
+const addLegFields = buildAddLegCase(leg19a, ADD_LEG_VALUES).fields;
+const pushedFieldIds = rf34PushedBlocks.flatMap((block) => [
+  block.fields.pickupAddress,
+  block.fields.pickupTime,
+  block.fields.dropoffAddress,
+]);
+const newFieldIds = rf34NewBlocks.flatMap((block) => [
+  block.fields.pickupAddress,
+  block.fields.pickupTime,
+  block.fields.dropoffAddress,
+]);
+const pushedWithout = pushedFieldIds.filter(
+  (id) => !(addLegFields.find((field) => field.id === id)?.previousValue ?? "").trim(),
+);
+const newWith = newFieldIds.filter(
+  (id) => (addLegFields.find((field) => field.id === id)?.previousValue ?? "").trim(),
+);
+check(
+  "...and every pushed field declares it, while no new-leg field does",
+  `${pushedWithout.length} pushed field(s) without a before of ${pushedFieldIds.length}; ` +
+    `${newWith.length} new-leg field(s) with one of ${newFieldIds.length}`,
+  pushedWithout.length === 0 && newWith.length === 0 && pushedFieldIds.length >= 3,
+);
+
+/* --- 34d. The renderer is told, never deciding --------------------------- */
+/**
+ * ⛔ `fieldChange` holds the rule and the sheet holds the values; a renderer
+ * that compared them for itself would be a second reader, and the one with no
+ * test around it is the one that drifts.
+ */
+const FIELD_RENDERER_SRC = codeOnly(
+  readFileSync(join(ROOT, "components/support/support-field-renderer.tsx"), "utf8"),
+);
+check(
+  "the field renderer is handed the change and computes none of it",
+  `sheet calls fieldChange ${/change=\{fieldChange\(field, values\[field\.id\] \?\? ""\)\}/.test(FORM_SHEET_SRC)}; ` +
+    `renderer calls it ${/fieldChange\(/.test(FIELD_RENDERER_SRC)}`,
+  /change=\{fieldChange\(field, values\[field\.id\] \?\? ""\)\}/.test(FORM_SHEET_SRC) &&
+    !/fieldChange\(/.test(FIELD_RENDERER_SRC) &&
+    !/previousValue/.test(FIELD_RENDERER_SRC) &&
+    // ⛔ ...and it renders exactly one line, from the resolved object.
+    (FIELD_RENDERER_SRC.match(/change\.before/g) ?? []).length === 1 &&
+    (FIELD_RENDERER_SRC.match(/change\.after/g) ?? []).length === 1,
 );
 
 // ---------------------------------------------------------------------------

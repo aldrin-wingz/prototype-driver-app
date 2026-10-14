@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Paperclip, Search, Check, Trash2, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LegOrderField } from "./leg-order-field";
+import type { FieldChange } from "@/lib/support/field-rules";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/ui/signature-pad";
@@ -486,6 +487,7 @@ export function SupportFieldRenderer({
   value,
   locked = false,
   warning,
+  change,
   onChange,
   values,
   setValue,
@@ -502,6 +504,15 @@ export function SupportFieldRenderer({
    * by accident.
    */
   warning?: string;
+  /**
+   * The before → after line, already resolved.
+   *
+   * ⛔ Passed in rather than computed here. The sheet holds the values and
+   * `fieldChange` holds the rule; a renderer that worked it out for itself
+   * would be a second reader of the same rule, and the one most likely to
+   * drift is the one with no test around it.
+   */
+  change?: FieldChange | null;
   onChange: (value: string) => void;
   /**
    * The whole form's values, for composite types only.
@@ -739,6 +750,33 @@ export function SupportFieldRenderer({
           would claim the value is rejected, and it isn't. */}
       {warning && (
         <p className="text-sm text-[#B45309]">⚠️ {warning}</p>
+      )}
+
+      {/*
+        Before → after, for a field that is CHANGING something rather than
+        asking it.
+
+        ⭐⭐ The form opens with every anchor holding the ride's own value, so a
+        driver who has retyped two fields of six has no way to see which two
+        without remembering. This answers it at a glance, and an untouched
+        field stays silent. (User direction, 2026-10-15.)
+
+        ⛔ `fieldChange` decides, not this file — whether there is a change,
+        and how both ends read. A `time` field holds `"15:50"` and must not
+        print one end as a clock face and the other as a 24-hour string, which
+        is precisely what a second formatter here would produce.
+
+        ⚠️ Blue, and the only blue on a support form. Amber is "read this, it
+        is not stopping you" and red is "this is rejected"; a change the driver
+        made themselves is neither — it is the thing they came to do.
+      */}
+      {change && (
+        <p className="text-sm text-gray-500">
+          <span className="line-through">{change.before}</span>
+          <span aria-hidden="true"> → </span>
+          <span className="sr-only"> changed to </span>
+          <span className="font-semibold text-[#2563EB]">{change.after}</span>
+        </p>
       )}
 
       {/* ⛔ `requiredNotEnforced` renders NOTHING. It used to print "Required in

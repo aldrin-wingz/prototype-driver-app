@@ -1,6 +1,7 @@
 import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
 import { getLegStage, MOCK_TODAY, type Trip } from "./mock-trips";
 import { ALL_POOLS, groupMembers } from "./trip-groups";
+import { toTimeInputValue } from "@/lib/support/prefill";
 import type { SupportFieldOption } from "@/types/support";
 
 /**
@@ -394,6 +395,19 @@ export interface AddLegBlock {
    */
   previous: { letter: string; fieldId: string | null; address: string } | null;
   /** What this leg is scheduled for today — existing legs only. */
+  /**
+   * What this leg holds on the manifest TODAY — the `before` of each field.
+   *
+   * ⛔⛔ **Only on an `existing` block, and that is the whole distinction.** A
+   * new leg's address is a question being asked; a pushed leg's is a value
+   * being changed, and the driver reviewing the form needs to see which. The
+   * before → after line keys on this, so a block without it shows none.
+   *
+   * ⚠️ Times are stored in `<input type="time">` shape, not as the labels
+   * `shiftedFrom` carries, because that is the shape the field holds and
+   * `fieldChange` formats both ends through one formatter.
+   */
+  was?: { pickupAddress: string; pickupTime: string; dropoffAddress: string };
   shiftedFrom?: string;
   /** What the cascade proposes instead — existing legs only. */
   shiftedTo?: string;
@@ -482,6 +496,11 @@ export function addLegBlocks(
               : null
             : ADD_DROPOFF_ADDRESS_FIELD,
           address: inFront ? inFront.dropoffAddress : "",
+        },
+        was: {
+          pickupAddress: leg.address,
+          pickupTime: toTimeInputValue(shift.fromLabel),
+          dropoffAddress: leg.dropoffAddress,
         },
         shiftedFrom: shift.fromLabel,
         shiftedTo: shift.toLabel,

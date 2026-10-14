@@ -11,6 +11,7 @@ import { findLegOption, type LegOption } from "@/lib/support-data/leg-options";
 import { SUPPORT_FORM_TITLE } from "@/lib/support-data/issue-types";
 import { deriveFromLeg } from "@/lib/support/prefill";
 import {
+  fieldChange,
   canSubmitCase,
   hasRequiredChange,
   emptyValues,
@@ -311,6 +312,8 @@ export function SupportFormSheet({
                   // case raised itself. Two cautions on one field would stack
                   // into noise, and the time-order one is the more specific.
                   warning={warnings[field.id] ?? field.warning}
+                  /* ⛔ The rule, not a comparison written here. */
+                  change={fieldChange(field, values[field.id] ?? "")}
                   onChange={(value) => setValue(field.id, value)}
                   values={values}
                   setValue={setValue}

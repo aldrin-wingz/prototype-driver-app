@@ -10,6 +10,7 @@ import {
   ISSUE_TRIP_CHANGE_REQUEST,
   ISSUE_ADD_LEG_REQUEST,
 } from "./issue-types";
+import { toTimeInputValue } from "@/lib/support/prefill";
 import {
   DECLINE_CHANNELS,
   DECLINE_CHANNEL_OPTIONS,
@@ -983,6 +984,13 @@ export function buildSupportFormCase({
               label: anchor.label,
               shortLabel: `${anchor.label.toLowerCase()}`,
               showIf: ONLY_TRIP_CHANGE,
+              /**
+               * ⛔ The ride's own time, so the before → after line can say what
+               * moved. Read from the SAME `anchor` the form's initial value is
+               * built from, so the two cannot drift into disagreeing about
+               * what the ride currently says.
+               */
+              previousValue: toTimeInputValue(anchor.time),
               // A passed anchor is shown with what was recorded and cannot be
               // edited — asking to move a pick-up that already happened is a
               // correction, which is row 03's case, not this one.
@@ -1007,6 +1015,8 @@ export function buildSupportFormCase({
               label: `${anchor.addressLabel} · ${anchor.label}`,
               maxLength: 160,
               showIf: ONLY_TRIP_CHANGE,
+              /** ⛔ As above — one `anchor`, read by the field and the prefill. */
+              previousValue: anchor.address,
               lockWhenPrefilled: anchor.passed,
               lockedBadge: anchor.passed ? PASSED_ANCHOR_BADGE : null,
             },
@@ -1138,6 +1148,8 @@ export function buildSupportFormCase({
               required: true,
               maxLength: 160,
               showIf: ONLY_ADD_LEG,
+              // ⛔ Absent on the NEW leg, which has no before — see `was`.
+              previousValue: block.was?.pickupAddress,
             },
             {
               id: block.fields.pickupTime,
@@ -1154,6 +1166,15 @@ export function buildSupportFormCase({
                 block.kind === "existing"
                   ? `Leg ${block.letter} is scheduled for ${block.shiftedFrom}, which no longer fits. Change this if the member can manage something else.`
                   : undefined,
+              /**
+               * ⛔⛔ The time this leg holds TODAY, not the value the form
+               * opened with. The field opens on the leg's NEW time, so
+               * inferring "before" from the initial value would print
+               * `3:50 PM → 3:50 PM` on exactly the leg the driver most needs
+               * to check. The `warning` above says the same thing in a
+               * sentence; this says it as a line the eye can scan.
+               */
+              previousValue: block.was?.pickupTime,
               showIf: ONLY_ADD_LEG,
             },
             ...(block.fields.dropoffIsHome
@@ -1181,6 +1202,7 @@ export function buildSupportFormCase({
               required: true,
               maxLength: 160,
               showIf: ONLY_ADD_LEG,
+              previousValue: block.was?.dropoffAddress,
             },
             {
               id: block.fields.dropoffTime,

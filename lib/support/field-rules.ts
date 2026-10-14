@@ -1,3 +1,4 @@
+import { fromTimeInputValue } from "@/lib/support/prefill";
 import type { SupportField } from "@/types/support";
 
 /**
@@ -118,4 +119,56 @@ export function emptyValues(fields: SupportField[]): Record<string, string> {
   return Object.fromEntries(
     fields.map((field) => [field.id, field.defaultValue ?? ""])
   );
+}
+
+// ---------------------------------------------------------------------------
+// Before → after
+// ---------------------------------------------------------------------------
+
+/** One field's change, ready to render. */
+export interface FieldChange {
+  before: string;
+  after: string;
+}
+
+/**
+ * What a field used to say and what it says now — or `null` when nothing has
+ * changed and there is nothing to show.
+ *
+ * ⭐⭐ **The point is review, not record-keeping.** Update Trip Details opens
+ * with every field holding the ride's own value, so a driver who has retyped
+ * two of six has no way to see which two without remembering. One line under
+ * each changed control answers it at a glance, and the unchanged fields stay
+ * silent. (User direction, 2026-10-15.)
+ *
+ * ⛔ Returns `null` for a field with no declared `previousValue`, for an empty
+ * current value, and for a value that matches. A line reading `X → X` is noise
+ * on a form whose whole job is to show what moved.
+ *
+ * ⚠️ Both ends go through the same formatter, so a `time` field cannot print
+ * `3:35 PM → 15:50`. That mismatch is what a second formatter at the render
+ * site would produce, which is why this returns STRINGS and not raw values.
+ */
+export function fieldChange(
+  field: Pick<SupportField, "type" | "previousValue">,
+  value: string,
+): FieldChange | null {
+  const previous = field.previousValue ?? "";
+  if (!previous.trim() || !value.trim()) return null;
+  if (previous.trim() === value.trim()) return null;
+  return {
+    before: formatFieldValue(field.type, previous),
+    after: formatFieldValue(field.type, value),
+  };
+}
+
+/**
+ * A stored value as the driver reads it.
+ *
+ * ⚠️ `time` only. Every other type already holds what it shows — an address is
+ * an address. A switch with a branch per type would be a second place deciding
+ * how a field renders, and the renderer is the first.
+ */
+function formatFieldValue(type: SupportField["type"], value: string): string {
+  return type === "time" ? (fromTimeInputValue(value) || value) : value;
 }

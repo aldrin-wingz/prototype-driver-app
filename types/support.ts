@@ -199,6 +199,25 @@ export interface SupportField {
    * form is not collecting. Row 19's slot-versus-pick-up is exactly that.
    */
   warning?: string;
+  /**
+   * What this field held BEFORE the driver touched it, for the before → after
+   * line under the control.
+   *
+   * ⛔⛔ **Declared, never inferred from the initial value.** For Update Trip
+   * Details the two coincide — the form opens on the ride's own time — but for
+   * Add Leg they do not: a pushed leg's time field opens on its NEW time, and
+   * the thing worth showing beside it is the time it used to have. Inferring
+   * "before" from whatever the form opened with would print `3:35 PM → 3:35 PM`
+   * on exactly the leg the driver most needs to check.
+   *
+   * ⚠️ A field with no `previousValue` shows no line, which is right for every
+   * question that is being ASKED rather than changed — a new leg's own address
+   * has no before.
+   *
+   * ⚠️ Stored in the same shape the control holds, so a `time` field's value is
+   * `"15:35"`; `fieldChange` is what turns both ends into clock faces.
+   */
+  previousValue?: string;
   required?: boolean;
   /**
    * Required in the real flow, but not enforced here.
