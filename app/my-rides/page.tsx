@@ -19,8 +19,29 @@ import {
   firstTabWithRides,
   ridesForSolution,
 } from "@/lib/solutions/scenario-rides";
+import { ClientCancellationAlert } from "@/components/driver/client-cancellation-alert";
+import {
+  CLIENT_CANCELLATION_SOLUTIONS,
+  isClientCancelled,
+} from "@/lib/driver-data/client-cancellation";
+import { sortByRideDate } from "@/lib/driver-data/ride-date";
 
 type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
+
+/**
+ * Whether production's cancellation alert has already been raised this session.
+ *
+ * ⛔⛔ **Scaffolding, and the only part of row 18's Now side that is.** In
+ * production a push raises this the moment Wingz cancels; the prototype has no
+ * push, so something has to stand in for one. A module-level flag rather than
+ * state because it must survive a remount — and because React's double-invoked
+ * effects would otherwise raise it twice on the first render in development.
+ *
+ * ⚠️ It resets on reload, like every other session flag here. "I dismissed it
+ * and it came back" is the first thing a reviewer reports as a bug; it is the
+ * page being reloaded.
+ */
+let cancelAlertRaised = false;
 
 interface TabConfig {
   value: TabValue;
@@ -208,6 +229,30 @@ export default function MyRidesPage() {
   }, [active?.id]);
 
   const currentTrips = getTripsForTab(activeTab);
+
+  /**
+   * ⭐⭐ Production's cancellation alert — `CAP-341`, row 18's Now side.
+   *
+   * ⛔ **The ALERT is ungated; only its TRIGGER is scoped.** What the alert says
+   * and does is production's on both sides of the toggle — the proposal does
+   * not remove it, it adds somewhere to find the ride afterwards. But a push
+   * does not exist here, so the stand-in fires only while row 18 is the row
+   * being demonstrated. Raising a modal about a cancelled ride at every
+   * reviewer who happens to open My Rides would be the scaffolding making a
+   * claim the capture does not.
+   */
+  const [cancelAlertTrip, setCancelAlertTrip] = useState<Trip | null>(null);
+  const demonstratingCancellations = Boolean(
+    active && CLIENT_CANCELLATION_SOLUTIONS.includes(active.id)
+  );
+  useEffect(() => {
+    if (!demonstratingCancellations || cancelAlertRaised) return;
+    const first = sortByRideDate(mockUpcomingTrips).find(isClientCancelled);
+    if (!first) return;
+    cancelAlertRaised = true;
+    setCancelAlertTrip(first);
+  }, [demonstratingCancellations]);
+
   
   return (
     <div className="flex min-h-screen flex-col pb-20">
@@ -267,6 +312,16 @@ export default function MyRidesPage() {
       </main>
       
       <BottomNav />
+
+      {/* ⛔ Mounted at the page root, not inside a tab — production raises it
+          over whatever the driver is looking at, and `Go to ride` navigates
+          away from here entirely. */}
+      <ClientCancellationAlert
+        trip={cancelAlertTrip}
+        onOpenChange={(open) => {
+          if (!open) setCancelAlertTrip(null);
+        }}
+      />
     </div>
   );
 }

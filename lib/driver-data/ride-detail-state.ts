@@ -1,3 +1,4 @@
+import { isClientCancelled } from "./client-cancellation";
 import type { Trip } from "./mock-trips";
 
 /**
@@ -17,6 +18,16 @@ import type { Trip } from "./mock-trips";
  * chain, never on the end.
  */
 export type DetailState =
+  /**
+   * Wingz cancelled it. Read-only, no footer, a banner saying so.
+   *
+   * ⛔⛔ **Not gated on the demo focus.** Production already has this screen —
+   * `CAP-342` is a photograph of it, reached from the alert's `Go to ride` —
+   * so gating it would make the prototype claim production has no cancelled
+   * view, which the capture disproves. What row 18 proposes is a way to reach
+   * it other than the alert, and an acknowledgement; both live elsewhere.
+   */
+  | "cancelled"
   /** Sent back, or a finished ride; read-only, no footer. */
   | "completed"
   /** An offer the driver has not accepted. */
@@ -37,6 +48,10 @@ export function detailStateFor(
   trip: Trip,
   { isSentBack }: { isSentBack: boolean },
 ): DetailState {
+  // ⛔ FIRST in the chain, deliberately. A cancelled ride's `status` is still
+  // `"upcoming"`, so anything lower would hand it the accept/decline swipe —
+  // and a branch on the END would meet the `else` fallthrough instead.
+  if (isClientCancelled(trip)) return "cancelled";
   if (isSentBack || trip.status === "completed") return "completed";
   if (trip.status === "upcoming") return "before-taken";
   if (trip.status === "in-progress") return "in-progress";

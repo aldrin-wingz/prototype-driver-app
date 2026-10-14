@@ -309,6 +309,7 @@ import {
   MY_RIDES_FILTERS,
   type RidesFilter,
 } from "../lib/driver-data/client-cancellation";
+import { detailStateFor } from "../lib/driver-data/ride-detail-state";
 import {
   groupByRideDay,
   parseRideDate,
@@ -10331,6 +10332,130 @@ check(
     days.every((d) => d.trips.length > 0) &&
     days.reduce((n, d) => n + d.trips.length, 0) === mockUpcomingTrips.length &&
     new Set(days.map((d) => d.label)).size === days.length,
+);
+
+/* --- 31g. The Now side: production's alert and production's screen -------- */
+/**
+ * ⛔⛔ **The cancelled ride's own screen is NOT gated, and that is easy to
+ * regress into a gate.** `CAP-342` is a photograph of production showing it;
+ * gating it would make the prototype claim production has no cancelled view.
+ * What row 18 proposes is a way to REACH it other than the alert.
+ *
+ * Enforced by signature, like `upcomingRides`: the rule is never given a focus,
+ * so it cannot consult one.
+ */
+const STATE_SRC = readFileSync(join(ROOT, "lib/driver-data/ride-detail-state.ts"), "utf8");
+check(
+  "the cancelled phase is decided without a demo focus",
+  `detailStateFor mentions DemoFocus: ${/DemoFocus/.test(codeOnly(STATE_SRC))}`,
+  !/DemoFocus/.test(codeOnly(STATE_SRC)) && !/showsCancelledRides/.test(codeOnly(STATE_SRC)),
+);
+check(
+  "...and every cancelled ride lands on it, ahead of every other phase",
+  `${CANCELLED_SEED.map((t) => detailStateFor(t, { isSentBack: false })).join(", ")}`,
+  CANCELLED_SEED.length === EXPECTED_ROW_18_CANCELLED &&
+    CANCELLED_SEED.every((t) => detailStateFor(t, { isSentBack: false }) === "cancelled"),
+);
+/**
+ * ⛔ The branch is FIRST, which a status check alone cannot prove: a cancelled
+ * ride's `status` is still `"upcoming"`, so a branch placed lower would send it
+ * to `before-taken` and the accept/decline swipe. Driven on the real seed.
+ */
+const wouldBeBeforeTaken = CANCELLED_SEED.filter((t) => t.status === "upcoming");
+check(
+  "...which matters because their status still says upcoming",
+  `${wouldBeBeforeTaken.length} of ${CANCELLED_SEED.length} would otherwise be before-taken`,
+  wouldBeBeforeTaken.length === EXPECTED_ROW_18_CANCELLED,
+);
+/** ⛔ ...and no OTHER seeded ride was swept into the new phase. */
+const strayCancelled = ALL_SEEDED.filter(
+  (t) => detailStateFor(t, { isSentBack: false }) === "cancelled",
+);
+check(
+  "...and no other seeded ride was swept into it",
+  `${strayCancelled.length} of ${ALL_SEEDED.length} ride(s) render cancelled`,
+  strayCancelled.length === EXPECTED_ROW_18_CANCELLED,
+);
+/**
+ * ⛔⛔ **One union, not two.** The layout carried its own copy of `DetailState`
+ * until 2026-10-15, and a fifth phase added to the rule left the screen's copy
+ * four wide. Two unions that must agree are one union.
+ */
+const LAYOUT_SRC = readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8");
+check(
+  "the screen imports the phase union rather than re-declaring it",
+  `declares its own: ${/^type DetailState =/m.test(codeOnly(LAYOUT_SRC))}`,
+  !/^type DetailState =/m.test(codeOnly(LAYOUT_SRC)) &&
+    /import type \{ DetailState \}/.test(codeOnly(LAYOUT_SRC)),
+);
+/**
+ * ⛔ The screen's three cancelled regions, each read off the code rather than a
+ * screenshot: the banner, the chip, and the explicit no-footer branch.
+ *
+ * ⚠️ That last one would fall through to the chain's trailing `null` anyway —
+ * which is the problem. This file's documented trap is a state absorbed by a
+ * catch-all, and "no footer" reached by accident is indistinguishable from
+ * "nobody got to it yet".
+ */
+const LAYOUT_CODE = codeOnly(LAYOUT_SRC);
+const CANCELLED_REGIONS: Array<[string, RegExp]> = [
+  ["the banner", /\{state === "cancelled" && \([\s\S]{0,400}CANCELLED_BANNER_TITLE/],
+  ["the greyed timeline", /state === "cancelled" && "opacity-/],
+  ["the no-footer branch", /\{state === "cancelled" \? null :/],
+];
+const missingRegions = CANCELLED_REGIONS.filter(([, re]) => !re.test(LAYOUT_CODE));
+check(
+  "the cancelled screen draws production's banner, greys the leg and shows no footer",
+  missingRegions.length
+    ? `missing: ${missingRegions.map(([what]) => what).join(", ")}`
+    : `${CANCELLED_REGIONS.length} of ${CANCELLED_REGIONS.length} region(s)`,
+  missingRegions.length === 0,
+);
+/** ⛔ ...and it never borrows row 16's banner copy, which says the opposite. */
+check(
+  "...and the cancelled banner is not row 16's",
+  `CANCELLATION_REQUESTED_TITLE within the cancelled block: ${/\{state === "cancelled" && \([\s\S]{0,500}CANCELLATION_REQUESTED/.test(LAYOUT_CODE)}`,
+  !/\{state === "cancelled" && \([\s\S]{0,500}CANCELLATION_REQUESTED/.test(LAYOUT_CODE),
+);
+/**
+ * ⛔⛔ **The alert's two buttons, and the second is the whole finding.**
+ * `Go to ride` is the only route to the ride; `OK` is terminal and records
+ * nothing. An alert that lost the second button would make the Now side a dead
+ * end with no screen behind it, which is not what the capture shows.
+ */
+const ALERT_SRC = codeOnly(
+  readFileSync(join(ROOT, "components/driver/client-cancellation-alert.tsx"), "utf8"),
+);
+check(
+  "the alert offers both of production's buttons, and only Go to ride navigates",
+  `dismiss ${ALERT_SRC.includes("CANCEL_ALERT_DISMISS")}, go ${ALERT_SRC.includes("CANCEL_ALERT_GO")}, ` +
+    `router.push ${(ALERT_SRC.match(/router\.push/g) ?? []).length}x`,
+  ALERT_SRC.includes("CANCEL_ALERT_DISMISS") &&
+    ALERT_SRC.includes("CANCEL_ALERT_GO") &&
+    (ALERT_SRC.match(/router\.push/g) ?? []).length === 1,
+);
+/** ⛔ The trip IS the open state — one value, so the two cannot disagree. */
+check(
+  "...and the trip it names is its open state, not a boolean beside it",
+  `trip: Trip | null ${/trip: Trip \| null/.test(ALERT_SRC)}, open={trip !== null} ${/open=\{trip !== null\}/.test(ALERT_SRC)}`,
+  /trip: Trip \| null/.test(ALERT_SRC) &&
+    /open=\{trip !== null\}/.test(ALERT_SRC) &&
+    !/^\s*open\??: boolean/m.test(ALERT_SRC),
+);
+/**
+ * ⛔⛔ **The alert itself is ungated; only its trigger is scoped.** Production
+ * raises it on both sides of the toggle — the proposal does not remove it. The
+ * prototype has no push, so the stand-in fires while row 18 is focused; that
+ * scoping is scaffolding and says so.
+ */
+const MY_RIDES_CODE = codeOnly(readFileSync(join(ROOT, "app/my-rides/page.tsx"), "utf8"));
+check(
+  "the alert's trigger is scoped to the row, and not to a mode",
+  `owners list ${MY_RIDES_CODE.includes("CLIENT_CANCELLATION_SOLUTIONS")}, ` +
+    `gated on mode ${/showsCancelledRides\([\s\S]{0,60}cancelAlert/i.test(MY_RIDES_CODE)}`,
+  MY_RIDES_CODE.includes("CLIENT_CANCELLATION_SOLUTIONS") &&
+    MY_RIDES_CODE.includes("<ClientCancellationAlert") &&
+    !/showsCancelledRides\([\s\S]{0,80}setCancelAlertTrip/.test(MY_RIDES_CODE),
 );
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ import {
   CornerUpRight,
   ChevronRight,
   Hourglass,
+  Ban,
   CalendarX,
   PencilLine,
   CalendarPlus,
@@ -90,8 +91,20 @@ import {
 } from "@/components/support/missed-swipe-prompt";
 import { MissedSwipeForm } from "@/components/support/missed-swipe-form";
 import { ReachRiderModal } from "./reach-rider-modal";
+/**
+ * ⛔ Imported, not re-declared. This file carried its own copy of the union
+ * until 2026-10-15; adding a fifth phase to `ride-detail-state.ts` left the
+ * screen's copy four wide, and `typecheck` caught it at the one call site that
+ * passes between them. Two unions that must agree are one union.
+ */
+import type { DetailState } from "@/lib/driver-data/ride-detail-state";
+import {
+  CANCELLED_BANNER_BODY,
+  CANCELLED_BANNER_TITLE,
+  CANCELLED_SUBTITLE,
+} from "@/lib/driver-data/client-cancellation";
 
-type DetailState = "before-taken" | "in-progress" | "needs-action" | "completed";
+
 
 /** Driver-facing label + display order for each swipe mark. */
 /**
@@ -697,19 +710,23 @@ export function RideDetailLayout({
   }
 
   const subtitle =
-    state === "before-taken"
-      ? "Will-Call Ride"
-      : state === "in-progress"
-        ? getInProgressSubtitle(activeStage, trip.sameDay)
-        : state === "completed"
-          ? "Completed Ride"
-          // The unconfirmed phase. Same rule as the unstarted in-progress one
-          // above and spelled out rather than shared, because this branch is
-          // reached from a different state and silently kept saying "Accepted
-          // Ride" on a will-call trip when only the other was patched.
-          : trip.sameDay
-            ? "Will-Call Ride"
-            : "Accepted Ride";
+    // ⛔ `Ride`, bare — CAP-342's own subtitle. Not "Cancelled Ride": the
+    // capture does not say that, and the banner below says it instead.
+    state === "cancelled"
+      ? CANCELLED_SUBTITLE
+      : state === "before-taken"
+        ? "Will-Call Ride"
+        : state === "in-progress"
+          ? getInProgressSubtitle(activeStage, trip.sameDay)
+          : state === "completed"
+            ? "Completed Ride"
+            // The unconfirmed phase. Same rule as the unstarted in-progress one
+            // above and spelled out rather than shared, because this branch is
+            // reached from a different state and silently kept saying "Accepted
+            // Ride" on a will-call trip when only the other was patched.
+            : trip.sameDay
+              ? "Will-Call Ride"
+              : "Accepted Ride";
 
   // Multi-incentive support in v1: render all incentive pills
   const hasIncentives = trip.incentiveTypes && trip.incentiveTypes.length > 0 && trip.clientEnrolledInIncentives !== false;
@@ -741,7 +758,10 @@ export function RideDetailLayout({
           "flex-1 overflow-y-auto",
           state === "before-taken"
             ? "pb-28"
-            : state === "completed"
+            // ⛔ `cancelled` pads like `completed`: both end with no footer in
+            // Now, and padding for one that is not there leaves a dead strip
+            // under the last row.
+            : state === "completed" || state === "cancelled"
               ? "pb-8"
               : "pb-44"
         )}
@@ -779,6 +799,34 @@ export function RideDetailLayout({
             </div>
           )}
         </div>
+
+        {/*
+          ⭐⭐ `CAP-342`'s banner, verbatim, directly under the map — production's
+          own words for a ride Wingz cancelled.
+
+          ⛔⛔ It must NEVER reuse `CANCELLATION_REQUESTED_*`. Those say Support
+          has the driver's report and is chasing it, which is the opposite
+          direction and would be false here: nobody reported anything, and there
+          is nothing to chase.
+
+          ⛔ Pink/red, not the amber the row-16 banner uses. Amber in this app
+          means "waiting on someone"; this is settled.
+        */}
+        {state === "cancelled" && (
+          <div className="mx-4 mt-4 rounded-xl bg-[#FEE2E2] p-4">
+            <div className="flex items-start gap-3">
+              <Ban className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#991B1B]" />
+              <div className="min-w-0">
+                <p className="font-semibold text-[#991B1B]">
+                  {CANCELLED_BANNER_TITLE}
+                </p>
+                <p className="mt-0.5 text-sm text-[#991B1B]">
+                  {CANCELLED_BANNER_BODY}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ⛔ Replaces production's red "please call the rider first" rather than
             sitting under it. The driver has just told us the rider is not going;
@@ -932,7 +980,19 @@ export function RideDetailLayout({
 
         {/* Leg details section */}
         <div className="p-4">
-          <div className="ml-1">
+          {/*
+            ⛔ `CAP-342` greys the whole timeline on a cancelled ride — the
+            times, the addresses and the fare line all muted while the trip card
+            above stays black. It is the clearest thing on that screen after the
+            banner: the leg is not going to happen.
+
+            ⚠️ Opacity on the WRAPPER rather than a muted variant threaded
+            through `LegCard`. The card already branches on `state` for three
+            other things and a fourth reason to differ, spread across its rows,
+            is four chances for one of them to be missed. Nothing here is
+            interactive on this state, so nothing is made unreadable-but-live.
+          */}
+          <div className={cn("ml-1", state === "cancelled" && "opacity-45")}>
             {trip.legs.map((leg, index) => (
               <LegCard
                 key={leg.id}
@@ -1027,6 +1087,19 @@ export function RideDetailLayout({
             </div>
           )}
 
+          {/* ⛔ The banner in a smaller font, in the slot the other phases use
+              for theirs. A cancelled ride that carried no chip here would read
+              as having no status at all once the banner scrolled away — which
+              is §14i2's lesson: one contradiction fixed in a big font is not
+              the contradiction fixed. */}
+          {state === "cancelled" && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
+                {CANCELLED_BANNER_TITLE}
+              </span>
+            </div>
+          )}
+
           {state === "needs-action" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {/* ⛔ The same contradiction as the banner, in a smaller font. A
@@ -1057,7 +1130,19 @@ export function RideDetailLayout({
       </div>
 
       {/* Bottom region — varies by state */}
-      {state === "before-taken" && isOverCapacity(trip) ? (
+      {/*
+        ⛔⛔ **A cancelled ride has NO footer, and this branch says so out loud.**
+
+        It would fall through to the `null` at the end of this chain anyway —
+        which is exactly the problem. This file's own documented trap is a state
+        absorbed silently by a catch-all, and "no footer" reached by accident is
+        indistinguishable from "nobody got to it yet". `CAP-342` shows no action
+        bar: there is nothing to do to a ride Wingz has already cancelled, and
+        production says so in the banner above.
+
+        ⚠️ Row 18's Acknowledge button lands here, gated, in its own commit.
+      */}
+      {state === "cancelled" ? null : state === "before-taken" && isOverCapacity(trip) ? (
         /*
           ⭐⭐ Catalogue rows 11 and 12 — production's over-capacity screen, and
           it is NOT a block. `CAP-340`: the accept control is simply absent, and
