@@ -208,10 +208,20 @@ export const WAIT_TIME_SEQUENCE = ["waitedFrom", "leftAt"];
  * removed the `requireOneOf` machinery with it, since the signature-or-photo rule
  * existed only for that variant.
  */
+/**
+ * What the one trailing signature is called.
+ *
+ * ⚠️ `Driver Signature` — production's own wording on the Member No-Show screen
+ * and on Stage 05, where the pads are labelled `Driver Signature` and `Member
+ * Signature`. The three fields this replaced said "Sign to confirm" twice and
+ * "Driver Signature" once; only one of those matches a captured screen.
+ */
+export const DRIVER_SIGNATURE_LABEL = "Driver Signature";
+
 export function buildSupportFormCase({
   includeIssues,
   askNoShowType = false,
-  askSignature = false,
+  signatureTakenElsewhere = false,
   askWaitTimes = true,
   missedSwipe,
   cannotReach,
@@ -242,7 +252,19 @@ export function buildSupportFormCase({
    */
   askNoShowType?: boolean;
   /** Ask for the signature here, because no screen collected one. */
-  askSignature?: boolean;
+  /**
+   * The signature was already taken on the screen that opened this form.
+   *
+   * ⛔⛔ **Only the Member No-Show screen does this.** It takes a signature
+   * before the form exists — production's own screen, captured — so asking
+   * again would be a second signature for one claim. Every other entry point
+   * is a tile or a sheet that collected nothing.
+   *
+   * ⚠️ Named for what is TRUE rather than for what to do (`askSignature`), so
+   * a caller has to know something about its own screen to pass it, instead of
+   * deciding a policy it cannot see.
+   */
+  signatureTakenElsewhere?: boolean;
   /**
    * Ask when the driver arrived and when they left.
    *
@@ -461,7 +483,7 @@ export function buildSupportFormCase({
             // Carried into the request because Support needs to know which kind
             // was claimed.
             lockWhenPrefilled: true,
-            lockedBadge: "From the no-show screen",
+            lockedBadge: null,
             showIf: EITHER_NO_SHOW_CASE,
           },
       {
@@ -489,7 +511,7 @@ export function buildSupportFormCase({
         // is about a specific pick-up the driver physically attended. Leaving it
         // open would let a driver standing at trip A file against trip B.
         lockWhenPrefilled: true,
-        lockedBadge: "From this ride",
+        lockedBadge: null,
       },
       ...(askWaitTimes
         ? ([
@@ -521,14 +543,15 @@ export function buildSupportFormCase({
         id: "waitedWhere",
         type: "text",
         label: "Where did you wait for the member?",
-        placeholder: "e.g. front entrance, west tower lobby, in the driveway",
-        required: true,
-        // ⚠️ Production should offer a map pin as well as free text — "the main
-        // entrance" of a hospital campus is not a location. Text only here,
-        // because a pin picker is a map the prototype does not have.
-        warning:
-          "A map pin belongs here too.",
-        showIf: ONLY_RIDER_NO_SHOW,
+        /**
+         * ⚠️ **The ask is IN the placeholder**, not in a line beneath it.
+         * Production should offer a map pin as well as free text — "the main
+         * entrance" of a hospital campus is not a location — and the amber
+         * line saying so was one more sentence under one more question.
+         * ⛔ Still text only: a pin picker is a map the prototype does not have.
+         */
+        placeholder: "Place google map pin location",
+        required: true,        showIf: ONLY_RIDER_NO_SHOW,
       },
       {
         id: "knocked",
@@ -733,29 +756,6 @@ export function buildSupportFormCase({
               label: "Attachments (optional)",
               showIf: ONLY_MISSED_SWIPE,
             },
-            /**
-             * ⛔⛔ The DRIVER's signature, and only when the drop-off is being
-             * reconstructed.
-             *
-             * `CAP-098` shows Stage 05 taking two signatures. The member's is
-             * gone once they have left the car; the driver's is not — they are
-             * sitting here filing this. Recording both as lost, as an earlier
-             * version did, threw away a signature that was there for the taking.
-             *
-             * LAST in the set, always: the driver attests to the answers above,
-             * so a field after it would be signed for before it was written.
-             */
-            ...(asksDropoff
-              ? [
-                  {
-                    id: "driverSignature",
-                    type: "signature",
-                    label: "Driver Signature",
-                    required: true,
-                    showIf: ONLY_MISSED_SWIPE,
-                  },
-                ]
-              : []),
           ] as SupportCaseDefinition["fields"])
         : []),
 
@@ -964,23 +964,6 @@ export function buildSupportFormCase({
               warning: channel.proofWarning,
               showIf: { field: "declineChannel", equals: [channel.value] },
             })),
-            {
-              id: "declineAttestation",
-              type: "signature",
-              label: "Sign to confirm",
-              /**
-               * ⚠️ Required on EVERY channel, not only the ones with no
-               * artifact. A screenshot shows a message; it does not show that
-               * the message is about this trip, or that the person who sent it
-               * is the member. The signature is the driver standing behind the
-               * claim, and the claim is the same one whichever way it arrived.
-               *
-               * LAST, always — the driver attests to the answers above, so a
-               * field after it would be signed for before it was written.
-               */
-              required: true,
-              showIf: ONLY_RIDER_DECLINED,
-            },
           ] as SupportCaseDefinition["fields"])
         : []),
 
@@ -1278,7 +1261,7 @@ export function buildSupportFormCase({
                * them most weeks" below is the claim it corroborates.
                */
               lockWhenPrefilled: true,
-              lockedBadge: "From this ride",
+              lockedBadge: null,
               showIf: ONLY_AUTO_ASSIGN,
             },
             {
@@ -1418,28 +1401,31 @@ export function buildSupportFormCase({
           ] as SupportCaseDefinition["fields"])
         : []),
 
-      // ⚠️ The signature is conditional, and where it lives is a real decision.
-      //
-      // Reached from the Member No-Show screen the driver has already signed —
-      // production signs before it refuses, and familiarity won — so asking
-      // again would be a second signature for one claim. Reached straight from
-      // `More`, no screen ran, and the claim needs an attestation: proving a wait
-      // is not proving the member was absent, and that gap is what a signature
-      // covers.
-      //
-      // LAST when present, always. The driver attests to the answers above, so a
-      // field after it would be signed for before it was written.
-      ...(askSignature
-        ? ([
+      /**
+       * ⭐⭐ **One driver signature, LAST, on every form.**
+       *
+       * It used to be three bespoke fields on three cases — `signature` on the
+       * no-show, `driverSignature` on the missed swipe, `declineAttestation` on
+       * the decline — each with its own label and its own `showIf`. Six other
+       * cases asked for nothing. A driver filing a trip change or a send-back
+       * attested to none of it. (User direction, 2026-10-14.)
+       *
+       * ⛔ **LAST, always.** The driver attests to the answers above, so a
+       * field after it would be signed for before it was written.
+       *
+       * ⛔ No `showIf`: it applies to every issue, which is the whole change.
+       * A gate here is how six cases went without one.
+       */
+      ...(signatureTakenElsewhere
+        ? []
+        : ([
             {
               id: "signature",
               type: "signature",
-              label: "Sign to confirm",
+              label: DRIVER_SIGNATURE_LABEL,
               required: true,
-              showIf: ONLY_RIDER_NO_SHOW,
             },
-          ] as SupportCaseDefinition["fields"])
-        : []),
+          ] as SupportCaseDefinition["fields"])),
     ],
   };
 }

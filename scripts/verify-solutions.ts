@@ -123,8 +123,9 @@ import { reachOptionsFor } from "../components/driver/reach-rider-modal";
 import { CANNOT_REACH_SOLUTIONS, showsCannotReachOption } from "../lib/driver-data/reach-attempt";
 import { buildGridTiles } from "../components/driver/more-options-screen";
 import { buildSupportFormCase } from "../lib/support-data/case-registry";
+import { DRIVER_SIGNATURE_LABEL } from "../lib/support-data/case-registry";
 import {
-  NOT_ON_THIS_TRIP,
+  NOT_SUPPLIED,
   contextLegs,
   tripContextFor,
 } from "../lib/support-data/trip-context";
@@ -1935,7 +1936,10 @@ const ASSIGN_CASE = buildSupportFormCase({
 const assignValues = { issue: ISSUE_AUTO_ASSIGN_REQUEST };
 const assignVisible = ASSIGN_CASE.fields.filter((f) => isFieldVisible(f, assignValues));
 const assignIds = assignVisible.map((f) => f.id);
-const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentScope", "assignmentNotes"];
+// ⚠️ `signature` is LAST on every list below: every support form now ends with
+// a driver signature (user direction, 2026-10-14). Six cases previously asked
+// for nothing at all.
+const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentScope", "assignmentNotes", "signature"];
 check(
   "the case renders exactly the declared field set",
   `${assignIds.length} of ${ASSIGN_CASE.fields.length} field(s) visible: ${assignIds.join(", ")}`,
@@ -1984,10 +1988,17 @@ check(
  * counted would disable the button forever — the `requireOneOf` landmine in
  * another spelling. Checked by filling only what renders.
  */
+/**
+ * ⚠️ `signature` is part of "only what renders" now — every support form ends
+ * with one. Omitting it here would make this check fail for the right reason
+ * and read as the wrong one: Submit IS reachable, the driver just has to sign.
+ */
+const SIGNED = "data:image/png;base64,TESTSIGNATURE";
 const filledAssign: Record<string, string> = {
   issue: ISSUE_AUTO_ASSIGN_REQUEST,
   member: "AMARA OKONKWO",
   assignmentScope: ASSIGNMENT_SCOPE_ALL,
+  signature: SIGNED,
 };
 check(
   "filling only the visible required fields enables Submit",
@@ -2117,18 +2128,24 @@ for (const scope of ASSIGNMENT_SCOPES) {
       .map((f) => f.id)
       .join(", ")}`,
     owed
+      // ⚠️ `signature` in every map: every support form now ends with one, so a
+      // map that omitted it would make BOTH arms false and the check would fail
+      // for a reason it is not about.
       ? !areRequiredFieldsFilled(ASSIGN_CASE.fields, {
           ...values,
           member: "AMARA OKONKWO",
+          signature: SIGNED,
         }) &&
         areRequiredFieldsFilled(ASSIGN_CASE.fields, {
           ...values,
           member: "AMARA OKONKWO",
+          signature: SIGNED,
           [owed]: "every Tue and Thu, 9:40 AM",
         })
       : areRequiredFieldsFilled(ASSIGN_CASE.fields, {
           ...values,
           member: "AMARA OKONKWO",
+          signature: SIGNED,
         }),
   );
 }
@@ -2859,7 +2876,10 @@ check(
 
 const sbValues = { issue: ISSUE_SEND_BACK_REASON };
 const sbVisible = SB_CASE.fields.filter((f) => isFieldVisible(f, sbValues)).map((f) => f.id);
-const EXPECTED_SB_FIELDS = ["issue", "returnReason", "returnNotes"];
+// ⚠️ `signature` is LAST on every list below: every support form now ends with
+// a driver signature (user direction, 2026-10-14). Six cases previously asked
+// for nothing at all.
+const EXPECTED_SB_FIELDS = ["issue", "returnReason", "returnNotes", "signature"];
 check(
   "the case renders exactly the declared field set",
   `${sbVisible.length} of ${SB_CASE.fields.length} visible: ${sbVisible.join(", ")}`,
@@ -4344,7 +4364,9 @@ const filledNoProof: Record<string, string> = {
   declineChannel: "in-person",
   toldAt: "10:12",
   declineSaid: "She said her daughter is taking her and she does not need us.",
-  declineAttestation: "signed",
+  // ⚠️ `declineAttestation` became the shared trailing `signature` when every
+  // form gained one — same field, same label, one id.
+  signature: SIGNED,
 };
 check(
   "a complete form with no attachment can be sent",
@@ -4369,10 +4391,10 @@ check(
 );
 check(
   "...and not one that is unsigned",
-  "declineAttestation empty",
+  "signature empty",
   !areRequiredFieldsFilled(declineCase.fields, {
     ...filledNoProof,
-    declineAttestation: "",
+    signature: "",
   }),
 );
 check(
@@ -4717,7 +4739,14 @@ check(
  *   · `hasRequiredChange` REFUSES it — which is the proof that something else
  *     is now stopping it.
  */
-const untouched = { ...built20a.initialValues, [CHANGE_SOURCE_FIELD]: "member" };
+// ⚠️ Plus a signature: every support form now ends with one, so an "untouched"
+// form that omitted it would fail the ordinary submit rule for a reason this
+// check is not about.
+const untouched = {
+  ...built20a.initialValues,
+  [CHANGE_SOURCE_FIELD]: "member",
+  signature: SIGNED,
+};
 check(
   "the untouched form passes the ORDINARY submit rule — the gate it needed does not exist",
   `canSubmitCase=${canSubmitCase(built20a.supportCase.fields, untouched)}`,
@@ -5493,6 +5522,7 @@ check(
       [ADD_PICKUP_ADDRESS_FIELD]: "x",
       [ADD_DROPOFF_ADDRESS_FIELD]: "y",
       [ADD_SOURCE_FIELD]: "member",
+      signature: SIGNED,
     },
   )}`,
   canSubmitCase(
@@ -5504,6 +5534,7 @@ check(
       [ADD_PICKUP_ADDRESS_FIELD]: "x",
       [ADD_DROPOFF_ADDRESS_FIELD]: "y",
       [ADD_SOURCE_FIELD]: "member",
+      signature: SIGNED,
     },
   ) === true,
 );
@@ -8908,7 +8939,7 @@ const HEADING_CASES: Array<{ why: string; built: ReturnType<typeof buildSupportF
   { why: "cannot reach member", built: buildSupportFormCase({ includeIssues: [ISSUE_CANNOT_REACH_MEMBER] }) },
   { why: "auto-assign request", built: buildSupportFormCase({ includeIssues: [ISSUE_AUTO_ASSIGN_REQUEST], autoAssign: true }) },
   { why: "send-back reason", built: buildSupportFormCase({ includeIssues: [ISSUE_SEND_BACK_REASON], sendBack: true }) },
-  { why: "rider no-show", built: buildSupportFormCase({ askNoShowType: true, askSignature: true }) },
+  { why: "rider no-show", built: buildSupportFormCase({ askNoShowType: true, signatureTakenElsewhere: false }) },
   { why: "rider declined", built: buildSupportFormCase({ includeIssues: [ISSUE_RIDER_DECLINED], riderDeclined: { legOptions: [] } }) },
 ];
 const notFirst = HEADING_CASES.filter((c) => c.built.fields[0]?.id !== "issue");
@@ -8977,6 +9008,60 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+console.log("\n29c. Every form ends with the driver's signature");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐⭐ It was three bespoke fields on three cases — `signature` on the no-show,
+ * `driverSignature` on the missed swipe, `declineAttestation` on the decline —
+ * each with its own id, label and `showIf`. **Six other cases asked for
+ * nothing**, so a driver filing a trip change or a send-back attested to none
+ * of it. One shared field now, last, on every form. (User direction,
+ * 2026-10-14.)
+ *
+ * ⛔ The only suppression is the Member No-Show SCREEN, which signs before the
+ * form exists — asking again would be a second signature for one claim.
+ */
+const unsigned = HEADING_CASES.filter((c) => {
+  const sigs = c.built.fields.filter((f) => f.type === "signature");
+  const last = c.built.fields[c.built.fields.length - 1];
+  return sigs.length !== 1 || last?.id !== "signature" || last?.required !== true;
+});
+check(
+  "every case ends with exactly one required signature",
+  unsigned.length
+    ? unsigned.map((c) => c.why).join(", ")
+    : `${HEADING_CASES.length} of ${HEADING_CASES.length} cases`,
+  unsigned.length === 0,
+);
+check(
+  "...under production's own wording",
+  `"${DRIVER_SIGNATURE_LABEL}"`,
+  DRIVER_SIGNATURE_LABEL === "Driver Signature",
+);
+/**
+ * ⛔⛔ **The suppression is a property of the SCREEN, not of the case**, and it
+ * has to be reachable both ways or one of the two paths is wrong. The no-show
+ * form is opened from the screen (signed) and standalone from More Options
+ * (not signed); Cancel at Door only ever from the screen.
+ */
+const suppressed = buildSupportFormCase({ signatureTakenElsewhere: true });
+const asked = buildSupportFormCase({ signatureTakenElsewhere: false });
+check(
+  "the suppression is reachable, and changes the field set",
+  `suppressed ${suppressed.fields.filter((f) => f.type === "signature").length}, asked ${asked.fields.filter((f) => f.type === "signature").length}`,
+  suppressed.fields.filter((f) => f.type === "signature").length === 0 &&
+    asked.fields.filter((f) => f.type === "signature").length === 1,
+);
+const CAD_FORM = codeOnly(readFileSync(join(ROOT, "components/support/cancel-at-door-form.tsx"), "utf8"));
+const NS_FORM = codeOnly(readFileSync(join(ROOT, "components/support/rider-no-show-form.tsx"), "utf8"));
+check(
+  "...and both callers pass what is true of their own screen",
+  `cancel-at-door ${/signatureTakenElsewhere: true/.test(CAD_FORM) ? "always" : "MISSING"}, no-show ${/signatureTakenElsewhere: !standalone/.test(NS_FORM) ? "only when the screen signed" : "MISSING"}`,
+  /signatureTakenElsewhere: true/.test(CAD_FORM) &&
+    /signatureTakenElsewhere: !standalone/.test(NS_FORM),
+);
+
+// ---------------------------------------------------------------------------
 console.log("\n30. One context block — trip, then the leg being filed against");
 // ---------------------------------------------------------------------------
 /**
@@ -8997,24 +9082,63 @@ check(
   CONTEXT_LEGS.length === EXPECTED_CONTEXT_LEGS,
 );
 
-/** ⛔ The six rows the leg section carries, in order, on every leg. */
-const EXPECTED_LEG_ROWS = 6;
+/**
+ * ⛔ The eight rows the leg section carries, in the order the leg happens —
+ * each scheduled time beside the mark that was meant to match it.
+ *
+ * ⚠️ `Status` is gone (it was the pill in the heading, worded identically) and
+ * so is the separate marks strip, which is now rows 4 and 7.
+ */
+const EXPECTED_LEG_ROWS = 8;
+const FIXED_LABELS: Array<[number, string]> = [
+  [0, "ID"],
+  [1, "Pick-up location"],
+  [3, "Actual pick-up time"],
+  [4, "Pick-up odometer"],
+  [6, "Actual drop-off time"],
+  [7, "Drop-off odometer"],
+];
 const wrongShape = CONTEXT_LEGS.filter((option) => {
   const rows = tripContextFor(option).legRows;
   return (
     rows.length !== EXPECTED_LEG_ROWS ||
-    rows[0].label !== "Leg ID" ||
-    rows[1].label !== "Status" ||
-    rows[3].label !== "Pick-up location" ||
-    rows[5].label !== "Drop-off location"
+    FIXED_LABELS.some(([i, label]) => rows[i].label !== label)
   );
 });
 check(
-  "every leg renders the same six rows, in the same order",
+  "every leg renders the same eight rows, in the same order",
   wrongShape.length
     ? wrongShape.slice(0, 3).map((o) => o.legId).join(", ")
     : `${CONTEXT_LEGS.length} of ${CONTEXT_LEGS.length} legs, ${EXPECTED_LEG_ROWS} rows each`,
   wrongShape.length === 0,
+);
+/**
+ * ⛔ Row 2 takes the SEED's own wording — `Est Pick-up Time` vs `Scheduled
+ * Pick-up Time`. Asserted as VARYING rather than as a literal: a fixed label
+ * would call an estimate a schedule on the rides where that is exactly the
+ * difference the driver is being asked about.
+ */
+const scheduledLabels = new Set(CONTEXT_LEGS.map((o) => tripContextFor(o).legRows[2].label));
+const borrowed = CONTEXT_LEGS.filter((o) => tripContextFor(o).legRows[2].label !== o.leg.label);
+check(
+  "the scheduled pick-up row takes the ride's own wording",
+  borrowed.length
+    ? borrowed.slice(0, 3).map((o) => o.legId).join(", ")
+    : `${scheduledLabels.size} distinct label(s): ${[...scheduledLabels].join(" · ")}`,
+  // ⚠️ Compared to the LEG's own label, not to a pattern. The first version
+  // demanded every label contain "pick-up" and failed on `Wait For Call` —
+  // which is a real seeded label, and the whole point of a will-call leg is
+  // that it has no scheduled pick-up time. The check was wrong, not the code.
+  borrowed.length === 0 && scheduledLabels.size > 1,
+);
+/** ⛔ Status is not a row — it is the pill, and two copies could disagree. */
+const statusRows = CONTEXT_LEGS.filter((o) =>
+  tripContextFor(o).legRows.some((r) => r.label === "Status"),
+);
+check(
+  "...and Status is not repeated as a row",
+  `${statusRows.length} of ${CONTEXT_LEGS.length} legs carry a Status row`,
+  statusRows.length === 0,
 );
 /** ⛔ And no row is ever blank — an absent fact is SAID. */
 const blanks = CONTEXT_LEGS.filter((option) =>
@@ -9027,29 +9151,37 @@ check(
 );
 
 /**
- * ⛔⛔ Three seeded trips have no drop-off stop. Those rows are marked absent
- * and say so; they are NOT dropped, or the block would stop being the same
- * block on every form — which is the whole point of standardising it.
+ * ⛔⛔ **A fact the app does not hold yet is a DASH, never a blank and never a
+ * dropped row.** Most legs have unsupplied marks — that is the normal state of
+ * a leg still in motion — so this is the common case, not an edge one.
+ *
+ * ⚠️ This used to assert exactly 3 legs carried an absent row, back when the
+ * only absence was a missing drop-off STOP. The block now also shows actual
+ * marks and odometers, so nearly every leg has at least one dash and the
+ * interesting property moved: not HOW MANY dash, but that a dash is what an
+ * unsupplied fact renders as.
  */
-const EXPECTED_ABSENT_LEGS = 3;
 const withAbsent = CONTEXT_LEGS.filter((option) =>
   tripContextFor(option).legRows.some((row) => row.absent),
 );
-check(
-  "a trip with no drop-off stop says so, rather than rendering blank",
-  `${withAbsent.length} of ${CONTEXT_LEGS.length} legs — ${withAbsent.map((o) => o.legId).join(", ")}`,
-  withAbsent.length === EXPECTED_ABSENT_LEGS &&
-    withAbsent.every((o) =>
-      tripContextFor(o).legRows
-        .filter((r) => r.absent)
-        .every((r) => r.value === NOT_ON_THIS_TRIP),
-    ),
+const badDash = CONTEXT_LEGS.filter((option) =>
+  tripContextFor(option).legRows.some((row) => row.absent && row.value !== NOT_SUPPLIED),
 );
-/** ⚠️ ...and the majority do carry one, so the check above is not the rule. */
 check(
-  "...while most legs carry a real drop-off",
-  `${CONTEXT_LEGS.length - withAbsent.length} of ${CONTEXT_LEGS.length} legs have both drop-off rows`,
-  CONTEXT_LEGS.length - withAbsent.length > withAbsent.length,
+  "an unsupplied fact is a dash, on every row that has one",
+  badDash.length
+    ? badDash.slice(0, 3).map((o) => o.legId).join(", ")
+    : `${withAbsent.length} of ${CONTEXT_LEGS.length} legs carry at least one dash`,
+  badDash.length === 0 && withAbsent.length > 0,
+);
+/** ⛔ ...and no leg is nothing but dashes, or the block would say nothing. */
+const allDashes = CONTEXT_LEGS.filter((option) =>
+  tripContextFor(option).legRows.every((row) => row.absent),
+);
+check(
+  "...and no leg is nothing but dashes",
+  `${allDashes.length} of ${CONTEXT_LEGS.length} legs are entirely unsupplied`,
+  allDashes.length === 0,
 );
 
 /**
@@ -9090,6 +9222,33 @@ check(
   "exactly one leg is marked as the one being filed against",
   badCurrent.length ? badCurrent.slice(0, 3).map((o) => o.legId).join(", ") : `${CONTEXT_LEGS.length} of ${CONTEXT_LEGS.length}`,
   badCurrent.length === 0,
+);
+
+/**
+ * ⛔⛔ **A locked leg renders NOTHING above the block.**
+ *
+ * The picker used to draw a card — `A Leg · 1049800377` over the rider, date
+ * and time — directly above the context block, which carries all four of those
+ * facts under headings that say which is which. The card was the same
+ * information twice, the second time unlabelled.
+ *
+ * ⚠️ This check exists because a break test found NOTHING caught it: restoring
+ * the card left every other check in this section green. A block that cannot
+ * tell whether it is being introduced twice is a block nobody is guarding.
+ */
+const LOCKED_PICKER_SRC = codeOnly(readFileSync(join(ROOT, "components/support/support-field-renderer.tsx"), "utf8"));
+check(
+  "a locked leg picker renders nothing, leaving the block to speak once",
+  /if \(locked && selected\) return null;/.test(LOCKED_PICKER_SRC)
+    ? "returns null"
+    : `${LOCKED_PICKER_SRC.slice(LOCKED_PICKER_SRC.indexOf("locked && selected"), LOCKED_PICKER_SRC.indexOf("locked && selected") + 60)}…`,
+  /if \(locked && selected\) return null;/.test(LOCKED_PICKER_SRC),
+);
+/** ⚠️ ...and the UNLOCKED picker still exists, or the field would never render. */
+check(
+  "...while an unlocked picker still offers the search",
+  `searchLegOptions ${(LOCKED_PICKER_SRC.match(/searchLegOptions/g) ?? []).length}x`,
+  /searchLegOptions\(/.test(LOCKED_PICKER_SRC),
 );
 
 /** ⛔ The component decides how it looks and nothing about what it says. */

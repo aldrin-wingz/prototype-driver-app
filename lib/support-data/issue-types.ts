@@ -93,7 +93,16 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
   },
   {
     value: ISSUE_CANCEL_AT_DOOR,
-    label: "Cancel at Door",
+    /**
+     * ⚠️ Names its parent case, because it IS one: catalogue row 02 is a
+     * branch of the no-show, filed from the same screen against the same
+     * matrix. "Cancel at Door" on its own read as a separate thing to report.
+     *
+     * ⛔ The no-show TYPE stays `Cancel At Door` — that string is captured
+     * production wording in `NO_SHOW_TYPES` and this is not it. Two different
+     * lists; only ours moves.
+     */
+    label: "Rider No-Show - Cancelled at Door",
     description:
       "For a member who came to the door and refused the ride. Tell us who turned you away, so Support can see the wait was over before it started.",
     // Same reasoning as Rider No-Show: reached from the Member No-Show screen

@@ -33,7 +33,9 @@ export function buildRiderNoShow(
   const standalone = noShowType === "";
   const supportCase = buildSupportFormCase({
     askNoShowType: standalone,
-    askSignature: standalone,
+    // ⛔ Inverted: the Member No-Show screen takes a signature before this form
+    // opens, so only the standalone entry (straight from More Options) asks.
+    signatureTakenElsewhere: !standalone,
     // `includeIssues` is what puts Rider No-Show in the select's options at all —
     // a selected value with no matching option renders as the placeholder, so the
     // form would claim no issue was picked.

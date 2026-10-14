@@ -52,12 +52,17 @@ export interface TripContext {
   /** Current Leg Details, in the order they are shown. */
   legRows: ContextRow[];
   status: string;
-  /** The marks already recorded — which is also what the form locks. */
-  marks: Array<{ label: string; recorded: string | null }>;
 }
 
-/** Said rather than blanked. See `ContextRow.absent`. */
-export const NOT_ON_THIS_TRIP = "Not recorded on this trip";
+/**
+ * What a row shows when the app does not hold that fact yet.
+ *
+ * ⛔ A dash, not a blank and not an omission. A blank reads as a rendering
+ * bug; dropping the row makes the block stop being the same block on every
+ * form, which is the whole point of standardising it. (User direction,
+ * 2026-10-14.)
+ */
+export const NOT_SUPPLIED = "—";
 
 /**
  * The legs of this trip, as a driver counts them.
@@ -107,6 +112,15 @@ function dropOffStop(trip: Trip): TripLeg | undefined {
 export function tripContextFor(option: LegOption): TripContext {
   const { trip, leg } = option;
   const dropOff = dropOffStop(trip);
+  const progress = leg.progress;
+  /** ⚠️ `0` is a real odometer reading, so only null/undefined is "not supplied". */
+  const reading = (value: number | null | undefined) =>
+    value === null || value === undefined ? null : String(value);
+
+  const row = (label: string, value: string | null): ContextRow =>
+    value === null || value === ""
+      ? { label, value: NOT_SUPPLIED, absent: true }
+      : { label, value };
 
   return {
     tripId: trip.id,
@@ -114,33 +128,35 @@ export function tripContextFor(option: LegOption): TripContext {
     client: trip.client,
     legs: contextLegs(option),
     status: getLegStatusLabel(leg),
-    legRows: [
-      { label: "Leg ID", value: leg.legCode ? `${leg.legCode} · ${leg.id}` : leg.id },
-      { label: "Status", value: getLegStatusLabel(leg) },
-      /**
-       * ⚠️ The seed's OWN wording for the row label — `Est Pick-up Time`,
-       * `Scheduled Pick-up Time`, `Wait for Call`. A fixed "Pick-up time" would
-       * call an estimate a schedule on the rides where that is the difference
-       * the driver is being asked about.
-       */
-      { label: leg.label, value: `${trip.date} · ${leg.time}` },
-      { label: "Pick-up location", value: leg.address },
-      dropOff
-        ? { label: dropOff.label, value: dropOff.time }
-        : { label: "Drop-off time", value: NOT_ON_THIS_TRIP, absent: true },
-      dropOff
-        ? { label: "Drop-off location", value: dropOff.address }
-        : { label: "Drop-off location", value: NOT_ON_THIS_TRIP, absent: true },
-    ],
     /**
-     * ⛔ Kept, though it is not in the requested row list. This IS the rule for
-     * the form below — a recorded mark arrives locked and a blank one is the
-     * driver's to supply — so removing it would leave the locks unexplained.
+     * ⛔⛔ **Scheduled and actual, side by side, in the order the leg happens.**
+     *
+     * The marks used to live in a separate strip under these rows — three
+     * ticks reading "Pick-up to supply". Now each is the row beside the time it
+     * was meant to match, which is the comparison anyone reading this block is
+     * actually making.
+     *
+     * ⛔ `Status` is gone: it was the same word as the pill in the heading.
+     *
+     * ⚠️ **The EN-ROUTE mark is no longer shown.** It is not in the requested
+     * row list, and it is the one mark the app almost always holds — the missed
+     * swipe case calls it "the one mark we always have". One row to restore if
+     * that turns out to matter.
      */
-    marks: [
-      { label: "En-route", recorded: leg.progress?.startedAt ?? null },
-      { label: "Pick-up", recorded: leg.progress?.pickedUpAt ?? null },
-      { label: "Drop-off", recorded: leg.progress?.droppedOffAt ?? null },
+    legRows: [
+      row("ID", leg.legCode ? `${leg.legCode} · ${leg.id}` : leg.id),
+      row("Pick-up location", leg.address),
+      /**
+       * ⚠️ The seed's OWN wording — `Est Pick-up Time` vs `Scheduled Pick-up
+       * Time`. A fixed label would call an estimate a schedule on the rides
+       * where that is the difference the driver is being asked about.
+       */
+      row(leg.label, `${trip.date} · ${leg.time}`),
+      row("Actual pick-up time", progress?.pickedUpAt ?? null),
+      row("Pick-up odometer", reading(progress?.pickedUpOdometer)),
+      row(dropOff?.label ?? "Appointment Time", dropOff?.time ?? null),
+      row("Actual drop-off time", progress?.droppedOffAt ?? null),
+      row("Drop-off odometer", reading(progress?.droppedOffOdometer)),
     ],
   };
 }

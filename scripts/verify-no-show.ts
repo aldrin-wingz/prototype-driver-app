@@ -492,7 +492,7 @@ for (const kept of ["waitedFrom", "leftAt", "waitedWhere", "knocked"]) {
 const standalone = buildSupportFormCase({
   includeIssues: [ISSUE_RIDER_NO_SHOW],
   askNoShowType: true,
-  askSignature: true,
+  signatureTakenElsewhere: false,
 });
 const filled: Record<string, string> = {
   issue: ISSUE_RIDER_NO_SHOW,
@@ -544,14 +544,39 @@ check("no relation option is a person's name",
   CONTACT_RELATION_OPTIONS.map((o) => o.label).join(" | "));
 
 // ── The two variants ask different things ─────────────────────────────────
+/**
+ * ⚠️ `signatureTakenElsewhere: true` on both, MIRRORING `cancel-at-door-form`.
+ * Every support form now ends with a driver signature; this one does not,
+ * because the Member No-Show screen — its only entry point — already took one.
+ * A check below pins that the real caller agrees, so this mirror cannot drift
+ * into testing a form the app does not build.
+ */
 const cadAtPickup = buildSupportFormCase({
   includeIssues: [ISSUE_CANCEL_AT_DOOR],
   askWaitTimes: false,
+  signatureTakenElsewhere: true,
 });
 const cadAway = buildSupportFormCase({
   includeIssues: [ISSUE_CANCEL_AT_DOOR],
   askWaitTimes: true,
+  signatureTakenElsewhere: true,
 });
+/**
+ * ⛔⛔ **The suppression belongs to the SCREEN, not to the case.** Cancel at
+ * Door is reached only from the Member No-Show screen, which signs first; the
+ * no-show form is reached from there AND standalone from More Options, so it
+ * suppresses only on the first path. Asserted against the real call sites,
+ * because this file otherwise builds its own cases and would never notice a
+ * caller that stopped passing it.
+ */
+const CAD_SRC = readFileSync("components/support/cancel-at-door-form.tsx", "utf8");
+const NO_SHOW_SRC = readFileSync("components/support/rider-no-show-form.tsx", "utf8");
+check("Cancel at Door never asks for a second signature",
+  /signatureTakenElsewhere: true/.test(CAD_SRC),
+  "the form would ask again after the screen already signed");
+check("...while the no-show form suppresses only on the path that signed",
+  /signatureTakenElsewhere: !standalone/.test(NO_SHOW_SRC),
+  "the no-show form suppresses unconditionally, so the standalone entry never signs");
 const atPickupIds = cadAtPickup.fields.map((f) => f.id);
 const awayIds = cadAway.fields.map((f) => f.id);
 

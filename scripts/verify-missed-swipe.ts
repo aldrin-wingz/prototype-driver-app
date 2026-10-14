@@ -113,7 +113,17 @@ const SCENARIOS: Array<{
   editable: string[];
   readOnly: string[];
   memberSignatureMissing: boolean;
-  /** The form collects the driver's own signature, which IS recoverable. */
+  /**
+   * The form collects the driver's own signature, which IS recoverable.
+   *
+   * ⚠️ **`true` on every scenario now.** It used to track
+   * `memberSignatureMissing` — the driver signed exactly when the member's
+   * could not be taken. Every support form now ends with a driver signature
+   * (user direction, 2026-10-14), including 1a, where the real Stage 05 takes
+   * both signatures and this form only reconstructs the pick-up. Kept as a
+   * declared column rather than removed, so the day it stops being universal
+   * the table is where that is written down.
+   */
   asksDriverSignature: boolean;
 }> = [
   {
@@ -123,7 +133,7 @@ const SCENARIOS: Array<{
     editable: ["pickupTime", "pickupOdometer"],
     readOnly: ["enRouteTime", "dropOffTime", "dropoffOdometer"],
     memberSignatureMissing: false,
-    asksDriverSignature: false,
+    asksDriverSignature: true,
   },
   {
     name: "1b · both ends",
@@ -386,7 +396,7 @@ for (const scenario of SCENARIOS) {
     `got ${leavesMemberSignatureMissing(scenario.asks)}`);
 
   const hasDriverField = caseFor(scenario.asks, scenario.rideId).fields.some(
-    (f) => f.id === "driverSignature"
+    (f) => f.id === "signature"
   );
   check(`${scenario.name}: driver signature asked = ${scenario.asksDriverSignature}`,
     hasDriverField === scenario.asksDriverSignature, `got ${hasDriverField}`);
@@ -396,15 +406,29 @@ check("the member-signature outcome differs across the three",
   `${SCENARIOS.filter((s) => s.memberSignatureMissing).length} of ${SCENARIOS.length}`);
 /** ⛔ The two must track each other: a lost member signature is exactly when the
  *  driver's is worth collecting. If they ever diverge, one of them is wrong. */
-check("a lost member signature always asks for the driver's",
-  SCENARIOS.every((s) => s.memberSignatureMissing === s.asksDriverSignature),
-  "the two halves of Stage 05 disagree");
+/**
+ * ⚠️ **This used to pair the two halves of Stage 05** — "a lost member
+ * signature always asks for the driver's" — and it held because the driver's
+ * was asked for exactly when the member's was lost. Every support form now ends
+ * with a driver signature (user direction, 2026-10-14), so one side of that
+ * pairing is constant and comparing them would pass vacuously.
+ *
+ * ⛔ The halves are asserted separately instead: the driver always signs, and
+ * the member's is lost on SOME scenarios and not others — which is the property
+ * that still varies and still decides what the form records.
+ */
+check("the driver signs on every scenario",
+  SCENARIOS.every((s) => s.asksDriverSignature),
+  `${SCENARIOS.filter((s) => s.asksDriverSignature).length} of ${SCENARIOS.length}`);
+check("...while the member's signature is lost on some and not others",
+  new Set(SCENARIOS.map((s) => s.memberSignatureMissing)).size === 2,
+  "every scenario agrees about the member's signature, so the rule is not being tested");
 
 /** ⛔ It must be LAST — the driver signs for what is above it. */
-for (const scenario of SCENARIOS.filter((s) => s.asksDriverSignature)) {
+for (const scenario of SCENARIOS) {
   const fields = caseFor(scenario.asks, scenario.rideId).fields;
   check(`${scenario.name}: the driver signature is the last field`,
-    fields[fields.length - 1]?.id === "driverSignature",
+    fields[fields.length - 1]?.id === "signature",
     `last is ${fields[fields.length - 1]?.id}`);
 }
 
@@ -647,7 +671,10 @@ section("7. Negative controls — the other cases are untouched");
 const noShowCase = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
 const MISSED_ONLY = [
   "enRouteTime", "pickupTime", "pickupOdometer", "dropOffTime", "dropoffOdometer",
-  "pickupWhere", "dropoffWhere", "attachment", "driverSignature",
+  // ⚠️ `driverSignature` left this list when the signature became shared — it
+  // is no longer a Missed Swipe field, so finding it in a no-show build is now
+  // correct rather than a leak.
+  "pickupWhere", "dropoffWhere", "attachment",
 ];
 const leaked = MISSED_ONLY.filter((id) => noShowCase.fields.some((f) => f.id === id));
 check("no Missed Swipe field reaches a no-show build",
@@ -671,18 +698,36 @@ check("...and there were some to check",
   caseFor(["pickup", "dropoff"], RIDE_1).fields.filter((f) => MISSED_ONLY.includes(f.id)).length >= 5,
   "");
 /**
- * ⛔ Two signature fields now exist on one form runtime — the no-show's
- * `signature` and Missed Swipe's `driverSignature`. Different ids on purpose: a
- * shared one would make a no-show attestation and a drop-off attestation the
- * same stored value under two different pieces of copy.
+ * ⛔⛔ **SUPERSEDED, deliberately.** This asserted the opposite: that the
+ * no-show's `signature` and Missed Swipe's `driverSignature` were DIFFERENT
+ * ids, because "a shared one would make a no-show attestation and a drop-off
+ * attestation the same stored value under two different pieces of copy".
+ *
+ * ⭐ The reason was the two pieces of copy, and there is now one. Every form
+ * ends with the same `Driver Signature` field, so the same stored value under
+ * the same label is the intended outcome rather than a collision. Six cases
+ * previously asked for nothing at all.
+ *
+ * ⚠️ Rewritten rather than deleted, so the reversal is on the record where the
+ * old claim was.
  */
-check("the two cases' signature fields are distinct",
-  noShowCase.fields.some((f) => f.type === "signature" && f.id !== "driverSignature") ||
-    !noShowCase.fields.some((f) => f.type === "signature"),
-  "a no-show build carries the driver-signature id");
-check("Missed Swipe's signature is its own id",
-  caseFor(["dropoff"], RIDE_2).fields.some((f) => f.id === "driverSignature"),
-  "the driver signature is missing from a drop-off build");
+const SIGNING_CASES = [
+  ["no-show", noShowCase],
+  ["missed swipe, drop-off", caseFor(["dropoff"], RIDE_2)],
+  ["missed swipe, both ends", caseFor(["pickup", "dropoff"], RIDE_1)],
+] as const;
+const signatureIds = new Set(
+  SIGNING_CASES.flatMap(([, c]) => c.fields.filter((f) => f.type === "signature").map((f) => f.id)),
+);
+check("every case signs with the SAME field, not one of its own",
+  signatureIds.size === 1 && signatureIds.has("signature"),
+  `${[...signatureIds].join(", ") || "none"} across ${SIGNING_CASES.length} cases`);
+check("...and exactly one signature per case, at the end",
+  SIGNING_CASES.every(([, c]) => {
+    const sigs = c.fields.filter((f) => f.type === "signature");
+    return sigs.length === 1 && c.fields[c.fields.length - 1].id === "signature";
+  }),
+  SIGNING_CASES.map(([n, c]) => `${n}:${c.fields.filter((f) => f.type === "signature").length}`).join(" "));
 
 check("the anchor→mark map is the production sequence",
   MARK_FOR_ANCHOR.pickup === "pickedUpAt" && MARK_FOR_ANCHOR.dropoff === "droppedOffAt", "");

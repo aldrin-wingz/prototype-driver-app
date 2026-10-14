@@ -1,11 +1,9 @@
 "use client";
 
-import { Check, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getLegStage } from "@/lib/driver-data/mock-trips";
 import type { LegOption } from "@/lib/support-data/leg-options";
 import { tripContextFor } from "@/lib/support-data/trip-context";
-import { DRIVER_NAVY } from "@/constants/driver-app-colors";
 
 /**
  * The trip and leg this request is being filed against.
@@ -78,27 +76,6 @@ export function TripSummaryBanner({ option }: { option: LegOption }) {
           />
         ))}
 
-        {/* ⛔ Which marks we already hold. This IS the rule for the form below:
-            a recorded mark arrives locked, a blank one is one the driver has to
-            supply — so it stays, though it is not one of the named rows. */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-200 pt-3">
-          {context.marks.map((mark) => (
-            <span
-              key={mark.label}
-              className="flex items-center gap-1.5 text-xs"
-              style={mark.recorded ? { color: DRIVER_NAVY } : undefined}
-            >
-              {mark.recorded ? (
-                <Check className="h-3.5 w-3.5 text-[#00B090]" />
-              ) : (
-                <Circle className="h-3.5 w-3.5 text-gray-300" />
-              )}
-              <span className={mark.recorded ? "font-medium" : "text-gray-500"}>
-                {mark.label} {mark.recorded ?? "to supply"}
-              </span>
-            </span>
-          ))}
-        </div>
       </Section>
     </div>
   );

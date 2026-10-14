@@ -119,22 +119,19 @@ function LegPicker({
   const results = searchLegOptions(query, field.legScope).slice(0, 6);
   const selected = value ? findLegOption(value) : undefined;
 
-  // Some flows are about one specific ride and nothing else — a no-show filed from
-  // a ride must stay filed against that ride. Show it as settled context, the same
-  // as a locked member.
-  if (locked && selected) {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5">
-        <p className="text-base font-semibold text-gray-900">
-          {selected.leg.legCode ? `${selected.leg.legCode} Leg · ` : ""}
-          {selected.legId}
-        </p>
-        <p className="text-sm text-gray-500">
-          {selected.trip.rider} · {selected.trip.date} · {selected.leg.time}
-        </p>
-      </div>
-    );
-  }
+  /**
+   * ⛔⛔ **A locked leg renders NOTHING here.**
+   *
+   * It used to render a card — `A Leg · 1049800377` over the rider, date and
+   * time. The context block directly beneath now carries all four of those
+   * facts under headings that say which is which, so the card was the same
+   * information twice, the second time without labels. The sheet still renders
+   * the context block for this field; it just no longer introduces it.
+   *
+   * ⚠️ Only when LOCKED. A driver actually choosing a leg still gets the
+   * picker below — there, the question is real and needs asking.
+   */
+  if (locked && selected) return null;
 
   return (
     <div className="space-y-2">

@@ -34,6 +34,12 @@ export function buildCancelAtDoor(
   const supportCase = buildSupportFormCase({
     includeIssues: [ISSUE_CANCEL_AT_DOOR],
     askWaitTimes: !atPickup,
+    /**
+     * ⛔ The Member No-Show screen is this form's ONLY entry point, and it
+     * takes a signature before the form exists — so asking again would be a
+     * second signature for one claim.
+     */
+    signatureTakenElsewhere: true,
   });
 
   const initialValues: Record<string, string> = {
