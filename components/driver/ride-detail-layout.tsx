@@ -55,11 +55,14 @@ import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import {
+  OVER_CAPACITY_REQUEST_CTA,
   OVER_CAPACITY_SWIPE_LABEL,
   dispatchDialHref,
   isOverCapacity,
   overCapacityHeadline,
+  showsCapacityException,
 } from "@/lib/driver-data/over-capacity";
+import { OverCapacityForm } from "@/components/support/over-capacity-form";
 import {
   CANCELLATION_REQUESTED_DETAIL,
   CANCELLATION_REQUESTED_PILL,
@@ -505,6 +508,7 @@ export function RideDetailLayout({
   const [preferredFormOpen, setPreferredFormOpen] = useState(false);
   const [tripChangeOpen, setTripChangeOpen] = useState(false);
   const [addLegOpen, setAddLegOpen] = useState(false);
+  const [capacityFormOpen, setCapacityFormOpen] = useState(false);
   const [dropOffReading, setDropOffReading] = useState<number | null>(null);
   const [missedSwipeAsks, setMissedSwipeAsks] = useState<SwipeAnchor[] | null>(
     null
@@ -1192,20 +1196,49 @@ export function RideDetailLayout({
         ) : null
       ) : state === "before-taken" && isOverCapacity(trip) ? (
         /*
-          ⭐⭐ Catalogue rows 11 and 12 — production's over-capacity screen, and
-          it is NOT a block. `CAP-340`: the accept control is simply absent, and
-          where SWIPE TO ACCEPT would be there is a pink swipe that dials
+          ⭐⭐ Catalogue rows 11, 12 and 13 — production's over-capacity screen,
+          and it is NOT a block. `CAP-340`: the accept control is simply absent,
+          and where SWIPE TO ACCEPT would be there is a pink swipe that dials
           dispatch. A block at least says what went wrong; this says only *over
           capacity* and a reference number, and hands the driver a telephone.
-          That call IS what rows 11 and 12 exist to remove.
+          That call IS what rows 11, 12 and 13 exist to remove.
 
-          ⛔ Now-only. Both rows are `no-app-surface`, so there is no proposed
-          side, no toggle, and `showsProposal` is never consulted here — there
-          is nothing to gate.
+          ⛔⛔ **ONE region is gated, and it is this footer.** The screen, the
+          missing accept control and the `Over Capacity Trip #` line are all
+          production's and stay on both sides — gating any of them would make
+          the prototype claim production has no over-capacity screen, which the
+          capture disproves. Row 13 replaces the telephone with a request; rows
+          11 and 12 still propose backend work and still show the telephone.
 
-          ⚠️ A real `tel:` href, because a prototype that only SAYS it would
-          dial cannot be told apart from one that does nothing.
+          ⚠️ A real `tel:` href on the Now side, because a prototype that only
+          SAYS it would dial cannot be told apart from one that does nothing.
         */
+        showsCapacityException(demo) ? (
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            {pendingRequest ? (
+              /*
+                ⛔ The SAME amber chip every other pending case swaps in, not a
+                bespoke one. The driver has filed a request and the trip is
+                still unacceptable; a footer that changed shape here would
+                suggest something else had happened.
+              */
+              <div className="flex h-14 items-center justify-center gap-2 rounded-full bg-[#FEF3C7]">
+                <Hourglass className="h-5 w-5 text-[#92400E]" />
+                <span className="text-sm font-bold uppercase text-[#92400E]">
+                  Pending Support Review
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCapacityFormOpen(true)}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#282828] text-sm font-bold uppercase tracking-wide text-white"
+              >
+                {OVER_CAPACITY_REQUEST_CTA}
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <a
             href={dispatchDialHref()}
@@ -1224,6 +1257,7 @@ export function RideDetailLayout({
             </span>
           </a>
         </div>
+        )
       ) : state === "before-taken" ? (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <div className="relative flex h-14 items-center justify-center overflow-hidden rounded-full">
@@ -1431,6 +1465,15 @@ export function RideDetailLayout({
         leg={activeLeg}
         open={addLegOpen}
         onOpenChange={setAddLegOpen}
+      />
+
+      {/* ⛔ No `onSubmitted` navigation. The request has not been accepted and
+          there is nowhere to go — the driver stays on the screen they were
+          arguing with, which now says Support has it. */}
+      <OverCapacityForm
+        trip={trip}
+        open={capacityFormOpen}
+        onOpenChange={setCapacityFormOpen}
       />
 
       {/* ⛔ No `onSubmitted` navigation — the driver is already on the ride, and

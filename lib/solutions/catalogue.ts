@@ -498,8 +498,17 @@ export const SOLUTIONS: Solution[] = [
       "An in-app over-capacity request in place of the dispatch phone number: the screen names the accepted trips already holding the vehicle's seats, asks the driver why this one still fits, and sends that to Support",
     tableSummary: "Name what is holding the seats, and ask why this one fits.",
     klass: "form",
-    buildState: "not-yet",
-    entry: null,
+    buildState: "in-prototype",
+    /**
+     * ⚠️ The SAME route as `nowEntry`, which no other row does. Both sides are
+     * the same screen — only the footer changes — so sending the two sides to
+     * different places would invent a difference the proposal does not make.
+     */
+    entry: {
+      route: "/requests/REQ-OVERCAP-001",
+      label:
+        "Open the over-capacity request. The telephone is gone: tap Request a capacity exception to see which accepted trips are holding the seats, how short the record is, and to say why this one still fits. ⛔ Sending it accepts nothing — the trip stays in Requests until Support releases it.",
+    },
     nowEntry: {
       route: "/requests/REQ-OVERCAP-001",
       label:
@@ -975,17 +984,33 @@ export function modeFor(solution: Solution | undefined, wanted: DemoMode): DemoM
  * Where focusing this row should land, for the side being shown.
  *
  * ⛔ `nowEntry` wins on `"now"` and `entry` wins on `"fixed"`, each falling
- * back to the other before `SOLUTION_HOME`. No row carries both today, so this
- * is identical to the old `entry?.route ?? SOLUTION_HOME` for all 24 of them —
- * and a check asserts that, because a rule that changed 24 rows while adding
- * two would be a refactor wearing a feature's clothes.
+ * back to the other before `SOLUTION_HOME`. Only row 13 carries both, and both
+ * of its entries point at the same screen, so this is identical to the old
+ * `entry?.route ?? SOLUTION_HOME` for every row — and a check asserts that,
+ * because a rule that changed 27 rows while adding one would be a refactor
+ * wearing a feature's clothes.
+ *
+ * ⛔⛔ **`entryFor` is the whole entry, not just its route, and the strip reads
+ * it.** Walked and found 2026-10-15: the briefing printed `entry.label`
+ * unconditionally, so row 13 — the first row ever to carry both — described
+ * its PROPOSAL while standing on production's side. "The telephone is gone"
+ * over a screen whose only control is a telephone. `entryRouteFor` delegates
+ * here so the route and the words can never name different sides.
  */
-export function entryRouteFor(solution: Solution, mode: DemoMode): string {
-  const preferred =
-    mode === "now"
+export function entryFor(solution: Solution, mode: DemoMode): SolutionEntry | undefined {
+  // ⚠️ `?? undefined` because `entry` is `null` for a row with no proposal and
+  // `nowEntry` is absent — two spellings of "nothing" that a caller testing
+  // truthiness would not notice, and a return type mixing them would make the
+  // strip's `{shownEntry && …}` render `null` as a legal value.
+  return (
+    (mode === "now"
       ? solution.nowEntry ?? solution.entry
-      : solution.entry ?? solution.nowEntry;
-  return preferred?.route ?? SOLUTION_HOME;
+      : solution.entry ?? solution.nowEntry) ?? undefined
+  );
+}
+
+export function entryRouteFor(solution: Solution, mode: DemoMode): string {
+  return entryFor(solution, mode)?.route ?? SOLUTION_HOME;
 }
 
 /** Share of categorised calls this entry's subject area accounts for. */

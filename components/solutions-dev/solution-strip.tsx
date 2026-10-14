@@ -8,6 +8,7 @@ import {
   CLASS_LABEL,
   CLEAR_FOCUS_LABEL,
   buildStateLabel,
+  entryFor,
   formatShare,
   SOLUTIONS,
 } from "@/lib/solutions/catalogue";
@@ -55,7 +56,13 @@ function Column({ heading, children }: { heading: string; children: React.ReactN
 }
 
 export function SolutionStrip() {
-  const { active, clear, setPickerOpen } = useSolution();
+  const { active, mode, clear, setPickerOpen } = useSolution();
+  /**
+   * ⛔⛔ The entry for the side ON SCREEN, never `active.entry`. Row 13 carries
+   * both an `entry` and a `nowEntry`, and reading the proposal's words over
+   * production's screen is exactly the half-truth the toggle exists to remove.
+   */
+  const shownEntry = active ? entryFor(active, mode) : undefined;
   const router = useRouter();
   /**
    * ⚠️ Collapsible because of narrow viewports, not as decoration. Side by
@@ -166,15 +173,15 @@ export function SolutionStrip() {
                 {active.noSurfaceReason}
               </p>
             )}
-            {active.entry && (
+            {shownEntry && (
               <div className={cn("mt-1 px-2", !briefingOpen && "hidden")}>
                 <p className="text-[11px] leading-snug text-[#7D9A92]">
-                  {active.entry.label}
+                  {shownEntry.label}
                 </p>
                 {/* A slice can have more than one state worth seeing. Rider
                     No-Show has two branches of one check, and showing only the
                     form branch demonstrates half the case. */}
-                {active.entry.alternates?.map((alternate) => (
+                {shownEntry.alternates?.map((alternate) => (
                   <button
                     key={alternate.route}
                     type="button"

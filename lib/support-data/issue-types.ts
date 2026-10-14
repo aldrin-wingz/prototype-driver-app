@@ -65,6 +65,7 @@ export const ISSUE_SEND_BACK_REASON = "send-back-reason";
 export const ISSUE_RIDER_DECLINED = "rider-declined";
 export const ISSUE_TRIP_CHANGE_REQUEST = "trip-change-request";
 export const ISSUE_ADD_LEG_REQUEST = "add-leg-request";
+export const ISSUE_OVER_CAPACITY_EXCEPTION = "over-capacity-exception";
 
 /**
  * The support issues a driver can file.
@@ -210,6 +211,21 @@ export const SUPPORT_ISSUE_TYPES: SupportIssueType[] = [
     visibility: "hidden",
     buildState: "in-prototype",
     note: "Entered from the Add Leg to Trip tile in More Options, or — for a leg that is already finished — the one dedicated button on the completed ride. ⛔ Submitting adds NOTHING to the manifest; the client owns it. The group gains a 'Leg requested' banner naming the position asked for and which existing legs would shift.",
+  },
+  {
+    value: ISSUE_OVER_CAPACITY_EXCEPTION,
+    label: "Over Capacity — Asking to Take It Anyway",
+    // ⚠️ No ⛔ markers in here — a driver reads this line under the form title.
+    // It has to say the thing the screen it replaces never said: WHY the trip
+    // cannot be accepted. Production offers only the words "Over Capacity", a
+    // reference number and a telephone.
+    description:
+      "This trip needs more seats than your record says you have, counting the trips you have already accepted around it. Tell us why you can still take it and Support will check. Sending this does not accept the trip.",
+    // Hidden like the rest: the only entry point is the request screen itself,
+    // which already knows which trip and which issue.
+    visibility: "hidden",
+    buildState: "in-prototype",
+    note: "Entered from the over-capacity request screen, in place of production's SWIPE TO CALL DISPATCH. ⛔ Submitting accepts NOTHING — the trip stays in Requests until Support releases it. ⭐ The 'my vehicle has more seats' answer IS catalogue row 11's data cleanse, collected as a question rather than a phone call.",
   },
 ];
 

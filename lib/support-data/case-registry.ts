@@ -9,8 +9,18 @@ import {
   ISSUE_SEND_BACK_REASON,
   ISSUE_TRIP_CHANGE_REQUEST,
   ISSUE_ADD_LEG_REQUEST,
+  ISSUE_OVER_CAPACITY_EXCEPTION,
 } from "./issue-types";
 import { toTimeInputValue } from "@/lib/support/prefill";
+import {
+  OC_REASON_MORE_SEATS,
+  OC_REASON_OTHER,
+  OVER_CAPACITY_REASONS,
+  OVER_CAPACITY_REASON_LABEL,
+  OVER_CAPACITY_SEATS_HELP,
+  OVER_CAPACITY_SEATS_TITLE,
+} from "@/lib/driver-data/over-capacity";
+import type { SeatBlockConfig } from "@/types/support";
 import { addLegBlockGroup } from "@/lib/driver-data/add-leg-request";
 import {
   DECLINE_CHANNELS,
@@ -113,6 +123,10 @@ const ONLY_TRIP_CHANGE = {
 const ONLY_ADD_LEG = {
   field: "issue",
   equals: [ISSUE_ADD_LEG_REQUEST],
+};
+const ONLY_OVER_CAPACITY = {
+  field: "issue",
+  equals: [ISSUE_OVER_CAPACITY_EXCEPTION],
 };
 
 /**
@@ -231,6 +245,7 @@ export function buildSupportFormCase({
   riderDeclined,
   tripChange,
   addLeg,
+  overCapacity,
 }: {
   /**
    * Issues to offer even though they are hidden.
@@ -365,6 +380,22 @@ export function buildSupportFormCase({
     /** Set when the chosen slot contradicts the pick-up time. */
     slotWarning?: string;
   };
+  /**
+   * Build the over-capacity exception request — catalogue row 13.
+   *
+   * ⚠️ Carries the assembled `SeatBlockConfig`, like `addLeg` carries its
+   * `legOrder` and for the same reason: which accepted trips overlap, how many
+   * seats they hold at once and how short the record is are rules living in
+   * `lib/driver-data/over-capacity.ts`, and this builder has neither the
+   * manifest nor the request to work them out from.
+   *
+   * ⛔ Never `{ blocks: [] }` as a stand-in for "not this case". A request can
+   * genuinely be over capacity with NOTHING overlapping it — a wheelchair plus
+   * three escorts in a five-seat vehicle needs no help being too big — and the
+   * panel says so instead of listing nothing. Absent means a different case;
+   * empty rows mean this one, with the vehicle on its own.
+   */
+  overCapacity?: { seatBlocks: SeatBlockConfig };
 } = {}): SupportCaseDefinition {
   const asksPickup = missedSwipe?.some((a) => a.anchor === "pickup") ?? false;
   const asksDropoff = missedSwipe?.some((a) => a.anchor === "dropoff") ?? false;
@@ -403,7 +434,9 @@ export function buildSupportFormCase({
       : undefined,
     resolution: "cs-queue",
     successMessage: "Sent to Support",
-    zendeskEquivalent: addLeg
+    zendeskEquivalent: overCapacity
+      ? "Over capacity — exception request"
+      : addLeg
       ? "Add a leg to a trip"
       : tripChange
       ? "Trip change request"
@@ -1461,6 +1494,100 @@ export function buildSupportFormCase({
                 "e.g. I can be back in the area after 2pm if it helps",
               maxLength: 500,
               showIf: ONLY_SEND_BACK,
+            },
+          ] as SupportCaseDefinition["fields"])
+        : []),
+
+      // ---- Over capacity: why you can still take it ---------------------
+      //
+      // Catalogue row 13 — `Trip / Ride Assignment`, 610 calls, shared with
+      // rows 11 and 12. The user's answer, 2026-10-15: *"instead of swipe and
+      // then it will call make it a submit form where it will show the trips
+      // that are blocking them from taking it and then them to give a reason
+      // why they can take another"*.
+      //
+      // ⛔⛔ **Submitting accepts NOTHING.** The trip stays in Requests and
+      // stays unacceptable until Support releases it. What this removes is the
+      // phone call `CAP-340` hands the driver instead of an accept control —
+      // not the block itself.
+      //
+      // ⭐ The panel comes FIRST, before the question. The driver is being
+      // asked to argue against a refusal, and production never told them what
+      // the refusal was made of — only the words "Over Capacity" and a
+      // reference number. Asking the question above the evidence would repeat
+      // that.
+      ...(overCapacity
+        ? ([
+            {
+              id: "seatBlocks",
+              type: "seat-blocks",
+              label: OVER_CAPACITY_SEATS_TITLE,
+              helpText: OVER_CAPACITY_SEATS_HELP,
+              seatBlocks: overCapacity.seatBlocks,
+              // ⛔ Never `required`. It collects nothing; a required field with
+              // no value can never be satisfied and would disable Submit for
+              // the life of the form.
+              showIf: ONLY_OVER_CAPACITY,
+            },
+            {
+              id: "exceptionReason",
+              type: "select",
+              label: OVER_CAPACITY_REASON_LABEL,
+              shortLabel: "your reason",
+              placeholder: "Select:",
+              required: true,
+              options: [...OVER_CAPACITY_REASONS],
+              showIf: ONLY_OVER_CAPACITY,
+            },
+            {
+              /**
+               * ⭐⭐ **This single field IS catalogue row 11.** Row 11 proposes
+               * a one-off cleanse of stored vehicle capacity; a driver who has
+               * just said their vehicle has more seats than the record shows is
+               * reporting precisely that record, and this is the value to clean
+               * it to. The driver never has to know they filed a data
+               * correction.
+               *
+               * ⛔ Gated on the ANSWER, like every other escape hatch here, and
+               * safe for the same reason: `exceptionReason` is itself gated on
+               * this issue, so it can hold a value on no other case.
+               */
+              id: "actualSeats",
+              type: "stepper",
+              label: "How many seats does it actually have?",
+              shortLabel: "your vehicle's real seat count",
+              required: true,
+              min: 1,
+              max: 15,
+              // ⚠️ Opens on the record's own number rather than blank, so the
+              // driver corrects a value instead of inventing one — and so the
+              // before → after line under it has a BEFORE to show.
+              defaultValue: String(overCapacity.seatBlocks.seatsOnRecord),
+              previousValue: String(overCapacity.seatBlocks.seatsOnRecord),
+              showIf: {
+                field: "exceptionReason",
+                equals: [OC_REASON_MORE_SEATS],
+              },
+            },
+            {
+              id: "exceptionReasonOther",
+              type: "text",
+              label: "Tell us what makes it fit",
+              placeholder: "In a few words",
+              required: true,
+              showIf: {
+                field: "exceptionReason",
+                equals: [OC_REASON_OTHER],
+              },
+            },
+            {
+              id: "exceptionNotes",
+              type: "textarea",
+              label: "Anything else Support should know? (optional)",
+              placeholder:
+                "e.g. two of them are in the same wheelchair space and one is an escort",
+              maxLength: 500,
+              showIf: ONLY_OVER_CAPACITY,
             },
           ] as SupportCaseDefinition["fields"])
         : []),

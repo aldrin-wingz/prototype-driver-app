@@ -26,6 +26,7 @@ import {
   COVERED_CALLS,
   demonstrableSides,
   entryRouteFor,
+  entryFor,
   findSolution,
   hasProposedSide,
   isDemonstrable,
@@ -43,6 +44,18 @@ import {
   OVER_CAPACITY_PREFIX,
   OVER_CAPACITY_PROVENANCE,
   OVER_CAPACITY_SOLUTIONS,
+  OVER_CAPACITY_EXCEPTION_SOLUTIONS,
+  OVER_CAPACITY_REASONS,
+  OC_REASON_MORE_SEATS,
+  OC_REASON_FINISHES_FIRST,
+  VEHICLE_SEATS_ON_RECORD,
+  arithmeticSaysOver,
+  blockingTrips,
+  peakSeatWindow,
+  peakSeatsHeld,
+  seatsNeeded,
+  tripWindow,
+  showsCapacityException,
   OVER_CAPACITY_SWIPE_LABEL,
   dispatchDialHref,
   isOverCapacity,
@@ -182,6 +195,7 @@ import {
 import {
   ISSUE_RIDER_DECLINED,
   ISSUE_SEND_BACK_REASON,
+  ISSUE_OVER_CAPACITY_EXCEPTION,
 } from "../lib/support-data/issue-types";
 import {
   ARTIFACT_CHANNELS,
@@ -216,8 +230,12 @@ import {
   hasRequiredChange,
   isFieldVisible,
   CHECKED,
+  NON_INPUT_FIELD_TYPES,
+  collectsAnswer,
 } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
+import { ID_BADGE } from "../lib/driver-data/id-badge";
+import { buildOverCapacityException } from "../components/support/over-capacity-form";
 import {
   ISSUE_ADD_LEG_REQUEST,
   ISSUE_TRIP_CHANGE_REQUEST,
@@ -1032,7 +1050,7 @@ check(
  */
 const EXPECTED_RIDE_ROUTES = 21;  // ⭐ +1 on 2026-10-15: row 19's cancelled ride
 /** `/requests` (row 10) ×2, plus row 16's `/options/account`. */
-const EXPECTED_SURFACE_ROUTES = 5;  // ⭐ +1 on 2026-10-15: row 19's entry, /my-rides itself
+const EXPECTED_SURFACE_ROUTES = 6;  // ⭐ +1 on 2026-10-15: row 19's entry, /my-rides itself; +1: row 13's request screen
 check(
   "...and the two kinds of route were counted as declared",
   `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
@@ -1256,6 +1274,10 @@ for (const [id, expected] of Object.entries(EXPECTED_NEEDS_ACTION)) {
 const EXPECTED_UPCOMING: Record<string, number> = {
   // Ten still on and three cancelled — the manifest row 19 argues over.
   "my-rides-cancelled": 13,
+  // ⭐ Row 13's two blocking rides. They are not the demo — the demo is the
+  // REQUEST screen — but they are what its evidence panel names, and a reviewer
+  // who opens My Rides after focusing row 13 has to find them.
+  "over-capacity-exception": 2,
 };
 for (const [id, expected] of Object.entries(EXPECTED_UPCOMING)) {
   const shown = ridesForSolution(mockUpcomingTrips, id);
@@ -2172,6 +2194,13 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
    * showing the argument's backdrop instead of the argument.
    */
   "my-rides-cancelled": "upcoming",
+  /**
+   * ⚠️ Upcoming, and it is NOT where the demo is. Row 13's entry is the
+   * request screen; the two Upcoming rides are the trips its panel names. A
+   * reviewer who focuses row 13 and then opens My Rides has to land on them,
+   * which is what this rule is for.
+   */
+  "over-capacity-exception": "upcoming",
 };
 /**
  * ⚠️ Row 16 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
@@ -6741,6 +6770,14 @@ const GATES: Array<{
   { name: "showsMemberFilter", owners: ["auto-assign-request", "request-feed-member-filter"], shown: (f) => showsMemberFilter(f) },
   /** ⭐ Added 2026-10-15 — row 19. The lists, the bar and the Acknowledge button. */
   { name: "showsCancelledRides", owners: ["my-rides-cancelled"], shown: (f) => showsCancelledRides(f) },
+  /**
+   * ⭐ Added 2026-10-15 — row 13. ⛔ Owned by ONE row, not the three that share
+   * the screen: rows 11 and 12 propose backend work and still show production's
+   * telephone, so lighting the request form on them would be two proposals in
+   * one flow reading as one feature. Written out as a literal rather than
+   * imported, so this compares the gate to the declaration and not to itself.
+   */
+  { name: "showsCapacityException", owners: ["over-capacity-exception"], shown: (f) => showsCapacityException(f) },
   { name: "buildOptionsRows", owners: ["account-self-service"], inPlainMirror: false, shown: (f) => buildOptionsRows(f).some((r) => r.proposed) },
   { name: "reachOptionsFor/standard", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(false, f).some((o) => o.proposed) },
   { name: "reachOptionsFor/same-day", owners: ["tag-number-invalid", "cannot-reach-member"], shown: (f) => reachOptionsFor(true, f).some((o) => o.proposed) },
@@ -6776,7 +6813,7 @@ check(
   `${GATES.length} gate(s) x ${FOCUS_IDS.length} focus(es) x ${DEMO_MODES.length} mode(s)`,
   gateSweep === GATES.length * FOCUS_IDS.length * DEMO_MODES.length &&
     FOCUS_IDS.length === EXPECTED_ROWS + 1 &&
-    GATES.length === 14,
+    GATES.length === 15,
 );
 /**
  * ⛔ Non-vacuity: a sweep where every gate said `false` everywhere would agree
@@ -6844,7 +6881,7 @@ for (const want of PRE_B1) {
  * rest, and together they have to account for every gate. A gate in NEITHER is
  * a gate whose behaviour nothing here describes.
  */
-const ADDED_AFTER_B1 = ["showsMemberFilter", "showsCancelledRides"];
+const ADDED_AFTER_B1 = ["showsMemberFilter", "showsCancelledRides", "showsCapacityException"];
 check(
   "with the mode pinned to fixed, every gate answers what it answered before B1",
   movedBehaviour.length
@@ -7288,8 +7325,8 @@ check(
  * one above stops being empty. Both edits, or the pair disagrees.
  */
 const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
-const EXPECTED_WITH_NOW = 13;  // ⭐ +1 on 2026-10-15: row 19
-const EXPECTED_BUILT = 13;  // ⭐ +1 on 2026-10-15: row 19
+const EXPECTED_WITH_NOW = 14;  // ⭐ +1 on 2026-10-15: row 19; +1: row 13
+const EXPECTED_BUILT = 14;  // ⭐ +1 on 2026-10-15: row 19; +1: row 13
 check(
   "...and every built row has a production side to compare against",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
@@ -8186,7 +8223,16 @@ check(
  * reachability claim is the mistake that let row 10's production side ship
  * unreachable.
  */
-const PROPOSED_ONLY = ["request-feed-member-filter", "vehicle-capacity-backend", "over-capacity-exception"];
+/**
+ * ⚠️ Three as of 2026-10-15. Rows 12 and 13 both sit under the Use Case cell
+ * row 11 draws — the over-capacity run is three rows long now — so neither
+ * draws one of its own and both are reached by their Proposed Feature cell.
+ */
+const PROPOSED_ONLY = [
+  "request-feed-member-filter",
+  "vehicle-capacity-backend",
+  "over-capacity-exception",
+];
 const proposedOnly = [...reachableBy]
   .filter(([id, cols]) => isDemonstrable(findSolution(id)!) && !cols.has("use-case"))
   .map(([id]) => id)
@@ -8196,7 +8242,7 @@ const reachDrift = [
   ...proposedOnly.filter((id) => !PROPOSED_ONLY.includes(id)).map((id) => `+${id}`),
 ];
 check(
-  "...and exactly the rows under a merged use case draw no cell of their own",
+  "...and exactly the three rows under a merged use case draw no cell of their own",
   reachDrift.length
     ? `DRIFT: ${reachDrift.join(" ")}`
     : `${proposedOnly.length} of ${EXPECTED_TABLE_ROWS} — ${proposedOnly.join(", ")}`,
@@ -8291,7 +8337,7 @@ const INERT_ROWS = [
   "otp-exclusion",
 ];
 /** Rows with one side: production's screen, and no proposal built. */
-const SINGLE_SIDED = ["vehicle-capacity-cleanse", "vehicle-capacity-backend", "over-capacity-exception"];
+const SINGLE_SIDED = ["vehicle-capacity-cleanse", "vehicle-capacity-backend"];
 /**
  * ⛔ Both lists checked against the rule, in both directions. A list that
  * merely happened to match today would stop matching silently the first time a
@@ -8460,7 +8506,7 @@ check(
     : `${INERT_ROWS.length} greyed, ${SINGLE_SIDED.length} one-sided, ` +
       `${SOLUTIONS.length - INERT_ROWS.length - SINGLE_SIDED.length} with both sides`,
   sidedDrift.length === 0 &&
-    INERT_ROWS.length + SINGLE_SIDED.length + 13 === EXPECTED_TABLE_ROWS,
+    INERT_ROWS.length + SINGLE_SIDED.length + 14 === EXPECTED_TABLE_ROWS,
 );
 /**
  * ⛔⛔ **A greyed row really has nothing** — not an entry, not a `nowEntry`,
@@ -8578,10 +8624,47 @@ check(
     : "gone from the table (the strip still carries it below 1280)",
   !B6_TABLE_CODE.includes("entry.label"),
 );
+/**
+ * ⛔⛔ **...and it names the side ON SCREEN**, which it did not until
+ * 2026-10-15. The strip read `active.entry.label` unconditionally, which was
+ * harmless while no row carried both an `entry` and a `nowEntry` — and the
+ * moment row 13 did, the briefing read *"The telephone is gone"* over
+ * production's screen, whose only control is a telephone. Found by walking.
+ *
+ * ⚠️ So the property is no longer "it mentions a label" but "it reads
+ * `entryFor`, and reads `active.entry` nowhere". Both halves matter: a strip
+ * that called `entryFor` and then printed `active.entry.label` beside it would
+ * pass the first and fail the driver.
+ */
+const STRIP_CODE = codeOnly(STRIP_SRC);
 check(
   "...and the strip, which is the only surface below 1280, still carries it",
-  codeOnly(STRIP_SRC).includes("entry.label") ? "kept" : "DELETED — the briefing lost its entry note on a phone",
-  codeOnly(STRIP_SRC).includes("entry.label"),
+  `entryFor: ${STRIP_CODE.includes("entryFor(active, mode)")}; ` +
+    `label: ${STRIP_CODE.includes("shownEntry.label")}; ` +
+    `raw active.entry: ${/active\.entry\b/.test(STRIP_CODE)}`,
+  STRIP_CODE.includes("entryFor(active, mode)") &&
+    STRIP_CODE.includes("shownEntry.label") &&
+    !/active\.entry\b/.test(STRIP_CODE),
+);
+/**
+ * ⛔ And the two sides really do say different things for the row that has
+ * both, or the fix above is a refactor nothing depends on.
+ */
+const rfBoth = SOLUTIONS.filter((row) => row.entry && row.nowEntry);
+check(
+  "...and the one row with both sides describes each of them differently",
+  rfBoth
+    .map((r) => `${r.order}: now "${entryFor(r, "now")!.label.slice(0, 28)}…" vs fixed "${entryFor(r, "fixed")!.label.slice(0, 28)}…"`)
+    .join("; ") || "NO ROW CARRIES BOTH",
+  rfBoth.length === 1 &&
+    rfBoth.every(
+      (r) => entryFor(r, "now")!.label !== entryFor(r, "fixed")!.label,
+    ) &&
+    // ⛔ ...while every row with only one entry is unmoved by the mode, or
+    // this rule changed 27 rows while fixing one.
+    SOLUTIONS.filter((r) => !(r.entry && r.nowEntry)).every(
+      (r) => entryFor(r, "now") === entryFor(r, "fixed"),
+    ),
 );
 check(
   "...and the alternates kept their buttons, now reading the short label",
@@ -9322,9 +9405,9 @@ check(
     `${SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length} can show one, ` +
     `${proposalVsPrototype.length} row(s) differ`,
   SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - 3 &&
-    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 13 &&
+    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 14 &&
     // ⭐ They must genuinely differ, or one is the other under a new name.
-    proposalVsPrototype.length === 12,
+    proposalVsPrototype.length === 11,
 );
 /**
  * ⛔ And the greying is driven by the rule, not by a second opinion in the
@@ -9342,26 +9425,50 @@ check(
     !/buildState\s*===/.test(TABLE_GREY),
 );
 /**
- * ⛔ The over-capacity screen is NOT gated on a mode, because there is nothing
- * to gate. A `showsProposal` call reaching it would be a gate on a proposal
- * that does not exist, and would hide production's own screen on one side.
- */
-/**
- * ⚠️ The whole file, not `codeOnly` — this asserts an ABSENCE, and the
- * comments here are about why there is no gate, so stripping them would be
- * stripping the thing most likely to mention one. It costs a false positive if
- * someone writes `showsProposal(` in prose; that is the right way round.
+ * ⛔⛔ **Exactly ONE region of the over-capacity screen is gated, and it is the
+ * footer.**
+ *
+ * This check used to assert the opposite — that the file consulted no gate at
+ * all — and it was right until 2026-10-15, when row 13 gave the screen a
+ * proposed side. What has not changed is the reason it existed: the screen
+ * itself, the absent accept control and the `Over Capacity Trip #` line are
+ * production's, photographed in `CAP-340`, and gating any of them would make
+ * the prototype claim production has no over-capacity screen.
+ *
+ * ⚠️ So the property is now a COUNT, not an absence. One call site in the
+ * layout means one gated region; two would mean something else moved with the
+ * toggle, and a reviewer comparing the sides could not tell which change was
+ * the proposal.
  */
 const OC_RULES_SRC = readFileSync(join(ROOT, "lib/driver-data/over-capacity.ts"), "utf8");
-const OC_GATE = /showsProposal\(|\bDemoFocus\b|\bDemoMode\b/;
+const ocGateCalls = [...OC_CODE.matchAll(/showsCapacityException\(/g)].length;
 check(
-  "the over-capacity surface consults no proposal gate",
-  OC_GATE.test(OC_RULES_SRC)
-    ? `GATED (${OC_RULES_SRC.match(OC_GATE)?.[0]}) — a proposal that does not exist is being switched on`
-    : "ungated, because there is no proposal",
-  !OC_GATE.test(OC_RULES_SRC) &&
-    // ⛔ Positive control: the file really was read, and really does hold the
-    // surface. An empty string passes every absence test ever written.
+  "exactly one region of the over-capacity screen is gated",
+  `${ocGateCalls} call site(s) in ride-detail-layout; ` +
+    `production copy still unconditional: ${!/showsCapacityException\([^)]*\)\s*&&\s*[^?]*OVER_CAPACITY_SWIPE_LABEL/.test(OC_CODE)}`,
+  ocGateCalls === 1 &&
+    // ⛔ Positive control: the file really was read and really does hold the
+    // production copy. An empty string passes every absence test ever written.
+    OC_CODE.includes("OVER_CAPACITY_SWIPE_LABEL") &&
+    OC_CODE.includes("dispatchDialHref()"),
+);
+/**
+ * ⛔⛔ ...and the gate names ONE row, not the three that share the screen.
+ * Rows 11 and 12 propose a data cleanse and a backend path; lighting the
+ * request form while a reviewer stands on either of them is the "two proposals
+ * in one flow read as one feature" trap `showsProposal` exists to prevent.
+ *
+ * ⚠️ Compared against a literal written here, never against the module's own
+ * constant — a count exported beside the thing it counts is a restatement.
+ */
+check(
+  "...and it is switched on by row 13 alone",
+  `${OVER_CAPACITY_EXCEPTION_SOLUTIONS.join(", ")} (screen serves ${OVER_CAPACITY_SOLUTIONS.length})`,
+  OVER_CAPACITY_EXCEPTION_SOLUTIONS.join(",") === "over-capacity-exception" &&
+    // ⛔ And the two lists really are different, or one is the other renamed.
+    OVER_CAPACITY_SOLUTIONS.length === 3 &&
+    OC_ROWS.every((id) => !OVER_CAPACITY_EXCEPTION_SOLUTIONS.includes(id)) &&
+    // ⛔ The file still holds the production copy it is not allowed to gate.
     OC_RULES_SRC.includes("OVER_CAPACITY_SWIPE_LABEL"),
 );
 /** ⚠️ ...but the rows are still named, so the scenario ride can claim them. */
@@ -9513,7 +9620,7 @@ check(
   builtUnchanged.length
     ? `DECORATIVE on ${builtUnchanged.length} of ${builtRows.length}: ${builtUnchanged.map((r) => `${r.order} ${r.id}`).join(", ")}`
     : `${builtRows.length} of ${builtRows.length} built row(s) change something`,
-  builtUnchanged.length === 0 && builtRows.length === 13,
+  builtUnchanged.length === 0 && builtRows.length === 14,
 );
 /**
  * ⛔⛔ **The measurement against the list.** `ROWS_AWAITING_NOW` is a line
@@ -9550,7 +9657,7 @@ check(
   unbuiltThatMoved.length
     ? `MOVED: ${unbuiltThatMoved.map((r) => `${r.order} ${r.id} (${rowChanges.get(r.id)!.join(", ")})`).join("; ")}`
     : `0 of ${unbuiltRows.length} unbuilt row(s) move`,
-  unbuiltThatMoved.length === 0 && unbuiltRows.length === 15,
+  unbuiltThatMoved.length === 0 && unbuiltRows.length === 14,
 );
 /**
  * ⛔ And the plain mirror is on no side at all, so it cannot move either. This
@@ -9600,10 +9707,11 @@ check(
  * says. There is exactly one, and it has a reason.
  *
  * `route` is `entryRouteFor`, which differs between the two sides only for a
- * row carrying BOTH an `entry` and a `nowEntry`. No row does today: rows 11 and
- * 12 have a `nowEntry` and no `entry`, so they land in the same place on either
- * reading. It stays in the fingerprint so that the first row to carry both is
- * measured rather than assumed — but it is declared inert until then.
+ * row carrying BOTH an `entry` and a `nowEntry` and pointing them at different
+ * screens. ⭐ Row 13 is the first row to carry both, added 2026-10-15 — and it
+ * points them at the SAME screen, because only its footer differs between the
+ * sides. So `route` is still inert, and now for a measured reason rather than
+ * for want of a row to measure.
  */
 const INERT_SURFACES = ["route"];
 const allSurfaces = Object.keys(surfaceFingerprint(SOLUTIONS[0], "now"));
@@ -9618,8 +9726,21 @@ check(
     : `${INERT_SURFACES.length} inert — ${INERT_SURFACES.join(", ")}; ` +
       `${surfacesTouched.size} live of ${allSurfaces.length}`,
   inertDrift.length === 0 &&
-    // ⚠️ ...and `route` is inert for the reason claimed, not by accident.
-    SOLUTIONS.filter((row) => row.entry && row.nowEntry).length === 0,
+    /**
+     * ⭐⭐ ...and `route` is inert for the reason claimed, not by accident —
+     * and the reason CHANGED on 2026-10-15. Row 13 is the first row ever to
+     * carry both an `entry` and a `nowEntry`, which is the case this line was
+     * written to catch. It is still inert, for a better reason: both of row
+     * 13's entries point at the SAME screen, because only the footer differs
+     * between the sides. A row carrying both and pointing them at different
+     * routes would move `route`, and this would fail.
+     */
+    SOLUTIONS.filter(
+      (row) => row.entry && row.nowEntry && row.entry.route !== row.nowEntry.route,
+    ).length === 0 &&
+    // ⛔ Non-vacuity: some row really does carry both, or the clause above is
+    // true of an empty set and proves nothing.
+    SOLUTIONS.filter((row) => row.entry && row.nowEntry).length === 1,
 );
 
 
@@ -9676,6 +9797,16 @@ const HEADING_CASES: Array<{ why: string; built: ReturnType<typeof buildSupportF
   { why: "send-back reason", built: buildSupportFormCase({ includeIssues: [ISSUE_SEND_BACK_REASON], sendBack: true }) },
   { why: "rider no-show", built: buildSupportFormCase({ askNoShowType: true, signatureTakenElsewhere: false }) },
   { why: "rider declined", built: buildSupportFormCase({ includeIssues: [ISSUE_RIDER_DECLINED], riderDeclined: { legOptions: [] } }) },
+  /**
+   * ⭐ Added 2026-10-15 — and it is the only case in this list carrying a
+   * NON-INPUT field, which §29b's help-text exemption had until now never
+   * swept. The exemption existed for `notice`, and no case in the list had one;
+   * the clause was true of an empty set for four slices.
+   *
+   * ⛔ Built from the app's own constructor, so the seat panel here is the seat
+   * panel the screen draws.
+   */
+  { why: "over capacity", built: buildOverCapacityException(OC_TRIP!).supportCase },
 ];
 const notFirst = HEADING_CASES.filter((c) => c.built.fields[0]?.id !== "issue");
 check(
@@ -9683,7 +9814,7 @@ check(
   notFirst.length
     ? notFirst.map((c) => `${c.why} → ${c.built.fields[0]?.id}`).join(", ")
     : `${HEADING_CASES.length} of ${HEADING_CASES.length} cases, each ${HEADING_CASES[0].built.fields.length}+ fields`,
-  notFirst.length === 0 && HEADING_CASES.length === 5,
+  notFirst.length === 0 && HEADING_CASES.length === 6,
 );
 
 // ---------------------------------------------------------------------------
@@ -9702,16 +9833,36 @@ console.log("\n29b. No field carries a descriptor under it");
  * sees nothing render, and cannot tell why.
  */
 const HELP_CASES = HEADING_CASES.map((c) => c.built);
+/**
+ * ⛔ Declared here as a literal, never imported from `field-rules`. A list
+ * exported beside the rule it describes is a restatement of it, and two
+ * restatements agreeing has already passed two break tests in this repo while
+ * the code was wrong. The clause below asserts the two agree.
+ */
+const NON_INPUT_TYPES = ["notice", "seat-blocks"];
 const descriptorFields = HELP_CASES.flatMap((c) =>
-  c.fields.filter((f) => f.helpText && f.type !== "notice").map((f) => `${f.id} (${f.type})`),
+  c.fields
+    .filter((f) => f.helpText && !NON_INPUT_TYPES.includes(f.type))
+    .map((f) => `${f.id} (${f.type})`),
 );
 const sweptFields = HELP_CASES.reduce((n, c) => n + c.fields.length, 0);
+const nonInputsSeen = HELP_CASES.flatMap((c) =>
+  c.fields.filter((f) => NON_INPUT_TYPES.includes(f.type)),
+);
 check(
   "no input field carries help text",
   descriptorFields.length
     ? descriptorFields.slice(0, 5).join(", ")
-    : `0 of ${sweptFields} fields across ${HELP_CASES.length} cases`,
-  descriptorFields.length === 0 && sweptFields > 30,
+    : `0 of ${sweptFields} fields across ${HELP_CASES.length} cases; ` +
+      `${nonInputsSeen.length} non-input field(s) exempt`,
+  descriptorFields.length === 0 &&
+    sweptFields > 30 &&
+    // ⛔ The exemption is the rule's own list, not a convenient one.
+    NON_INPUT_TYPES.join(",") === [...NON_INPUT_FIELD_TYPES].join(",") &&
+    // ⛔ Non-vacuity: the exempt types are really IN the sweep, or the filter
+    // above is excluding nothing and this is a check about an empty set.
+    nonInputsSeen.length > 0 &&
+    nonInputsSeen.every((f) => !collectsAnswer(f)),
 );
 /**
  * ⛔ ...and the renderer has no way to show one, so the rule cannot be bypassed.
@@ -9723,7 +9874,12 @@ check(
  * generic return.
  */
 const RENDERER_SRC = codeOnly(readFileSync(join(ROOT, "components/support/support-field-renderer.tsx"), "utf8"));
-const noticeBranch = RENDERER_SRC.indexOf('field.type === "notice"');
+/**
+ * ⚠️ The FIRST non-input branch, which is `seat-blocks` as of 2026-10-15 — it
+ * returns above the notice branch. Anchoring on `notice` alone put the
+ * boundary below one of its own legal sites and failed both.
+ */
+const noticeBranch = RENDERER_SRC.indexOf('field.type === "seat-blocks"');
 /**
  * ⚠️ The component's own top-level `return` — two-space indent, the first one
  * AFTER the notice branch. The first attempt anchored on the generic markup
@@ -9735,7 +9891,7 @@ const genericReturn = RENDERER_SRC.indexOf("\n  return (", noticeBranch);
 const helpSites = [...RENDERER_SRC.matchAll(/field\.helpText/g)].map((m) => m.index ?? -1);
 const strays = helpSites.filter((i) => i < noticeBranch || i > genericReturn);
 check(
-  "...and every helpText the renderer reads is inside the notice branch",
+  "...and every helpText the renderer reads is inside a non-input branch",
   strays.length
     ? `${strays.length} of ${helpSites.length} site(s) outside it`
     : `${helpSites.length} site(s), all between the notice branch and the generic return`,
@@ -11728,7 +11884,7 @@ const FORM_FILES = readdirSync(FORM_DIR).filter((name) => name.endsWith("-form.t
  * ⛔ Declared as a literal. A sweep over whatever happens to be in the folder
  * has no denominator — a glob that matched nothing would pass perfectly.
  */
-const EXPECTED_FORM_FILES = 9;
+const EXPECTED_FORM_FILES = 10;  // ⭐ +1 on 2026-10-15: row 13's over-capacity form
 const mountsSheet = FORM_FILES.filter((name) =>
   codeOnly(readFileSync(join(FORM_DIR, name), "utf8")).includes("<SupportFormSheet"),
 );
@@ -12179,6 +12335,309 @@ check(
       rf34PushedBlocks.find((b) => b.tripId === pushedRow?.groupId)?.fields.pickupTime &&
     pushedRow?.dropoffTimeField ===
       rf34PushedBlocks.find((b) => b.tripId === pushedRow?.groupId)?.fields.dropoffTime,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n36. Row 13 — the seats, and why this trip still fits");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐⭐ **The panel is an argument, so every number on it has to be checkable.**
+ * The driver is being shown a refusal broken into parts and asked to answer it.
+ * A total that is merely plausible is worse here than on any other screen in
+ * this app, because the whole point of the slice is that production told them
+ * nothing and they had to ring Support.
+ */
+const rf36Request = mockRequestTrips.find((t) => t.id === "REQ-OVERCAP-001")!;
+const rf36Blocks = blockingTrips(rf36Request, mockUpcomingTrips);
+const rf36Panel = buildOverCapacityException(rf36Request).supportCase.fields.find(
+  (f) => f.type === "seat-blocks",
+)?.seatBlocks;
+
+/* --- 36a. The blocking trips are the overlapping ones, and only those ----- */
+/**
+ * ⛔⛔ **Both directions, over the whole manifest.** A rule that returned
+ * everything would list the driver's April rides against a September request;
+ * one that returned nothing would print "nothing overlaps" on a screen whose
+ * entire purpose is to say what does.
+ */
+const rf36ShouldBlock = mockUpcomingTrips.filter((trip) => {
+  if (trip.date !== rf36Request.date) return false;
+  const a = tripWindow(rf36Request);
+  const b = tripWindow(trip);
+  return Boolean(a && b && b.to > a.from && b.from < a.to);
+});
+const rf36Drift = [
+  ...rf36ShouldBlock
+    .filter((t) => !rf36Blocks.some((b) => b.trip.id === t.id))
+    .map((t) => `-${t.scenario?.code ?? t.id}`),
+  ...rf36Blocks
+    .filter((b) => !rf36ShouldBlock.some((t) => t.id === b.trip.id))
+    .map((b) => `+${b.trip.scenario?.code ?? b.trip.id}`),
+];
+check(
+  "the blocking trips are exactly the accepted rides that overlap this one",
+  rf36Drift.length
+    ? `DRIFT: ${rf36Drift.join(" ")}`
+    : `${rf36Blocks.length} of ${mockUpcomingTrips.length} upcoming — ` +
+      `${rf36Blocks.map((b) => `${b.trip.scenario?.code} ${b.fromLabel}-${b.toLabel} x${b.seats}`).join(", ")}`,
+  rf36Drift.length === 0 &&
+    // ⛔ Non-vacuity in both directions: some ride must block, and most must not.
+    rf36Blocks.length === 2 &&
+    rf36Blocks.length < mockUpcomingTrips.length,
+);
+/**
+ * ⛔⛔ **Touching ends do NOT overlap**, and nothing else in the seed tests it.
+ * A ride that drops off at the moment the request picks up shares a boundary,
+ * not a passenger — and a `<=` here would invent a blocking trip the driver can
+ * see is finished. Driven on a synthetic ride rather than the seed, because
+ * seeding one would put a third ride on a manifest the panel prints.
+ */
+const rf36Touching: Trip = {
+  ...rf36Blocks[0].trip,
+  id: "RF36-TOUCHING",
+  legs: [
+    { ...rf36Blocks[0].trip.legs[0], time: "8:15 AM" },
+    { ...rf36Blocks[0].trip.legs[1], time: rf36Request.legs[0].time },
+  ],
+};
+const rf36Inside: Trip = { ...rf36Touching, id: "RF36-INSIDE", legs: [
+  { ...rf36Touching.legs[0] },
+  { ...rf36Touching.legs[1], time: "9:06 AM" },
+] };
+check(
+  "a ride that ENDS when this one starts does not block it, one a minute later does",
+  `ends ${rf36Request.legs[0].time}: ` +
+    `${blockingTrips(rf36Request, [rf36Touching]).length} block(s); ` +
+    `ends 9:06 AM: ${blockingTrips(rf36Request, [rf36Inside]).length} block(s)`,
+  blockingTrips(rf36Request, [rf36Touching]).length === 0 &&
+    // ⛔ The positive control, or `<` and `<=` are indistinguishable here.
+    blockingTrips(rf36Request, [rf36Inside]).length === 1,
+);
+/** ⛔ A will-call ride has no window at all, and must not land on every request. */
+const rf36WillCall: Trip = { ...rf36Touching, id: "RF36-WILLCALL", legs: [
+  { ...rf36Touching.legs[0], time: "Will-Call" },
+  { ...rf36Touching.legs[1], time: "Will-Call" },
+] };
+check(
+  "...and a will-call ride has no window, so it blocks nothing",
+  `tripWindow → ${JSON.stringify(tripWindow(rf36WillCall))}; ` +
+    `${blockingTrips(rf36Request, [rf36WillCall]).length} block(s)`,
+  tripWindow(rf36WillCall) === null &&
+    blockingTrips(rf36Request, [rf36WillCall]).length === 0,
+);
+
+/* --- 36b. ⛔⛔ A peak, never a sum --------------------------------------- */
+/**
+ * ⛔⛔ **The one arithmetic mistake that would refuse a trip for a conflict
+ * that does not exist.** Two blocking rides that do not overlap EACH OTHER
+ * never share the vehicle, so adding their passengers reports seats the van
+ * never holds at once.
+ *
+ * The seeded pair DO overlap, so peak and sum agree there — which means the
+ * seed alone cannot tell the two rules apart. Pulled apart here: the same two
+ * rides, one moved clear of the other.
+ */
+const rf36Sum = rf36Blocks.reduce((n, b) => n + b.seats, 0);
+const rf36Apart = mockUpcomingTrips.map((trip) =>
+  trip.id === rf36Blocks[1].trip.id
+    ? { ...trip, legs: [
+        { ...trip.legs[0], time: "9:35 AM" },
+        { ...trip.legs[1], time: "10:20 AM" },
+      ] }
+    : trip,
+);
+const rf36ApartBlocks = blockingTrips(rf36Request, rf36Apart);
+check(
+  "seats held is the PEAK, not the sum — proved on rides that do not overlap",
+  `seeded: peak ${peakSeatsHeld(rf36Request, rf36Blocks)} = sum ${rf36Sum}; ` +
+    `moved apart: peak ${peakSeatsHeld(rf36Request, rf36ApartBlocks)} vs sum ` +
+    `${rf36ApartBlocks.reduce((n, b) => n + b.seats, 0)}`,
+  // ⛔ Both still block, or the control moved one out of the window instead of
+  // out of the other's way, and the peak dropped for the wrong reason.
+  rf36ApartBlocks.length === 2 &&
+    peakSeatsHeld(rf36Request, rf36ApartBlocks) === 2 &&
+    rf36ApartBlocks.reduce((n, b) => n + b.seats, 0) === 3 &&
+    // ⛔ ...and the seeded pair really do agree, or the two rules were never
+    // compared on a case where they could differ.
+    peakSeatsHeld(rf36Request, rf36Blocks) === rf36Sum,
+);
+/** ⛔ And the moment the panel names really does hold the number it claims. */
+const rf36Peak = peakSeatWindow(rf36Request, rf36Blocks);
+const rf36Covering = rf36Blocks.filter(
+  (b) => rf36Peak && b.from <= rf36Peak.from && b.to > rf36Peak.from,
+);
+check(
+  "...and the moment the panel names is a moment those seats are really held",
+  `${rf36Panel?.peakLabel} — covered by ${rf36Covering.map((b) => b.trip.scenario?.code).join(", ")}`,
+  Boolean(rf36Peak) &&
+    rf36Covering.reduce((n, b) => n + b.seats, 0) === rf36Peak!.seats &&
+    rf36Peak!.seats === peakSeatsHeld(rf36Request, rf36Blocks) &&
+    // ⛔ A window, not an instant — `from === to` would be a label naming no
+    // span at all.
+    rf36Peak!.to > rf36Peak!.from,
+);
+
+/* --- 36c. The panel is the arithmetic, not a second opinion -------------- */
+/**
+ * ⛔⛔ **Every number on the panel against the rule that produced it.** This is
+ * the row-10 lesson applied before it can be relearned: one rule copied into
+ * six renderers that all agreed and were all wrong.
+ */
+const rf36Expected = {
+  seatsOnRecord: VEHICLE_SEATS_ON_RECORD,
+  seatsRequested: rf36Request.passengerCount,
+  seatsNeeded: seatsNeeded(rf36Request, rf36Blocks),
+  rows: rf36Blocks.length,
+  vehicle: ID_BADGE.vehicle,
+};
+check(
+  "every number the panel prints is the one the rule computes",
+  `record ${rf36Panel?.seatsOnRecord}, this trip ${rf36Panel?.seatsRequested}, ` +
+    `needed ${rf36Panel?.seatsNeeded}, over ${(rf36Panel?.seatsNeeded ?? 0) - (rf36Panel?.seatsOnRecord ?? 0)}, ` +
+    `${rf36Panel?.rows.length} row(s), vehicle "${rf36Panel?.vehicle}"`,
+  rf36Panel?.seatsOnRecord === rf36Expected.seatsOnRecord &&
+    rf36Panel?.seatsRequested === rf36Expected.seatsRequested &&
+    rf36Panel?.seatsNeeded === rf36Expected.seatsNeeded &&
+    rf36Panel?.rows.length === rf36Expected.rows &&
+    // ⛔⛔ The vehicle is the BADGE's, never retyped. Two screens disagreeing
+    // about what the driver drives is what a second copy invites.
+    rf36Panel?.vehicle === rf36Expected.vehicle &&
+    // ⛔ And it really is over capacity, or the panel is explaining nothing.
+    rf36Panel!.seatsNeeded > rf36Panel!.seatsOnRecord,
+);
+/**
+ * ⛔⛔ **The seed's flag and the panel's arithmetic agree.** `isOverCapacity`
+ * is SEEDED — production decides server-side against rules this prototype does
+ * not have — so nothing structurally forces the two together. A screen saying
+ * "seven needed, five on record" over a flag that came from somewhere else
+ * would be explaining a refusal that had a different reason.
+ */
+const rf36Disagree = mockRequestTrips.filter(
+  (t) => isOverCapacity(t) !== arithmeticSaysOver(t, mockUpcomingTrips),
+);
+check(
+  "the seeded over-capacity flag and the arithmetic tell the same story",
+  rf36Disagree.length
+    ? `DISAGREE: ${rf36Disagree.map((t) => `${t.id} flag=${isOverCapacity(t)}`).join(", ")}`
+    : `${mockRequestTrips.filter(isOverCapacity).length} flagged of ${mockRequestTrips.length} request(s), all agreeing`,
+  rf36Disagree.length === 0 &&
+    // ⛔ Non-vacuity in both directions: one request is flagged, and the rest
+    // are a negative control rather than an untested majority.
+    mockRequestTrips.filter(isOverCapacity).length === 1 &&
+    mockRequestTrips.length > 20,
+);
+/** ⛔ The panel computes nothing of its own — one constructor, one source. */
+const rf36PanelSrc = codeOnly(
+  readFileSync(join(ROOT, "components/support/seat-blocks-field.tsx"), "utf8"),
+);
+check(
+  "the panel component works nothing out",
+  `blockingTrips: ${rf36PanelSrc.includes("blockingTrips")}; ` +
+    `peakSeats: ${/peakSeats/.test(rf36PanelSrc)}; ` +
+    `reads config: ${rf36PanelSrc.includes("config.seatsNeeded")}`,
+  !rf36PanelSrc.includes("blockingTrips") &&
+    !/peakSeats/.test(rf36PanelSrc) &&
+    // ⛔ Positive control: the file was really read and really draws the panel.
+    rf36PanelSrc.includes("config.seatsNeeded") &&
+    rf36PanelSrc.includes("config.rows"),
+);
+
+/* --- 36d. The question, and the one answer that is row 11 ---------------- */
+/**
+ * ⭐⭐ **`actualSeats` IS catalogue row 11, asked as a question.** Row 11
+ * proposes a one-off cleanse of stored vehicle capacity; a driver who says
+ * their vehicle has more seats than the record shows has just reported that
+ * record, and this field is the value to clean it to.
+ *
+ * ⛔ It must appear on that answer and on NO other. The other four reasons are
+ * genuine one-trip exceptions — a correct record and a scheduling answer — and
+ * treating one as a capacity correction would overwrite a right number with a
+ * wrong one.
+ */
+const rf36Case = buildOverCapacityException(rf36Request).supportCase;
+const rf36SeatsField = rf36Case.fields.find((f) => f.id === "actualSeats")!;
+const rf36ReasonShown = OVER_CAPACITY_REASONS.filter((r) =>
+  isFieldVisible(rf36SeatsField, {
+    issue: ISSUE_OVER_CAPACITY_EXCEPTION,
+    exceptionReason: r.value,
+  }),
+);
+check(
+  "the seat-count correction appears on one reason and no other",
+  `${rf36ReasonShown.map((r) => r.value).join(", ") || "none"} of ` +
+    `${OVER_CAPACITY_REASONS.length} reason(s)`,
+  rf36ReasonShown.length === 1 &&
+    rf36ReasonShown[0].value === OC_REASON_MORE_SEATS &&
+    // ⛔ ...and it opens on the record's own number, so the driver corrects a
+    // value instead of inventing one — and the before → after line has a before.
+    rf36SeatsField.defaultValue === String(VEHICLE_SEATS_ON_RECORD) &&
+    rf36SeatsField.previousValue === String(VEHICLE_SEATS_ON_RECORD),
+);
+/**
+ * ⛔⛔ **Nothing about the form is submittable while the reason is blank**, and
+ * the panel must not be what blocks it. A `seat-blocks` field is not a
+ * `notice`: it stands in for an answer the app already has, not for questions
+ * that do not exist, so it blocks nothing and is never `required`.
+ */
+const rf36Blank = { issue: ISSUE_OVER_CAPACITY_EXCEPTION, signature: "" };
+const rf36Answered = {
+  issue: ISSUE_OVER_CAPACITY_EXCEPTION,
+  exceptionReason: OC_REASON_FINISHES_FIRST,
+  signature: "drawn",
+};
+check(
+  "the reason and the signature gate Submit; the panel does not",
+  `blank: ${canSubmitCase(rf36Case.fields, rf36Blank)}; ` +
+    `answered: ${canSubmitCase(rf36Case.fields, rf36Answered)}; ` +
+    `panel required: ${Boolean(rf36Case.fields.find((f) => f.type === "seat-blocks")?.required)}`,
+  !canSubmitCase(rf36Case.fields, rf36Blank) &&
+    canSubmitCase(rf36Case.fields, rf36Answered) &&
+    !rf36Case.fields.find((f) => f.type === "seat-blocks")?.required &&
+    // ⛔ ...and a `notice` really would have blocked it, or the distinction
+    // above is a claim about nothing.
+    !canSubmitCase(
+      [...rf36Case.fields, { id: "rf36", type: "notice", label: "x" }],
+      rf36Answered,
+    ),
+);
+/** ⛔ The block is absent when the case is not this one — no leaking fields. */
+const rf36Leaked = buildSupportFormCase({
+  includeIssues: [ISSUE_SEND_BACK_REASON],
+  sendBack: true,
+}).fields.filter(
+  (f) => f.type === "seat-blocks" || f.id.startsWith("exception") || f.id === "actualSeats",
+);
+check(
+  "the block is absent when overCapacity is not passed",
+  `${rf36Leaked.length} of ${rf36Case.fields.length} leaked`,
+  rf36Leaked.length === 0 &&
+    // ⛔ Positive control: the fields really do exist on the case that asks.
+    rf36Case.fields.filter(
+      (f) => f.type === "seat-blocks" || f.id.startsWith("exception") || f.id === "actualSeats",
+    ).length === 5,
+);
+
+/* --- 36e. Submitting accepts nothing ------------------------------------- */
+/**
+ * ⛔⛔ **The request stays unacceptable.** Support has to release it; the form
+ * removes the phone call, not the block. Asserted on the rules the screen
+ * reads, not on prose: the trip still has no accept control, because
+ * `isOverCapacity` is unchanged by anything the form does, and the form's own
+ * module exports nothing that could change it.
+ */
+const rf36FormSrc = codeOnly(
+  readFileSync(join(ROOT, "components/support/over-capacity-form.tsx"), "utf8"),
+);
+check(
+  "the form accepts nothing — it only files a request",
+  `submitForm: ${rf36FormSrc.includes("submitForm(")}; ` +
+    `tracks status: ${/appTracksStatus: true/.test(rf36FormSrc)}; ` +
+    `accept/claim calls: ${/accept|claimTrip|takeTrip/i.test(rf36FormSrc)}`,
+  rf36FormSrc.includes("submitForm(") &&
+    // ⚠️ Tracked, unlike Rider No-Show: Support either releases the trip or
+    // does not, so the screen can honestly show "Waiting on Support".
+    /appTracksStatus: true/.test(rf36FormSrc) &&
+    !/accept|claimTrip|takeTrip/i.test(rf36FormSrc),
 );
 
 // ---------------------------------------------------------------------------

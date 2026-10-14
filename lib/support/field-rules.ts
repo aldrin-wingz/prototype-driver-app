@@ -1,5 +1,5 @@
 import { fromTimeInputValue } from "@/lib/support/prefill";
-import type { SupportField } from "@/types/support";
+import type { SupportField, SupportFieldType } from "@/types/support";
 
 /**
  * What a ticked `checkbox` holds.
@@ -9,6 +9,30 @@ import type { SupportField } from "@/types/support";
  * visibly ticks and does nothing, and nothing about it looks wrong on screen.
  */
 export const CHECKED = "yes";
+
+/**
+ * Field types that SHOW something instead of collecting it.
+ *
+ * ⛔⛔ The list help text belongs to, and the reason it is a list rather than a
+ * check on `"notice"`. Help text under an input is a second description of a
+ * question that already has a label — the rule is that an input never carries
+ * one. A non-input field has no label to duplicate, so it may.
+ *
+ * ⚠️ `notice` and `seat-blocks` are NOT otherwise alike: a visible notice
+ * blocks Submit outright, because it stands in for questions that do not
+ * exist, while `seat-blocks` stands in for an answer the app already has and
+ * blocks nothing. Collapsing them into one behaviour is the mistake this
+ * comment exists to prevent — they share one property, not two.
+ */
+export const NON_INPUT_FIELD_TYPES: readonly SupportFieldType[] = [
+  "notice",
+  "seat-blocks",
+];
+
+/** Does this field ask the driver for something? */
+export function collectsAnswer(field: Pick<SupportField, "type">): boolean {
+  return !NON_INPUT_FIELD_TYPES.includes(field.type);
+}
 
 /** Whether a tick box is ticked. */
 export function ticked(value: string | undefined): boolean {

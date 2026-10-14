@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Paperclip, Search, Check, Trash2, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LegOrderField } from "./leg-order-field";
+import { SeatBlocksField } from "./seat-blocks-field";
 import type { FieldChange } from "@/lib/support/field-rules";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -536,6 +537,24 @@ export function SupportFieldRenderer({
   setValue?: (id: string, value: string) => void;
 }) {
   const isLocked = locked && Boolean(value);
+
+  /**
+   * Not an input either, but the opposite of a notice: a notice stands in for
+   * questions that do not exist, this stands in for an answer the app already
+   * has. Returned before the generic shape so the panel keeps its own heading
+   * and help text rather than being stacked under a second label row.
+   */
+  if (field.type === "seat-blocks" && field.seatBlocks) {
+    return (
+      <div className="space-y-2">
+        <p className="text-base font-semibold text-gray-900">{field.label}</p>
+        {field.helpText && (
+          <p className="text-sm text-gray-600">{field.helpText}</p>
+        )}
+        <SeatBlocksField config={field.seatBlocks} />
+      </div>
+    );
+  }
 
   // Not an input at all — a standing-in block where a field set would go. Uses
   // the project's locked flag wording, so nobody reads it as "broken".

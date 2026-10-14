@@ -73,6 +73,20 @@ export type SupportFieldType =
    */
   | "checkbox"
   /**
+   * Not an input — the seats a request needs and the accepted trips holding
+   * them.
+   *
+   * ⛔ Its payload is `seatBlocks`, NOT `options`, for the reason `leg-order`
+   * carries `legOrder`: one row is a member, a client, two clock faces and a
+   * seat count, and packing five facts into a `{value,label}` label is how a
+   * label becomes a data format nobody declared.
+   *
+   * ⚠️ It collects nothing and is never `required`. Unlike `notice` it does
+   * NOT block Submit — a notice stands in for questions that do not exist,
+   * whereas this stands in for an answer the app already has.
+   */
+  | "seat-blocks"
+  /**
    * Not an input — a block of copy standing in for a field set that isn't built.
    *
    * An issue can be a real, registered support case while its questions are still
@@ -190,6 +204,43 @@ export interface LegOrderConfig {
   dropoffTimeField: string;
 }
 
+/** One accepted trip holding seats, as the `seat-blocks` control draws it. */
+export interface SeatBlockRow {
+  /** The ride id, so the driver can find it in their own manifest. */
+  rideId: string;
+  rider: string;
+  client: string;
+  fromLabel: string;
+  toLabel: string;
+  seats: number;
+}
+
+/**
+ * Everything the `seat-blocks` control draws, assembled by the case builder.
+ *
+ * ⛔ The control works nothing out. Which trips overlap, how many seats are
+ * held at once and how short the record is are rules, and they live in
+ * `lib/driver-data/over-capacity.ts` where a check can reach them.
+ *
+ * ⛔⛔ `peakLabel` is a SENTENCE, not a number, and it is the one field here
+ * that stops the panel lying. Two rides carrying two and one add to three only
+ * while they overlap; name the moment and the arithmetic is checkable, leave
+ * it out and a driver whose rides do not overlap reads a total the vehicle
+ * never holds.
+ */
+export interface SeatBlockConfig {
+  /** The vehicle on the driver's record — read from `ID_BADGE`, never retyped. */
+  vehicle: string;
+  seatsOnRecord: number;
+  /** Passengers this request itself carries. */
+  seatsRequested: number;
+  /** The most held at once by the rows below, plus `seatsRequested`. */
+  seatsNeeded: number;
+  /** When the vehicle is fullest, in words. Empty when nothing overlaps. */
+  peakLabel: string;
+  rows: SeatBlockRow[];
+}
+
 /** Which of the driver's legs a leg picker offers. */
 export type LegScope = "all" | "in-progress";
 
@@ -276,6 +327,8 @@ export interface SupportField {
   options?: SupportFieldOption[];
   /** For `leg-order` — the group it places the new leg into. */
   legOrder?: LegOrderConfig;
+  /** For `seat-blocks` — the seats, and the trips holding them. */
+  seatBlocks?: SeatBlockConfig;
   /** Max length for free-text types. */
   maxLength?: number;
   /**

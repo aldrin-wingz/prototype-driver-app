@@ -1,4 +1,7 @@
 import { clockMinutes } from "./ride-date";
+import { ID_BADGE } from "./id-badge";
+import { showsProposal, type DemoFocus } from "@/lib/solutions/demo-mode";
+import type { SeatBlockConfig } from "@/types/support";
 import type { Trip } from "./mock-trips";
 
 /**
@@ -52,6 +55,32 @@ export const OVER_CAPACITY_SOLUTIONS: readonly string[] = [
    */
   "over-capacity-exception",
 ];
+
+/**
+ * The catalogue row the EXCEPTION REQUEST belongs to.
+ *
+ * ⛔⛔ **One row, not three.** `OVER_CAPACITY_SOLUTIONS` above is the rows the
+ * SCREEN serves and all three share it; this is the row whose PROPOSAL is
+ * built. Gating on all three would light the request form while a reviewer was
+ * standing on row 11, which proposes a data cleanse — the "two proposals in one
+ * flow read as one feature" trap `showsProposal` exists to prevent.
+ */
+export const OVER_CAPACITY_EXCEPTION_SOLUTIONS: readonly string[] = [
+  "over-capacity-exception",
+];
+
+/**
+ * Whether the driver is offered the request instead of the telephone.
+ *
+ * ⛔⛔ **This gates the FOOTER and nothing else.** The request screen itself,
+ * its missing accept control and the `Over Capacity Trip #` line are all
+ * production's, captured in `CAP-340`, and they stay on both sides. What the
+ * proposal replaces is the one control at the bottom: a number to ring becomes
+ * a request to file.
+ */
+export function showsCapacityException(focus: DemoFocus): boolean {
+  return showsProposal(focus, OVER_CAPACITY_EXCEPTION_SOLUTIONS);
+}
 
 /** The swipe's first line, before the trip number. `CAP-340`, verbatim. */
 export const OVER_CAPACITY_PREFIX = "Over Capacity Trip #";
@@ -292,4 +321,140 @@ export function seatsOver(request: Trip, blocks: readonly SeatBlock[]): number {
  */
 export function arithmeticSaysOver(request: Trip, accepted: readonly Trip[]): boolean {
   return seatsOver(request, blockingTrips(request, accepted)) > 0;
+}
+
+/**
+ * When the vehicle is fullest inside the request's window, and how full.
+ *
+ * ⚠️ The screen needs the MOMENT as well as the number. "3 seats held" beside
+ * two rides that between them carry three is arithmetic the driver has to do;
+ * "3 seats between 9:20 and 9:30 AM" is the fact, and it is also the sentence
+ * that explains why two non-overlapping rides would NOT have added up.
+ *
+ * ⛔ Returns the first peak when several moments tie. There is nothing to
+ * choose between them and picking the last would read as arbitrary; a check
+ * asserts the window it names really does hold the number it claims.
+ */
+export function peakSeatWindow(
+  request: Trip,
+  blocks: readonly SeatBlock[],
+): { from: number; to: number; seats: number } | null {
+  const window = tripWindow(request);
+  if (!window || blocks.length === 0) return null;
+  const edges = [
+    ...new Set([window.from, ...blocks.map((b) => Math.max(b.from, window.from))]),
+  ].sort((a, b) => a - b);
+  let best: { from: number; to: number; seats: number } | null = null;
+  for (const [i, at] of edges.entries()) {
+    const covering = blocks.filter((b) => b.from <= at && b.to > at);
+    const seats = covering.reduce((total, b) => total + b.seats, 0);
+    if (seats === 0 || (best && seats <= best.seats)) continue;
+    const until = Math.min(
+      window.to,
+      edges[i + 1] ?? window.to,
+      ...covering.map((b) => b.to),
+    );
+    best = { from: at, to: until, seats };
+  }
+  return best;
+}
+
+// ---- Driver-facing copy ---------------------------------------------------
+/**
+ * ⛔⛔ **Every string below is OURS.** `CAP-340` photographs production's dead
+ * end and nothing else — there is no captured screen for a form production
+ * does not have. Kept together so the fold-in audit can see in one place that
+ * none of it is a replication claim.
+ */
+export const OVER_CAPACITY_REQUEST_CTA = "Request a capacity exception";
+export const OVER_CAPACITY_FORM_SUBMIT = "Send Request";
+export const OVER_CAPACITY_SEATS_TITLE = "What is holding the seats";
+export const OVER_CAPACITY_SEATS_HELP =
+  "These are the trips you have already accepted that overlap this one.";
+/** The vehicle line's label. The vehicle itself comes from `ID_BADGE`. */
+export const OVER_CAPACITY_VEHICLE_LABEL = "On your record";
+export const OVER_CAPACITY_REASON_LABEL = "Why can you still take this trip?";
+export const OVER_CAPACITY_SUCCESS =
+  "Nothing is accepted yet. Support will check the seats against your answer and come back to you — the trip stays in Requests until they do.";
+
+/** The reason options, and the one that reports a data error. */
+export const OC_REASON_MORE_SEATS = "more-seats";
+export const OC_REASON_FINISHES_FIRST = "finishes-first";
+export const OC_REASON_TRAVELLING_TOGETHER = "travelling-together";
+export const OC_REASON_COVERED = "covered";
+export const OC_REASON_OTHER = "other";
+
+/**
+ * ⭐⭐ **`OC_REASON_MORE_SEATS` is catalogue row 11, asked as a question.**
+ *
+ * Row 11 proposes a one-off cleanse of stored vehicle capacity. A driver who
+ * picks this option has just reported exactly the record row 11 would clean,
+ * and the seat count they give is the value to clean it to — without ever
+ * having to know that is what they did. One form, two rows served.
+ *
+ * ⛔ The others are genuine one-trip exceptions and must NOT be read as data
+ * errors. A driver whose first ride finishes before this one starts has a
+ * correct record and a scheduling answer; treating that as a capacity
+ * correction would overwrite a right number with a wrong one.
+ */
+export const OVER_CAPACITY_REASONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: OC_REASON_MORE_SEATS, label: "My vehicle has more seats than the record shows" },
+  { value: OC_REASON_FINISHES_FIRST, label: "One of these trips will be done before this pick-up" },
+  { value: OC_REASON_TRAVELLING_TOGETHER, label: "These members are travelling together" },
+  { value: OC_REASON_COVERED, label: "Another driver is covering one of these trips" },
+  { value: OC_REASON_OTHER, label: "Other" },
+];
+
+/**
+ * The rules above, assembled into the one object the panel draws.
+ *
+ * ⛔⛔ **The only constructor.** `SeatBlocksField` computes nothing and the
+ * form component computes nothing; both read this. A second assembly site is
+ * how the panel and the check start agreeing with each other while disagreeing
+ * with the arithmetic — the failure this repo has already shipped once, with
+ * one rule copied into six renderers that all agreed and were all wrong.
+ *
+ * ⚠️ `vehicle` comes from `ID_BADGE`, the app's only statement about what the
+ * driver drives. Not retyped here, and not a parameter: a caller that could
+ * pass a different vehicle is a caller that eventually will.
+ */
+export function buildSeatBlocks(
+  request: Trip,
+  accepted: readonly Trip[],
+): SeatBlockConfig {
+  const blocks = blockingTrips(request, accepted);
+  const peak = peakSeatWindow(request, blocks);
+  return {
+    vehicle: ID_BADGE.vehicle,
+    seatsOnRecord: VEHICLE_SEATS_ON_RECORD,
+    seatsRequested: request.passengerCount,
+    seatsNeeded: seatsNeeded(request, blocks),
+    peakLabel: peak
+      ? `${peak.seats} ${peak.seats === 1 ? "seat" : "seats"}, ` +
+        `${clockLabelOf(peak.from)} - ${clockLabelOf(peak.to)}`
+      : "",
+    rows: blocks.map((block) => ({
+      rideId: block.trip.id,
+      rider: block.trip.rider,
+      client: block.trip.client,
+      fromLabel: block.fromLabel,
+      toLabel: block.toLabel,
+      seats: block.seats,
+    })),
+  };
+}
+
+/**
+ * Minutes past midnight, back to the clock face the seed writes.
+ *
+ * ⚠️ Its own function rather than `clockLabel` from `ride-filters.ts`: that one
+ * is the ride FILTER's, it has an `Any` edge case the filter needs, and reusing
+ * it would make a filter's vocabulary load-bearing for a support form.
+ */
+function clockLabelOf(minutes: number): string {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour < 12 ? "AM" : "PM";
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return `${display}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
