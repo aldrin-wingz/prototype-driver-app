@@ -606,32 +606,37 @@ export function buildSupportFormCase({
 
       // ---- Missed Swipe --------------------------------------------------
       //
-      // ⛔⛔ **Every field renders, prefilled with everything the app holds.
-      // Only the ends being CONFIRMED accept input; the rest are read-only.**
-      // One rule, applied per scenario — 1a confirms the pick-up, 1b confirms
-      // both, ride 2 confirms the drop-off. A form that hid the settled fields
-      // would make the driver take the app's word for them; a form that opened
-      // them all would invite edits to marks that are already facts.
+      // ⛔⛔ **Only the ends being CONFIRMED render. Anything the app already
+      // recorded is NOT a field.** (User direction, 2026-10-14 — "remove any
+      // fields that are already recorded and only keep the ones we have not".)
+      //
+      // The form used to render the whole record, settled values prefilled and
+      // locked, so the driver could see what they were not being asked. That
+      // reason expired when the sheet gained its `Current leg details` block:
+      // every recorded time and odometer is printed two inches above, from
+      // `tripContextFor`, with a dash where nothing was supplied. Rendering them
+      // again as dead inputs asked the driver to read the same five facts twice
+      // and left the real questions below the fold.
+      //
+      // ⚠️ **So the facts moved, they did not disappear** — and that is a
+      // coupling worth naming: `trip-context.ts` is now the only place a
+      // recorded pick-up or drop-off mark is shown on this form. `verify-
+      // missed-swipe` §4 asserts both halves, absence here and presence there.
+      //
+      // ⛔ The en-route mark is recorded on every one of these legs, so by this
+      // rule it is not a field either — and it is NOT one of the eight rows in
+      // `Current leg details`. It is therefore no longer on screen anywhere in
+      // this form. Deliberate and flagged to the user; one row restores it.
       //
       // ⚠️ The odometer is the exception the rule has to carry. A time can be
       // proposed from the location trail; a reading exists only because a swipe
       // captured it, and on a missed swipe that is exactly what did not happen.
-      // So a confirmable odometer opens BLANK and says why, while a recorded one
-      // prefills and locks like any other fact.
+      // So a confirmable odometer opens BLANK.
       ...(missedSwipe
         ? ([
-            {
-              id: "enRouteTime",
-              type: "time",
-              label: "En-route time",
-              prefillFrom: "enRouteTime",
-              lockWhenPrefilled: true,
-              showIf: ONLY_MISSED_SWIPE,
-            },
-
             // ---- the pick-up end ----
-            asksPickup
-              ? {
+            ...(asksPickup
+              ? ([{
                   id: "pickupTime",
                   type: "time",
                   label: "What time did you pick the member up?",
@@ -644,17 +649,8 @@ export function buildSupportFormCase({
                   // got in. Locking a guess makes the driver file a time they
                   // can see is wrong.
                   showIf: ONLY_MISSED_SWIPE,
-                }
-              : {
-                  id: "pickupTime",
-                  type: "time",
-                  label: "Pick-up time",
-                  prefillFrom: "recordedPickupAt",
-                  lockWhenPrefilled: true,
-                  showIf: ONLY_MISSED_SWIPE,
                 },
-            asksPickup
-              ? {
+                {
                   id: "pickupOdometer",
                   type: "number",
                   label: "Odometer at pick-up",
@@ -663,15 +659,8 @@ export function buildSupportFormCase({
                   min: 0,
                   placeholder: "e.g. 48213",
                   showIf: ONLY_MISSED_SWIPE,
-                }
-              : {
-                  id: "pickupOdometer",
-                  type: "number",
-                  label: "Odometer at pick-up",
-                  prefillFrom: "recordedPickupOdometer",
-                  lockWhenPrefilled: true,
-                  showIf: ONLY_MISSED_SWIPE,
-                },
+                }] as SupportCaseDefinition["fields"])
+              : []),
             // Only when the trail could NOT place them there. Asking where the
             // pick-up happened while the app can already see they were at the
             // pick-up address is the interrogation this case exists to remove.
@@ -690,8 +679,8 @@ export function buildSupportFormCase({
               : []),
 
             // ---- the drop-off end ----
-            asksDropoff
-              ? {
+            ...(asksDropoff
+              ? ([{
                   id: "dropOffTime",
                   type: "time",
                   label: "What time did you drop the member off?",
@@ -699,17 +688,8 @@ export function buildSupportFormCase({
                   required: true,
                   prefillFrom: "dropoffSeenAt",
                   showIf: ONLY_MISSED_SWIPE,
-                }
-              : {
-                  id: "dropOffTime",
-                  type: "time",
-                  label: "Drop-off time",
-                  prefillFrom: "recordedDropoffAt",
-                  lockWhenPrefilled: true,
-                  showIf: ONLY_MISSED_SWIPE,
                 },
-            asksDropoff
-              ? {
+                {
                   id: "dropoffOdometer",
                   type: "number",
                   label: "Odometer at drop-off",
@@ -718,15 +698,8 @@ export function buildSupportFormCase({
                   min: 0,
                   placeholder: "e.g. 48229",
                   showIf: ONLY_MISSED_SWIPE,
-                }
-              : {
-                  id: "dropoffOdometer",
-                  type: "number",
-                  label: "Odometer at drop-off",
-                  prefillFrom: "recordedDropoffOdometer",
-                  lockWhenPrefilled: true,
-                  showIf: ONLY_MISSED_SWIPE,
-                },
+                }] as SupportCaseDefinition["fields"])
+              : []),
             ...(asksDropoff && !confirmed("dropoff")
               ? [
                   {
@@ -839,12 +812,12 @@ export function buildSupportFormCase({
               /**
                * ⚠️ `requiredNotEnforced` — the project's existing pattern for a
                * file nobody walking a demo has to hand. The asterisk shows the
-               * real requirement; the prototype does not block on it.
+               * real requirement; the prototype does not block on it. Since
+               * 2026-10-14 it prints nothing: the amber disclosure line came
+               * out with the other helper texts.
                */
               required: true,
               requiredNotEnforced: true,
-              warning:
-                "Not in prototype yet — the real form would require this, and you can submit without it here.",
               showIf: ONLY_CANNOT_REACH,
             },
           ] as SupportCaseDefinition["fields"])
@@ -961,7 +934,6 @@ export function buildSupportFormCase({
               label: channel.proofLabel,
               required: channel.hasArtifact,
               requiredNotEnforced: channel.hasArtifact,
-              warning: channel.proofWarning,
               showIf: { field: "declineChannel", equals: [channel.value] },
             })),
           ] as SupportCaseDefinition["fields"])

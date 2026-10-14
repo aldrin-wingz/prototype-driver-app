@@ -57,6 +57,7 @@ import { buildPrefilledValues, fromTimeInputValue } from "../lib/support/prefill
 import { canSubmitCase, isFieldVisible } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
 import { getLegOptions } from "../lib/support-data/leg-options";
+import { tripContextFor, NOT_SUPPLIED } from "../lib/support-data/trip-context";
 import {
   isMemberSignatureMissing,
   markMemberSignatureMissing,
@@ -111,7 +112,15 @@ const SCENARIOS: Array<{
   rideId: string;
   asks: SwipeAnchor[];
   editable: string[];
-  readOnly: string[];
+  /**
+   * ⛔⛔ **Recorded, therefore NOT a field.** This column used to be
+   * `readOnly` — the same ids, rendered prefilled and locked. Since
+   * 2026-10-14 (user direction) the form asks only for what the app does not
+   * already hold, so these must be ABSENT from the built case. The facts
+   * themselves moved to the sheet's `Current leg details` block, which §4b
+   * asserts — absence here is only honest if presence there is true.
+   */
+  absent: string[];
   memberSignatureMissing: boolean;
   /**
    * The form collects the driver's own signature, which IS recoverable.
@@ -131,7 +140,7 @@ const SCENARIOS: Array<{
     rideId: RIDE_1,
     asks: ["pickup"],
     editable: ["pickupTime", "pickupOdometer"],
-    readOnly: ["enRouteTime", "dropOffTime", "dropoffOdometer"],
+    absent: ["enRouteTime", "dropOffTime", "dropoffOdometer"],
     memberSignatureMissing: false,
     asksDriverSignature: true,
   },
@@ -140,7 +149,7 @@ const SCENARIOS: Array<{
     rideId: RIDE_1,
     asks: ["pickup", "dropoff"],
     editable: ["pickupTime", "pickupOdometer", "dropOffTime", "dropoffOdometer"],
-    readOnly: ["enRouteTime"],
+    absent: ["enRouteTime"],
     memberSignatureMissing: true,
     asksDriverSignature: true,
   },
@@ -149,7 +158,7 @@ const SCENARIOS: Array<{
     rideId: RIDE_2,
     asks: ["dropoff"],
     editable: ["dropOffTime", "dropoffOdometer"],
-    readOnly: ["enRouteTime", "pickupTime", "pickupOdometer"],
+    absent: ["enRouteTime", "pickupTime", "pickupOdometer"],
     memberSignatureMissing: true,
     asksDriverSignature: true,
   },
@@ -456,7 +465,7 @@ check("postponing invents no pick-up time",
   leg1.progress?.pickedUpAt === null, `seed holds ${String(leg1.progress?.pickedUpAt)}`);
 
 // ═══════════════════════════════════════════════════════════════════
-section("4. Every field renders — only the confirmable ones are editable");
+section("4. Only what the app did NOT record is asked");
 
 function fieldsOf(asks: SwipeAnchor[], rideId: string) {
   const supportCase = caseFor(asks, rideId);
@@ -464,15 +473,27 @@ function fieldsOf(asks: SwipeAnchor[], rideId: string) {
   return supportCase.fields.filter((f) => isFieldVisible(f, values));
 }
 
-/** Declared: every scenario shows the whole record, however little is editable. */
-const ALWAYS_SHOWN = [
+/**
+ * ⛔⛔ **The rule inverted on 2026-10-14 and this section inverted with it.**
+ *
+ * It used to assert that all five swipe fields render on every scenario, the
+ * settled ones locked. The user's direction is the opposite: *"remove any
+ * fields that are already recorded and only keep the fields with the ones we
+ * have not."* So the declared column is now ABSENT, and the load-bearing claim
+ * is that no recorded value is asked for twice.
+ *
+ * ⚠️ The five ids are still declared here as the full swipe record, because the
+ * two halves have to partition it — a scenario that listed neither `dropOffTime`
+ * as editable nor as absent would otherwise go unmeasured.
+ */
+const SWIPE_RECORD = [
   "enRouteTime", "pickupTime", "pickupOdometer", "dropOffTime", "dropoffOdometer",
 ];
 for (const scenario of SCENARIOS) {
-  const ids = fieldsOf(scenario.asks, scenario.rideId).map((f) => f.id);
-  const absent = ALWAYS_SHOWN.filter((id) => !ids.includes(id));
-  check(`${scenario.name}: the whole record renders`,
-    absent.length === 0, `missing ${absent.join(",")} of ${ALWAYS_SHOWN.length}`);
+  check(`${scenario.name}: the declared columns partition the whole record`,
+    [...scenario.editable, ...scenario.absent].sort().join(",") ===
+      [...SWIPE_RECORD].sort().join(","),
+    `${scenario.editable.length} + ${scenario.absent.length} of ${SWIPE_RECORD.length}`);
 }
 check("every scenario was built", SCENARIOS.length === 3, `${SCENARIOS.length}`);
 
@@ -481,36 +502,124 @@ for (const scenario of SCENARIOS) {
   const fields = fieldsOf(scenario.asks, scenario.rideId);
   const byId = new Map(fields.map((f) => [f.id, f]));
 
+  const missing = scenario.editable.filter((id) => !byId.has(id));
+  check(`${scenario.name}: ${scenario.editable.length} unrecorded field(s) are asked`,
+    missing.length === 0, `not rendered: ${missing.join(",")}`);
+
   const wronglyLocked = scenario.editable.filter(
     (id) => byId.get(id)?.lockWhenPrefilled === true
   );
-  check(`${scenario.name}: ${scenario.editable.length} editable field(s) accept input`,
+  check(`${scenario.name}: ...and every one of them accepts input`,
     wronglyLocked.length === 0, `locked: ${wronglyLocked.join(",")}`);
 
-  const wronglyOpen = scenario.readOnly.filter(
-    (id) => byId.get(id)?.lockWhenPrefilled !== true
-  );
-  check(`${scenario.name}: ${scenario.readOnly.length} settled field(s) are read-only`,
-    wronglyOpen.length === 0, `open: ${wronglyOpen.join(",")}`);
+  const stillAsked = scenario.absent.filter((id) => byId.has(id));
+  check(`${scenario.name}: ${scenario.absent.length} recorded field(s) are not asked at all`,
+    stillAsked.length === 0, `still rendered: ${stillAsked.join(",")}`);
 
   // Both sets must be non-empty, or one half of the rule is untested.
   check(`${scenario.name}: the split is real`,
-    scenario.editable.length > 0 && scenario.readOnly.length > 0,
-    `${scenario.editable.length} / ${scenario.readOnly.length}`);
+    scenario.editable.length > 0 && scenario.absent.length > 0,
+    `${scenario.editable.length} / ${scenario.absent.length}`);
+}
+/**
+ * ⛔ **Nothing on a Missed Swipe is locked any more** — the locked variants were
+ * the recorded ones and they are gone. Asserted over the whole built case, not
+ * just the five declared ids: a lock reintroduced on any swipe field would mean
+ * a recorded value had crept back in as a dead input, which is exactly what was
+ * removed.
+ */
+/**
+ * ⚠️ `issue` and `legId` are the sheet's own context header — what you are
+ * filing and against which leg — and they lock because the entry point already
+ * settled them. Declared as a literal allow-list rather than filtered out
+ * quietly, so a third locked field is a failure and not an exemption.
+ */
+const LOCKED_CONTEXT = ["issue", "legId"];
+for (const scenario of SCENARIOS) {
+  const locked = fieldsOf(scenario.asks, scenario.rideId)
+    .filter((f) => f.lockWhenPrefilled === true)
+    .map((f) => f.id);
+  check(`${scenario.name}: nothing but the context header is a locked restatement`,
+    locked.join(",") === LOCKED_CONTEXT.join(","),
+    `locked: ${locked.join(",")}`);
 }
 // The three scenarios must genuinely differ, or one case is being tested thrice.
 const signatures = SCENARIOS.map((s) => s.editable.join(","));
 check("the three scenarios have three different editable sets",
   new Set(signatures).size === 3, signatures.join(" | "));
 
-// Each odometer sits with its own time.
+// Each odometer sits with its own time — on the ends that are asked about.
 for (const scenario of SCENARIOS) {
   const ids = fieldsOf(scenario.asks, scenario.rideId).map((f) => f.id);
-  check(`${scenario.name}: each odometer follows its own time`,
-    ids.indexOf("pickupOdometer") === ids.indexOf("pickupTime") + 1 &&
-      ids.indexOf("dropoffOdometer") === ids.indexOf("dropOffTime") + 1,
+  const pairs: Array<[string, string]> = [
+    ["pickupTime", "pickupOdometer"],
+    ["dropOffTime", "dropoffOdometer"],
+  ];
+  const present = pairs.filter(([time]) => ids.includes(time));
+  const wrong = present.filter(([time, odo]) => ids.indexOf(odo) !== ids.indexOf(time) + 1);
+  check(`${scenario.name}: each odometer follows its own time (${present.length} pair(s))`,
+    wrong.length === 0 && present.length === scenario.asks.length,
     ids.join(","));
 }
+
+/* --- 4b. The recorded facts are still on screen, one block up ------------ */
+/**
+ * ⛔⛔ **This is the half that makes §4's absence honest.**
+ *
+ * Dropping the recorded fields is only a simplification if the driver can
+ * still see them. They are printed by `tripContextFor` in the sheet's
+ * `Current leg details` block — so for every scenario, every value the form
+ * stopped asking for must appear THERE, with its real value and not a dash.
+ *
+ * ⛔ `enRouteTime` is the exception, and it is a real gap rather than a pass:
+ * the en-route mark is not one of the eight requested rows, so it is now shown
+ * nowhere on this form. Declared as a literal so it is a decision on the record
+ * rather than a hole the check cannot see.
+ */
+const NOT_SHOWN_ANYWHERE = ["enRouteTime"];
+/** Form field id → the `Current leg details` row that now carries it. */
+const CONTEXT_ROW_FOR: Record<string, string> = {
+  pickupTime: "Actual pick-up time",
+  pickupOdometer: "Pick-up odometer",
+  dropOffTime: "Actual drop-off time",
+  dropoffOdometer: "Drop-off odometer",
+};
+/**
+ * ⚠️ **1a's drop-off is recorded by the swipe the driver just made**, not by
+ * the seed — that scenario IS "postponed the pick-up, swiped the drop-off
+ * live, now confirming". `getLegOptions` reads the session overlay, so the
+ * block sees it exactly as the sheet does. Reset immediately after, so §6
+ * still starts from an empty overlay and asserts so.
+ */
+resetSessionSwipes();
+recordSessionSwipe(leg1.id, "droppedOffAt", "11:51 AM", 48229);
+let contextChecked = 0;
+for (const scenario of SCENARIOS) {
+  const option = getLegOptions("in-progress").find(
+    (o) => o.legId === firstLeg(scenario.rideId).id
+  );
+  check(`${scenario.name}: the sheet can build its context block`, Boolean(option), "no leg option");
+  if (!option) continue;
+  const rows = tripContextFor(option).legRows;
+  const dropped = scenario.absent
+    .filter((id) => !NOT_SHOWN_ANYWHERE.includes(id))
+    .filter((id) => {
+      contextChecked += 1;
+      const row = rows.find((r) => r.label === CONTEXT_ROW_FOR[id]);
+      return !row || row.absent === true || row.value === NOT_SUPPLIED;
+    });
+  check(`${scenario.name}: every recorded value it stopped asking for is shown above`,
+    dropped.length === 0, `missing from the context block: ${dropped.join(",")}`);
+}
+resetSessionSwipes();
+/** ⛔ Non-vacuity: the loop above must have had something to look for. */
+check("...and the context check actually examined some values",
+  contextChecked === 4,
+  `${contextChecked} recorded value(s) across ${SCENARIOS.length} scenario(s)`);
+check("the one mark shown nowhere is declared, and it is the en-route mark",
+  NOT_SHOWN_ANYWHERE.length === 1 && NOT_SHOWN_ANYWHERE[0] === "enRouteTime" &&
+    SCENARIOS.every((s) => s.absent.includes("enRouteTime")),
+  NOT_SHOWN_ANYWHERE.join(","));
 
 // ═══════════════════════════════════════════════════════════════════
 section("5. Prefill — times proposed, odometers never invented");
@@ -526,20 +635,13 @@ for (const scenario of SCENARIOS) {
   check(`${scenario.name}: no confirmable odometer is invented`,
     invented.length === 0, `${invented.join(",")} came prefilled`);
 
-  // ...while a RECORDED one must come through, or a fact is being hidden.
-  const recorded = scenario.readOnly
-    .filter((id) => id.endsWith("Odometer"))
-    .filter((id) => {
-      const anchor = id.startsWith("pickup") ? "pickedUpOdometer" : "droppedOffOdometer";
-      return typeof firstLeg(scenario.rideId).progress?.[anchor] === "number";
-    });
-  const dropped = recorded.filter((id) => (values[id] ?? "") === "");
-  check(`${scenario.name}: ${recorded.length} recorded odometer(s) come through`,
-    dropped.length === 0, `blank: ${dropped.join(",")}`);
-
-  // The en-route mark is always a fact and always present.
-  check(`${scenario.name}: the en-route mark prefills`,
-    /^\d{2}:\d{2}$/.test(values.enRouteTime ?? ""), `"${values.enRouteTime}"`);
+  // ⛔ ...and a recorded one is no longer prefilled either, because the field
+  // is gone. §4b is what asserts the value is still on screen; here the claim
+  // is only that nothing recorded leaks back in as a form VALUE, which is what
+  // would happen if one of the dropped fields were quietly restored.
+  const resurrected = scenario.absent.filter((id) => (values[id] ?? "") !== "");
+  check(`${scenario.name}: no recorded value comes back as a form value`,
+    resurrected.length === 0, `prefilled: ${resurrected.join(",")}`);
 
   // ⛔ Found by walking: a prefill that warns against itself.
   const supportCase = caseFor(scenario.asks, scenario.rideId);
@@ -567,19 +669,44 @@ const leakControl = {
 check("an editable odometer stays blank even where a reading exists",
   (leakControl.pickupOdometer ?? "") === "",
   `"${leakControl.pickupOdometer}" leaked from a recorded ${leg2.progress?.pickedUpOdometer}`);
-check("...and the control really does hold a reading to leak",
+/**
+ * ⚠️ The companion used to prove the control by showing the SAME field filled
+ * when it was read-only. There is no read-only variant any more, so the control
+ * is proved the only way left: the leg genuinely holds a reading, and the field
+ * is genuinely built and asked for.
+ */
+check("...and the control really does hold a reading to leak, into a real field",
   typeof leg2.progress?.pickedUpOdometer === "number" &&
-    (buildPrefilledValues(caseFor(["dropoff"], RIDE_2), ride(RIDE_2), leg2).pickupOdometer ?? "") !== "",
-  "the same field is blank when READ-ONLY too, so the control proves nothing");
+    caseFor(["pickup"], RIDE_2).fields.some((f) => f.id === "pickupOdometer"),
+  "nothing to leak into, so the control proves nothing");
 
-// The order checker must be capable of firing.
+/**
+ * The order checker must be capable of firing.
+ *
+ * ⛔⛔ **Built on 1b, and that is a consequence worth naming.** It used to run
+ * on 1a against the prefilled `enRouteTime`. With the recorded fields gone, a
+ * scenario asking about ONE end has only one time on the form and nothing to
+ * compare it against — so the warning now fires only where both ends are asked
+ * for. `SWIPE_TIME_SEQUENCE` still names all three in true order and
+ * `orderedTimeFields` skips the ones the case does not render, so nothing is
+ * wrong; it is simply bounded by less. Flagged to the user, not papered over.
+ */
 const warnControl = getTimeOrderWarnings(
-  caseFor(["pickup"], RIDE_1).fields,
-  { ...valuesFor(["pickup"], RIDE_1), pickupTime: "00:01" },
+  caseFor(["pickup", "dropoff"], RIDE_1).fields,
+  { ...valuesFor(["pickup", "dropoff"], RIDE_1), pickupTime: "23:30", dropOffTime: "00:01" },
   SWIPE_TIME_SEQUENCE
 );
 check("...and the order checker fires when a time really is impossible",
   Object.keys(warnControl).length > 0, "the sequence checker is inert");
+/** ⛔ The bound that was lost, stated as a literal rather than left implicit. */
+const BOUNDED_SCENARIOS = ["1b · both ends"];
+const bounded = SCENARIOS.filter((sc) => {
+  const fields = caseFor(sc.asks, sc.rideId).fields;
+  return SWIPE_TIME_SEQUENCE.filter((id) => fields.some((f) => f.id === id)).length > 1;
+});
+check("exactly one scenario still has two times to compare",
+  bounded.map((b) => b.name).join(",") === BOUNDED_SCENARIOS.join(","),
+  `${bounded.map((b) => b.name).join(", ") || "none"} of ${SCENARIOS.length}`);
 
 // A confirmed time is proposed from the trail where the trail can speak.
 const r1 = valuesFor(["pickup", "dropoff"], RIDE_1);
@@ -588,8 +715,9 @@ check("ride 1's pick-up time is proposed from the trail",
 const r2 = valuesFor(["dropoff"], RIDE_2);
 check("ride 2's drop-off time is proposed from the trail",
   /^\d{2}:\d{2}$/.test(r2.dropOffTime ?? ""), `"${r2.dropOffTime}"`);
-check("ride 2's recorded pick-up time comes through",
-  /^\d{2}:\d{2}$/.test(r2.pickupTime ?? ""), `"${r2.pickupTime}"`);
+check("ride 2's recorded pick-up time is NOT asked for again",
+  !("pickupTime" in r2) && !caseFor(["dropoff"], RIDE_2).fields.some((f) => f.id === "pickupTime"),
+  `"${r2.pickupTime}"`);
 
 // Submit must hinge on the answers the scenario actually asks for.
 for (const scenario of SCENARIOS) {
@@ -1264,10 +1392,50 @@ check("...offering the same two answers, because the difference is what follows"
  * above.
  */
 const copyFor = (p: (typeof prompts)[number]) =>
-  [p.reason, ...p.choices.map((c) => `${c.title}|${c.detail}`)].join("¶");
+  [p.reason, ...p.choices.map((c) => c.title)].join("¶");
 check("...and the two ends do not read the same",
   copyFor(prompts[0]) !== copyFor(prompts[1]),
   "both anchors render identical copy — the parameter is decorative");
+/**
+ * ⛔⛔ **No subtext under any answer** — user direction, 2026-10-14: *"no more
+ * subtext, instead just 'You are not at the Pickup Location / Is the member
+ * still with you?'"*. Each answer used to carry a second line describing what
+ * the app would do next; four lines of prose for a two-way question, and a
+ * promise made before the driver had answered.
+ *
+ * ⚠️ Asserted on the DATA, not on the markup: `Choice` no longer has a second
+ * copy property, so the only way one comes back is a new field — which this
+ * fails on, because it sweeps every own key of every choice against a declared
+ * allow-list.
+ */
+const CHOICE_KEYS = ["answer", "icon", "title", "tone"];
+const extraKeys = prompts.flatMap((p) =>
+  p.choices.flatMap((c) => Object.keys(c).filter((k) => !CHOICE_KEYS.includes(k))),
+);
+check("no answer carries a second line of copy",
+  extraKeys.length === 0 &&
+    prompts.every((p) => p.choices.every((c) => Object.keys(c).length === CHOICE_KEYS.length)),
+  `extra key(s): ${[...new Set(extraKeys)].join(",") || "none"}`);
+/**
+ * ⛔ And the reason line is the short explicit one, not the old sentence that
+ * explained the recording problem. Checked as a shape — one short sentence
+ * naming the location — rather than as a literal, because the literal is two
+ * lines further up this same file and two copies of a string are two chances to
+ * drift.
+ */
+for (const p of prompts) {
+  check(`the ${p.anchor} reason is one short explicit line`,
+    /^You are not at the (pick-up|drop-off) location\.$/.test(p.reason),
+    `"${p.reason}"`);
+}
+check("...and neither explains the recording problem any more",
+  prompts.every((p) => !/record|happened|any more/i.test(p.reason)),
+  prompts.map((p) => p.reason).join(" | "));
+/** ⛔ The question itself is unchanged and is the same at both ends. */
+check("both ends still ask the same question",
+  prompts.every((p) => p.question === "Is the member still with you?"),
+  prompts.map((p) => p.question).join(" vs "));
+
 const pickupReason = promptChoices("pickup").reason;
 const dropoffReason = promptChoices("dropoff").reason;
 check("...each naming its OWN end of the leg",

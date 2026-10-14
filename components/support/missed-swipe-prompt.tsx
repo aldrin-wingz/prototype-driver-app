@@ -26,11 +26,16 @@ export type MissedSwipeAnswer =
   /** 1b — the leg is over and nothing was swiped live. */
   | "ride-over";
 
+/**
+ * ⛔ **No subtext.** Each answer is one line that says what the driver did.
+ * The explanatory second line went (user direction, 2026-10-14): it described
+ * what the APP would do next, which is a promise made before the driver has
+ * answered, and it made four lines of prose out of a two-way question.
+ */
 interface Choice {
   answer: MissedSwipeAnswer;
   icon: typeof PersonStanding;
   title: string;
-  detail: string;
   tone: "primary" | "plain";
 }
 
@@ -51,16 +56,14 @@ const PICKUP_CHOICES: Choice[] = [
     answer: "member-aboard",
     icon: PersonStanding,
     title: "Yes — they're in the car now",
-    detail:
-      "Carry on and drop them off as normal. We'll confirm the pick-up after that.",
     tone: "primary",
   },
   {
     answer: "ride-over",
     icon: FileText,
-    title: "Yes — and the ride is already over",
-    detail:
-      "We'll ask you to confirm both ends, and fill in whatever we can.",
+    // ⚠️ "No", not "Yes — and". The question asks whether the member is still
+    // with you, and a driver whose ride is over is answering no.
+    title: "No — the ride is already over",
     tone: "plain",
   },
 ];
@@ -84,16 +87,12 @@ const DROPOFF_CHOICES: Choice[] = [
     answer: "member-aboard",
     icon: PersonStanding,
     title: "Yes — they're still in the car",
-    detail:
-      "No problem. Carry on, and swipe again once you've dropped them off.",
     tone: "primary",
   },
   {
     answer: "ride-over",
     icon: FileText,
     title: "No — I've already dropped them off",
-    detail:
-      "We'll ask you to confirm the drop-off, and fill in whatever we can.",
     tone: "plain",
   },
 ];
@@ -112,15 +111,13 @@ export function promptChoices(anchor: SwipeAnchor): {
   if (anchor === "pickup") {
     return {
       question: "Is the member still with you?",
-      reason:
-        "You're not at the pick-up any more, so we can't record this swipe where it happened.",
+      reason: "You are not at the pick-up location.",
       choices: PICKUP_CHOICES,
     };
   }
   return {
     question: "Is the member still with you?",
-    reason:
-      "You're not at the drop-off, so we can't record this swipe where it happened.",
+    reason: "You are not at the drop-off location.",
     choices: DROPOFF_CHOICES,
   };
 }
@@ -150,10 +147,13 @@ export function MissedSwipePrompt({
     <Drawer open={anchor !== null} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto max-w-md">
         <div className="px-5 pb-8 pt-2">
-          <DrawerTitle className="text-lg font-bold text-[#303068]">
+          {/* ⚠️ The location line LEADS, the question follows — the order the
+              driver reads it in. `DrawerTitle` stays on the question so the
+              sheet's accessible name is what it is asking. */}
+          <p className="text-sm text-gray-600">{reason}</p>
+          <DrawerTitle className="mt-1 text-lg font-bold text-[#303068]">
             {question}
           </DrawerTitle>
-          <p className="mt-2 text-sm text-gray-600">{reason}</p>
 
           <div className="mt-6 flex flex-col gap-3">
             {choices.map((choice) => {
@@ -177,25 +177,14 @@ export function MissedSwipePrompt({
                         : "h-6 w-6 shrink-0 text-[#303068]"
                     }
                   />
-                  <span className="flex min-w-0 flex-col">
-                    <span
-                      className={
-                        choice.tone === "primary"
-                          ? "text-sm font-semibold text-white"
-                          : "text-sm font-semibold text-[#303068]"
-                      }
-                    >
-                      {choice.title}
-                    </span>
-                    <span
-                      className={
-                        choice.tone === "primary"
-                          ? "text-xs font-normal text-white/85"
-                          : "text-xs font-normal text-gray-500"
-                      }
-                    >
-                      {choice.detail}
-                    </span>
+                  <span
+                    className={
+                      choice.tone === "primary"
+                        ? "min-w-0 text-sm font-semibold text-white"
+                        : "min-w-0 text-sm font-semibold text-[#303068]"
+                    }
+                  >
+                    {choice.title}
                   </span>
                 </Button>
               );

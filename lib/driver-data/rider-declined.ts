@@ -236,18 +236,13 @@ export interface DeclineChannelRule {
    */
   proofLabel: string;
   /**
-   * ⛔⛔ **A disclosure, not a description — which is why only two channels
-   * have one.** Every channel used to carry a `proofHelp` line rendered in grey
-   * under the field; those came out with every other descriptor (user
-   * direction, 2026-10-14). What could not come out is the fact that on the two
-   * channels where an artifact EXISTS, the real form would require it and this
-   * one does not. That is a build-state flag, so it renders as the amber
-   * warning the rest of the app uses for exactly that.
-   *
-   * ⚠️ `undefined` on the three channels where nothing can be attached — there
-   * is no gap to disclose when production would not ask either.
+   * ⛔ **No second string beside the label.** This table carried a `proofHelp`
+   * line first and then a `proofWarning` disclosure; both are gone (user
+   * direction, 2026-10-14 — every helper line under a field came out). The
+   * label is the whole ask, and the two channels whose proof the real form
+   * would require still carry `requiredNotEnforced` in the case registry, which
+   * keeps them out of the submit gate without printing anything.
    */
-  proofWarning?: string;
 }
 
 /**
@@ -266,8 +261,6 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: true,
     secondHand: false,
     proofLabel: "Screenshot of the message",
-    proofWarning:
-      "Not in prototype yet — the real form would require this, and you can submit without it here.",
   },
   {
     value: "call",
@@ -275,8 +268,6 @@ export const DECLINE_CHANNELS: readonly DeclineChannelRule[] = [
     hasArtifact: true,
     secondHand: false,
     proofLabel: "Screenshot of your call log",
-    proofWarning:
-      "Not in prototype yet — the real form would require this, and you can submit without it here.",
   },
   {
     value: "in-person",

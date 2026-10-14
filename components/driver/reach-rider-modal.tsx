@@ -49,7 +49,12 @@ interface ReachOption {
   label: string;
   /** Helper line printed under the option list while it is selected. */
   note?: string;
-  /** ⚠️ Marks the one option production does not have. */
+  /**
+   * ⚠️ Marks the one option production does not have.
+   *
+   * ⛔ Renders nothing since 2026-10-14 — the pill came out. It is read by
+   * `verify-solutions`' gate sweeps, which is why it is still here.
+   */
   proposed?: boolean;
 }
 
@@ -79,13 +84,12 @@ export function reachOptionsFor(
   return [
     { value: "confirmed", label: "Yes, I confirmed with the rider" },
     { value: "declined", label: "Rider declined the trip" },
-    sameDay
-      ? {
-          value: "later",
-          label: "No, but I will go to the pickup as scheduled",
-          note: "Note: Don't worry—you can still start the trip on the pickup day, but it's best to confirm with the rider in advance.",
-        }
-      : { value: "later", label: "No, try again later" },
+    // ⚠️ **The proposal sits THIRD, above "No, try again later"** (user
+    // direction, 2026-10-14). It is the answer a driver who could not get
+    // through is actually looking for, and underneath "try again later" it read
+    // as the afterthought rather than the thing the row is arguing for.
+    // ⛔ It is still gated, and the three production options still survive
+    // every focus — what moved is where it sits, not whether it shows.
     ...(showsCannotReachOption(focus)
       ? ([
           {
@@ -101,6 +105,13 @@ export function reachOptionsFor(
           },
         ] as ReachOption[])
       : []),
+    sameDay
+      ? {
+          value: "later",
+          label: "No, but I will go to the pickup as scheduled",
+          note: "Note: Don't worry—you can still start the trip on the pickup day, but it's best to confirm with the rider in advance.",
+        }
+      : { value: "later", label: "No, try again later" },
   ];
 }
 
@@ -236,16 +247,13 @@ export function ReachRiderModal({
                     <span className="block text-base font-bold leading-snug text-gray-900">
                       {option.label}
                     </span>
-                    {/* The three options above are production; this one is the
-                        proposal, and a screenshot of this sheet has to say which
-                        is which. ⚠️ Its own block, not a trailing span — inline
-                        it wrapped onto a second line and left a dangling
-                        separator behind the label. */}
-                    {option.proposed && (
-                      <span className="mt-1 inline-block rounded-full border border-gray-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                        Proposed
-                      </span>
-                    )}
+                    {/* ⛔ No "Proposed" pill. It used to render here off
+                        `option.proposed`; the pill came out on user direction,
+                        2026-10-14. ⛔⛔ The FLAG stays and is still the thing
+                        every gate sweep in `verify-solutions` reads to tell
+                        "the proposal is offered" from "it is not" — deleting it
+                        would silently make those checks unable to see the
+                        option at all. What is gone is the badge, not the data. */}
                   </span>
                   {isSelected && (
                     <span

@@ -1127,11 +1127,19 @@ for (const [name, list] of [["standard", standard], ["same-day", sameDay]] as co
     `${list.length} — ${list.map((o) => o.value).join(", ")}`,
     list.length === EXPECTED_REACH_OPTIONS,
   );
+  /**
+   * ⛔ **Position, not just presence.** The proposal moved from last to THIRD
+   * on 2026-10-14 (user direction) — above "No, try again later", because it is
+   * the answer a driver who could not get through is looking for. Asserted as
+   * an index with the production option that must follow it, so a silent slide
+   * back to the bottom of the list fails here rather than in a screenshot.
+   */
   check(
-    `...and the ${name} modal carries the proposed option`,
-    `${list.filter((o) => o.proposed).length} proposed of ${list.length}`,
+    `...and the ${name} modal carries the proposed option, third of four`,
+    `${list.filter((o) => o.proposed).length} proposed of ${list.length}, at index ${list.findIndex((o) => o.proposed)}`,
     list.filter((o) => o.proposed).length === 1 &&
-      list[list.length - 1].value === "cannot-reach",
+      list[2].value === "cannot-reach" &&
+      list[3].value === "later",
   );
 }
 /**
@@ -1191,15 +1199,44 @@ check(
  * matched the standard one, both demos would show the same alternative and the
  * second scenario ride would be making an argument it no longer makes.
  */
+/**
+ * ⛔⛔ **No "Proposed" pill, and the flag that used to draw it is still set.**
+ *
+ * The badge came out on user direction, 2026-10-14. `option.proposed` did not:
+ * it is what every gate sweep in this file reads to tell "the proposal is
+ * offered" from "it is not", so deleting it would have left those checks
+ * sweeping a property nobody sets and passing over nothing.
+ *
+ * ⚠️ Both halves, or either one alone is misleading — a check that only looked
+ * for the absent badge would pass on a file where the option itself had gone.
+ * ⛔ `codeOnly`, because the comment where the pill was names it.
+ */
+const reachModalCode = codeOnly(REACH_SOURCES.modal);
 check(
-  "the two variants' third option really differs",
-  `"${standard[2].label}" vs "${sameDay[2].label}"`,
-  standard[2].label !== sameDay[2].label && Boolean(sameDay[2].note) && !standard[2].note,
+  "the reach modal draws no Proposed pill",
+  `${(reachModalCode.match(/>\s*Proposed\s*</g) ?? []).length} pill(s), ${(reachModalCode.match(/option\.proposed/g) ?? []).length} read(s) of option.proposed in markup`,
+  !/>\s*Proposed\s*</.test(reachModalCode) && !/option\.proposed/.test(reachModalCode),
+);
+check(
+  "...while the flag itself is still set on the one proposed option",
+  `${standard.filter((o) => o.proposed).map((o) => o.value).join(",") || "none"}`,
+  standard.filter((o) => o.proposed).length === 1 &&
+    standard.find((o) => o.proposed)?.value === "cannot-reach" &&
+    REACH_SOURCES.modal.includes("proposed: true"),
+);
+
+/** ⚠️ The `later` option, wherever it sits — not an index, after the reorder. */
+const laterOf = (list: typeof standard) => list.find((o) => o.value === "later")!;
+check(
+  "the two variants' third production option really differs",
+  `"${laterOf(standard).label}" vs "${laterOf(sameDay).label}"`,
+  laterOf(standard).label !== laterOf(sameDay).label &&
+    Boolean(laterOf(sameDay).note) && !laterOf(standard).note,
 );
 check(
   "the same-day note is production's own wording",
-  `${sameDay[2].note?.slice(0, 32)}…`,
-  (sameDay[2].note ?? "").includes("you can still start the trip on the pickup day"),
+  `${laterOf(sameDay).note?.slice(0, 32)}…`,
+  (laterOf(sameDay).note ?? "").includes("you can still start the trip on the pickup day"),
 );
 
 // ---- the numbers offered are the trip's own ----------------------------
@@ -4267,13 +4304,16 @@ check(
  * proof box. Copy here cannot see the field order — that lives in the case
  * registry — so naming a position is a claim this table has no way to keep.
  *
- * ⚠️ Retargeted when the help strings went: the rule is about COPY attached to
- * a field, not about one property, so it now reads the label and the warning —
- * the two that survived. Narrowing it to `proofLabel` alone would have left the
- * warning free to reintroduce exactly the bug this caught.
+ * ⚠️ Retargeted twice. The help strings went first and the rule moved to the
+ * label plus the warning; the warning went too (2026-10-14), so `proofLabel` is
+ * now the only copy this table attaches to a field and the only thing left to
+ * read. ⛔ If a second copy property is ever added here, it belongs in this
+ * template string — a rule narrowed to one property is a rule the next
+ * property is free to break.
  */
+const CHANNEL_COPY = (c: (typeof DECLINE_CHANNELS)[number]) => `${c.label} ${c.proofLabel}`;
 const positional = DECLINE_CHANNELS.filter((c) =>
-  /\b(above|below)\b/i.test(`${c.proofLabel} ${c.proofWarning ?? ""}`),
+  /\b(above|below)\b/i.test(CHANNEL_COPY(c)),
 );
 check(
   "no proof copy points at where another field sits",
@@ -4553,25 +4593,48 @@ check(
   declineLeaks.length === 0,
 );
 /**
- * ⛔⛔ **The disclosure survived the descriptor cull, and this is what proves
- * it.** Every channel used to carry a grey `proofHelp` line; those came out
- * with every other field descriptor. What could not come out is that on the
- * two channels where an artifact EXISTS, the real form would require it and
- * this one does not — so that moved to `proofWarning`, which renders amber.
+ * ⛔⛔ **The disclosure is GONE, and the exemption it described is not.**
  *
- * ⚠️ The renderer prepends the ⚠️, so the string itself no longer carries the
- * flag wording. Asserted on the PAIRING instead: a warning exists exactly where
- * an artifact does, and nowhere else.
+ * Every channel once carried a grey `proofHelp` line; that went with the other
+ * field descriptors. Then the amber `proofWarning` — *"Not in prototype yet —
+ * the real form would require this…"* — went too (user direction, 2026-10-14:
+ * remove these kinds of helper texts). What survives is the BEHAVIOUR it was
+ * describing: on the two channels where an artifact exists the field is
+ * `required` and `requiredNotEnforced`, so the asterisk shows and the submit
+ * gate ignores it.
+ *
+ * ⛔ So this check moved from the copy to the flags. A disclosure is easy to
+ * delete by accident and easy to miss; the pairing is what actually decides
+ * whether a demo can be submitted, and it is now the only thing asserted.
  */
-const flagged = DECLINE_CHANNELS.filter((c) => Boolean(c.proofWarning));
+const proofFieldFor = (value: string) =>
+  declineCase.fields.find((f) => f.id === `declineProof-${value}`);
+const exempt = DECLINE_CHANNELS.filter(
+  (c) => proofFieldFor(c.value)?.requiredNotEnforced === true,
+);
 check(
-  "the unenforced proof asks disclose that the real form would require them",
-  `${flagged.length} warning(s) of ${ARTIFACT_CHANNELS.length} artifact channel(s), ${DECLINE_CHANNELS.length} channels total`,
-  flagged.length === ARTIFACT_CHANNELS.length &&
-    flagged.every((c) => c.hasArtifact) &&
-    // ⛔ ...and no channel without an artifact claims a gap production does not have.
-    DECLINE_CHANNELS.every((c) => c.hasArtifact || !c.proofWarning) &&
-    flagged.every((c) => c.proofWarning!.includes("Not in prototype yet")),
+  "the proof ask is required-but-unenforced on exactly the artifact channels",
+  `${exempt.length} exempt of ${ARTIFACT_CHANNELS.length} artifact channel(s), ${DECLINE_CHANNELS.length} channels total`,
+  exempt.length === ARTIFACT_CHANNELS.length &&
+    exempt.every((c) => c.hasArtifact) &&
+    // ⛔ Both halves, or a build where nothing is required would also pass.
+    exempt.every((c) => proofFieldFor(c.value)?.required === true) &&
+    DECLINE_CHANNELS.every(
+      (c) => c.hasArtifact || proofFieldFor(c.value)?.required !== true,
+    ),
+);
+/**
+ * ⛔⛔ **And no channel carries disclosure copy any more.** The strings are the
+ * thing that was removed, so their absence is the thing to assert — over every
+ * copy property the table has, not just the one that used to hold them.
+ */
+const disclosing = DECLINE_CHANNELS.filter((c) =>
+  /not in prototype|not enforced|real form/i.test(CHANNEL_COPY(c)),
+);
+check(
+  "no decline channel carries prototype-disclosure copy",
+  `${disclosing.length} of ${DECLINE_CHANNELS.length} channel(s) — ${disclosing.map((c) => c.value).join(", ") || "none"}`,
+  disclosing.length === 0 && DECLINE_CHANNELS.length > 3,
 );
 
 
@@ -9005,6 +9068,81 @@ check(
     ? `${strays.length} of ${helpSites.length} site(s) outside it`
     : `${helpSites.length} site(s), all between the notice branch and the generic return`,
   helpSites.length > 0 && genericReturn > noticeBranch && strays.length === 0,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n29d. No field carries a prototype-disclosure line either");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **Two amber lines used to stack under one file field** — *"⚠️ Not in
+ * prototype yet — the real form would require this, and you can submit without
+ * it here"* and *"⚠️ Required in the real flow — not enforced in the
+ * prototype"*. Both are gone (user direction, 2026-10-14: *"remove these kinds
+ * of helper texts"*).
+ *
+ * ⛔ What did NOT go is `requiredNotEnforced`. `field-rules.ts` reads it to keep
+ * those fields out of the submit gate, so deleting the flag would have made a
+ * demo unsubmittable without a screenshot nobody has. The flag now renders
+ * nothing — which is precisely the state a check has to pin down, because
+ * "renders nothing" is indistinguishable from "was never read" by eye.
+ */
+const DISCLOSURE_LINES = [
+  "Required in the real flow",
+  "the real form would require this",
+];
+const disclosureInRenderer = DISCLOSURE_LINES.filter((line) => RENDERER_SRC.includes(line));
+check(
+  "the renderer draws no prototype-disclosure line",
+  `${disclosureInRenderer.length} of ${DISCLOSURE_LINES.length} line(s) still in the renderer`,
+  disclosureInRenderer.length === 0,
+);
+/**
+ * ⛔ ...and it does not read the flag at all, so no other wording can grow back
+ * off it. ⚠️ `codeOnly`, because the comment that replaced the block names the
+ * property it replaced — a mention is not a use, and this file's own §17 shipped
+ * a check that could not tell them apart.
+ */
+check(
+  "...and the renderer never reads requiredNotEnforced",
+  `${(RENDERER_SRC.match(/requiredNotEnforced/g) ?? []).length} read(s) in the renderer`,
+  !RENDERER_SRC.includes("requiredNotEnforced"),
+);
+/**
+ * ⛔⛔ The behaviour the line described must still hold, or this was a deletion
+ * rather than a copy change. Swept over every form, both directions.
+ */
+const exemptFields = HELP_CASES.flatMap((c) =>
+  c.fields.filter((f) => f.requiredNotEnforced).map((f) => `${f.id}`),
+);
+check(
+  "required-but-unenforced fields still exist to be exempted",
+  `${exemptFields.length} field(s) across ${HELP_CASES.length} cases — ${exemptFields.slice(0, 4).join(", ")}`,
+  exemptFields.length > 0,
+);
+const blockingExempt = HELP_CASES.filter((c) => {
+  const filled: Record<string, string> = {};
+  for (const f of c.fields) {
+    if (f.requiredNotEnforced) continue;
+    if (f.required) filled[f.id] = f.type === "number" ? "1" : "x";
+  }
+  // Only the cases that HAVE an exempt field say anything here.
+  return c.fields.some((f) => f.requiredNotEnforced) && !canSubmitCase(c.fields, filled);
+});
+check(
+  "...and leaving one blank never blocks the submit",
+  `${blockingExempt.length} case(s) blocked of ${HELP_CASES.filter((c) => c.fields.some((f) => f.requiredNotEnforced)).length} with an exempt field`,
+  blockingExempt.length === 0,
+);
+/** ⛔ No field's `warning` is a disclosure either — that is where one moved last time. */
+const disclosingWarnings = HELP_CASES.flatMap((c) =>
+  c.fields
+    .filter((f) => f.warning && /not in prototype|not enforced|real form/i.test(f.warning))
+    .map((f) => f.id),
+);
+check(
+  "no field warning discloses the prototype instead of the answer",
+  `${disclosingWarnings.length} of ${sweptFields} fields — ${disclosingWarnings.join(", ") || "none"}`,
+  disclosingWarnings.length === 0,
 );
 
 // ---------------------------------------------------------------------------

@@ -702,14 +702,14 @@ export function SupportFieldRenderer({
         <p className="text-sm text-[#B45309]">⚠️ {warning}</p>
       )}
 
-      {/* Says outright that the asterisk above is real but unenforced here, using
-          the project's locked flag wording — otherwise a required field that lets
-          you submit without it reads as a bug in the gate. */}
-      {field.requiredNotEnforced && (
-        <p className="text-sm text-[#B45309]">
-          ⚠️ Required in the real flow — not enforced in the prototype
-        </p>
-      )}
+      {/* ⛔ `requiredNotEnforced` renders NOTHING. It used to print "Required in
+          the real flow — not enforced in the prototype" under the field; that
+          went with every other prototype-disclosure helper line (user
+          direction, 2026-10-14). The flag itself stays — `field-rules.ts` reads
+          it to keep the field out of the submit gate — so what changed is the
+          disclosure, not the behaviour. ⚠️ A required field can therefore be
+          left blank with nothing on screen saying so; the asterisk is the only
+          hint left, which is what was asked for. */}
     </div>
   );
 }
