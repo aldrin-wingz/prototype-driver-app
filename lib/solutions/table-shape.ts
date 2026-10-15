@@ -62,8 +62,23 @@ function runSpan(keys: readonly string[][], index: number): number {
   return span;
 }
 
-export function tableRows(): TableRow[] {
-  const ordered = [...SOLUTIONS].sort((a, b) => a.order - b.order);
+/**
+ * @param rows the catalogue rows to lay out. Defaults to the whole catalogue.
+ *
+ * ⛔⛔ **Parameterised 2026-10-15 so the table's own filters can narrow it**,
+ * and the merges MUST be recomputed over whatever is passed. Spans computed on
+ * the full set and drawn over a filtered one reach past the last visible row of
+ * their run — a `rowSpan` of 3 on a table showing one of those three, which
+ * renders a cell hanging over the rows beneath it.
+ *
+ * ⚠️ Two rows of one subject area separated by a filtered-out third become
+ * ADJACENT, and therefore merge. That is correct for a narrowed view: the cell
+ * says "these visible rows share this area", which they do. ⛔ It is also why
+ * `applyTableFilters` must preserve order — reordering would merge rows the
+ * spreadsheet never merged.
+ */
+export function tableRows(rows: readonly Solution[] = SOLUTIONS): TableRow[] {
+  const ordered = [...rows].sort((a, b) => a.order - b.order);
 
   // ⛔ Each key INCLUDES the keys above it. A Problem repeated under a
   // different Subject Area is a different cell in the spreadsheet, and keying

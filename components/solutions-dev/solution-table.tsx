@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Check, CornerDownRight, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -21,6 +22,23 @@ import {
   type DemoMode,
 } from "@/lib/solutions/demo-mode";
 import { tableRows } from "@/lib/solutions/table-shape";
+import {
+  FILTER_STATES,
+  NO_TABLE_FILTERS,
+  TABLE_FILTER_CLEAR_LABEL,
+  TABLE_FILTER_EMPTY_BODY,
+  TABLE_FILTER_EMPTY_TITLE,
+  TABLE_FILTERS,
+  addedTableFilterCount,
+  applyTableFilters,
+  filterState,
+  isMultiValueOn,
+  tableFilterCounts,
+  toggleMultiValue,
+  visibleSubjectAreas,
+  withTableFilter,
+  type TableFilterValues,
+} from "@/lib/solutions/table-filters";
 import {
   COLUMN_MODE,
   cellSelected,
@@ -210,8 +228,20 @@ function SelectCell({
 export function SolutionTable() {
   const { active, mode, focus, setMode, clear } = useSolution();
   const router = useRouter();
-  const rows = tableRows();
+  /**
+   * ⚠️ Component state, not the URL. These narrow the dev selector while
+   * someone is working; they are not part of what a focus means, and putting
+   * them in the query string would make a shared link carry a hidden view.
+   */
+  const [tableFilters, setTableFilters] = useState<TableFilterValues>(NO_TABLE_FILTERS);
+  const visible = applyTableFilters(SOLUTIONS, tableFilters);
+  /**
+   * ⛔⛔ The merges are recomputed over the VISIBLE rows. Spans from the full
+   * set drawn over a narrowed one reach past the last visible row of their run.
+   */
+  const rows = tableRows(visible);
   const groups = subjectAreaGroups();
+  const filterCounts = tableFilterCounts(tableFilters);
   const activeId = active?.id ?? null;
 
   /**
@@ -243,11 +273,123 @@ export function SolutionTable() {
         <h2 className="text-sm font-bold text-gray-900">
           Driver Inbound Call Volume — Problems and Proposed Features
         </h2>
-        <p className="mt-0.5 text-[11px] text-gray-500">
-          {SOLUTIONS.length} proposed features across {groups.length} subject
-          areas, covering {COVERED_CALLS.toLocaleString()} support calls.
-          Percentages are a share of the 7,483 calls that carry a subject area.
-          Click a <strong className="font-semibold text-gray-700">Use Case</strong> to
+        {/*
+          ⭐ The description was replaced by these filters at user direction
+          (2026-10-15, *"for the sake of prototyping and focus"*). What it said
+          that still had to survive is below the controls: the two counts, the
+          fixed denominator, and how to drive the table.
+
+          ⛔ The row renders `TABLE_FILTERS`. It names no key of its own, so a
+          third filter is one object literal in the registry and nothing here.
+        */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {TABLE_FILTERS.map((filter) => (
+            <div key={filter.key} className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-gray-700">
+                {filter.label}
+              </span>
+              <div className="flex items-center rounded-md border border-[#E5E7EB] p-0.5">
+                {/*
+                  ⭐⭐ The two shapes, both drawn from the registry. `multi` is
+                  a set of values you tick — which is what lets "App surface"
+                  and "In-app form" be on at the SAME time, the thing three
+                  independent predicates structurally could not express. `tri`
+                  is All / Only / Hide over a yes-or-no property.
+                */}
+                {filter.control === "multi"
+                  ? filter.values.map((option) => {
+                      const on = isMultiValueOn(filter, option.value, tableFilters);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() =>
+                            setTableFilters((current) =>
+                              toggleMultiValue(current, filter, option.value),
+                            )
+                          }
+                          className={cn(
+                            "flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors",
+                            on
+                              ? "bg-[#065F46] text-white"
+                              : "text-gray-400 hover:bg-[#F3F4F6] hover:text-gray-600",
+                          )}
+                        >
+                          {on && <Check className="h-3 w-3" strokeWidth={3} />}
+                          {option.label}
+                          <span className={on ? "text-[#A7F3D0]" : "text-gray-400"}>
+                            {filterCounts[`${filter.key}:${option.value}`]}
+                          </span>
+                        </button>
+                      );
+                    })
+                  : FILTER_STATES.map((state) => {
+                      const selected =
+                        filterState(filter.key, tableFilters) === state.value;
+                      return (
+                        <button
+                          key={state.value}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() =>
+                            setTableFilters((current) =>
+                              withTableFilter(current, filter.key, state.value),
+                            )
+                          }
+                          className={cn(
+                            "rounded px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors",
+                            selected
+                              ? "bg-[#065F46] text-white"
+                              : "text-gray-500 hover:bg-[#F3F4F6] hover:text-gray-700",
+                          )}
+                        >
+                          {state.label}
+                          {/*
+                            ⚠️ The count each segment WOULD leave, computed
+                            against the other filters' current states — so it
+                            answers "what happens if I press this", not "what
+                            would happen if this were the only filter".
+                          */}
+                          <span
+                            className={cn(
+                              "ml-1",
+                              selected ? "text-[#A7F3D0]" : "text-gray-400",
+                            )}
+                          >
+                            {filterCounts[`${filter.key}:${state.value}`]}
+                          </span>
+                        </button>
+                      );
+                    })}
+              </div>
+            </div>
+          ))}
+          {addedTableFilterCount(tableFilters) > 0 && (
+            <button
+              type="button"
+              onClick={() => setTableFilters(NO_TABLE_FILTERS)}
+              className="rounded px-2 py-0.5 text-[11px] font-semibold text-gray-500 underline hover:text-gray-700"
+            >
+              {TABLE_FILTER_CLEAR_LABEL}
+            </button>
+          )}
+        </div>
+        <p className="mt-2 text-[11px] text-gray-500">
+          Showing <strong className="font-semibold text-gray-700">{visible.length}</strong> of{" "}
+          {SOLUTIONS.length} proposed features, across{" "}
+          <strong className="font-semibold text-gray-700">{visibleSubjectAreas(visible)}</strong> of{" "}
+          {groups.length} subject areas.{" "}
+          {/*
+            ⛔⛔ No FILTERED call total, ever. `calls` is the subject AREA's
+            figure, shared across its rows, so an area whose three rows become
+            one has not lost two thirds of its calls — they were never
+            attributable to a row. The denominator sentence below is true at
+            every filter state, which is why it is the one that stays.
+          */}
+          The {COVERED_CALLS.toLocaleString()} calls these cover are a share of
+          the 7,483 that carry a subject area. Click a{" "}
+          <strong className="font-semibold text-gray-700">Use Case</strong> to
           see what happens today, or its{" "}
           <strong className="font-semibold text-gray-700">Proposed Feature</strong> to
           see what we propose instead.
@@ -277,6 +419,33 @@ export function SolutionTable() {
             </tr>
           </thead>
           <tbody>
+            {/*
+              ⛔⛔ **A REACHABLE state, not a defensive branch.** "Only in-app
+              form" with "Hide in prototype" leaves nothing, because every form
+              row is built — and a table that answered that with a blank body
+              under a full header would read as a rendering fault rather than
+              as an answer. The row says which filters emptied it and offers
+              the way out, exactly as My Rides' own empty state does.
+            */}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {TABLE_FILTER_EMPTY_TITLE}
+                  </p>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    {TABLE_FILTER_EMPTY_BODY}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTableFilters(NO_TABLE_FILTERS)}
+                    className="mt-3 rounded-md bg-[#065F46] px-3 py-1.5 text-[11px] font-semibold text-white"
+                  >
+                    {TABLE_FILTER_CLEAR_LABEL}
+                  </button>
+                </td>
+              </tr>
+            )}
             {rows.map(({ solution, areaSpan, problemSpan, useCaseSpan, useCaseRunIds }) => {
               const isActive = activeId === solution.id;
               /**

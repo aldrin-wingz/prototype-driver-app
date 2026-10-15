@@ -27,6 +27,8 @@ import {
   demonstrableSides,
   entryRouteFor,
   entryFor,
+  CLASS_LABEL,
+  buildStateLabel,
   findSolution,
   hasProposedSide,
   isDemonstrable,
@@ -39,6 +41,25 @@ import {
 } from "../lib/solutions/catalogue";
 import { splitUseCase } from "../components/solutions-dev/use-case-flow";
 import { mergedRunCounts, tableRows } from "../lib/solutions/table-shape";
+import {
+  DEFAULT_FILTER_STATE,
+  FILTER_ALL,
+  FILTER_HIDE,
+  FILTER_ONLY,
+  FILTER_STATES,
+  NO_TABLE_FILTERS,
+  TABLE_FILTERS,
+  TABLE_FILTER_EMPTY_BODY,
+  addedTableFilterCount,
+  applyTableFilters,
+  filterState,
+  multiOn,
+  tableFilterCounts,
+  tableFilter,
+  visibleSubjectAreas,
+  type TableFilterState,
+  type TableFilterValues,
+} from "../lib/solutions/table-filters";
 import {
   OVER_CAPACITY_DISPATCH_PHONE,
   OVER_CAPACITY_PREFIX,
@@ -12717,6 +12738,352 @@ check(
     // does not, so the screen can honestly show "Waiting on Support".
     /appTracksStatus: true/.test(rf36FormSrc) &&
     !/accept|claimTrip|takeTrip/i.test(rf36FormSrc),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n37. The feature table's own filters");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐ A filter FEATURE, not three filters — the same shape `ride-filters.ts`
+ * took for My Rides, at the user's own direction: *"the solution is not just
+ * one filter but building a filter feature that we can then add more options"*.
+ * The control renders the registry and names no key.
+ *
+ * ⭐⭐ **Two control shapes, and the second ask is why.** `klass` was three
+ * independent All/Only/Hide predicates for one commit, which structurally could
+ * not express *"see both app surface and in-app form at the same time"* — two
+ * `Only` filters over one attribute AND together to nothing, always. It is a
+ * MULTI-SELECT now, and it still expresses every state the tri-state could.
+ * `buildState` stays tri-state, because it is a yes/no property rather than a
+ * set of values.
+ *
+ * ⚠️ Prototyping tooling, not a driver-facing surface.
+ */
+const RF37_SRC = codeOnly(
+  readFileSync(join(ROOT, "components/solutions-dev/solution-table.tsx"), "utf8"),
+);
+const RF37_KLASS = tableFilter("klass");
+const RF37_BUILT = tableFilter("inPrototype");
+/** ⛔ Declared here, never imported from the module under test. */
+const RF37_KINDS = ["form", "surface", "no-app-surface"];
+/** Every state of every filter, for the sweeps below. */
+const rf37KlassSets: string[][] = [
+  RF37_KINDS,
+  ["form"],
+  ["surface"],
+  ["no-app-surface"],
+  ["form", "surface"],
+  ["form", "no-app-surface"],
+  ["surface", "no-app-surface"],
+  [],
+];
+function rf37Values(kinds: string[], built: TableFilterState): TableFilterValues {
+  const out: Record<string, string> = {};
+  if (kinds.length !== RF37_KINDS.length) out.klass = RF37_KINDS.filter((k) => kinds.includes(k)).join(",");
+  if (built !== DEFAULT_FILTER_STATE) out.inPrototype = built;
+  return out as TableFilterValues;
+}
+const rf37Combos = rf37KlassSets.flatMap((kinds) =>
+  FILTER_STATES.map((st) => ({ kinds, built: st.value, values: rf37Values(kinds, st.value) })),
+);
+
+/* --- 37a. ⛔⛔ The default shows EVERY row -------------------------------- */
+/**
+ * ⛔⛔ **§25's reachability checks walk the UNFILTERED table.** They assert
+ * every live row can be focused from a cell; if the table opened on a state
+ * that hid rows, those checks would describe a view nobody sees. So the default
+ * is asserted here rather than assumed there — in the registry AND in the
+ * component's initial state, which are two different places it could go wrong.
+ */
+check(
+  "the table opens showing every row, which is what §25 measures",
+  `default leaves ${applyTableFilters(SOLUTIONS, NO_TABLE_FILTERS).length} of ${SOLUTIONS.length}; ` +
+    `initial state NO_TABLE_FILTERS: ${RF37_SRC.includes("useState<TableFilterValues>(NO_TABLE_FILTERS)")}; ` +
+    `${addedTableFilterCount(NO_TABLE_FILTERS)} filter(s) narrowing`,
+  applyTableFilters(SOLUTIONS, NO_TABLE_FILTERS).length === SOLUTIONS.length &&
+    addedTableFilterCount(NO_TABLE_FILTERS) === 0 &&
+    RF37_SRC.includes("useState<TableFilterValues>(NO_TABLE_FILTERS)") &&
+    // ⛔ Every kind ticked, and the tri-state on All — the two defaults that
+    // are stored as ABSENCE rather than as a value.
+    RF37_KLASS.control === "multi" &&
+    multiOn(RF37_KLASS, NO_TABLE_FILTERS).join(",") === RF37_KINDS.join(",") &&
+    filterState("inPrototype", NO_TABLE_FILTERS) === DEFAULT_FILTER_STATE,
+);
+
+/* --- 37b. ⭐⭐ The ask: two kinds visible at once ------------------------- */
+/**
+ * ⭐⭐ **The check the second message bought.** User direction 2026-10-15:
+ * *"I want to filter out any proposed features that will not have any app
+ * surface. In other words being able to see both app surface and in-app form
+ * at the same time."*
+ *
+ * ⛔ Three independent `Only` predicates could not do this: over one attribute
+ * they AND to the empty set. The multi-select is what makes the state
+ * reachable, so the state itself is what this asserts — not the control.
+ */
+const rf37BothKinds = applyTableFilters(SOLUTIONS, rf37Values(["form", "surface"], FILTER_ALL));
+const rf37NoSurfaceRows = SOLUTIONS.filter((r) => r.klass === "no-app-surface");
+check(
+  "⭐ in-app form AND app surface can be visible together, with the rest hidden",
+  `${rf37BothKinds.length} of ${SOLUTIONS.length} shown; ` +
+    `${rf37NoSurfaceRows.length} no-app-surface row(s) hidden — ${rf37NoSurfaceRows.map((r) => r.order).join(", ")}`,
+  rf37BothKinds.length === SOLUTIONS.length - rf37NoSurfaceRows.length &&
+    rf37BothKinds.some((r) => r.klass === "form") &&
+    rf37BothKinds.some((r) => r.klass === "surface") &&
+    !rf37BothKinds.some((r) => r.klass === "no-app-surface") &&
+    // ⛔ Non-vacuity: all three kinds must really be populated, or "both at
+    // once" is a claim about a set that was never split.
+    RF37_KINDS.every((k) => SOLUTIONS.some((r) => r.klass === k)),
+);
+/**
+ * ⛔ ...and the multi-select still expresses every state the tri-state could,
+ * or the change cost something. *Only forms* is the other two unticked; *hide
+ * forms* is forms unticked; *all* is all three.
+ */
+check(
+  "...and it still expresses only-this and hide-this, which the tri-state did",
+  `only form: ${applyTableFilters(SOLUTIONS, rf37Values(["form"], FILTER_ALL)).length}; ` +
+    `hide form: ${applyTableFilters(SOLUTIONS, rf37Values(["surface", "no-app-surface"], FILTER_ALL)).length}; ` +
+    `all: ${applyTableFilters(SOLUTIONS, NO_TABLE_FILTERS).length}`,
+  applyTableFilters(SOLUTIONS, rf37Values(["form"], FILTER_ALL)).every((r) => r.klass === "form") &&
+    applyTableFilters(SOLUTIONS, rf37Values(["surface", "no-app-surface"], FILTER_ALL)).every(
+      (r) => r.klass !== "form",
+    ) &&
+    applyTableFilters(SOLUTIONS, rf37Values(["form"], FILTER_ALL)).length +
+      applyTableFilters(SOLUTIONS, rf37Values(["surface", "no-app-surface"], FILTER_ALL)).length ===
+      SOLUTIONS.length,
+);
+/** ⛔ The kinds really do partition the catalogue — every row has exactly one. */
+const rf37KindCounts = RF37_KINDS.map(
+  (k) => applyTableFilters(SOLUTIONS, rf37Values([k], FILTER_ALL)).length,
+);
+check(
+  "the three kinds partition the catalogue exactly",
+  `${RF37_KINDS.map((k, i) => `${k} ${rf37KindCounts[i]}`).join(", ")} = ${rf37KindCounts.reduce((a, b) => a + b, 0)} of ${SOLUTIONS.length}`,
+  rf37KindCounts.reduce((a, b) => a + b, 0) === SOLUTIONS.length &&
+    rf37KindCounts.every((n) => n > 0) &&
+    // ⛔ ...and the registry offers exactly those three, in the catalogue's own
+    // order, with the catalogue's own words.
+    RF37_KLASS.control === "multi" &&
+    RF37_KLASS.values.map((v) => v.value).join(",") === RF37_KINDS.join(",") &&
+    RF37_KLASS.values.map((v) => v.label).join(" | ") ===
+      RF37_KINDS.map((k) => CLASS_LABEL[k as keyof typeof CLASS_LABEL]).join(" | "),
+);
+
+/**
+ * ⛔⛔ **The two control shapes count different things, and the walk is why.**
+ * A tri-state segment counts what pressing it would leave. A multi CHIP counts
+ * the rows carrying its own value — because the chip is usually already on, and
+ * "what pressing this would leave" is then the count with it REMOVED. Walked
+ * and found: `In-app form 17` sat beside a ticked chip on a catalogue holding
+ * eleven forms, which reads as a count of forms and is not one.
+ */
+const rf37Counts = tableFilterCounts(NO_TABLE_FILTERS);
+check(
+  "a kind chip counts its own rows; a tri-state segment counts what it would leave",
+  RF37_KINDS.map((k) => `${k} ${rf37Counts[`klass:${k}`]}`).join(", ") +
+    ` | ` +
+    FILTER_STATES.map((st) => `${st.value} ${rf37Counts[`inPrototype:${st.value}`]}`).join(", "),
+  RF37_KINDS.every(
+    (k) => rf37Counts[`klass:${k}`] === SOLUTIONS.filter((r) => r.klass === k).length,
+  ) &&
+    // ⛔ The chips partition, so at the default they sum to the whole table.
+    RF37_KINDS.reduce((n, k) => n + rf37Counts[`klass:${k}`], 0) === SOLUTIONS.length &&
+    // ⛔ ...while the tri-state segments do NOT sum to it — All counts the
+    // whole table on its own. Two semantics, and this is what tells them apart.
+    rf37Counts["inPrototype:all"] === SOLUTIONS.length &&
+    rf37Counts["inPrototype:only"] + rf37Counts["inPrototype:hide"] === SOLUTIONS.length &&
+    // ⛔ And a chip's number really does respond to the OTHER filter, or it is
+    // a constant wearing a count's clothes.
+    tableFilterCounts(rf37Values(RF37_KINDS, FILTER_ONLY))["klass:no-app-surface"] !==
+      rf37Counts["klass:no-app-surface"],
+);
+
+/* --- 37c. The tri-state filter still partitions -------------------------- */
+const rf37Only = applyTableFilters(SOLUTIONS, rf37Values(RF37_KINDS, FILTER_ONLY));
+const rf37Hide = applyTableFilters(SOLUTIONS, rf37Values(RF37_KINDS, FILTER_HIDE));
+check(
+  "In prototype's Only and Hide partition the catalogue exactly",
+  `${rf37Only.length} only + ${rf37Hide.length} hide = ${rf37Only.length + rf37Hide.length} of ${SOLUTIONS.length}`,
+  rf37Only.length + rf37Hide.length === SOLUTIONS.length &&
+    !rf37Only.some((r) => rf37Hide.some((o) => o.id === r.id)) &&
+    // ⛔ Non-vacuity in BOTH directions: a predicate true of everything, or of
+    // nothing, would partition perfectly and filter nothing.
+    rf37Only.length > 0 &&
+    rf37Hide.length > 0 &&
+    RF37_BUILT.control === "tri" &&
+    RF37_BUILT.label === buildStateLabel("in-prototype"),
+);
+/**
+ * ⛔ ...and the two filters ask different questions, or one is the other under
+ * a new name. Every `form` row is built today, so the difference has to come
+ * from the other direction: rows that are built and are not forms.
+ */
+const rf37BuiltNotForm = SOLUTIONS.filter(
+  (r) => r.buildState === "in-prototype" && r.klass !== "form",
+);
+check(
+  "...and Kind and In prototype are genuinely different questions",
+  `${rf37BuiltNotForm.length} built but not a form — ${rf37BuiltNotForm.map((r) => `${r.order} ${r.klass}`).join(", ")}`,
+  rf37BuiltNotForm.length > 0 &&
+    // ⛔ And they compose: forms that are built is the intersection, not one
+    // filter winning.
+    applyTableFilters(SOLUTIONS, rf37Values(["form"], FILTER_ONLY)).length ===
+      SOLUTIONS.filter((r) => r.klass === "form" && r.buildState === "in-prototype").length,
+);
+
+/* --- 37d. ⛔⛔ The merges are recomputed over the VISIBLE rows ------------ */
+/**
+ * ⛔⛔ **The failure a filtered table invites.** `tableRows()` reconstructs the
+ * spreadsheet's merged cells by walking ADJACENT rows of equal text. Spans
+ * computed on the full set and drawn over a narrowed one reach past the last
+ * visible row of their run — a `rowSpan` of 3 on a table showing one of those
+ * three, which renders a cell hanging over the rows beneath it.
+ *
+ * Swept over all 24 states, each with its own denominator: every visible row is
+ * covered exactly once in all three merged columns, and a covered row carries
+ * the same text as the row covering it.
+ */
+const rf37SpanBad: string[] = [];
+let rf37Swept = 0;
+for (const combo of rf37Combos) {
+  const shown = applyTableFilters(SOLUTIONS, combo.values);
+  const laid = tableRows(shown);
+  rf37Swept += 1;
+  const name = `[${combo.kinds.join("+") || "none"}]/${combo.built}`;
+  if (laid.length !== shown.length) {
+    rf37SpanBad.push(`${name}: ${laid.length} laid of ${shown.length}`);
+    continue;
+  }
+  for (const key of ["areaSpan", "problemSpan", "useCaseSpan"] as const) {
+    const covered = laid.reduce((n, r) => n + r[key], 0);
+    if (covered !== shown.length) rf37SpanBad.push(`${name}.${key}: ${covered} of ${shown.length}`);
+  }
+  for (let i = 1; i < laid.length; i++) {
+    if (laid[i].problemSpan === 0 && laid[i].solution.problem !== laid[i - 1].solution.problem) {
+      rf37SpanBad.push(`${name}: row ${laid[i].solution.order} covered by a different problem`);
+    }
+  }
+}
+const rf37Sizes = rf37Combos.map((c) => applyTableFilters(SOLUTIONS, c.values).length);
+check(
+  "every filter combination lays out merges that cover its own rows exactly once",
+  rf37SpanBad.length
+    ? `BAD: ${rf37SpanBad.slice(0, 4).join("; ")}`
+    : `${rf37Swept} combination(s) — ${Math.min(...rf37Sizes)} to ${Math.max(...rf37Sizes)} row(s)`,
+  rf37SpanBad.length === 0 &&
+    rf37Swept === rf37KlassSets.length * FILTER_STATES.length &&
+    // ⛔ Non-vacuity: the combinations must really produce different sizes, or
+    // identical full tables passed many times.
+    new Set(rf37Sizes).size > 1 &&
+    Math.max(...rf37Sizes) === SOLUTIONS.length,
+);
+/** ⛔ ...and the component passes the VISIBLE rows, not the catalogue. */
+check(
+  "...and the table lays out the rows its filters left, not all of them",
+  `tableRows(visible): ${RF37_SRC.includes("tableRows(visible)")}; ` +
+    `bare tableRows(): ${/tableRows\(\s*\)/.test(RF37_SRC)}`,
+  RF37_SRC.includes("tableRows(visible)") &&
+    // ⛔⛔ And no bare call survives beside it. Two layouts in one component is
+    // the shape where the header counts one set and the body draws another.
+    !/tableRows\(\s*\)/.test(RF37_SRC),
+);
+
+/* --- 37e. The empty state is reachable, and says nothing stale ----------- */
+/**
+ * ⛔⛔ **Not a defensive branch.** Several of the 24 states really do leave
+ * zero rows — unticking every kind, and *only forms* with *hide in prototype*,
+ * because every form row happens to be built. A table answering that with a
+ * blank body under a full header reads as a rendering fault rather than as an
+ * answer.
+ *
+ * ⚠️ The copy must stay GENERIC: both reasons are facts about the catalogue
+ * right now, not about the filters, and a sentence naming one would outlive it.
+ */
+const rf37Empty = rf37Combos.filter((c) => applyTableFilters(SOLUTIONS, c.values).length === 0);
+check(
+  "the empty state is reachable, and its copy does not explain today's reason",
+  `${rf37Empty.length} of ${rf37Combos.length} state(s) empty — ` +
+    `${rf37Empty.slice(0, 4).map((c) => `[${c.kinds.join("+") || "none"}]/${c.built}`).join(", ")}; ` +
+    `"${TABLE_FILTER_EMPTY_BODY}"`,
+  rf37Empty.length > 0 &&
+    // ⛔ ...and not EVERY state, or the filters have emptied the table outright.
+    rf37Empty.length < rf37Combos.length &&
+    // ⛔ The copy names no kind, no build state and no count.
+    !/form|surface|prototype|\d/i.test(TABLE_FILTER_EMPTY_BODY) &&
+    // ⛔ And the branch really is in the table, with the way out.
+    RF37_SRC.includes("rows.length === 0") &&
+    RF37_SRC.includes("setTableFilters(NO_TABLE_FILTERS)"),
+);
+
+/* --- 37f. The control renders the registry ------------------------------- */
+/**
+ * ⛔ The point of a filter FEATURE: adding the next filter must be one object
+ * literal. A control that names a key, a kind or a build state cannot be
+ * extended without editing it — which is exactly what the second ask would
+ * have cost if the first build had hard-coded three predicates into the JSX.
+ */
+/**
+ * ⚠️ Scoped to the CONTROL's own markup, not the whole component. The klass
+ * BADGE further up the file legitimately compares `solution.klass` to literals
+ * — it is rendering the column, not filtering it — and a file-wide sweep would
+ * fail on code this check is not about. The slice runs from the registry map to
+ * the Clear button that closes the row.
+ */
+const rf37ControlFrom = RF37_SRC.indexOf("TABLE_FILTERS.map(");
+const rf37ControlTo = RF37_SRC.indexOf("TABLE_FILTER_CLEAR_LABEL", rf37ControlFrom);
+const rf37Control =
+  rf37ControlFrom < 0 || rf37ControlTo < 0 ? "" : RF37_SRC.slice(rf37ControlFrom, rf37ControlTo);
+const rf37NamedKeys = TABLE_FILTERS.filter((f) => rf37Control.includes(`"${f.key}"`));
+const rf37NamedKinds = RF37_KINDS.filter((k) => rf37Control.includes(`"${k}"`));
+check(
+  "the control renders the registry and names no filter, key or kind of its own",
+  `control is ${rf37Control.length} chars; ` +
+    `both shapes: ${rf37Control.includes('filter.control === "multi"')}; ` +
+    `named inline: ${[...rf37NamedKeys.map((f) => f.key), ...rf37NamedKinds].join(", ") || "none"}`,
+  // ⛔ Positive control: the slice really is the control, not an empty string.
+  // An empty string names nothing and passes every absence test ever written.
+  rf37Control.length > 500 &&
+    rf37Control.includes("FILTER_STATES.map(") &&
+    rf37Control.includes("filter.values.map(") &&
+    rf37Control.includes('filter.control === "multi"') &&
+    rf37NamedKeys.length === 0 &&
+    rf37NamedKinds.length === 0 &&
+    // ⛔ Non-vacuity: there really are keys and kinds it could have named.
+    TABLE_FILTERS.length === 2 &&
+    RF37_KINDS.length === 3,
+);
+
+/* --- 37g. ⛔⛔ No filtered call total ------------------------------------- */
+/**
+ * ⛔⛔ **`calls` is the SUBJECT AREA's figure, shared across its rows.** An
+ * area whose three rows become one has not lost two thirds of its calls — they
+ * were never attributable to a row. A "showing N of M calls" line would be the
+ * header inventing an attribution the source file does not make, and it would
+ * be wrong in exactly the way §1's own warning describes.
+ */
+check(
+  "the header counts rows and areas, and never sums calls over them",
+  `visible.length: ${RF37_SRC.includes("visible.length")}; ` +
+    `visibleSubjectAreas: ${RF37_SRC.includes("visibleSubjectAreas(visible)")}; ` +
+    `sums calls: ${/visible[\s\S]{0,80}\.calls|calls[\s\S]{0,40}reduce/.test(RF37_SRC)}`,
+  RF37_SRC.includes("visible.length") &&
+    RF37_SRC.includes("visibleSubjectAreas(visible)") &&
+    !/visible[\s\S]{0,80}\.calls|calls[\s\S]{0,40}reduce/.test(RF37_SRC) &&
+    // ⛔ The fixed denominator sentence stays, because it is true at every
+    // filter state — that is why it is the half of the description that lived.
+    RF37_SRC.includes("COVERED_CALLS.toLocaleString()"),
+);
+/** ⛔ And the area count really does move with the filters. */
+const rf37AreaCounts = rf37Combos.map((c) =>
+  visibleSubjectAreas(applyTableFilters(SOLUTIONS, c.values)),
+);
+check(
+  "...and the subject-area count really narrows with them",
+  `${[...new Set(rf37AreaCounts)].sort((a, b) => a - b).join(" / ")} area(s) across ${rf37Combos.length} state(s)`,
+  new Set(rf37AreaCounts).size > 1 &&
+    Math.max(...rf37AreaCounts) === EXPECTED_AREAS.length &&
+    Math.min(...rf37AreaCounts) < EXPECTED_AREAS.length,
 );
 
 // ---------------------------------------------------------------------------
