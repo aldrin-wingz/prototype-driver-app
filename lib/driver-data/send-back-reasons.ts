@@ -27,7 +27,7 @@ import type { Trip } from "./mock-trips";
  * Source: `Project - CS Tool React Migration/Phase 1/References/Screenshot
  * Context Log.md`, documented from screenshots on 2026-05-18.
  *
- * ⚠️ **Including the five `OTHER`s.** The duplication is real and is already a
+ * ⚠️ **Including the four `OTHER`s.** The duplication is real and is already a
  * logged open question on this project ("`OTHER` ~6×, `MEMBER CANCELLED` 3×,
  * and not filtered by category"). Seeding the list as captured — duplicates and
  * all — is what makes it evidence; de-duplicating it here would quietly assert
@@ -69,57 +69,90 @@ export function dedupedDriverInitiatedReasons(): string[] {
 export const SEND_BACK_REASON_OTHER = "OTHER";
 
 /**
- * ⛔⛔ **The ones a DRIVER can truthfully answer.**
+ * ⛔⛔ **The app offers production's whole `DRIVER INITIATED` set.** User
+ * direction, 2026-10-16: *"the same cancellation reasons when set to driver
+ * initiated will be provided in the app."*
  *
- * The captured list is an AGENT's. Most of it is written about a driver rather
- * than by one (`DRIVER NO SHOW`, `DRIVER CANCELLED`, `TRANSFER TO ANOTHER
- * DRIVER`), or is a dispatch fact about the fleet (`vehicle shortage`, `driver
- * shortage`, `too many trips`, `too much volume with same time period`), or is
- * a client code the driver cannot know (`REQUESTED BY VERIDA`, `MEDIFAM ER`,
- * `RidesCanceledbyTP`), or is an ops finding made after the fact (`wrong level
- * of service assigned`, `outside operational hours`, `member no longer
- * attends`).
+ * ⚠️ **This SUPERSEDES a narrowing**, and the narrowing's reasoning is kept
+ * because it is the risk the new list runs. `DRIVER_ANSWERABLE_REASONS` offered
+ * six of the nineteen, on the grounds that the captured list is an AGENT's:
+ * most of it is written about a driver rather than by one (`DRIVER NO SHOW`,
+ * `DRIVER CANCELLED`, `TRANSFER TO ANOTHER DRIVER`), or is a dispatch fact
+ * about the fleet (`vehicle shortage`, `driver shortage`, `too many trips`,
+ * `too much volume with same time period`), or is a client code the driver
+ * cannot know (`REQUESTED BY VERIDA`, `MEDIFAM ER`, `RidesCanceledbyTP`), or is
+ * an ops finding made after the fact (`wrong level of service assigned`,
+ * `outside operational hours`, `member no longer attends`).
  *
- * Offering all of them would make a driver pick the nearest wrong answer —
- * exactly what the Cancel-at-Door picker did before it was fixed, and what
- * production's free-text `Spoke with` still does.
+ * That comment flagged itself as *"a reading, not an ops decision"* and named
+ * open question 4 in the Phase 7 spec. The ops decision has now been made, and
+ * it goes the other way — so the reading is retired rather than argued with.
  *
- * ⚠️ **This is a reading, not an ops decision.** It is an allow-list of EXACT
- * strings from the array above, so a check can prove nothing invented reaches a
- * driver, and widening it is a one-line edit. Flagged as open question 4 in the
- * Phase 7 spec.
+ * ⛔ The risk it named is still real: a driver who cannot truthfully answer may
+ * pick the nearest wrong one, and a CS Tool category carries consequences
+ * (`shouldRunSendbackPenaltyForCancel` is true for `DRIVER INITIATED` in
+ * sendback markets). Recorded, not re-litigated.
  */
-export const DRIVER_ANSWERABLE_REASONS: readonly string[] = [
-  "CONFLICT WITH ANOTHER TRIP",
-  "TRAFFIC/CAR ISSUES",
-  "weather",
-  "not in service area",
-  "issue with member or facility",
-  SEND_BACK_REASON_OTHER,
+export const CS_TOOL_REASONS_A_DRIVER_CANNOT_KNOW: readonly string[] = [
+  "REQUESTED BY VERIDA",
+  "MEDIFAM ER",
+  "RidesCanceledbyTP",
 ];
 
 /**
- * The options the form offers.
+ * The options the form offers — all nineteen distinct captured strings.
  *
  * ⚠️ Sentence-cased for the driver, with the production string kept as the
  * VALUE. The captured list is SHOUTING in places and lowercase in others
  * (`CONFLICT WITH ANOTHER TRIP` beside `vehicle shortage`) because it is two
  * lists concatenated; a driver should not have to read that seam. What is
  * stored and sent is still production's exact string.
+ *
+ * ⛔ **Deduped.** `OTHER` appears four times in the capture because that is
+ * what the screenshot shows, and the capture keeps all four as evidence — but a
+ * dropdown repeating one option is an artefact, not a requirement.
  */
 export function sendBackReasonOptions(): SupportFieldOption[] {
-  return DRIVER_ANSWERABLE_REASONS.map((value) => ({
+  return dedupedDriverInitiatedReasons().map((value) => ({
     value,
     label: DRIVER_FACING_LABELS[value] ?? value,
   }));
 }
 
+/**
+ * ⛔⛔ **A relabel fixes CASING, never spelling and never meaning.**
+ *
+ * The capture spells it `DRIVER CANCELLED` in one entry and `RidesCanceledbyTP`
+ * in another — two Ls and one. Both labels keep their own source's spelling;
+ * harmonising them would be this prototype quietly correcting production and
+ * then presenting the result as a replica.
+ *
+ * ⛔ **No acronym is expanded.** `TP` and `MEDIFAM ER` stay as captured,
+ * because nobody has told us what they stand for and a plausible guess on a
+ * screen a driver files against is worse than an opaque label.
+ *
+ * ⚠️ Every label must fit `MAX_SEND_BACK_LABEL_CHARS` — the select does not
+ * wrap and does not ellipsize, so a long one is cut mid-word.
+ */
 const DRIVER_FACING_LABELS: Record<string, string> = {
   "CONFLICT WITH ANOTHER TRIP": "It clashes with another trip",
+  "TRANSFER TO ANOTHER DRIVER": "Transfer to another driver",
+  "REQUESTED BY VERIDA": "Requested by Verida",
+  "DRIVER NO SHOW": "Driver no-show",
+  "MEDIFAM ER": "Medifam ER",
   "TRAFFIC/CAR ISSUES": "Traffic or a problem with my car",
+  "DRIVER CANCELLED": "Driver cancelled",
+  "vehicle shortage": "Vehicle shortage",
+  "driver shortage": "Driver shortage",
+  "too many trips": "Too many trips",
   weather: "Weather",
   "not in service area": "It's outside the area I drive",
+  "wrong level of service assigned": "Wrong level of service assigned",
+  "too much volume with same time period": "Too much volume at that time",
   "issue with member or facility": "An issue with the member or facility",
+  "outside operational hours": "Outside operational hours",
+  "member no longer attends": "Member no longer attends",
+  RidesCanceledbyTP: "Rides canceled by TP",
   OTHER: "Something else",
 };
 

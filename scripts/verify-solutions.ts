@@ -206,7 +206,7 @@ import { offeredSwipe, routeSwipeTap } from "../lib/driver-data/missed-swipe-rul
 import {
   CS_TOOL_DRIVER_INITIATED_REASONS,
   dedupedDriverInitiatedReasons,
-  DRIVER_ANSWERABLE_REASONS,
+  CS_TOOL_REASONS_A_DRIVER_CANNOT_KNOW,
   isShortNoticeSendBack,
   SEND_BACK_DENIED_BODY,
   SEND_BACK_DENIED_DISMISS,
@@ -3164,14 +3164,20 @@ for (const [name, src] of Object.entries(SB_SOURCES)) {
  * Log.md`. Every reason a driver is offered must appear in that array by EXACT
  * string — not paraphrased, not re-cased, not "close enough".
  */
-const invented = DRIVER_ANSWERABLE_REASONS.filter(
-  (r) => !CS_TOOL_DRIVER_INITIATED_REASONS.includes(r),
-);
+/**
+ * ⛔ Declared, never derived. A count taken from the array it checks cannot
+ * fail, and the whole claim here is that the app's list and production's are
+ * the same list.
+ */
+const EXPECTED_DRIVER_INITIATED = 19;
+const RF_OFFERED = sendBackReasonOptions().map((o) => o.value);
+
+const invented = RF_OFFERED.filter((r) => !CS_TOOL_DRIVER_INITIATED_REASONS.includes(r));
 check(
   "every offered reason is a verbatim production string",
   invented.length
     ? `INVENTED: ${invented.join(", ")}`
-    : `${DRIVER_ANSWERABLE_REASONS.length} of ${CS_TOOL_DRIVER_INITIATED_REASONS.length} captured strings offered`,
+    : `${RF_OFFERED.length} offered, all present in the ${CS_TOOL_DRIVER_INITIATED_REASONS.length} captured strings`,
   invented.length === 0,
 );
 check(
@@ -3183,32 +3189,68 @@ check(
     // "`OTHER` ~6×" — that count is across ALL THREE categories; this list is
     // one of them. Both literals are declared so the pair cannot drift.
     CS_TOOL_DRIVER_INITIATED_REASONS.filter((r) => r === "OTHER").length === 4 &&
-    dedupedDriverInitiatedReasons().length === 19,
+    dedupedDriverInitiatedReasons().length === EXPECTED_DRIVER_INITIATED,
 );
 /**
- * ⛔ The narrowing is the point, so it has to be visible. If the allow-list ever
- * equals the captured list, someone has quietly handed a driver an agent's
- * vocabulary — `DRIVER NO SHOW`, `vehicle shortage`, `REQUESTED BY VERIDA`.
+ * ⛔⛔ **Set equality, in BOTH directions, against a declared literal.**
+ *
+ * Until 2026-10-16 this section asserted the opposite — that the app offered a
+ * SUBSET, and that the subset was strictly smaller. The ops decision reversed
+ * it: *"the same cancellation reasons when set to driver initiated will be
+ * provided in the app."*
+ *
+ * ⚠️ The old check could only prove nothing was INVENTED. This one also proves
+ * nothing is OMITTED, which is the half the new direction turns on — a reason
+ * missing from the app is a reason a driver cannot give and an agent can.
  */
-const AGENT_ONLY = [
-  "TRANSFER TO ANOTHER DRIVER", "DRIVER NO SHOW", "DRIVER CANCELLED",
-  "REQUESTED BY VERIDA", "MEDIFAM ER", "RidesCanceledbyTP",
-  "vehicle shortage", "driver shortage", "too many trips",
-  "too much volume with same time period", "wrong level of service assigned",
-  "outside operational hours", "member no longer attends",
-];
-const leakedAgent = AGENT_ONLY.filter((r) => DRIVER_ANSWERABLE_REASONS.includes(r));
+const rfMissing = dedupedDriverInitiatedReasons().filter((r) => !RF_OFFERED.includes(r));
+const rfExtra = RF_OFFERED.filter((r) => !dedupedDriverInitiatedReasons().includes(r));
 check(
-  "no agent-only reason is offered to a driver",
-  leakedAgent.length
-    ? leakedAgent.join(", ")
-    : `${AGENT_ONLY.length} agent-only string(s) withheld of ${CS_TOOL_DRIVER_INITIATED_REASONS.length} captured`,
-  leakedAgent.length === 0,
+  "the app offers production's whole DRIVER INITIATED set, and nothing else",
+  rfMissing.length || rfExtra.length
+    ? `MISSING: ${rfMissing.join(", ") || "none"} | EXTRA: ${rfExtra.join(", ") || "none"}`
+    : `${RF_OFFERED.length} of ${EXPECTED_DRIVER_INITIATED}, both directions`,
+  rfMissing.length === 0 &&
+    rfExtra.length === 0 &&
+    RF_OFFERED.length === EXPECTED_DRIVER_INITIATED,
+);
+/**
+ * ⛔ `OTHER` once on screen, four times in the capture. The dedupe is real and
+ * the evidence is intact — asserting only one of those would let either half
+ * drift.
+ */
+check(
+  "...with OTHER offered once, though the capture holds four",
+  `offered ${RF_OFFERED.filter((r) => r === SEND_BACK_REASON_OTHER).length}× · captured ${CS_TOOL_DRIVER_INITIATED_REASONS.filter(
+    (r) => r === SEND_BACK_REASON_OTHER,
+  ).length}×`,
+  RF_OFFERED.filter((r) => r === SEND_BACK_REASON_OTHER).length === 1 &&
+    CS_TOOL_DRIVER_INITIATED_REASONS.filter((r) => r === SEND_BACK_REASON_OTHER).length === 4,
+);
+/**
+ * ⛔⛔ **The reasons a driver has no way to know are offered DELIBERATELY.**
+ *
+ * This list used to be an exclusion — thirteen agent-only strings withheld, of
+ * which these three were client codes. They are now all offered, by ops
+ * decision. Kept as a named constant and asserted PRESENT so the consequence
+ * stays visible: if someone later decides the opacity is a defect, this is the
+ * check that tells them it was a choice and when it was made.
+ */
+const rfOpaqueMissing = CS_TOOL_REASONS_A_DRIVER_CANNOT_KNOW.filter(
+  (r) => !RF_OFFERED.includes(r),
 );
 check(
-  "...and the narrowing actually narrows",
-  `${DRIVER_ANSWERABLE_REASONS.length} offered of ${dedupedDriverInitiatedReasons().length} distinct`,
-  DRIVER_ANSWERABLE_REASONS.length < dedupedDriverInitiatedReasons().length,
+  "the client-code reasons are offered too, and that is the decision not an oversight",
+  rfOpaqueMissing.length
+    ? `NOT OFFERED: ${rfOpaqueMissing.join(", ")}`
+    : CS_TOOL_REASONS_A_DRIVER_CANNOT_KNOW.join(" · "),
+  rfOpaqueMissing.length === 0 &&
+    // ⛔ Non-vacuity: the list is non-empty and every entry is really captured,
+    // so this cannot pass by naming strings that do not exist.
+    CS_TOOL_REASONS_A_DRIVER_CANNOT_KNOW.length === 3 &&
+    CS_TOOL_REASONS_A_DRIVER_CANNOT_KNOW.every((r) =>
+      CS_TOOL_DRIVER_INITIATED_REASONS.includes(r),
+    ),
 );
 /** The driver-facing wording is a relabel; the VALUE stays production's. */
 const opts = sendBackReasonOptions();
