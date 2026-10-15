@@ -205,9 +205,22 @@ export function isStandingOrder(trip: Trip): boolean {
  * The steps a send-back runs through, in order.
  *
  * ```
- * reason  →  confirm  →  standing-order  →  penalty
- * (always)   (always)    (standing orders)  (short-notice)
+ * Now        confirm  →  denied        (standing orders — production's refusal)
+ *            confirm  →  penalty       (short-notice)
+ *            confirm                   (everything else)
+ *
+ * Proposed   standing-order-chat       (standing orders — ALONE, and terminal)
+ *            reason  →  confirm  →  penalty   (short-notice)
+ *            reason  →  confirm              (everything else)
  * ```
+ *
+ * ⛔⛔ **Superseded 2026-10-16 (D131/D136).** This comment used to draw
+ * `reason → confirm → standing-order → penalty` and say that a standing order
+ * which is ALSO short-notice raises both warnings — **four screens**. That model
+ * is gone. A standing order in Proposed is now blocked on the FIRST tap and
+ * handed to Support chat, so it reaches neither the reason form nor the
+ * confirmation nor the penalty. If you find the four-step diagram in an older
+ * artifact, this is what replaced it.
  *
  * ⛔⛔ **The reason comes FIRST, and that is the one ordering decision with a
  * reason behind it rather than a preference.** An answer collected after a
@@ -218,30 +231,30 @@ export function isStandingOrder(trip: Trip): boolean {
  * After that the sequence runs **general before specific**: production's own
  * "are you sure" — which it raises on every send-back — and then only the
  * consequences that actually apply to THIS trip. A driver sending back an
- * ordinary advance trip sees two screens; the extra ones are earned by
- * something true about the trip.
+ * ordinary advance trip sees two screens; the extra one is earned by something
+ * true about the trip.
  *
  * ⚠️ **Production raises `confirm` FIRST, before anything.** Here it is second,
  * after the reason. That is still a deviation from production ordering — a
  * smaller one than before, but a reader who knows the real app will notice it,
  * so it is said plainly rather than left to be discovered.
  *
- * ⚠️ **Only `standing-order` and `penalty` are conditional.** `confirm` is
- * production's and is raised on every send-back; the penalty warning appears
- * only for a short-notice trip, per the copy-update story's AC.
+ * ⚠️ **Only `penalty` is conditional on the Proposed side.** `confirm` is
+ * production's and is raised on every send-back that gets that far; the penalty
+ * warning appears only for a short-notice trip, per the copy-update story's AC.
  *
- * ⛔ **The penalty is last wherever it appears.** It is the screen with a number
- * in it, and production puts it at the end of its own sequence; nothing here
- * moves it.
+ * ⛔ **The penalty is last wherever it appears**, and a standing order never
+ * appears there at all — nothing is sent back, so there is nothing to be
+ * penalised for. That is the same reasoning the Now side already uses for
+ * `denied`.
  *
- * ⚠️ **All four combinations are real and the rule handles each**; the seed
- * demonstrates three (`14a` short-notice, `14b` plain, `14c` standing order). A
- * standing order that is ALSO short-notice raises both conditional warnings —
- * four screens — which is correct and is asserted rather than seeded, because a
- * ride raising both would let a reviewer read them as one screen.
+ * ⚠️ **The seed demonstrates three cases** (`14a` short-notice, `14b` plain,
+ * `14c` standing order). A standing order that is ALSO short-notice is **one
+ * screen here, not four** — asserted rather than seeded, because the assertion
+ * is the thing that would catch a regression back to the old model.
  *
- * ⚠️ **Four screens is a lot to put in front of a driver.** Each says something
- * the others do not, but the length is worth flagging to whoever owns this flow.
+ * ⛔ Terminality is declared in `SEND_BACK_TERMINAL_STEPS`, not inferred from a
+ * step's name. Read it from there.
  */
 export type SendBackStep =
   | "reason"

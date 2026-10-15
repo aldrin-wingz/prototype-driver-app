@@ -672,10 +672,16 @@ export function buildSupportFormCase({
         required: true,
         options: [...SPOKE_WITH_OPTIONS],
         /**
-         * ⚠️ Deliberately says nothing about WHO, because one of the three
-         * answers is "no one". An earlier version read "You named them on the
-         * previous screen…", which contradicts itself the moment a driver picks
-         * the option this field exists to offer.
+         * ⚠️ **Superseded 2026-10-16.** This comment used to justify the label by
+         * saying "one of the three answers is 'no one'". D126 deleted that
+         * option — `SPOKE_WITH_OPTIONS` has **two** entries, `member` and
+         * `point-of-contact`, and neither denies the door.
+         *
+         * The label still must not read "You named them on the previous
+         * screen…", for a reason that outlived the option: the screen's
+         * `Spoke with` is production's **free-text name**, and this is a
+         * **category**. Implying the driver is repeating themselves would be
+         * wrong about what is being asked.
          */
         showIf: ONLY_CANCEL_AT_DOOR,
       },
