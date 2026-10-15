@@ -523,8 +523,8 @@ export const SOLUTIONS: Solution[] = [
     problem: "Send-backs denied, specifically Standing Orders",
     useCase: "Driver needs to send back an SO → denied → calls Support",
     proposedFeature:
-      "In-app send-back reason form on every send-back, plus an explicit warning when the trip is a standing order — ⚠️ Not in prototype yet: bypassing the Standing Order block, which is being handled separately, and weighting the penalty by reason, which is row 15's scoring decision and still open",
-    tableSummary: "Every send-back collects a reason, and says when the trip is a standing order.",
+      "In-app send-back reason form on every send-back, and a standing order is blocked on the first tap with a route into Support chat rather than production's phone number — ⛔ the Standing Order block is production's and is NOT lifted — ⚠️ Not in prototype yet: weighting the penalty by reason, which is row 15's scoring decision and still open",
+    tableSummary: "Every send-back collects a reason; a standing order goes straight to Support chat.",
     klass: "form",
     buildState: "in-prototype",
     entry: {
@@ -540,9 +540,9 @@ export const SOLUTIONS: Solution[] = [
         },
         {
           route: "/my-rides/1049800396/more",
-          short: "A standing order, three screens",
+          short: "A standing order, blocked on the first tap",
           label:
-            "A STANDING ORDER (SO-4471, dialysis Mon/Wed/Fri). Three screens: reason, production's own popup, then the standing-order warning — general before specific, so the extra screen is earned by something true about the trip. The warning says in as many words what nothing in the app says today: sending back one trip can cost the whole standing order, and repeated send-backs risk suspension. ⚠️ Not in prototype yet: this copy is PROPOSED — production says nothing at all here today, which is the problem. ⛔ It warns, it does not block; a hard block is what sends drivers to Support in the first place.",
+            "A STANDING ORDER (SO-4471, dialysis Mon/Wed/Fri). ONE screen, and it is the first one: no reason form, no confirmation, no penalty — the app says no and offers Support chat. It still names what a send-back costs, because that is why Support is in the loop: one trip can cost the whole standing order, and repeated send-backs risk suspension. ⛔ The block is production's (`CAP-330`) and is not lifted — what changes is that production refuses on the THIRD tap and names a phone, while this refuses on the first and opens a chat. ⚠️ Not in prototype yet: this copy is PROPOSED; production warns about nothing.",
         },
       ],
     },

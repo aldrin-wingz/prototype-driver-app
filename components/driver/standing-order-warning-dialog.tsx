@@ -10,84 +10,78 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  STANDING_ORDER_BLOCK_CHAT,
+  STANDING_ORDER_BLOCK_COST,
+  STANDING_ORDER_BLOCK_DISMISS,
+  STANDING_ORDER_BLOCK_RISK,
+  STANDING_ORDER_BLOCK_ROUTE,
+  STANDING_ORDER_BLOCK_TITLE,
+  STANDING_ORDER_BLOCK_WHY,
+} from "@/lib/driver-data/send-back-reasons";
 
 /**
- * Raised when the trip being sent back belongs to a **standing order**.
+ * Raised the instant a driver taps `Send Back Trip` on a **standing order**.
  *
- * ⛔⛔ **The copy here is PROPOSED, not production's** — and that is the
- * opposite of the penalty dialog beside it, whose every phrase is lifted
- * verbatim from `Other/NEMT Driver App/Other - NEMT Driver App - Short-notice
- * sendback popup copy update.md`. Nothing in the vault says what the app tells
- * a driver about sending back a standing order, because the app tells them
- * nothing: that silence is the problem this screen exists to fix. Treat a
- * screenshot of it as a proposal to review, never as a replicated screen.
+ * ⛔⛔ **It BLOCKS; it does not warn.** This is the reverse of what stood here
+ * until 2026-10-16, and the reversal is user direction. The old dialog argued
+ * that a hard block is what sends a driver to Support, which is the traffic
+ * row 14 exists to absorb — but production already blocks (`CAP-330`), the
+ * block is not ours to lift, and the proposal was quietly lifting it. What was
+ * actually missing was never permission; it was somewhere to go.
  *
- * ⚠️ **It warns; it does not block.** A driver who genuinely cannot do the trip
- * still has to be able to return it — a hard block is exactly what sends them
- * to Support, which is the traffic row 14 exists to absorb. What was missing
- * was never permission, it was the driver knowing what it costs.
+ * ⛔⛔ **The copy here is PROPOSED, not production's.** Production's refusal
+ * ends at *"please call into support for assistance"* and arrives two taps in,
+ * after a confirmation that was never going to matter. This says the same no on
+ * the first tap and opens a chat instead of naming a phone. Treat a screenshot
+ * of it as a proposal to review, never as a replicated screen.
  *
- * ⛔ Nothing here changes the penalty, and nothing here bypasses any block.
- * Both are out of scope by user direction — the Standing Order block is being
- * handled separately and the scoring policy is row 15's.
+ * ⛔ Every string comes from `lib/`. A consequence sentence written inline here
+ * is a claim no check can reach — and this one makes a promise about the
+ * client's behaviour.
  */
 export function StandingOrderWarningDialog({
   open,
   onOpenChange,
-  onConfirm,
+  onContactSupport,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
+  onContactSupport: () => void;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-w-sm rounded-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-lg font-bold text-[#D85878]">
-            This is a standing order
+            {STANDING_ORDER_BLOCK_TITLE}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3 text-left text-sm text-gray-700">
-              {/* Consequence first, and the big one first — the driver is not
-                  risking this trip, they are risking all of them. */}
-              <p>
-                This member rides with you on a set schedule. Sending back one
-                trip can cost you{" "}
-                <span className="font-semibold text-gray-900">
-                  the whole standing order
-                </span>{" "}
-                — the client can reassign every future trip to another driver.
-              </p>
-              <p>
-                Standing orders are the trips clients depend on most. Sending
-                them back can also put your account at risk of{" "}
-                <span className="font-semibold text-gray-900">suspension</span>.
-              </p>
-              {/* ⚠️ The way out, named. A warning with no alternative is a
-                  warning a driver can only ignore. */}
-              <p>
-                If you can still make it, go back and keep the trip. If you
-                cannot, send it back as early as you can and tell Support why.
-              </p>
+              {/* Why it stopped, before what it costs — a driver who is told the
+                  consequence first has not yet been told they cannot proceed. */}
+              <p>{STANDING_ORDER_BLOCK_WHY}</p>
+              <p>{STANDING_ORDER_BLOCK_COST}</p>
+              <p>{STANDING_ORDER_BLOCK_RISK}</p>
+              {/* ⚠️ The way out, named. A block with no alternative is the dead
+                  end this row exists to remove. */}
               <p className="font-semibold text-gray-900">
-                Are you sure you want to send this one back?
+                {STANDING_ORDER_BLOCK_ROUTE}
               </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-row justify-end gap-2">
-          {/* Cancel and Continue, matching the penalty dialog beside it — two
-              confirmation popups in one flow must not disagree about which
-              button means stop. */}
+          {/* ⛔ Dismiss says what dismissing MEANS. "Cancel" on a block is
+              ambiguous — cancel the trip, or cancel the send-back? */}
           <AlertDialogCancel className="mt-0 rounded-xl border-gray-300 text-base font-semibold text-[#303068]">
-            Cancel
+            {STANDING_ORDER_BLOCK_DISMISS}
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={onContactSupport}
             className="rounded-xl bg-[#D85878] text-base font-bold text-white hover:bg-[#C44A68]"
           >
-            Continue
+            {STANDING_ORDER_BLOCK_CHAT}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

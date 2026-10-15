@@ -195,6 +195,13 @@ import {
 import { buildAutoAssignRequest } from "../components/support/auto-assign-request-form";
 import { buildSendBackReason } from "../components/support/send-back-reason-form";
 import { SPOKE_WITH_OPTIONS, treatmentFor } from "../lib/driver-data/no-show-rules";
+import {
+  DEFAULT_SUPPORT_CHAT_TOPIC,
+  SUPPORT_CHAT_TOPICS,
+  supportChatMessage,
+  supportChatRoute,
+  supportChatTopicFrom,
+} from "../lib/driver-data/support-chat";
 import { offeredSwipe, routeSwipeTap } from "../lib/driver-data/missed-swipe-rules";
 import {
   CS_TOOL_DRIVER_INITIATED_REASONS,
@@ -210,7 +217,16 @@ import {
   SEND_BACK_CONFIRM_BUILT,
   SEND_BACK_PENALTY_USD,
   SEND_BACK_REASON_OTHER,
+  SEND_BACK_TERMINAL_STEPS,
   sendBackReasonOptions,
+  STANDING_ORDER_BLOCK_CHAT,
+  STANDING_ORDER_BLOCK_COST,
+  STANDING_ORDER_BLOCK_DISMISS,
+  STANDING_ORDER_BLOCK_RISK,
+  STANDING_ORDER_BLOCK_ROUTE,
+  STANDING_ORDER_BLOCK_TITLE,
+  STANDING_ORDER_BLOCK_WHY,
+  zendeskStandingOrderMessage,
   sendBackSteps,
   type SendBackStep,
 } from "../lib/driver-data/send-back-reasons";
@@ -3350,14 +3366,28 @@ check(
  * ⭐ Production's own popup is built from the screenshot the user supplied on
  * 2026-10-13 — the only place its copy has ever been written down.
  *
- * ⚠️ **Unconditional**: every send-back raises it. Only the penalty warning and
- * the standing-order warning are conditional.
+ * ⚠️ **Unconditional on every send-back that can actually happen.** Only the
+ * penalty warning is conditional now.
+ *
+ * ⛔⛔ **Scoped as of 2026-10-16.** This asserted "EVERY send-back" over a list
+ * that included the standing-order ride — true while the proposal let one
+ * through, and false the moment it stopped. A standing order is blocked before
+ * any confirmation, so demanding one of it would be demanding the flow back.
+ * The non-vacuity clause keeps the claim honest: the excluded ride really is
+ * blocked, so this is a scope and not a hole.
  */
 check(
-  "production's popup is built and raised on EVERY send-back",
-  `SEND_BACK_CONFIRM_BUILT=${SEND_BACK_CONFIRM_BUILT}`,
+  "production's popup is raised on every send-back that can complete",
+  `SEND_BACK_CONFIRM_BUILT=${SEND_BACK_CONFIRM_BUILT}; blocked: ${[SHORT, ADVANCE, SO_RIDE]
+    .filter((t) => !sendBackCompletes(sendBackSteps(t, PLAIN)))
+    .length} of 3`,
   SEND_BACK_CONFIRM_BUILT === true &&
-    [SHORT, ADVANCE, SO_RIDE].every((t) => sendBackSteps(t, PLAIN).includes("confirm")),
+    [SHORT, ADVANCE, SO_RIDE]
+      .filter((t) => sendBackCompletes(sendBackSteps(t, PLAIN)))
+      .every((t) => sendBackSteps(t, PLAIN).includes("confirm")) &&
+    // ⛔ Non-vacuity, twice over: something is excluded, and something is not.
+    [SHORT, ADVANCE, SO_RIDE].some((t) => !sendBackCompletes(sendBackSteps(t, PLAIN))) &&
+    [SHORT, ADVANCE, SO_RIDE].some((t) => sendBackCompletes(sendBackSteps(t, PLAIN))),
 );
 
 /**
@@ -3385,15 +3415,19 @@ const STEP_MATRIX: Array<{ trip: Trip; name: string; steps: SendBackStep[] }> = 
   {
     trip: SO_RIDE,
     name: "standing order",
-    steps: ["reason", "confirm", "standing-order"],
+    steps: ["standing-order-chat"],
   },
   {
-    // ⚠️ Not seeded — asserted. A ride raising BOTH warnings would let a
-    // reviewer read them as one screen, so the seed demonstrates them apart
-    // and the rule is checked on a trip built here.
+    // ⚠️ Not seeded — asserted, because a ride that is both would let a reviewer
+    // read the result as a coincidence.
+    //
+    // ⛔⛔ **One screen, not four.** Until 2026-10-16 this was
+    // `reason → confirm → standing-order → penalty`. A standing order now never
+    // reaches the penalty, because nothing is being sent back to be penalised
+    // for — the same reasoning production's own refusal uses.
     trip: { ...SO_RIDE, sameDay: true },
     name: "standing order AND short-notice",
-    steps: ["reason", "confirm", "standing-order", "penalty"],
+    steps: ["standing-order-chat"],
   },
 ];
 for (const row of STEP_MATRIX) {
@@ -3414,42 +3448,65 @@ check(
     STEP_MATRIX.some((r) => !isShortNoticeSendBack(r.trip)),
 );
 /**
- * ⛔⛔ **The reason is asked FIRST, before any warning.** Asking why after three
- * warnings would collect an answer from a driver who has been talked at twice
- * and is tapping through. First is the only point in the sequence where the
- * answer is theirs rather than a reaction.
+ * ⛔⛔ **The reason is asked FIRST — on every trip that can be sent back at
+ * all.** Asking why after three warnings would collect an answer from a driver
+ * who has been talked at twice and is tapping through. First is the only point
+ * in the sequence where the answer is theirs rather than a reaction.
+ *
+ * ⚠️ **Scoped to completable paths as of 2026-10-16.** A standing order is
+ * blocked before anything is asked, so "reason first" cannot apply to it — and
+ * a check that still demanded it would be demanding the form this flow
+ * deliberately does not have. `sendBackCompletes` draws the line, so the two
+ * rules cannot disagree about which paths they cover.
  */
-check(
-  "the reason is the first step on every trip",
-  STEP_MATRIX.map((r) => `${r.name}:${sendBackSteps(r.trip, PLAIN)[0]}`).join(" "),
-  STEP_MATRIX.every((r) => sendBackSteps(r.trip, PLAIN)[0] === "reason"),
+const RF24_COMPLETABLE = STEP_MATRIX.filter((r) =>
+  sendBackCompletes(sendBackSteps(r.trip, PLAIN)),
 );
-const both = sendBackSteps({ ...SO_RIDE, sameDay: true }, PLAIN);
+check(
+  "the reason is the first step on every trip that can be sent back",
+  `${RF24_COMPLETABLE.length} of ${STEP_MATRIX.length} completable — ${RF24_COMPLETABLE.map(
+    (r) => `${r.name}:${sendBackSteps(r.trip, PLAIN)[0]}`,
+  ).join(" ")}`,
+  RF24_COMPLETABLE.length > 0 &&
+    RF24_COMPLETABLE.length < STEP_MATRIX.length &&
+    RF24_COMPLETABLE.every((r) => sendBackSteps(r.trip, PLAIN)[0] === "reason"),
+);
 /**
  * ⛔⛔ **General before specific.** Production's own "are you sure" — raised on
- * every send-back — comes before the warnings a trip has to EARN. A driver
- * sending back an ordinary advance trip sees two screens; the extra ones are
- * earned by something true about the trip.
+ * every send-back it allows — comes before the warning a trip has to EARN.
+ *
+ * ⚠️ Asserted on the short-notice trip, which is now the only path carrying an
+ * earned warning at all.
  */
+const RF24_EARNED = sendBackSteps(SHORT, PLAIN);
 check(
-  "production's popup comes before the warnings a trip has to earn",
-  both.join(" → "),
-  both.indexOf("confirm") < both.indexOf("standing-order") &&
-    both.indexOf("confirm") < both.indexOf("penalty"),
-);
-check(
-  "...and the standing-order warning comes before the penalty",
-  both.join(" → "),
-  both.indexOf("standing-order") < both.indexOf("penalty"),
+  "production's popup comes before the warning a trip has to earn",
+  RF24_EARNED.join(" → "),
+  RF24_EARNED.indexOf("confirm") >= 0 &&
+    RF24_EARNED.indexOf("confirm") < RF24_EARNED.indexOf("penalty"),
 );
 /**
- * ⚠️ The unconditional steps are the first two, always — so the two extra
- * screens only ever appear at the END of the sequence, never interleaved.
+ * ⛔⛔ **A standing order never reaches the penalty**, even when it is also
+ * short-notice. This is the check that would have caught the old four-screen
+ * path surviving the rewrite.
  */
+const RF24_BOTH = sendBackSteps({ ...SO_RIDE, sameDay: true }, PLAIN);
 check(
-  "every trip starts with the same two screens, whatever else follows",
-  STEP_MATRIX.map((r) => sendBackSteps(r.trip, PLAIN).slice(0, 2).join("+")).join(" "),
-  STEP_MATRIX.every(
+  "...and a standing order never reaches it, short-notice or not",
+  `both-properties path: ${RF24_BOTH.join(" → ")}; shortNotice=${isShortNoticeSendBack({
+    ...SO_RIDE,
+    sameDay: true,
+  })}`,
+  // ⛔ Non-vacuity: the trip really is short-notice, so "no penalty" is a
+  // decision and not an input that never qualified.
+  isShortNoticeSendBack({ ...SO_RIDE, sameDay: true }) &&
+    !RF24_BOTH.includes("penalty") &&
+    RF24_EARNED.includes("penalty"),
+);
+check(
+  "every completable trip starts with the same two screens, whatever else follows",
+  RF24_COMPLETABLE.map((r) => sendBackSteps(r.trip, PLAIN).slice(0, 2).join("+")).join(" "),
+  RF24_COMPLETABLE.every(
     (r) =>
       sendBackSteps(r.trip, PLAIN)[0] === "reason" &&
       sendBackSteps(r.trip, PLAIN)[1] === "confirm",
@@ -3460,9 +3517,10 @@ check(
   STEP_MATRIX.filter((r) => sendBackSteps(r.trip, PLAIN).includes("penalty"))
     .map((r) => sendBackSteps(r.trip, PLAIN).join(" → "))
     .join(" | "),
-  STEP_MATRIX.filter((r) => sendBackSteps(r.trip, PLAIN).includes("penalty")).every(
-    (r) => sendBackSteps(r.trip, PLAIN).at(-1) === "penalty",
-  ),
+  STEP_MATRIX.some((r) => sendBackSteps(r.trip, PLAIN).includes("penalty")) &&
+    STEP_MATRIX.filter((r) => sendBackSteps(r.trip, PLAIN).includes("penalty")).every(
+      (r) => sendBackSteps(r.trip, PLAIN).at(-1) === "penalty",
+    ),
 );
 
 /**
@@ -3517,28 +3575,83 @@ check(
   ALL_SEEDED.filter(isStandingOrder).length === 1,
 );
 /**
- * ⛔⛔ **It warns; it does not BLOCK.** A driver who genuinely cannot do the
- * trip still has to be able to return it — a hard block is exactly what sends
- * them to Support, which is the traffic this row exists to absorb.
+ * ⛔⛔ **It BLOCKS, and it names a route out.** This is the reverse of what
+ * stood here until 2026-10-16, which argued a hard block is what sends a driver
+ * to Support. Production already blocks (`CAP-330`) and the block is not ours to
+ * lift — so what was missing was never permission, it was somewhere to go.
+ *
+ * ⛔ Both halves are asserted. A block with no route is the dead end this row
+ * exists to remove; a route with no block is the proposal quietly lifting
+ * production's refusal, which is what this replaced.
  */
 check(
-  "the standing-order warning offers a way through, not a dead end",
-  "Cancel + Continue, and Continue completes the send-back",
-  /<AlertDialogAction[\s\S]{0,300}Continue\s*<\/AlertDialogAction>/.test(SO_SOURCE) &&
-    SB_SOURCES.more.includes("handleStandingOrderAccepted"),
+  "the standing-order dialog blocks, and offers a route rather than a way through",
+  `block: ${!SB_SOURCES.more.includes("handleStandingOrderAccepted")}; route: ${SB_SOURCES.more.includes(
+    "handleContactSupport",
+  )}; chat: ${SO_SOURCE.includes("STANDING_ORDER_BLOCK_CHAT")}`,
+  // ⛔ The old "Continue completes the send-back" handler is GONE, not merely
+  // unreferenced by the dialog.
+  !SB_SOURCES.more.includes("handleStandingOrderAccepted") &&
+    SB_SOURCES.more.includes("handleContactSupport") &&
+    SO_SOURCE.includes("STANDING_ORDER_BLOCK_CHAT") &&
+    SO_SOURCE.includes("STANDING_ORDER_BLOCK_DISMISS"),
 );
 const SO_PHRASES = [
   "the whole standing order",
   "reassign every future trip to another driver",
   "suspension",
 ];
-const missingSo = SO_PHRASES.filter(
-  (phrase) => !SO_SOURCE.replace(/\s+/g, " ").includes(phrase),
-);
+/**
+ * ⛔⛔ **Read off the CONSTANTS, not the component.** The copy moved to `lib/`
+ * on 2026-10-16, and a check still grepping the JSX would have gone green on an
+ * empty dialog the moment the strings left it — the exact shape of a check that
+ * stops testing. The component is asserted separately to USE them.
+ */
+const SO_COPY = [
+  STANDING_ORDER_BLOCK_TITLE,
+  STANDING_ORDER_BLOCK_WHY,
+  STANDING_ORDER_BLOCK_COST,
+  STANDING_ORDER_BLOCK_RISK,
+  STANDING_ORDER_BLOCK_ROUTE,
+].join(" ");
+const missingSo = SO_PHRASES.filter((phrase) => !SO_COPY.includes(phrase));
 check(
   "it names both consequences — the order, and the account",
   missingSo.length ? `MISSING: ${missingSo.join(" | ")}` : SO_PHRASES.join(" · "),
   missingSo.length === 0,
+);
+/**
+ * ⛔ ...and the dialog actually renders them. Copy in `lib/` that no component
+ * reads is copy no driver sees.
+ */
+const SO_RENDERED = [
+  "STANDING_ORDER_BLOCK_TITLE",
+  "STANDING_ORDER_BLOCK_WHY",
+  "STANDING_ORDER_BLOCK_COST",
+  "STANDING_ORDER_BLOCK_RISK",
+  "STANDING_ORDER_BLOCK_ROUTE",
+  "STANDING_ORDER_BLOCK_CHAT",
+  "STANDING_ORDER_BLOCK_DISMISS",
+].filter((name) => !SO_SOURCE.includes(`{${name}}`));
+check(
+  "...and every one of them reaches the screen",
+  SO_RENDERED.length ? `NOT RENDERED: ${SO_RENDERED.join(", ")}` : "7 of 7 rendered",
+  SO_RENDERED.length === 0,
+);
+/**
+ * ⛔⛔ **The route out is chat, where production's is a phone.** That single
+ * difference is row 14's proposal on this screen, so it is asserted in both
+ * directions — ours must not say "call", and production's must still say it.
+ */
+check(
+  "the block sends the driver to chat; production's refusal still says call",
+  `ours: "${STANDING_ORDER_BLOCK_CHAT}" / "${STANDING_ORDER_BLOCK_ROUTE}" | production: ${SEND_BACK_DENIED_BODY.includes(
+    "call into support",
+  )}`,
+  /chat/i.test(STANDING_ORDER_BLOCK_ROUTE) &&
+    !/\bcall\b/i.test(STANDING_ORDER_BLOCK_ROUTE) &&
+    !/\bcall\b/i.test(STANDING_ORDER_BLOCK_CHAT) &&
+    SEND_BACK_DENIED_BODY.includes("call into support"),
 );
 /**
  * ⛔ And it says so: this copy is PROPOSED, unlike the penalty dialog's, whose
@@ -3628,20 +3741,41 @@ const gridHandler = SB_SOURCES.more.slice(
     : SB_SOURCES.more.length,
 );
 /**
- * ⚠️ Updated in B3b. It used to require `setSendBackReasonOpen(true)` directly
- * inside the branch — the proposal's first step, hard-wired. Production's path
- * does not collect a reason at all, so the branch now opens whichever step the
- * computed path starts with. The interception itself is what this asserts; §24
- * runs the two sequences.
+ * ⚠️ Updated twice. B3b removed a hard-wired `setSendBackReasonOpen(true)`, so
+ * the branch opened whichever step the computed path started with — but as an
+ * `if (first === "reason") … else confirm`.
+ *
+ * ⛔⛔ **That `else` was a trapdoor**, and 2026-10-16 is when it would have
+ * opened: a path beginning `standing-order-chat` is not `"reason"`, so a
+ * standing-order driver would have been shown production's *"are you sure?"*
+ * and then nothing at all. The dispatch is now an exhaustive `switch` with a
+ * `never` default, so the NEXT new step is a type error rather than a wrong
+ * screen. This asserts the interception and the dispatch; §24 runs the
+ * sequences.
  */
 check(
   "Send Back Trip is intercepted in the grid handler, and returns",
-  `branch present: ${gridHandler.includes('if (id === "send-back")')}; keyed on the path: ${/sendBackPath\[0\] === "reason"/.test(gridHandler)}`,
-  /if \(id === "send-back"\)[\s\S]{0,1400}sendBackPath\[0\] === "reason"[\s\S]{0,400}return;/.test(
+  `branch present: ${gridHandler.includes('if (id === "send-back")')}; dispatches on the path: ${/openSendBackStep\(sendBackPath\[0\]\)/.test(
     gridHandler,
-  ) &&
-    /setSendBackReasonOpen\(true\)/.test(gridHandler) &&
-    /setSendBackConfirmOpen\(true\)/.test(gridHandler),
+  )}`,
+  /if \(id === "send-back"\)[\s\S]{0,1600}openSendBackStep\(sendBackPath\[0\]\)[\s\S]{0,200}return;/.test(
+    gridHandler,
+  ),
+);
+/**
+ * ⛔⛔ **The dispatcher is exhaustive, and the `never` is what proves it.**
+ * Without it a new `SendBackStep` compiles, falls through, and opens nothing —
+ * which in a walkthrough reads as the flow simply ending.
+ */
+check(
+  "...and the dispatcher cannot silently drop a step",
+  `never-guard: ${/const unreachable: never = step;/.test(codeOnly(SB_SOURCES.more))}; cases: ${
+    (codeOnly(SB_SOURCES.more).match(/case "(reason|confirm|standing-order-chat|penalty|denied)":/g) ?? [])
+      .length
+  } of 5`,
+  /const unreachable: never = step;/.test(codeOnly(SB_SOURCES.more)) &&
+    (codeOnly(SB_SOURCES.more).match(/case "(reason|confirm|standing-order-chat|penalty|denied)":/g) ?? [])
+      .length === 5,
 );
 check(
   "the send-back is recorded for Support but tracks no status",
@@ -3654,14 +3788,39 @@ check(
   /if \(!next\) setSendBackValues\(null\)/.test(SB_SOURCES.more),
 );
 
-/** ⛔ Out of scope by user direction, asserted as an ABSENCE. */
-const ROW_13 = SOLUTIONS.find((s) => s.id === "send-back-reason-form")!;
+/**
+ * ⛔⛔ **Two different kinds of "no", and the row must not conflate them.**
+ *
+ * Until 2026-10-16 both sat under `⚠️ Not in prototype yet`: lifting the
+ * Standing Order block was "being handled separately", and reason-weighted
+ * scoring was row 15's. Lifting the block is now an explicit NON-GOAL — the
+ * proposal deliberately keeps it — while scoring is still merely deferred.
+ *
+ * ⛔ Asserted POSITIONALLY: the block must be named in the head, before the
+ * deferral marker, and the scoring must be named after it. A substring test
+ * over the whole string would pass with the two swapped, which is the exact
+ * misreading this check exists to prevent — a reader would take "we are not
+ * lifting the block" as "we have not got to it yet".
+ */
+const ROW_14 = SOLUTIONS.find((s) => s.id === "send-back-reason-form")!;
+const RF_ROW14_MARKER = "⚠️ Not in prototype yet";
+const RF_ROW14_AT = ROW_14.proposedFeature.indexOf(RF_ROW14_MARKER);
+const RF_ROW14_HEAD = RF_ROW14_AT < 0 ? "" : ROW_14.proposedFeature.slice(0, RF_ROW14_AT);
+const RF_ROW14_TAIL = RF_ROW14_AT < 0 ? "" : ROW_14.proposedFeature.slice(RF_ROW14_AT);
 check(
-  "row 14 flags the two things it deliberately does NOT do",
-  ROW_13.proposedFeature.slice(-120),
-  ROW_13.proposedFeature.includes("⚠️ Not in prototype yet") &&
-    /Standing Order block/i.test(ROW_13.proposedFeature) &&
-    /row 15|scoring/i.test(ROW_13.proposedFeature),
+  "row 14 separates what it will not do from what it has not done yet",
+  RF_ROW14_AT < 0
+    ? "NO DEFERRAL MARKER"
+    : `head names the block: ${/Standing Order block/i.test(RF_ROW14_HEAD)}; tail defers scoring: ${/row 15|scoring/i.test(
+        RF_ROW14_TAIL,
+      )}`,
+  RF_ROW14_AT > 0 &&
+    // ⛔ The block is a stated non-goal, in the head, and NOT a deferral.
+    /Standing Order block/i.test(RF_ROW14_HEAD) &&
+    /not lifted/i.test(RF_ROW14_HEAD) &&
+    !/Standing Order block/i.test(RF_ROW14_TAIL) &&
+    // ⛔ ...while scoring still is one.
+    /row 15|scoring/i.test(RF_ROW14_TAIL),
 );
 check(
   "...and rows 15 and 21 stay unbuilt, still gated on the scoring policy",
@@ -7877,11 +8036,16 @@ check(
 if (STANDING && PLAIN_SEND_BACK) {
   const PATHS: Array<{ why: string; trip: Trip; focus: DemoFocus; want: string[] }> = [
     { why: "standing order, Now", trip: STANDING, focus: NOW_13, want: ["confirm", "denied"] },
-    { why: "standing order, Proposed", trip: STANDING, focus: FIXED_13, want: ["reason", "confirm", "standing-order"] },
+    // ⛔⛔ **One step, and it is terminal.** Until 2026-10-16 this read
+    // `reason → confirm → standing-order`: the proposal collected a reason and
+    // then let the standing order be sent back, which production refuses. The
+    // proposal is now SHORTER than production's, not longer — it says no on the
+    // first tap, where production says it on the third.
+    { why: "standing order, Proposed", trip: STANDING, focus: FIXED_13, want: ["standing-order-chat"] },
     { why: "ordinary ride, Now", trip: PLAIN_SEND_BACK, focus: NOW_13, want: ["confirm"] },
     { why: "ordinary ride, Proposed", trip: PLAIN_SEND_BACK, focus: FIXED_13, want: ["reason", "confirm"] },
     // ⚠️ The plain mirror shows every proposal, so it keeps the reason form.
-    { why: "standing order, plain mirror", trip: STANDING, focus: PLAIN, want: ["reason", "confirm", "standing-order"] },
+    { why: "standing order, plain mirror", trip: STANDING, focus: PLAIN, want: ["standing-order-chat"] },
   ];
   const pathWrong = PATHS.filter(
     (c) => sendBackSteps(c.trip, c.focus).join(" → ") !== c.want.join(" → "),
@@ -7921,27 +8085,50 @@ if (STANDING && PLAIN_SEND_BACK) {
       nowStanding.length === 2 &&
       sendBackCompletes(nowStanding) === false,
   );
-  /** ⚠️ ...while the PROPOSED path on that same trip raises all four screens. */
+  /**
+   * ⛔⛔ **...and the PROPOSED path on that same trip is ONE screen.**
+   *
+   * Until 2026-10-16 this asserted all four — `reason → confirm →
+   * standing-order → penalty` — and the comment above it flagged four screens
+   * as "a lot to put in front of a driver". The block removes three of them,
+   * and the one it keeps is a refusal rather than a warning: nothing is being
+   * sent back, so there is no reason to collect and no penalty to levy.
+   */
   check(
-    "...and the proposal still raises both warnings on that same trip",
-    `${sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ")}`,
-    sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ") ===
-      "reason → confirm → standing-order → penalty",
+    "...and the proposal blocks that same trip in one screen",
+    `${sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ")}; completes=${sendBackCompletes(
+      sendBackSteps(STANDING_AND_SHORT, FIXED_13),
+    )}`,
+    sendBackSteps(STANDING_AND_SHORT, FIXED_13).join(" → ") === "standing-order-chat" &&
+      sendBackCompletes(sendBackSteps(STANDING_AND_SHORT, FIXED_13)) === false,
   );
   /**
-   * ⛔ Every other path still completes, or this is a block not a gate.
+   * ⛔⛔ **Exactly which paths are blocked, declared by name.**
    *
-   * ⭐⭐ Including the PROPOSED standing-order path, and that is a recorded
-   * decision rather than an accident: user direction, 2026-10-14, *"leave it,
-   * the proposal is about reasons not permissions."* Row 14 proposes collecting
-   * a reason, not lifting production's block. This check is what stops either
-   * half of that being changed quietly.
+   * ⭐⭐ **Every standing-order path now is — and that is the reversal.** Until
+   * 2026-10-16 only production's refused, on a recorded decision (*"leave it,
+   * the proposal is about reasons not permissions"*): the proposal collected a
+   * reason and then let the trip go back, which production does not allow. User
+   * direction supersedes it. The block is not lifted on either side; what the
+   * proposal changes is that the driver is handed to chat instead of a phone
+   * number, on the first tap instead of the third.
+   *
+   * ⛔ Declared as a name list, not a count. A count would go green if the
+   * wrong three were blocked.
    */
+  const RF24_BLOCKED_PATHS = [
+    "standing order, Now",
+    "standing order, Proposed",
+    "standing order, plain mirror",
+  ];
   const blocked = PATHS.filter((c) => !sendBackCompletes(sendBackSteps(c.trip, c.focus)));
   check(
-    "...while every other path still finishes",
+    "...while every path that is not a standing order still finishes",
     `${blocked.length} of ${PATHS.length} blocked — ${blocked.map((c) => c.why).join(", ")}`,
-    blocked.length === 1 && blocked[0].why === "standing order, Now",
+    blocked.map((c) => c.why).sort().join(" | ") ===
+      [...RF24_BLOCKED_PATHS].sort().join(" | ") &&
+      // ⛔ Non-vacuity: something still completes, or "blocked" means nothing.
+      blocked.length < PATHS.length,
   );
   /**
    * ⛔ The reason form is row 14's entire proposal, so it must appear on exactly
@@ -7950,23 +8137,37 @@ if (STANDING && PLAIN_SEND_BACK) {
   const reasonInNow = [STANDING, PLAIN_SEND_BACK].filter((t) =>
     sendBackSteps(t, NOW_13).includes("reason"),
   );
-  check(
-    "...and production's path never collects a reason",
-    `${reasonInNow.length} of 2 ride(s) ask for one in Now`,
-    reasonInNow.length === 0 &&
-      sendBackSteps(STANDING, FIXED_13).includes("reason") &&
-      sendBackSteps(PLAIN_SEND_BACK, FIXED_13).includes("reason"),
-  );
   /**
-   * ⚠️ **Our standing-order warning never shows in Now.** It is flagged in its
-   * own component as proposed copy, and production warns about nothing — it
-   * refuses. Showing it beside the refusal would read as production's.
+   * ⚠️ **The proposal half is now the ORDINARY ride alone.** A standing order
+   * is blocked before anything is asked, so it collects no reason on either
+   * side — and the positive control has to come from a ride that can actually
+   * be sent back, or this check would be demanding the old flow back.
    */
   check(
-    "...and our standing-order warning stays out of production's path",
-    `Now: ${sendBackSteps(STANDING, NOW_13).join(" → ")}`,
-    !sendBackSteps(STANDING, NOW_13).includes("standing-order") &&
-      sendBackSteps(STANDING, FIXED_13).includes("standing-order"),
+    "...and production's path never collects a reason",
+    `Now: ${reasonInNow.length} of 2 ride(s) ask for one | Proposed ordinary: ${sendBackSteps(
+      PLAIN_SEND_BACK,
+      FIXED_13,
+    ).includes("reason")} | Proposed standing order: ${sendBackSteps(STANDING, FIXED_13).includes(
+      "reason",
+    )}`,
+    reasonInNow.length === 0 &&
+      // ⛔ The positive control: the proposal DOES collect one, where it can.
+      sendBackSteps(PLAIN_SEND_BACK, FIXED_13).includes("reason") &&
+      // ⛔ ...and never from a blocked standing order, on either side.
+      !sendBackSteps(STANDING, FIXED_13).includes("reason"),
+  );
+  /**
+   * ⚠️ **Our standing-order block never shows in Now.** Its copy is flagged in
+   * its own component as proposed, and production does not warn — it refuses,
+   * in its own words. Showing ours beside production's would read as if the app
+   * already said this.
+   */
+  check(
+    "...and our standing-order block stays out of production's path",
+    `Now: ${sendBackSteps(STANDING, NOW_13).join(" → ")} | Proposed: ${sendBackSteps(STANDING, FIXED_13).join(" → ")}`,
+    !sendBackSteps(STANDING, NOW_13).includes("standing-order-chat") &&
+      sendBackSteps(STANDING, FIXED_13).includes("standing-order-chat"),
   );
 }
 
@@ -7984,13 +8185,36 @@ check(
   /sendBackPath\.includes\("denied"\)/.test(codeOnly(MORE_SRC)) &&
     /sendBackSteps\(trip, demo\)/.test(codeOnly(MORE_SRC)),
 );
-/** ⛔ And the refusal is checked BEFORE our warning, or the warning wins. */
+/**
+ * ⛔⛔ **Our block is not reachable from the confirmation handler at all.**
+ *
+ * This used to assert an ORDER — refusal before warning — because both lived in
+ * `handleSendBackConfirmed` and whichever came first won. Since 2026-10-16 the
+ * block is raised from the grid tile instead, before any confirmation, so an
+ * ordering claim would be asserting against code that no longer exists. The
+ * stronger statement is available now: the confirmation handler knows nothing
+ * about standing orders, and the only terminal it can reach is production's.
+ *
+ * ⚠️ Non-vacuity matters here — "not present" is also what an empty or renamed
+ * handler looks like — so the refusal branch is asserted present in the same
+ * slice.
+ */
+const RF24_CONFIRM_HANDLER = (() => {
+  const src = codeOnly(MORE_SRC);
+  const at = src.indexOf("function handleSendBackConfirmed()");
+  return at < 0 ? "" : src.slice(at, src.indexOf("\n  }", at));
+})();
 check(
-  "...and it checks the refusal before reaching our warning",
-  `denied at ${codeOnly(MORE_SRC).indexOf('sendBackPath.includes("denied")')}, warning at ${codeOnly(MORE_SRC).indexOf("setStandingOrderOpen(true)")}`,
-  codeOnly(MORE_SRC).indexOf('sendBackPath.includes("denied")') > 0 &&
-    codeOnly(MORE_SRC).indexOf('sendBackPath.includes("denied")') <
-      codeOnly(MORE_SRC).indexOf("setStandingOrderOpen(true)"),
+  "...and the confirmation handler reaches production's refusal, never our block",
+  RF24_CONFIRM_HANDLER
+    ? `handler ${RF24_CONFIRM_HANDLER.length} chars; denied: ${RF24_CONFIRM_HANDLER.includes(
+        'sendBackPath.includes("denied")',
+      )}; block: ${RF24_CONFIRM_HANDLER.includes("setStandingOrderOpen(true)")}`
+    : "HANDLER NOT FOUND",
+  RF24_CONFIRM_HANDLER.length > 100 &&
+    RF24_CONFIRM_HANDLER.includes('sendBackPath.includes("denied")') &&
+    !RF24_CONFIRM_HANDLER.includes("setStandingOrderOpen(true)") &&
+    !RF24_CONFIRM_HANDLER.includes("isStandingOrder"),
 );
 check(
   "...and the refusal dialog is mounted",
@@ -13338,6 +13562,143 @@ check(
   `${SPOKE_WITH_OPTIONS.length} option(s): ${SPOKE_WITH_OPTIONS.map((o) => o.label).join(" · ")}`,
   SPOKE_WITH_OPTIONS.length === 2 &&
     SPOKE_WITH_OPTIONS.every((o) => !RF39_DENIAL.test(o.label)),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n40. The support chat opens on the right conversation");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **Routing a second case at the chat screen would have LIED.**
+ * `ZendeskChatScreen` auto-sends its template the instant it opens, and that
+ * template was hard-wired to row 17's. A standing-order driver sent there
+ * unchanged would have opened a chat whose first and only message reads *"My
+ * member no longer needs transportation"* — over a trip whose member needs it
+ * fine, auto-sent, under the driver's own name.
+ *
+ * ⚠️ Caught by reading the screen before reusing it, not by a gate. These
+ * checks are the gate.
+ */
+const RF40_SO = mockInProgressTrips.find(isStandingOrder)
+  ?? mockNeedsActionTrips.find(isStandingOrder)
+  ?? mockUpcomingTrips.find(isStandingOrder);
+check(
+  "a standing-order ride is seeded to build the message from",
+  RF40_SO ? `${RF40_SO.scenario?.code ?? RF40_SO.id}` : "NONE",
+  RF40_SO !== undefined,
+);
+if (RF40_SO) {
+  const decline = zendeskDeclineMessage(RF40_SO);
+  const standing = zendeskStandingOrderMessage(RF40_SO);
+  /**
+   * ⛔⛔ The two templates must differ in their INTRO — the sentence the driver
+   * is made to say. Comparing whole objects would pass on two messages that
+   * share an intro and differ only in a trip id.
+   */
+  check(
+    "the standing-order chat says something different from the declined one",
+    `standing: "${standing.intro.slice(0, 48)}…" | declined: "${decline.intro.slice(0, 48)}…"`,
+    standing.intro !== decline.intro &&
+      standing.intro.length > 0 &&
+      !/no longer needs transportation/i.test(standing.intro),
+  );
+  /**
+   * ⛔ It names the standing order, which is the one fact Support needs that
+   * the decline template has no field for.
+   */
+  check(
+    "...and it names the standing order it is about",
+    standing.lines.map((l) => l.label).join(" · "),
+    standing.lines.some((l) => l.label === "Standing Order" && l.value.length > 0) &&
+      standing.lines.some((l) => l.value === RF40_SO.id),
+  );
+  /**
+   * ⛔⛔ **No reason line.** The block arrives before any form, so the driver has
+   * given no reason — a prefilled one would be the form this flow deliberately
+   * does not have, filled in on their behalf.
+   */
+  check(
+    "...and it puts no reason in the driver's mouth",
+    `${standing.lines.length} line(s): ${standing.lines.map((l) => l.label).join(", ")}`,
+    !standing.lines.some((l) => /reason|why/i.test(l.label)),
+  );
+  /**
+   * ⛔⛔ **The screen picks by topic, and the default is row 17's.** Every URL
+   * that existed before this module resolves to exactly what it did before —
+   * a query parameter appearing on row 17's link would be this change reaching
+   * a screen it was meant to leave alone.
+   */
+  check(
+    "the default topic is row 17's, and its route is unchanged",
+    `default=${DEFAULT_SUPPORT_CHAT_TOPIC}; route=${supportChatRoute(RF40_SO.id, DEFAULT_SUPPORT_CHAT_TOPIC)}`,
+    DEFAULT_SUPPORT_CHAT_TOPIC === "rider-declined" &&
+      supportChatRoute(RF40_SO.id, DEFAULT_SUPPORT_CHAT_TOPIC) === `/support-chat/${RF40_SO.id}` &&
+      supportChatMessage(RF40_SO, DEFAULT_SUPPORT_CHAT_TOPIC).intro === decline.intro,
+  );
+  check(
+    "...and the standing-order route carries its topic",
+    supportChatRoute(RF40_SO.id, "standing-order-send-back"),
+    supportChatRoute(RF40_SO.id, "standing-order-send-back") ===
+      `/support-chat/${RF40_SO.id}?topic=standing-order-send-back` &&
+      supportChatMessage(RF40_SO, "standing-order-send-back").intro === standing.intro,
+  );
+  /**
+   * ⛔ **Strips, never refuses.** A stale or hand-typed link still opens the
+   * driver's chat. ⚠️ Both halves asserted — a function that returned the
+   * default for EVERYTHING would also pass the first.
+   */
+  check(
+    "an unknown topic falls back rather than 404ing",
+    `"nonsense" → ${supportChatTopicFrom("nonsense")}; undefined → ${supportChatTopicFrom(
+      undefined,
+    )}; known → ${supportChatTopicFrom("standing-order-send-back")}`,
+    supportChatTopicFrom("nonsense") === DEFAULT_SUPPORT_CHAT_TOPIC &&
+      supportChatTopicFrom(undefined) === DEFAULT_SUPPORT_CHAT_TOPIC &&
+      supportChatTopicFrom("standing-order-send-back") === "standing-order-send-back",
+  );
+}
+/** ⚠️ Every declared topic has a message builder, or a route opens on nothing. */
+check(
+  "every topic the registry declares can build a message",
+  `${SUPPORT_CHAT_TOPICS.length} topic(s): ${SUPPORT_CHAT_TOPICS.join(" · ")}`,
+  SUPPORT_CHAT_TOPICS.length === 2 &&
+    SUPPORT_CHAT_TOPICS.every(
+      (t) => supportChatMessage(mockUpcomingTrips[0], t).intro.length > 0,
+    ),
+);
+/**
+ * ⛔ The screen must take the topic rather than reach for one template. A
+ * component importing `zendeskDeclineMessage` directly is the hard-wiring this
+ * section exists to prevent.
+ */
+const RF40_CHAT_SRC = readFileSync(
+  join(ROOT, "components/driver/zendesk-chat-screen.tsx"),
+  "utf8",
+);
+check(
+  "the chat screen reads its message from the topic, not from one case",
+  `supportChatMessage: ${RF40_CHAT_SRC.includes("supportChatMessage")}; zendeskDeclineMessage: ${RF40_CHAT_SRC.includes(
+    "zendeskDeclineMessage",
+  )}`,
+  RF40_CHAT_SRC.includes("supportChatMessage(trip, topic)") &&
+    !codeOnly(RF40_CHAT_SRC).includes("zendeskDeclineMessage"),
+);
+/**
+ * ⛔⛔ And the block actually goes there, with the right topic named. A dialog
+ * whose primary action routes nowhere is the dead end this row removes.
+ */
+check(
+  "Contact Support routes to the chat on the standing-order topic",
+  `supportChatRoute: ${codeOnly(MORE_SRC).includes("supportChatRoute(trip.id, \"standing-order-send-back\")")}`,
+  codeOnly(MORE_SRC).includes('supportChatRoute(trip.id, "standing-order-send-back")') &&
+    codeOnly(MORE_SRC).includes("function handleContactSupport()"),
+);
+/** ⚠️ Both terminals are declared in one place, so "can this finish?" has one answer. */
+check(
+  "the terminal steps are declared, and both are present",
+  `${SEND_BACK_TERMINAL_STEPS.length}: ${SEND_BACK_TERMINAL_STEPS.join(" · ")}`,
+  SEND_BACK_TERMINAL_STEPS.length === 2 &&
+    SEND_BACK_TERMINAL_STEPS.includes("denied") &&
+    SEND_BACK_TERMINAL_STEPS.includes("standing-order-chat"),
 );
 
 // ---------------------------------------------------------------------------

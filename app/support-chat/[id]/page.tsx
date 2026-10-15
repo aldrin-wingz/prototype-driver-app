@@ -5,6 +5,10 @@ import { notFound } from "next/navigation";
 
 import { ZendeskChatScreen } from "@/components/driver/zendesk-chat-screen";
 import {
+  SUPPORT_CHAT_TOPIC_PARAM,
+  supportChatTopicFrom,
+} from "@/lib/driver-data/support-chat";
+import {
   mockCompletedTrips,
   mockInProgressTrips,
   mockNeedsActionTrips,
@@ -26,10 +30,19 @@ import {
  */
 export default function SupportChatPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = use(params);
+  /**
+   * ⛔ Which conversation to open with. `supportChatTopicFrom` STRIPS an
+   * unknown value rather than refusing it, so a stale or hand-typed link still
+   * opens the driver's chat instead of 404ing — and row 17's parameterless URL
+   * resolves to its own topic, unchanged.
+   */
+  const topic = supportChatTopicFrom(use(searchParams)[SUPPORT_CHAT_TOPIC_PARAM]);
   // ⚠️ Every pool, matching `my-rides/[id]` — a declined ride can be in any of
   // them, and a lookup narrower than the screen it was reached from would 404
   // on a trip the driver was just looking at.
@@ -41,5 +54,5 @@ export default function SupportChatPage({
     ...mockRequestTrips,
   ].find((candidate) => candidate.id === id);
   if (!trip) notFound();
-  return <ZendeskChatScreen trip={trip} />;
+  return <ZendeskChatScreen trip={trip} topic={topic} />;
 }

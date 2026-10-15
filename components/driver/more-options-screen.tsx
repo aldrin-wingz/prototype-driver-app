@@ -76,7 +76,9 @@ import {
   isStandingOrder,
   sendBackSteps,
   SEND_BACK_PENALTY_USD,
+  type SendBackStep,
 } from "@/lib/driver-data/send-back-reasons";
+import { supportChatRoute } from "@/lib/driver-data/support-chat";
 import { ISSUE_SEND_BACK_REASON } from "@/lib/support-data/issue-types";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
@@ -588,6 +590,46 @@ export function MoreOptionsScreen({
   }
 
   /**
+   * Open whichever surface the path BEGINS with.
+   *
+   * ⛔⛔ **Exhaustive on purpose.** This was `if (first === "reason") … else
+   * confirm`, and that `else` was a trapdoor: any path starting with something
+   * new fell silently into production's confirmation. Adding
+   * `standing-order-chat` would have shown a standing-order driver *"are you
+   * sure?"* and then nothing at all — a dead tap that looks like a bug and
+   * reads, in a walkthrough, like the flow simply ending. The `never` case
+   * turns the next new step into a type error instead of a wrong screen.
+   *
+   * ⚠️ `penalty` and `denied` cannot begin a path today. They are handled
+   * anyway, because "cannot happen" is the premise the `else` was built on.
+   */
+  function openSendBackStep(step: SendBackStep | undefined) {
+    switch (step) {
+      case "reason":
+        setSendBackReasonOpen(true);
+        return;
+      case "confirm":
+        setTimeout(() => setSendBackConfirmOpen(true), 0);
+        return;
+      case "standing-order-chat":
+        setTimeout(() => setStandingOrderOpen(true), 0);
+        return;
+      case "penalty":
+        setTimeout(() => setSendBackPenaltyOpen(true), 0);
+        return;
+      case "denied":
+        setTimeout(() => setSendBackDeniedOpen(true), 0);
+        return;
+      case undefined:
+        return;
+      default: {
+        const unreachable: never = step;
+        return unreachable;
+      }
+    }
+  }
+
+  /**
    * The reason step is done. Production's own "are you sure" follows — it is
    * raised on every send-back, so there is no branch here.
    *
@@ -619,10 +661,13 @@ export function MoreOptionsScreen({
       setTimeout(() => setSendBackDeniedOpen(true), 0);
       return;
     }
-    if (isStandingOrder(trip)) {
-      setTimeout(() => setStandingOrderOpen(true), 0);
-      return;
-    }
+    /**
+     * ⛔ **No standing-order branch here any more.** A standing order never
+     * reaches this handler on either side: production refuses it after the
+     * confirmation (`denied`, above), and the proposal blocks it before the
+     * confirmation ever opens. A branch here would be unreachable code that
+     * reads like a third path.
+     */
     if (isShortNoticeSendBack(trip)) {
       setTimeout(() => setSendBackPenaltyOpen(true), 0);
       return;
@@ -631,17 +676,24 @@ export function MoreOptionsScreen({
   }
 
   /**
-   * The standing-order warning was accepted. The penalty warning still follows
-   * if this trip is also short-notice — two different consequences, and neither
-   * stands in for the other.
+   * `Contact Support` on the standing-order block.
+   *
+   * ⛔⛔ **Nothing is sent back.** The trip stays on the manifest and the
+   * driver leaves the ride for the chat, exactly as row 17's dead end does —
+   * except here that is the destination rather than the complaint, because the
+   * block is production's and is not ours to lift.
+   *
+   * ⛔ **No penalty screen on the way.** It used to follow this dialog when the
+   * trip was also short-notice; it must not now, because nothing is being sent
+   * back to be penalised for. Four screens became one.
+   *
+   * ⚠️ The topic is named, so the chat auto-sends the standing-order template
+   * rather than row 17's *"my member no longer needs transportation"* — which
+   * would be a false statement, auto-sent, under the driver's name.
    */
-  function handleStandingOrderAccepted() {
+  function handleContactSupport() {
     setStandingOrderOpen(false);
-    if (isShortNoticeSendBack(trip)) {
-      setTimeout(() => setSendBackPenaltyOpen(true), 0);
-      return;
-    }
-    completeSendBack();
+    router.push(supportChatRoute(trip.id, "standing-order-send-back"));
   }
 
   /**
@@ -709,11 +761,7 @@ export function MoreOptionsScreen({
        * opening the reason form from the tile. The first step of a sequence is
        * part of the sequence.
        */
-      if (sendBackPath[0] === "reason") {
-        setSendBackReasonOpen(true);
-      } else {
-        setTimeout(() => setSendBackConfirmOpen(true), 0);
-      }
+      openSendBackStep(sendBackPath[0]);
       return;
     }
     if (id === "auto-assign") {
@@ -916,12 +964,13 @@ export function MoreOptionsScreen({
         open={standingOrderOpen}
         onOpenChange={(next) => {
           setStandingOrderOpen(next);
-          // ⛔ Cancelling here abandons the whole send-back, answers included.
-          // The trip stays with the driver, which is what "Cancel" has to mean
-          // on a screen asking whether they are sure.
+          // ⛔ Dismissing keeps the trip. There are no held answers to clear
+          // any more — the block arrives before the reason form, so nothing was
+          // collected — but the reset stays as a guard against a future path
+          // that reaches this dialog with values in hand.
           if (!next) setSendBackValues(null);
         }}
-        onConfirm={handleStandingOrderAccepted}
+        onContactSupport={handleContactSupport}
       />
       <SendBackPenaltyDialog
         open={sendBackPenaltyOpen}

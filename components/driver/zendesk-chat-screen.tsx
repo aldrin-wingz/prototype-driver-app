@@ -6,13 +6,24 @@ import { Header } from "@/components/driver/header";
 import {
   ZENDESK_COMPOSER_PLACEHOLDER,
   ZENDESK_SENT_STATUS,
-  zendeskDeclineMessage,
 } from "@/lib/driver-data/rider-declined";
+import {
+  DEFAULT_SUPPORT_CHAT_TOPIC,
+  supportChatMessage,
+  type SupportChatTopic,
+} from "@/lib/driver-data/support-chat";
 import type { Trip } from "@/lib/driver-data/mock-trips";
 
 /**
- * The Zendesk support chat, as production leaves it — catalogue row **16**'s
- * Now side.
+ * The Zendesk support chat — catalogue row **17**'s Now side, and row **14**'s
+ * PROPOSED destination for a standing order.
+ *
+ * ⛔⛔ **One surface, two valences, and that is not a contradiction.** For
+ * row 17 the chat is the dead end the proposal exists to replace: the app could
+ * have handled it and did not. For row 14 the block is real and is NOT being
+ * lifted, so Support genuinely has to do it — and chat beats production's
+ * *"call into support"*. Same screen, opposite argument, which is why it takes
+ * a `topic` rather than being copied.
  *
  * ⭐⭐ **This is the dead end.** Tapping `Chat with Support` on the declined
  * sheet opens this and **auto-sends** the template; the driver typed nothing and
@@ -38,8 +49,19 @@ import type { Trip } from "@/lib/driver-data/mock-trips";
  *
  * ⚠️ Zendesk chat is NOT the in-app chat. Different surface, different product.
  */
-export function ZendeskChatScreen({ trip }: { trip: Trip }) {
-  const message = zendeskDeclineMessage(trip);
+export function ZendeskChatScreen({
+  trip,
+  topic = DEFAULT_SUPPORT_CHAT_TOPIC,
+}: {
+  trip: Trip;
+  /**
+   * ⛔ Which conversation this is. Defaults to row 17's, so every existing
+   * caller renders exactly what it rendered before this prop existed — the
+   * screen gained a second topic, it did not change its first.
+   */
+  topic?: SupportChatTopic;
+}) {
+  const message = supportChatMessage(trip, topic);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0B0F10]">

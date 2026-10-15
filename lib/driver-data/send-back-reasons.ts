@@ -3,7 +3,7 @@ import type { SupportFieldOption } from "@/types/support";
 import type { Trip } from "./mock-trips";
 
 /**
- * Catalogue row **13** — `Send-back`, 609 calls. The reason a driver gives when
+ * Catalogue row **14** — `Send-back`, 609 calls. The reason a driver gives when
  * they send a trip back.
  *
  * ⛔⛔ **"Send-back reason" ALREADY MEANS SOMETHING ELSE, and the two will be
@@ -213,11 +213,26 @@ export function isStandingOrder(trip: Trip): boolean {
 export type SendBackStep =
   | "reason"
   | "confirm"
-  | "standing-order"
+  | "standing-order-chat"
   | "penalty"
   | "denied";
 
-/** Catalogue row **13**, which owns the reason form. */
+/**
+ * ⛔⛔ **The steps that END the flow.** A path containing one of these files
+ * nothing — the trip stays on the manifest.
+ *
+ * ⚠️ Declared as a list rather than hard-coded into `sendBackCompletes`, because
+ * there are now TWO terminals for two different reasons: production refuses
+ * (`denied`), and the proposal hands the driver to Support (`standing-order-chat`).
+ * A reader asking "can this path finish?" should find one list, not a boolean
+ * expression that grew an `&&`.
+ */
+export const SEND_BACK_TERMINAL_STEPS: readonly SendBackStep[] = [
+  "denied",
+  "standing-order-chat",
+];
+
+/** Catalogue row **14**, which owns the reason form. */
 export const SEND_BACK_SOLUTIONS: readonly string[] = ["send-back-reason-form"];
 
 /**
@@ -239,6 +254,64 @@ export const SEND_BACK_DENIED_TITLE = "Send-back request failed";
 export const SEND_BACK_DENIED_BODY =
   "Standing Order Trips cannot be sent back via the Driver App. To send back this trip, please call into support for assistance.";
 export const SEND_BACK_DENIED_DISMISS = "OK";
+
+/**
+ * ⛔⛔ **OURS, not production's** — and the difference IS the proposal.
+ * Production's refusal above ends at *call into support for assistance*: a phone
+ * number, reached two taps in, after a confirmation that was never going to
+ * matter. This says the same no on the FIRST tap, and hands the driver to chat.
+ *
+ * ⚠️ Treat a screenshot of this as a proposal to review, never as a replicated
+ * screen. Nothing in the vault captures an app that offers it.
+ *
+ * ⛔ The consequence sentence is kept from the warning this replaced. It is why
+ * Support is in the loop at all — a driver who learns what a send-back costs the
+ * whole schedule may decide not to send it back, and that is the better outcome
+ * for everyone including them.
+ */
+export const STANDING_ORDER_BLOCK_TITLE = "This is a standing order";
+export const STANDING_ORDER_BLOCK_WHY =
+  "This member rides with you on a set schedule, so this trip cannot be sent back from the app.";
+export const STANDING_ORDER_BLOCK_COST =
+  "Sending back one trip can cost you the whole standing order — the client can reassign every future trip to another driver.";
+/**
+ * ⚠️ Kept from the warning this replaced (`140b9e7`). It is still true after
+ * the block — Support sending the trip back is still a send-back — and dropping
+ * it would be a copy change nobody asked for, smuggled in under a flow change.
+ */
+export const STANDING_ORDER_BLOCK_RISK =
+  "Standing orders are the trips clients depend on most. Sending them back can also put your account at risk of suspension.";
+export const STANDING_ORDER_BLOCK_ROUTE =
+  "Support can send it back for you. Start a chat and tell them why.";
+export const STANDING_ORDER_BLOCK_CHAT = "Contact Support";
+export const STANDING_ORDER_BLOCK_DISMISS = "Keep the trip";
+
+/**
+ * What the chat opens with, auto-sent the way row 17's is.
+ *
+ * ⛔ **No reason line.** The block arrives before any form, so the driver has
+ * not given one — and prefilling a field they never filled would be the form
+ * this flow deliberately does not have. They type it into the chat.
+ *
+ * ⚠️ Pure and exported so a check can build the real message rather than grep a
+ * component for a line, the same reason `zendeskDeclineMessage` is.
+ */
+export const ZENDESK_STANDING_ORDER_INTRO =
+  "I need help sending back a standing order trip. The Driver App cannot send it back for me.";
+
+export function zendeskStandingOrderMessage(
+  trip: Trip
+): { intro: string; lines: Array<{ label: string; value: string }> } {
+  return {
+    intro: ZENDESK_STANDING_ORDER_INTRO,
+    lines: [
+      { label: "Member Name", value: trip.rider },
+      { label: "Trip Date", value: trip.date },
+      { label: "Trip ID", value: trip.id },
+      { label: "Standing Order", value: trip.standingOrderId ?? "—" },
+    ],
+  };
+}
 
 /** Production's own popup is built — see `SendBackConfirmDialog`. */
 export const SEND_BACK_CONFIRM_BUILT = true;
@@ -270,28 +343,34 @@ export function sendBackSteps(trip: Trip, focus: DemoFocus): SendBackStep[] {
   }
 
   /**
-   * ⛔⛔ **The proposal still lets a standing order be sent back, and that is a
-   * DECISION, not an oversight.** User direction, 2026-10-14: *"leave it, the
-   * proposal is about reasons not permissions."*
+   * ⛔⛔ **A standing order never reaches the reason form.** It is blocked on
+   * the first tap and handed to Support chat — user direction, 2026-10-16.
    *
-   * Production refuses outright (`CAP-330`). Row 14 proposes collecting a
-   * reason on every send-back; it does not propose lifting the block, and a
-   * prototype that quietly lifted it would be arguing for a change nobody
-   * asked for — on the row whose whole point is a smaller one.
+   * ⚠️ **This SUPERSEDES the decision of 2026-10-14**, under which the proposal
+   * collected a reason and then let the standing order be sent back: *"leave it,
+   * the proposal is about reasons not permissions."* That reading is kept here
+   * because it is the argument the current rule had to beat — it held that
+   * lifting production's block would be arguing for a change nobody asked for.
+   * The new direction agrees, and goes further: the block is not lifted at all.
+   * What changes is that the driver is given somewhere to go.
    *
-   * ⚠️ So the comparison on a standing order is deliberately lopsided: Now
-   * refuses, Proposed proceeds. Anyone reading that as a bug should read this
-   * first. §24 asserts the Proposed path still completes, so the decision
-   * cannot be silently "fixed" either way.
+   * ⛔ So the proposal is now a SHORTER path than production's, not a longer
+   * one. Production makes the driver confirm before refusing (`CAP-330`, two
+   * taps in); the proposal says no on the first tap, and says where to go.
+   *
+   * ⛔ No `penalty` either. Nothing is being sent back, so there is nothing to
+   * be penalised for — the same reasoning production's own `denied` path uses.
+   * A standing order that is ALSO short-notice is one screen here, not four.
    */
+  if (isStandingOrder(trip)) return ["standing-order-chat"];
+
   const steps: SendBackStep[] = ["reason"];
   if (SEND_BACK_CONFIRM_BUILT) steps.push("confirm");
-  if (isStandingOrder(trip)) steps.push("standing-order");
   if (isShortNoticeSendBack(trip)) steps.push("penalty");
   return steps;
 }
 
-/** Whether this path can finish at all. ⛔ A denied path never files anything. */
+/** Whether this path can finish at all. ⛔ A terminal path never files anything. */
 export function sendBackCompletes(steps: readonly SendBackStep[]): boolean {
-  return !steps.includes("denied");
+  return !steps.some((step) => SEND_BACK_TERMINAL_STEPS.includes(step));
 }
