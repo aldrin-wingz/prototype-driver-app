@@ -43,6 +43,27 @@ export type SolutionClass = "form" | "surface" | "no-app-surface";
  */
 export type BuildState = "in-prototype" | "not-yet";
 
+/**
+ * A ticket on the Engineering Tasks Board that builds some of this row.
+ *
+ * ⛔⛔ **The Task ID, not the title.** A title is Notion's to change — these
+ * two are due to be renamed to the `Support Automation - <Subject Area> - …`
+ * convention — and a copy of it here would be a second, staler source for the
+ * same string. The id survives a rename, it is how the team refers to a ticket
+ * out loud, and it fits a table cell.
+ *
+ * ⚠️ **A row can carry more than one.** Row 01 is two stories — the branch
+ * that counts down and the branch that offers a form — and they are separate
+ * tickets. ⛔ The reverse is also true and is why this is not a single field:
+ * one ticket can serve two rows once rows share a build.
+ */
+export interface NotionTicket {
+  /** The board's own `Task ID`, e.g. `"10435"`. Rendered as `#10435`. */
+  id: string;
+  /** Absolute `app.notion.com` URL. A check asserts the host. */
+  url: string;
+}
+
 export interface SolutionEntry {
   /** Where the demo starts. */
   route: string;
@@ -140,6 +161,14 @@ export interface Solution {
   sharedBuildWith?: string;
   /** Required when `klass` is `no-app-surface`; forbidden otherwise. */
   noSurfaceReason?: string;
+  /**
+   * The Notion tickets that build this row, if any yet.
+   *
+   * ⚠️ Absent on most rows and that is not a gap — only 1 of 28 has stories
+   * written, let alone ticketed. The column renders an em dash, which says
+   * "no ticket" rather than "no value".
+   */
+  notionTickets?: readonly NotionTicket[];
 }
 
 /**
@@ -175,6 +204,15 @@ export const SOLUTIONS: Solution[] = [
     tableSummary: "File the no-show in-app at the curb instead of calling it in.",
     klass: "form",
     buildState: "in-prototype",
+    /**
+     * ⭐ The two branches of a single check, and two separate tickets:
+     * `10435` is the countdown, `10437` the form offered once the driver can
+     * no longer be placed at the pick-up.
+     */
+    notionTickets: [
+      { id: "10435", url: "https://app.notion.com/p/3d5ac7c6c89d809794bafa8ba025ce5e" },
+      { id: "10437", url: "https://app.notion.com/p/b74ac7c6c89d8369b1cf819ed729636d" },
+    ],
     entry: {
       route: "/my-rides/1049800377/more",
       label:

@@ -196,6 +196,11 @@ import { buildAutoAssignRequest } from "../components/support/auto-assign-reques
 import { buildSendBackReason } from "../components/support/send-back-reason-form";
 import { SPOKE_WITH_OPTIONS, treatmentFor } from "../lib/driver-data/no-show-rules";
 import {
+  NOTION_COLUMN_EMPTY,
+  NOTION_COLUMN_LABEL,
+  NOTION_HOST,
+} from "../lib/solutions/table-select";
+import {
   DEFAULT_SUPPORT_CHAT_TOPIC,
   SUPPORT_CHAT_TOPICS,
   supportChatMessage,
@@ -8392,9 +8397,13 @@ check(
     new Set(columnModes).size === DEMO_MODES.length,
 );
 /**
- * ⛔ The six columns are partitioned: two select, four do not, none is both and
- * none is neither. A column dropped from both lists is a column whose
+ * ⛔ The seven columns are partitioned: two select, five do not, none is both
+ * and none is neither. A column dropped from both lists is a column whose
  * behaviour nothing here describes.
+ *
+ * ⚠️ `notion` joined the inert side in 2026-10-16. It holds LINKS, which is not
+ * selecting — a tap leaves the prototype, and taking the focus as well would
+ * change the app behind a tab the reader has just left for.
  */
 const DECLARED_COLUMNS: TableColumn[] = [
   "subject-area",
@@ -8403,6 +8412,7 @@ const DECLARED_COLUMNS: TableColumn[] = [
   "problem",
   "use-case",
   "proposed-feature",
+  "notion",
 ];
 const partitioned = [...SELECTING_COLUMNS, ...INERT_COLUMNS];
 check(
@@ -8411,7 +8421,8 @@ check(
   partitioned.length === DECLARED_COLUMNS.length &&
     new Set(partitioned).size === DECLARED_COLUMNS.length &&
     DECLARED_COLUMNS.every((c) => partitioned.includes(c)) &&
-    (INERT_COLUMNS as readonly string[]).join(",") === "subject-area,calls,share,problem",
+    (INERT_COLUMNS as readonly string[]).join(",") ===
+      "subject-area,calls,share,problem,notion",
 );
 
 /* --- 25b. Which cell is lit ---------------------------------------------- */
@@ -9144,7 +9155,7 @@ check(
 const HEAD_BG = /const HEAD_CELL = "[^"]*bg-\[#[0-9A-Fa-f]{6}\]/;
 const HEAD_ROW = B6_TABLE_CODE.match(/<tr className="[^"]*">\s*\n\s*<th/)?.[0] ?? "";
 const headCells = (B6_TABLE_CODE.match(/<th className=\{cn\(HEAD_CELL/g) ?? []).length;
-const EXPECTED_HEAD_CELLS = 5; // four written out here, plus SideHeader's one
+const EXPECTED_HEAD_CELLS = 6; // five written out here, plus SideHeader's one
 check(
   "the sticky header cells carry their own background, not the row's",
   `HEAD_CELL has a background: ${HEAD_BG.test(B6_TABLE_CODE)}; ` +
@@ -13741,6 +13752,111 @@ check(
   SEND_BACK_TERMINAL_STEPS.length === 2 &&
     SEND_BACK_TERMINAL_STEPS.includes("denied") &&
     SEND_BACK_TERMINAL_STEPS.includes("standing-order-chat"),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n41. The ticket column");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔ **Declared, never counted off the catalogue.** A total derived from the
+ * same array it checks cannot fail — and the whole point of this column is to
+ * say which rows have a ticket, so the number has to be asserted from outside.
+ *
+ * ⚠️ One row of 28 today. That is not a gap: only Rider No-Show has stories
+ * written, let alone ticketed. Rows 02 and 14 get theirs once their tickets
+ * exist, and this literal moving is how that lands deliberately.
+ */
+const EXPECTED_TICKETED_ROWS = 1;
+const EXPECTED_TICKETS = 2;
+const rf41Ticketed = SOLUTIONS.filter((s) => (s.notionTickets?.length ?? 0) > 0);
+const rf41All = rf41Ticketed.flatMap((s) => s.notionTickets ?? []);
+check(
+  "exactly the declared rows carry a ticket",
+  `${rf41Ticketed.length} row(s) of ${SOLUTIONS.length}, ${rf41All.length} ticket(s): ${rf41Ticketed
+    .map((s) => `${s.order}=${(s.notionTickets ?? []).map((t) => t.id).join("+")}`)
+    .join(" ")}`,
+  rf41Ticketed.length === EXPECTED_TICKETED_ROWS &&
+    rf41All.length === EXPECTED_TICKETS &&
+    // ⭐ Row 01 is two stories — the countdown branch and the form branch — so
+    // the multi-ticket shape is exercised rather than merely permitted.
+    rf41Ticketed[0]?.order === 1,
+);
+/**
+ * ⛔⛔ Every url is a real Notion link. A relative path or a pasted CS Tool URL
+ * would render as a link and go nowhere, which is worse than an em dash.
+ */
+const rf41BadHost = rf41All.filter((t) => !t.url.startsWith(`https://${NOTION_HOST}/`));
+check(
+  "...and every one points at Notion",
+  rf41BadHost.length ? `WRONG HOST: ${rf41BadHost.map((t) => t.url).join(", ")}` : NOTION_HOST,
+  rf41BadHost.length === 0 &&
+    // ⛔ Non-vacuity: there is something to check, and the matcher can decline.
+    rf41All.length > 0 &&
+    !`https://example.com/x`.startsWith(`https://${NOTION_HOST}/`),
+);
+/** ⚠️ Ids are unique across the whole catalogue — one ticket, one row, today. */
+check(
+  "...and no ticket id appears twice",
+  `${new Set(rf41All.map((t) => t.id)).size} distinct of ${rf41All.length}`,
+  new Set(rf41All.map((t) => t.id)).size === rf41All.length &&
+    rf41All.every((t) => /^\d{4,6}$/.test(t.id)),
+);
+/**
+ * ⛔⛔ **Last, and never merged.** Columns 1–4 sit inside `areaSpan`/
+ * `problemSpan` runs and column 5 inside `useCaseSpan`. An unmerged cell
+ * inserted into a merged run shifts every later cell one column left — the
+ * failure §18 already calls out — so the only safe slot is after the one
+ * column that never merges.
+ */
+const RF41_HEAD = B6_TABLE_CODE.slice(
+  B6_TABLE_CODE.indexOf("<thead>"),
+  B6_TABLE_CODE.indexOf("</thead>"),
+);
+check(
+  "the ticket column is drawn last",
+  `header order: ${(RF41_HEAD.match(/title="([^"]+)"|>([A-Za-z% ]+)<\/th>/g) ?? []).length} cell(s); ticket at ${RF41_HEAD.indexOf(
+    "NOTION_COLUMN_LABEL",
+  )}, proposed feature at ${RF41_HEAD.indexOf('title="Proposed Feature"')}`,
+  RF41_HEAD.indexOf("NOTION_COLUMN_LABEL") > RF41_HEAD.indexOf('title="Proposed Feature"') &&
+    RF41_HEAD.indexOf('title="Proposed Feature"') > 0 &&
+    // ⛔ And `tableRows` never learned about it — it merges nothing.
+    !readFileSync(join(ROOT, "lib/solutions/table-shape.ts"), "utf8").includes("notion"),
+);
+/**
+ * ⛔⛔ **The empty-state row must span EVERY column.** A `colSpan` left at 6
+ * after a seventh column lands leaves a stray cell beside the "no rows" message
+ * — visible only when every filter is off, which is the state nobody walks.
+ */
+const rf41ColSpan = B6_TABLE_CODE.match(/colSpan=\{(\d+)\}/)?.[1] ?? "none";
+check(
+  "...and the empty-filter row spans all of them",
+  `colSpan=${rf41ColSpan} vs ${DECLARED_COLUMNS.length} declared columns`,
+  rf41ColSpan === String(DECLARED_COLUMNS.length),
+);
+/**
+ * ⛔ A row with no ticket says so. An empty cell reads as a rendering fault;
+ * the em dash is an answer, and on a table where 27 of 28 rows have none that
+ * distinction is most of the column.
+ */
+check(
+  "a row with no ticket renders the em dash, not nothing",
+  `${SOLUTIONS.length - rf41Ticketed.length} row(s) without a ticket; empty marker ${JSON.stringify(
+    NOTION_COLUMN_EMPTY,
+  )}`,
+  B6_TABLE_CODE.includes("{NOTION_COLUMN_EMPTY}") &&
+    B6_TABLE_CODE.includes("{NOTION_COLUMN_LABEL}") &&
+    NOTION_COLUMN_EMPTY.length > 0 &&
+    SOLUTIONS.length - rf41Ticketed.length > 0,
+);
+/**
+ * ⛔⛔ **The links open away from the app.** Without `target="_blank"` a tap
+ * replaces the prototype with Notion and the reader loses the focused row, the
+ * mode and the scroll position they were reading from.
+ */
+check(
+  "...and a ticket link leaves for a new tab, safely",
+  `target: ${/target="_blank"/.test(B6_TABLE_CODE)}; rel: ${/rel="noreferrer"/.test(B6_TABLE_CODE)}`,
+  /target="_blank"/.test(B6_TABLE_CODE) && /rel="noreferrer"/.test(B6_TABLE_CODE),
 );
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,8 @@ import {
   COLUMN_MODE,
   cellSelected,
   columnModeFor,
+  NOTION_COLUMN_EMPTY,
+  NOTION_COLUMN_LABEL,
   selectAction,
   type SelectingColumn,
 } from "@/lib/solutions/table-select";
@@ -416,6 +418,11 @@ export function SolutionTable() {
               <th className={cn(HEAD_CELL, "text-left")}>Problem</th>
               <SideHeader title="Use Case" column="use-case" />
               <SideHeader title="Proposed Feature" column="proposed-feature" />
+              {/* ⛔ LAST, and it never merges. Columns 1-4 sit inside
+                  `areaSpan`/`problemSpan` runs and column 5 inside
+                  `useCaseSpan`; an unmerged cell inserted into a merged run
+                  shifts every later cell one column left. */}
+              <th className={cn(HEAD_CELL, "text-left")}>{NOTION_COLUMN_LABEL}</th>
             </tr>
           </thead>
           <tbody>
@@ -429,7 +436,7 @@ export function SolutionTable() {
             */}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center">
+                <td colSpan={7} className="px-4 py-10 text-center">
                   <p className="text-sm font-semibold text-gray-900">
                     {TABLE_FILTER_EMPTY_TITLE}
                   </p>
@@ -643,6 +650,31 @@ export function SolutionTable() {
                     )}
                   </SelectCell>
                   )}
+
+                  {/* ⛔ A plain `<td>`, never a `SelectCell`. A tap here leaves
+                      the prototype for Notion, and taking the focus as well
+                      would change the app behind a tab the reader just left
+                      for. `INERT_COLUMNS` says the same thing where a check can
+                      read it. */}
+                  <td className={cn(CELL, "whitespace-nowrap")}>
+                    {solution.notionTickets?.length ? (
+                      <span className="flex flex-col gap-1">
+                        {solution.notionTickets.map((ticket) => (
+                          <a
+                            key={ticket.id}
+                            href={ticket.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-[11px] font-semibold text-[#065F46] underline decoration-[#065F46]/30 underline-offset-2 hover:decoration-[#065F46] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00B090]"
+                          >
+                            #{ticket.id}
+                          </a>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-gray-300">{NOTION_COLUMN_EMPTY}</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}

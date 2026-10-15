@@ -18,14 +18,15 @@ import type { DemoMode } from "./demo-mode";
  * only ever appears inside JSX is a branch no check can reach.
  */
 
-/** Every column the table draws. Four of them are inert — see `INERT_COLUMNS`. */
+/** Every column the table draws. Five of them are inert — see `INERT_COLUMNS`. */
 export type TableColumn =
   | "subject-area"
   | "calls"
   | "share"
   | "problem"
   | "use-case"
-  | "proposed-feature";
+  | "proposed-feature"
+  | "notion";
 
 /**
  * The two columns that select, and the side each one means.
@@ -84,7 +85,31 @@ export function columnModeFor(
  * cell can be focused only through its own Proposed Feature cell — which never
  * merges, and is why all 26 rows stay reachable.
  */
-export const INERT_COLUMNS = ["subject-area", "calls", "share", "problem"] as const;
+export const INERT_COLUMNS = [
+  "subject-area",
+  "calls",
+  "share",
+  "problem",
+  /**
+   * ⛔ The ticket column holds LINKS, which is not the same as selecting. A
+   * tap on it leaves the prototype for Notion; it must never also take the
+   * focus, or the driver-app state changes behind a tab the reader has just
+   * left for.
+   */
+  "notion",
+] as const;
+
+/**
+ * The ticket column's own copy.
+ *
+ * ⛔ In `lib/` rather than inline, like every other label the table draws. The
+ * em dash is the one worth naming: it says "no ticket yet", which on a table
+ * where 27 of 28 rows have none is an ANSWER, not a missing value.
+ */
+export const NOTION_COLUMN_LABEL = "Ticket";
+export const NOTION_COLUMN_EMPTY = "—";
+/** ⚠️ Every ticket url must sit on this host. A check asserts it. */
+export const NOTION_HOST = "app.notion.com";
 
 export type SelectAction =
   /** Not the focused row: take the focus, and land on the column's side. */
