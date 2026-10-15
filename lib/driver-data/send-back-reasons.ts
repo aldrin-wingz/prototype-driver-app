@@ -317,7 +317,7 @@ export const STANDING_ORDER_BLOCK_RISK =
 export const STANDING_ORDER_BLOCK_ROUTE =
   "Support can send it back for you. Start a chat and tell them why.";
 export const STANDING_ORDER_BLOCK_CHAT = "Contact Support";
-export const STANDING_ORDER_BLOCK_DISMISS = "Keep the trip";
+export const STANDING_ORDER_BLOCK_DISMISS = "Close";
 
 /**
  * What the chat opens with, auto-sent the way row 17's is.

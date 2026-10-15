@@ -72,14 +72,16 @@ export function StandingOrderWarningDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-row justify-end gap-2">
-          {/* ⛔ Dismiss says what dismissing MEANS. "Cancel" on a block is
-              ambiguous — cancel the trip, or cancel the send-back? */}
+          {/* ⛔ "Close", not "Cancel". On a block, "Cancel" is ambiguous — cancel
+              the trip, or cancel the send-back? "Close" can only mean the
+              dialog, which is all this button does: nothing was in flight to
+              abandon, because the block arrives before the reason form. */}
           <AlertDialogCancel className="mt-0 rounded-xl border-gray-300 text-base font-semibold text-[#303068]">
             {STANDING_ORDER_BLOCK_DISMISS}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onContactSupport}
-            className="rounded-xl bg-[#D85878] text-base font-bold text-white hover:bg-[#C44A68]"
+            className="rounded-xl bg-[#10B981] text-base font-bold text-white hover:bg-[#059669]"
           >
             {STANDING_ORDER_BLOCK_CHAT}
           </AlertDialogAction>
