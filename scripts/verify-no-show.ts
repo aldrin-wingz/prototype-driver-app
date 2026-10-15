@@ -178,7 +178,7 @@ check("every exempt ride is still exercised", exempted === 3,
 
 // ── The two stories, one ride each ──────────────────────────────
 // These replace the matrix checks. They assert the branch each ride demonstrates,
-// which is exactly what `PRD - Rider No-Show.md` specifies — timer if the driver IS
+// which is exactly what `PRD - Support Automation.md` § Rider No-Show specifies — timer if the driver IS
 // at the pick-up, form if they are NOT. ⚠️ Both must FAIL the presence walk, or they
 // would file and neither story would be reachable.
 const timerRide = tagged.find((t) => t.noShowDemo === "3.1");
@@ -241,7 +241,8 @@ if (anyTrip) {
     postPickupThresholdMinutes(indiana, PLAIN_MIRROR) === NO_SHOW_POST_PICKUP_MINUTES,
     `${postPickupThresholdMinutes(indiana, PLAIN_MIRROR)}`);
   // ⚠️⚠️ A DECLARED DIVERGENCE, not an assertion of intent.
-  // `PRD - Rider No-Show.md` withdrew the universal pick-up-time gate on 2026-09-09:
+  // The PRD (`PRD - Support Automation.md` § Out of Scope; renamed 2026-10-16, D130)
+  // withdrew the universal pick-up-time gate on 2026-09-09:
   // only WellTrans Indiana has a wait, and no other market gains one. The CODE has not
   // caught up — `treatmentFor`'s default carries `pickupTimeGate: true`, so an untagged
   // ride outside Indiana still resolves to a 0-minute gate rather than no gate at all.
