@@ -194,7 +194,7 @@ import {
 } from "../lib/driver-data/member-assignment";
 import { buildAutoAssignRequest } from "../components/support/auto-assign-request-form";
 import { buildSendBackReason } from "../components/support/send-back-reason-form";
-import { treatmentFor } from "../lib/driver-data/no-show-rules";
+import { SPOKE_WITH_OPTIONS, treatmentFor } from "../lib/driver-data/no-show-rules";
 import { offeredSwipe, routeSwipeTap } from "../lib/driver-data/missed-swipe-rules";
 import {
   CS_TOOL_DRIVER_INITIATED_REASONS,
@@ -13262,6 +13262,82 @@ check(
     // ⛔ ...and the generic fallback really is reached, or the chooser is a
     // lookup that happens to cover everything.
     rf38Placeholders.includes(SUPPORT_NOTES_PLACEHOLDER),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n39. A row's copy cannot offer a door answer the picker does not");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **Row 02's copy outlived the option it described.** "No one came to the
+ * door" left `SPOKE_WITH_OPTIONS` on 2026-10-15 (D126) — a form reached by
+ * choosing *Cancel At Door* must not offer the denial of that choice — but
+ * `proposedFeature` and `entry.label` went on naming it. Every gate stayed
+ * green, because nothing compared the catalogue's prose against the picker it
+ * describes. A story written from the catalogue would have inherited a control
+ * that does not exist.
+ *
+ * ⚠️ **Scoped to rows that talk about the door**, not a global ban on the word
+ * "nobody". Another row may legitimately need it, and a ban wide enough to catch
+ * a word everywhere is a ban nobody can keep.
+ *
+ * ⛔ Reads the COPY FIELDS, never the file text. `catalogue.ts` has comments
+ * saying "nobody" about something else entirely ("nobody noticed row 18 was
+ * silent"), so a grep over the source would fail on its own prose.
+ */
+const RF39_DENIAL = /\bno[- ]?one\b|\bnobody\b/i;
+const RF39_DOOR = /came to the door/i;
+
+function rf39Copy(s: Solution): string[] {
+  return [
+    s.problem,
+    s.useCase,
+    s.proposedFeature,
+    s.tableSummary,
+    s.noSurfaceReason ?? "",
+    s.entry?.label ?? "",
+    s.nowEntry?.label ?? "",
+    ...(s.entry?.alternates ?? []).flatMap((a) => [a.label, a.short]),
+    ...(s.nowEntry?.alternates ?? []).flatMap((a) => [a.label, a.short]),
+  ].filter((t) => t.length > 0);
+}
+
+const rf39DoorRows = SOLUTIONS.filter((s) => rf39Copy(s).some((t) => RF39_DOOR.test(t)));
+const rf39Fields = rf39DoorRows.reduce((n, s) => n + rf39Copy(s).length, 0);
+const rf39Offenders = rf39DoorRows.filter((s) => rf39Copy(s).some((t) => RF39_DENIAL.test(t)));
+
+check(
+  "every row whose copy names the door is a row the picker can answer",
+  rf39Offenders.length === 0
+    ? `${rf39DoorRows.length} door row(s), ${rf39Fields} field(s) scanned, 0 offenders`
+    : `offending row(s): ${rf39Offenders.map((s) => s.order).join(", ")}`,
+  rf39Offenders.length === 0,
+);
+
+/**
+ * ⛔⛔ Non-vacuity. Zero offenders reads the same whether the rule holds or the
+ * scan found nothing to scan — so prove the scan has a subject AND that the
+ * matcher can both fire and decline.
+ */
+check(
+  "...and the scan has a subject, with a matcher that can fail",
+  `${rf39DoorRows.length} door row(s) · ${rf39Fields} field(s) · control fires: ${RF39_DENIAL.test(
+    "answer 'no one came to the door' and the countdown comes back",
+  )}`,
+  rf39DoorRows.length > 0 &&
+    rf39Fields > 0 &&
+    RF39_DENIAL.test("answer 'no one came to the door' and the countdown comes back") &&
+    !RF39_DENIAL.test("who came to the door (the member, or someone else)"),
+);
+
+/**
+ * ⭐ The other half of the rule, read off the picker itself. If a third option
+ * is ever added that denies the door, this fails before any copy mentions it.
+ */
+check(
+  "the picker itself offers no denial of the door",
+  `${SPOKE_WITH_OPTIONS.length} option(s): ${SPOKE_WITH_OPTIONS.map((o) => o.label).join(" · ")}`,
+  SPOKE_WITH_OPTIONS.length === 2 &&
+    SPOKE_WITH_OPTIONS.every((o) => !RF39_DENIAL.test(o.label)),
 );
 
 // ---------------------------------------------------------------------------
