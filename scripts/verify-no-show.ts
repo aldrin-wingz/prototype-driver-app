@@ -34,7 +34,6 @@ import {
   resolveNoShow,
   SPOKE_WITH_CONTACT,
   SPOKE_WITH_MEMBER,
-  SPOKE_WITH_NOBODY,
   SPOKE_WITH_OPTIONS,
   treatmentFor,
   waivesPresenceWait,
@@ -470,9 +469,13 @@ check("the form variant is computed, not hardcoded",
   /atPickup=\{cancelAtDoorAtPickup\}/.test(SCREEN), "variant hardcoded");
 check("and it is computed from whether the app placed the driver there",
   /setCancelAtDoorAtPickup\(outcome\.kind === "files"\)/.test(SCREEN), "not derived");
-check("⛔ a refused waiver re-resolves WITHOUT the type",
-  /waiver-refused[\s\S]{0,400}resolveNoShow\(trip, activeLeg, demo, elapsed, null\)/.test(SCREEN),
-  "would show the waived outcome back to a driver who just lost the waiver");
+/**
+ * ⛔ The refused-waiver re-resolve went with the option that could trigger it.
+ * What remains is the simpler property: every resolution leaves the screen.
+ */
+check("every Cancel at Door resolution leaves the screen",
+  /onResolved=\{\(\) => router\.push\(backHref\)\}/.test(SCREEN),
+  "a resolution branches somewhere this check does not describe");
 
 // ── The form asks four questions and no attachment ─────────────────────────
 const form = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
@@ -512,30 +515,60 @@ check("the form is blocked when a required answer is missing",
 
 // ── Cancel at Door — the two questions the waiver rests on ─────────────────
 /**
- * ⛔⛔ The waiver is a CLAIM that a member came out and refused. These checks
- * hold the line that the claim is actually asked for, and that answering it
- * honestly can take the waiver away again.
+ * ⛔⛔ The waiver is a CLAIM that a member came out and refused, and the picker
+ * must not let the form CONTRADICT the type that opened it.
+ *
+ * ⭐ "No one came to the door" was an option for one slice, argued for by a
+ * real measurement — ~9.1% of production's Cancel At Door filings record no
+ * person at all. It was removed 2026-10-15 at user direction: a driver only
+ * reaches this form by choosing *Cancel At Door*, which IS the claim that
+ * somebody came out, and the place to say nobody did is **Member Not Home** on
+ * the type screen. Those 9.1% are mis-typed filings, not a missing option.
  */
-check("three ways to answer who was at the door", SPOKE_WITH_OPTIONS.length === 3,
+check("two ways to answer who was at the door", SPOKE_WITH_OPTIONS.length === 2,
   SPOKE_WITH_OPTIONS.map((o) => o.value).join(","));
-check("one of them is nobody", SPOKE_WITH_OPTIONS.some((o) => o.value === SPOKE_WITH_NOBODY),
-  SPOKE_WITH_OPTIONS.map((o) => o.value).join(","));
+check("⛔ and none of them contradicts the type that opened the form",
+  !SPOKE_WITH_OPTIONS.some((o) => /no.?one|nobody|nothing/i.test(`${o.value} ${o.label}`)),
+  SPOKE_WITH_OPTIONS.map((o) => o.label).join(" | "));
 
 const earning = SPOKE_WITH_OPTIONS.filter((o) => answerEarnsWaiver(o.value));
-check("exactly two of the three answers earn the waiver", earning.length === 2,
+/**
+ * ⛔⛔ **Every OFFERED answer earns the waiver now** — which is exactly why the
+ * refusal branch that read this was deleted rather than left unreachable. What
+ * stops `answerEarnsWaiver` being `() => true` is the second half: a blank or
+ * an unrecognised value still earns nothing, and that is the case a draft or an
+ * undecided third option would arrive as.
+ */
+check("every offered answer earns the waiver", earning.length === SPOKE_WITH_OPTIONS.length,
   `${earning.length} of ${SPOKE_WITH_OPTIONS.length}: ${earning.map((o) => o.value).join(",")}`);
 check("the member earns it", answerEarnsWaiver(SPOKE_WITH_MEMBER));
 check("a point of contact earns it", answerEarnsWaiver(SPOKE_WITH_CONTACT));
-check("⛔ nobody at the door earns NOTHING", !answerEarnsWaiver(SPOKE_WITH_NOBODY));
 check("an unanswered question earns nothing", !answerEarnsWaiver(""));
 check("and an unknown answer earns nothing", !answerEarnsWaiver("the dispatcher"));
+check("⛔ so the rule is not simply true — it refuses what it is not given",
+  !answerEarnsWaiver(null) && !answerEarnsWaiver(undefined) && !answerEarnsWaiver("no-one"));
 
 /**
- * ⚠️ The two rules must be able to DISAGREE, or asking is theatre. The type
- * routes the driver to the questions; the answer decides the outcome.
+ * ⛔⛔ **The refusal path is GONE, and its absence is asserted.** Nothing may
+ * reintroduce a `waiver-refused` resolution without the option that justifies
+ * it — a branch no answer can reach is a branch that cannot be wrong.
  */
-check("the route and the verdict are independent rules",
-  waivesPresenceWait("Cancel At Door", PLAIN_MIRROR) && !answerEarnsWaiver(SPOKE_WITH_NOBODY));
+/**
+ * ⚠️ Comments STRIPPED on both sides. This asserts an absence and the comments
+ * are about why the thing is absent — the two notes explaining the removal both
+ * name `waiver-refused`, so an unstripped sweep would fail against correct code.
+ */
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const CAD_FORM_CODE = stripComments(
+  readFileSync("components/support/cancel-at-door-form.tsx", "utf8"),
+);
+check("⛔ no unreachable waiver-refusal survives in the screen or the form",
+  !/waiver-refused/.test(stripComments(SCREEN)) && !/waiver-refused/.test(CAD_FORM_CODE) &&
+    // ⛔ Positive control: both files were really read and really do hold the
+    // flow. An empty string passes every absence test ever written.
+    /CancelAtDoorForm/.test(stripComments(SCREEN)) && /SupportFormSheet/.test(CAD_FORM_CODE),
+  "a refusal nothing can trigger is still wired");
 
 check("the relation options are a real list", CONTACT_RELATION_OPTIONS.length >= 4,
   `${CONTACT_RELATION_OPTIONS.length}`);
@@ -545,38 +578,53 @@ check("no relation option is a person's name",
 
 // ── The two variants ask different things ─────────────────────────────────
 /**
- * ⚠️ `signatureTakenElsewhere: true` on both, MIRRORING `cancel-at-door-form`.
- * Every support form now ends with a driver signature; this one does not,
- * because the Member No-Show screen — its only entry point — already took one.
+ * ⚠️ `signatureTakenElsewhere: false` on both, MIRRORING `cancel-at-door-form`.
  * A check below pins that the real caller agrees, so this mirror cannot drift
  * into testing a form the app does not build.
  */
 const cadAtPickup = buildSupportFormCase({
   includeIssues: [ISSUE_CANCEL_AT_DOOR],
   askWaitTimes: false,
-  signatureTakenElsewhere: true,
+  signatureTakenElsewhere: false,
 });
 const cadAway = buildSupportFormCase({
   includeIssues: [ISSUE_CANCEL_AT_DOOR],
   askWaitTimes: true,
-  signatureTakenElsewhere: true,
+  signatureTakenElsewhere: false,
 });
 /**
- * ⛔⛔ **The suppression belongs to the SCREEN, not to the case.** Cancel at
- * Door is reached only from the Member No-Show screen, which signs first; the
- * no-show form is reached from there AND standalone from More Options, so it
- * suppresses only on the first path. Asserted against the real call sites,
+ * ⛔⛔ **Cancel at Door DOES ask for the driver's signature, and the comment
+ * that said otherwise was the defect.**
+ *
+ * It read "the Member No-Show screen already took one" — true, but it takes the
+ * **MEMBER's**: `NO_SHOW_TYPE_FORMS` swaps the pad's label to `Member
+ * Signature` for Cancel At Door alone, and every other type keeps `Driver
+ * Signature`. So this was the one no-show path on which the driver attested to
+ * nothing, while the two beside it both did. (User direction, 2026-10-15.)
+ *
+ * ⛔ The suppression still belongs to the SCREEN rather than to the case: the
+ * no-show form is reached from the screen AND standalone from More Options, so
+ * it suppresses only on the first path. Asserted against the real call sites,
  * because this file otherwise builds its own cases and would never notice a
  * caller that stopped passing it.
  */
 const CAD_SRC = readFileSync("components/support/cancel-at-door-form.tsx", "utf8");
 const NO_SHOW_SRC = readFileSync("components/support/rider-no-show-form.tsx", "utf8");
-check("Cancel at Door never asks for a second signature",
-  /signatureTakenElsewhere: true/.test(CAD_SRC),
-  "the form would ask again after the screen already signed");
+check("⛔ Cancel at Door asks for the DRIVER's signature — the screen took the member's",
+  /signatureTakenElsewhere: false/.test(CAD_SRC) &&
+    noShowFormFor("Cancel At Door").signatureLabel === "Member Signature" &&
+    // ⛔ ...and it really is the exception, or "the screen took the member's"
+    // is a claim about every type.
+    noShowFormFor("Member Not Home").signatureLabel === "Driver Signature" &&
+    noShowFormFor("Member Not Ready").signatureLabel === "Driver Signature",
+  "the driver attests to nothing on the one path where the pad asked the member");
 check("...while the no-show form suppresses only on the path that signed",
   /signatureTakenElsewhere: !standalone/.test(NO_SHOW_SRC),
   "the no-show form suppresses unconditionally, so the standalone entry never signs");
+/** ⛔ And the field really lands on both variants, not just in the parameter. */
+check("...so both Cancel at Door variants end with the driver signature",
+  cadAtPickup.fields.at(-1)?.id === "signature" && cadAway.fields.at(-1)?.id === "signature",
+  `${cadAtPickup.fields.at(-1)?.id} / ${cadAway.fields.at(-1)?.id}`);
 const atPickupIds = cadAtPickup.fields.map((f) => f.id);
 const awayIds = cadAway.fields.map((f) => f.id);
 
@@ -616,7 +664,23 @@ check("and is asked only for a point of contact",
 // ── The submit gate is reachable on both variants ─────────────────────────
 // ⚠️ An unreachable gate is worse than a missing field: the form looks complete
 // and the Submit button never lights.
-const CAD_BASE = { issue: ISSUE_CANCEL_AT_DOOR, noShowType: "Cancel At Door", legId: "1049800373" };
+/**
+ * ⚠️ `signature` is in the BASE, so the checks below measure what they name.
+ * Without it every one of them would fail for the same reason — the new
+ * required pad — and would stop saying anything about the questions they are
+ * about. The pad gets its own check instead, directly below.
+ */
+const CAD_BASE = {
+  issue: ISSUE_CANCEL_AT_DOOR,
+  noShowType: "Cancel At Door",
+  legId: "1049800373",
+  signature: "drawn",
+};
+check("⛔ and an unsigned Cancel at Door cannot be submitted",
+  !canSubmitCase(cadAtPickup.fields, {
+    ...CAD_BASE, signature: "", spokeWithWho: SPOKE_WITH_MEMBER,
+  }),
+  "the driver signature is on the form but gates nothing");
 check("the at-pick-up form submits with the member",
   canSubmitCase(cadAtPickup.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_MEMBER }));
 check("⚠️ a point of contact cannot submit without saying who they are",
@@ -625,8 +689,6 @@ check("and can once they do",
   canSubmitCase(cadAtPickup.fields, {
     ...CAD_BASE, spokeWithWho: SPOKE_WITH_CONTACT, spokeWithRelation: CONTACT_RELATION_OPTIONS[0].value,
   }));
-check("nobody-at-the-door is a submittable answer, not a dead end",
-  canSubmitCase(cadAtPickup.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_NOBODY }));
 check("the form is blocked with the question unanswered",
   !canSubmitCase(cadAtPickup.fields, CAD_BASE));
 check("the away form needs its times too",

@@ -1008,26 +1008,28 @@ export function waivesPresenceWait(
  */
 export const SPOKE_WITH_MEMBER = "member";
 export const SPOKE_WITH_CONTACT = "point-of-contact";
-export const SPOKE_WITH_NOBODY = "no-one";
 
+/**
+ * ⛔⛔ **"No one came to the door" is NOT offered, and that is a correction.**
+ *
+ * It was here for one slice, and the argument for it was a real measurement:
+ * ~9.1% of production's Cancel At Door filings record no person at all —
+ * `nothing` (1,198) and `no one` (26) — plus 2.9% naming Wingz, Support or the
+ * client, which is a phone call and not somebody at the door.
+ *
+ * ⭐ But the measurement answers a different question than the one this picker
+ * asks. A driver only reaches this form by choosing **Cancel At Door** on the
+ * screen before, which IS the claim that the member came out and refused.
+ * Offering "no one came" here lets the form contradict the type that opened it
+ * — and the right place to say nobody came out is the type selection, where
+ * **Member Not Home** is waiting. (User direction, 2026-10-15.)
+ *
+ * ⚠️ So those 9.1% are mis-typed filings, not a missing option. What this
+ * prototype does about them is a question for the type screen, and it is open.
+ */
 export const SPOKE_WITH_OPTIONS = [
   { value: SPOKE_WITH_MEMBER, label: "The member themselves" },
   { value: SPOKE_WITH_CONTACT, label: "Someone else at the door" },
-  /**
-   * ⛔⛔ **The option the two-option design did not have, and the reason it
-   * needs one.**
-   *
-   * ~9.1% of Cancel At Door filings record no person at all — `nothing` (1,198)
-   * and `no one` (26) — and another 2.9% name Wingz, Support or the client,
-   * which is a phone call and not somebody at the door. Without an honest way to
-   * say "nobody came out", a required picker makes every one of those drivers
-   * claim a conversation that did not happen — and that claim is exactly what
-   * would be skipping the ten-minute wait.
-   *
-   * ⚠️ A Cancel At Door with nobody at the door IS a Member Not Home. This
-   * answer earns no waiver; see `answerEarnsWaiver`.
-   */
-  { value: SPOKE_WITH_NOBODY, label: "No one came to the door" },
 ] as const;
 
 /**
@@ -1051,9 +1053,17 @@ export const CONTACT_RELATION_OPTIONS = [
  *
  * ⚠️ **Two rules, deliberately separate.** `waivesPresenceWait` asks whether the
  * TYPE may skip the wait, and so decides which form opens. This asks whether the
- * ANSWER supports it, and so decides the outcome. Collapsing them into one would
- * mean the route and the verdict could never disagree — and the whole point of
- * asking is that they sometimes must.
+ * ANSWER supports it, and so decides the outcome.
+ *
+ * ⛔⛔ **Every answer the picker OFFERS now earns it**, since "no one came to
+ * the door" was removed — so this can no longer refuse a completed form, and
+ * the refusal branch that read it has gone with the option. What it still
+ * refuses is an EMPTY or unrecognised value, which is why it survives: the
+ * submit gate stops a blank, but nothing else stops a value arriving from a
+ * draft or a future third option that nobody remembered to decide about.
+ *
+ * ⚠️ A check asserts every offered option earns the waiver AND that unknown
+ * values do not — the second half is what stops this becoming `() => true`.
  */
 export function answerEarnsWaiver(spokeWithWho: string | null | undefined): boolean {
   return spokeWithWho === SPOKE_WITH_MEMBER || spokeWithWho === SPOKE_WITH_CONTACT;

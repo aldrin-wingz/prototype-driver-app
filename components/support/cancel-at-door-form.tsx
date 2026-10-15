@@ -9,14 +9,26 @@ import { buildPrefilledValues } from "@/lib/support/prefill";
 import { resolveTripContext } from "@/lib/support/trip-context";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
-  answerEarnsWaiver,
   CONTACT_RELATION_OPTIONS,
   SPOKE_WITH_OPTIONS,
 } from "@/lib/driver-data/no-show-rules";
 import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
 
 /** What the driver's answers resolved to, for the screen that opened this. */
-export type CancelAtDoorResolution = "filed" | "sent" | "waiver-refused";
+/**
+ * ⛔⛔ **`"waiver-refused"` is GONE, and it went with the option that produced
+ * it.** The only answer that could withdraw the waiver was "no one came to the
+ * door", removed 2026-10-15 because a form reached by choosing *Cancel At Door*
+ * must not offer the contradiction of that choice. With every offered answer
+ * earning the waiver, the branch became unreachable — and a branch nothing can
+ * reach is a branch that cannot be wrong and cannot be right.
+ *
+ * ⚠️ So a driver who meant *nobody came out* now says so where it belongs: by
+ * choosing **Member Not Home** on the type screen. What the prototype should do
+ * about production's ~9.1% of mis-typed Cancel At Door filings is an OPEN
+ * question for that screen, not for this one.
+ */
+export type CancelAtDoorResolution = "filed" | "sent";
 
 /**
  * Build the Cancel at Door case for one leg.
@@ -36,11 +48,18 @@ export function buildCancelAtDoor(
     includeIssues: [ISSUE_CANCEL_AT_DOOR],
     askWaitTimes: !atPickup,
     /**
-     * ⛔ The Member No-Show screen is this form's ONLY entry point, and it
-     * takes a signature before the form exists — so asking again would be a
-     * second signature for one claim.
+     * ⛔⛔ **FALSE, and the comment that said otherwise was the defect.** It
+     * read "the Member No-Show screen takes a signature before the form
+     * exists" — true, but it takes the **MEMBER's**. `NO_SHOW_TYPE_FORMS`
+     * swaps the pad's label to `Member Signature` for Cancel At Door alone;
+     * every other type keeps `Driver Signature`. So this was the one no-show
+     * path on which the driver attested to nothing, while the two beside it
+     * both did. (User direction, 2026-10-15.)
+     *
+     * ⚠️ Two signatures on one claim is still the thing to avoid — they are
+     * just not the same person's.
      */
-    signatureTakenElsewhere: true,
+    signatureTakenElsewhere: false,
   });
 
   const initialValues: Record<string, string> = {
@@ -102,25 +121,7 @@ export function CancelAtDoorForm({
       onOpenChange={onOpenChange}
       initialValues={initialValues}
       onSubmit={(values) => {
-        const earned = answerEarnsWaiver(values.spokeWithWho);
         onOpenChange(false);
-
-        /**
-         * ⛔⛔ **The answer can withdraw the waiver, and here is where it does.**
-         *
-         * A Cancel At Door where nobody came to the door is a Member Not Home
-         * wearing the wrong label, and ~9.1% of production's Cancel At Door
-         * filings record exactly that. Letting it through would mean the wait is
-         * skipped on a refusal that never happened — so the driver gets the
-         * countdown they would have got, and nothing is filed.
-         *
-         * ⚠️ Only at the pick-up. Away from it nothing was going to file either
-         * way, so the honest answer still goes to Support as a request.
-         */
-        if (atPickup && !earned) {
-          onResolved?.("waiver-refused");
-          return;
-        }
 
         if (atPickup) {
           const who =

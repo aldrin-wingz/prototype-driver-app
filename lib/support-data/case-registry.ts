@@ -233,6 +233,50 @@ export const WAIT_TIME_SEQUENCE = ["waitedFrom", "leftAt"];
  */
 export const DRIVER_SIGNATURE_LABEL = "Driver Signature";
 
+/**
+ * The one optional note every form carries.
+ *
+ * ⛔ One id and one label, because six ids under two labels is six things that
+ * can drift — and they had, reading "Anything else Support should know?" on two
+ * cases and "…(optional)" on four.
+ */
+export const SUPPORT_NOTES_FIELD = "supportNotes";
+export const SUPPORT_NOTES_LABEL = "Anything else Support should know? (optional)";
+
+/** The generic example, for a case with nothing more specific to suggest. */
+export const SUPPORT_NOTES_PLACEHOLDER =
+  "Optional — anything that would save Support a phone call";
+
+/**
+ * A per-case example for the shared note.
+ *
+ * ⚠️ Chosen here rather than passed in, for the reason `zendeskEquivalent` is:
+ * the builder already knows which case it is building, and a caller that could
+ * pass the wrong one eventually will.
+ */
+function notesPlaceholder(of: {
+  cannotReach?: unknown;
+  autoAssign?: boolean;
+  sendBack?: boolean;
+  riderDeclined?: unknown;
+  tripChange?: unknown;
+  addLeg?: unknown;
+  overCapacity?: unknown;
+}): string {
+  if (of.overCapacity)
+    return "e.g. two of them are in the same wheelchair space and one is an escort";
+  if (of.addLeg)
+    return "Optional — where they need to go, or anything about the timing";
+  if (of.tripChange)
+    return "Optional — what they told you, or why the details are wrong";
+  if (of.sendBack) return "e.g. I can be back in the area after 2pm if it helps";
+  if (of.autoAssign)
+    return "e.g. dialysis Tue/Thu mornings, or they asked again this week";
+  if (of.cannotReach)
+    return "e.g. the menu asked for an extension I do not have, or the facility desk said to call back after 2pm";
+  return SUPPORT_NOTES_PLACEHOLDER;
+}
+
 export function buildSupportFormCase({
   includeIssues,
   askNoShowType = false,
@@ -845,15 +889,6 @@ export function buildSupportFormCase({
               showIf: { field: "reachOutcome", equals: [REACH_OUTCOME_OTHER] },
             },
             {
-              id: "reachNotes",
-              type: "textarea",
-              label: "Anything else Support should know? (optional)",
-              placeholder:
-                "e.g. the menu asked for an extension I do not have, or the facility desk said to call back after 2pm",
-              maxLength: 500,
-              showIf: ONLY_CANNOT_REACH,
-            },
-            {
               id: "contactProof",
               type: "file",
               label: "Photo of your call log",
@@ -1077,18 +1112,6 @@ export function buildSupportFormCase({
               options: [...CHANGE_SOURCE_OPTIONS],
               showIf: ONLY_TRIP_CHANGE,
             },
-            {
-              id: CHANGE_NOTES_FIELD,
-              type: "textarea",
-              label: "Anything else Support should know?",
-              shortLabel: "notes",
-              placeholder: "Optional — what they told you, or why the details are wrong",
-              // ⚠️ Optional, following the user's own call on row 17: ask, never
-              // block. The required select already carries the thing Support
-              // cannot proceed without.
-              maxLength: 300,
-              showIf: ONLY_TRIP_CHANGE,
-            },
           ] as SupportCaseDefinition["fields"])
         : []),
 
@@ -1304,16 +1327,6 @@ export function buildSupportFormCase({
              * computed it went with it; a rule nothing reads is a rule that
              * cannot be wrong and cannot be right.
              */
-            {
-              id: ADD_NOTES_FIELD,
-              type: "textarea",
-              label: "Anything else Support should know?",
-              shortLabel: "notes",
-              placeholder:
-                "Optional — where they need to go, or anything about the timing",
-              maxLength: 300,
-              showIf: ONLY_ADD_LEG,
-            },
           ] as SupportCaseDefinition["fields"])
         : []),
 
@@ -1422,15 +1435,6 @@ export function buildSupportFormCase({
                 equals: [ASSIGNMENT_SCOPE_SPECIFIC],
               },
             },
-            {
-              id: "assignmentNotes",
-              type: "textarea",
-              label: "Anything else Support should know? (optional)",
-              placeholder:
-                "e.g. dialysis Tue/Thu mornings, or they asked again this week",
-              maxLength: 500,
-              showIf: ONLY_AUTO_ASSIGN,
-            },
           ] as SupportCaseDefinition["fields"])
         : []),
 
@@ -1485,15 +1489,6 @@ export function buildSupportFormCase({
                 field: "returnReason",
                 equals: [SEND_BACK_REASON_OTHER],
               },
-            },
-            {
-              id: "returnNotes",
-              type: "textarea",
-              label: "Anything else Support should know? (optional)",
-              placeholder:
-                "e.g. I can be back in the area after 2pm if it helps",
-              maxLength: 500,
-              showIf: ONLY_SEND_BACK,
             },
           ] as SupportCaseDefinition["fields"])
         : []),
@@ -1580,17 +1575,50 @@ export function buildSupportFormCase({
                 equals: [OC_REASON_OTHER],
               },
             },
-            {
-              id: "exceptionNotes",
-              type: "textarea",
-              label: "Anything else Support should know? (optional)",
-              placeholder:
-                "e.g. two of them are in the same wheelchair space and one is an escort",
-              maxLength: 500,
-              showIf: ONLY_OVER_CAPACITY,
-            },
           ] as SupportCaseDefinition["fields"])
         : []),
+
+      /**
+       * ⭐⭐ **One optional note, LAST BUT ONE, on every form.**
+       *
+       * It used to be six bespoke fields on six cases — `reachNotes`,
+       * `assignmentNotes`, `returnNotes`, `exceptionNotes`, `changeNotes` and
+       * `addLegNotes` — under TWO different labels, while Rider No-Show, Cancel
+       * at Door and Missed Swipe offered no way to say anything at all. Exactly
+       * the shape the driver signature was in before it was consolidated, and
+       * fixed the same way. (User direction, 2026-10-15: *"another standard for
+       * all forms is the optional anything else to tell support"*.)
+       *
+       * ⛔ **Before the signature, never after.** The driver attests to what
+       * they wrote, so a note taken after the pad would be signed for before it
+       * existed — the same rule that puts the signature last.
+       *
+       * ⛔ No `showIf`: it applies to every issue, which is the whole change.
+       * A gate here is how three cases went without one.
+       *
+       * ⚠️ The PLACEHOLDER still varies, because what is worth adding differs
+       * per case and a generic example teaches nothing. It is chosen here
+       * rather than passed by the caller, for the reason `zendeskEquivalent`
+       * is: the builder already knows which case it is building.
+       */
+      ...([
+        {
+          id: SUPPORT_NOTES_FIELD,
+          type: "textarea",
+          label: SUPPORT_NOTES_LABEL,
+          shortLabel: "notes",
+          placeholder: notesPlaceholder({
+            cannotReach,
+            autoAssign,
+            sendBack,
+            riderDeclined,
+            tripChange,
+            addLeg,
+            overCapacity,
+          }),
+          maxLength: 500,
+        },
+      ] as SupportCaseDefinition["fields"]),
 
       /**
        * ⭐⭐ **One driver signature, LAST, on every form.**

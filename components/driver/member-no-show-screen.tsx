@@ -475,19 +475,12 @@ export function MemberNoShowScreen({
         atPickup={cancelAtDoorAtPickup}
         open={cancelAtDoorOpen}
         onOpenChange={setCancelAtDoorOpen}
-        onResolved={(resolution) => {
-          if (resolution === "waiver-refused") {
-            /**
-             * ⛔ Resolve WITHOUT the type, deliberately. The waived outcome is
-             * `files`, and showing that would be the opposite of what just
-             * happened — the driver needs the countdown they would have had if
-             * they had never claimed a refusal at the door.
-             */
-            setRefusal(resolveNoShow(trip, activeLeg, demo, elapsed, null));
-            return;
-          }
-          router.push(backHref);
-        }}
+        /**
+         * ⛔ The `"waiver-refused"` branch went with the option that produced
+         * it — see `CancelAtDoorResolution`. Both remaining resolutions leave
+         * the screen, so there is nothing left to branch on.
+         */
+        onResolved={() => router.push(backHref)}
       />
 
       <RiderNoShowForm

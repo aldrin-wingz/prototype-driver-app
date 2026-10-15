@@ -58,6 +58,15 @@ function check(label: string, detail: string, ok: boolean) {
   if (!ok) failures++;
 }
 
+/** ⚠️ Comments stripped, so an ABSENCE check cannot fail on the note that
+ *  explains the absence. Mirrors the base repo's own helper. */
+function codeOnly(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+}
+
 function sourceFiles(): string[] {
   const out: string[] = [];
   const skip = new Set(["node_modules", ".next", ".git", "references", "public"]);
@@ -489,6 +498,74 @@ check(
   "no capture-derived rider names",
   leaked.length ? leaked.join(", ") : `0 of ${CAPTURE_NAMES.length} known names present`,
   leaked.length === 0,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n12. The balance card has ONE action (CAP-329 / BAL-B2)");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **The mirror was a capture batch out of date.** This card paired
+ * `Weekly Earnings` with `Payout Activity` in a two-column grid, replicating
+ * the `BAL-B1` shoot. Two LATER captures show a single full-width
+ * `Payout Activity`:
+ *
+ * - `BAL-B2` — `01-08 - B2 Home - Positive Balance Friday Date.png`: a positive
+ *   balance WITH a scheduled date.
+ * - `CAP-329` — the 2026-10-14 production shot: a negative balance with NO
+ *   scheduled line.
+ *
+ * ⭐ Two opposite states, one button in both, so this is not a control the
+ * other state hides. (User direction, 2026-10-15.)
+ */
+const WALLET_CARD_SRC = readFileSync(
+  join(ROOT, "components/driver/wallet-card.tsx"),
+  "utf8",
+);
+const WALLET_CARD_CODE = codeOnly(WALLET_CARD_SRC);
+const walletButtons = [...WALLET_CARD_CODE.matchAll(/<button/g)].length;
+check(
+  "the balance card offers exactly one action, and it is Payout Activity",
+  `${walletButtons} button(s); Payout Activity ${WALLET_CARD_CODE.includes("Payout Activity")}; ` +
+    `Weekly Earnings ${WALLET_CARD_CODE.includes("Weekly Earnings")}`,
+  walletButtons === 1 &&
+    WALLET_CARD_CODE.includes("Payout Activity") &&
+    // ⛔ The removed one, in the CODE only — the comment above explains why it
+    // went and names it, so an unstripped sweep would fail against correct code.
+    !WALLET_CARD_CODE.includes("Weekly Earnings") &&
+    !WALLET_CARD_CODE.includes("/weekly-earnings"),
+);
+/**
+ * ⛔ Full width, not a lone cell in a two-column grid — a single button left in
+ * the old grid sits in half the card with a gap beside it, which is neither
+ * capture.
+ */
+check(
+  "...drawn full width, not left in the two-column grid it shared",
+  `w-full ${/className="[^"]*w-full/.test(WALLET_CARD_CODE)}; ` +
+    `grid-cols-2 ${WALLET_CARD_CODE.includes("grid-cols-2")}`,
+  /className="[^"]*w-full/.test(WALLET_CARD_CODE) &&
+    !WALLET_CARD_CODE.includes("grid-cols-2") &&
+    // ⛔ Positive control: the file really was read and really is the card.
+    WALLET_CARD_CODE.includes("getBalanceSummary()"),
+);
+/**
+ * ⚠️ **`/weekly-earnings` is now UNREACHABLE, and that is recorded rather than
+ * tidied away.** This button was its only entry point anywhere in the app.
+ * Deleting the screen as well would be a claim about production that no capture
+ * supports — absence of a capture is not evidence — so the route stays until
+ * someone shoots the released app. This check pins the state so it cannot be
+ * forgotten: the page exists, and nothing links to it.
+ */
+const linksToWeekly = sourceFiles()
+  // ⚠️ The page itself is not a link to itself.
+  .filter((file) => !file.endsWith("app/weekly-earnings/page.tsx"))
+  .filter((file) => codeOnly(readFileSync(file, "utf8")).includes("/weekly-earnings"));
+check(
+  "⚠️ the weekly-earnings screen still exists and nothing links to it",
+  `page ${existsSync(join(ROOT, "app/weekly-earnings/page.tsx"))}; ` +
+    `${linksToWeekly.length} link(s)` +
+    (linksToWeekly.length ? `: ${linksToWeekly.map((f) => f.replace(ROOT + "/", "")).join(", ")}` : ""),
+  existsSync(join(ROOT, "app/weekly-earnings/page.tsx")) && linksToWeekly.length === 0,
 );
 
 // ---------------------------------------------------------------------------

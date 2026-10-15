@@ -257,6 +257,12 @@ import {
 } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
 import { ID_BADGE } from "../lib/driver-data/id-badge";
+import { noShowFormFor } from "../lib/driver-data/no-show-rules";
+import {
+  SUPPORT_NOTES_FIELD,
+  SUPPORT_NOTES_LABEL,
+  SUPPORT_NOTES_PLACEHOLDER,
+} from "../lib/support-data/case-registry";
 import {
   REQUEST_SWIPE_ACCEPT,
   REQUEST_SWIPE_REJECT,
@@ -1638,9 +1644,14 @@ const EXPECTED_REACH_FIELDS = [
   "contactNumber",
   "reachOutcome",
   "reachOutcomeOther",
-  "reachNotes",
   "contactProof",
+  // ⚠️ Moved to the END on 2026-10-15: the note is no longer this case's own
+  // field but the shared one every form carries, and shared fields are appended
+  // after each case's block, before the signature.
+  SUPPORT_NOTES_FIELD,
 ];
+/** ⛔ The subset that belongs to THIS case — the shared note is on them all. */
+const REACH_OWN_FIELDS = EXPECTED_REACH_FIELDS.filter((id) => id !== SUPPORT_NOTES_FIELD);
 const missingFields = EXPECTED_REACH_FIELDS.filter((id) => !reachFieldIds.includes(id));
 check(
   "the form asks every declared field",
@@ -1770,8 +1781,21 @@ check(
 const otherCase = buildSupportFormCase({ includeIssues: [ISSUE_CANNOT_REACH_MEMBER] });
 check(
   "the block is absent when no contact options are passed",
-  `${otherCase.fields.filter((f) => EXPECTED_REACH_FIELDS.includes(f.id)).length} of ${EXPECTED_REACH_FIELDS.length} leaked`,
-  otherCase.fields.every((f) => !EXPECTED_REACH_FIELDS.includes(f.id)),
+  `${otherCase.fields.filter((f) => REACH_OWN_FIELDS.includes(f.id)).length} of ${REACH_OWN_FIELDS.length} leaked`,
+  otherCase.fields.every((f) => !REACH_OWN_FIELDS.includes(f.id)),
+);
+/**
+ * ⛔⛔ ...but the SHARED note is on it, and must be. `supportNotes` is every
+ * form's field as of 2026-10-15, so sweeping it as a leak would assert the
+ * opposite of the thing that was just built. The leak list above is this case's
+ * OWN fields; this is the other half.
+ */
+check(
+  "...while the shared note and signature are on it, because they are on everything",
+  `notes ${otherCase.fields.some((f) => f.id === SUPPORT_NOTES_FIELD)}, ` +
+    `signature ${otherCase.fields.some((f) => f.id === "signature")}`,
+  otherCase.fields.some((f) => f.id === SUPPORT_NOTES_FIELD) &&
+    otherCase.fields.some((f) => f.id === "signature"),
 );
 
 // ---- the More Options grid ---------------------------------------------
@@ -2313,7 +2337,7 @@ const assignIds = assignVisible.map((f) => f.id);
 // ⚠️ `signature` is LAST on every list below: every support form now ends with
 // a driver signature (user direction, 2026-10-14). Six cases previously asked
 // for nothing at all.
-const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentScope", "assignmentNotes", "signature"];
+const EXPECTED_ASSIGN_FIELDS = ["issue", "member", "assignmentScope", SUPPORT_NOTES_FIELD, "signature"];
 check(
   "the case renders exactly the declared field set",
   `${assignIds.length} of ${ASSIGN_CASE.fields.length} field(s) visible: ${assignIds.join(", ")}`,
@@ -2413,11 +2437,11 @@ check(
  * goes quietly short.
  */
 const PLAIN_CASE_IDS = buildSupportFormCase().fields.map((f) => f.id);
+/** ⛔ This case's OWN fields. The shared note is on every case by design. */
 const ASSIGN_OWN_FIELDS = [
   "member",
   "assignmentReason",
   "assignmentReasonOther",
-  "assignmentNotes",
 ];
 const leaked = ASSIGN_OWN_FIELDS.filter((id) => PLAIN_CASE_IDS.includes(id));
 check(
@@ -3253,7 +3277,7 @@ const sbVisible = SB_CASE.fields.filter((f) => isFieldVisible(f, sbValues)).map(
 // ⚠️ `signature` is LAST on every list below: every support form now ends with
 // a driver signature (user direction, 2026-10-14). Six cases previously asked
 // for nothing at all.
-const EXPECTED_SB_FIELDS = ["issue", "returnReason", "returnNotes", "signature"];
+const EXPECTED_SB_FIELDS = ["issue", "returnReason", SUPPORT_NOTES_FIELD, "signature"];
 check(
   "the case renders exactly the declared field set",
   `${sbVisible.length} of ${SB_CASE.fields.length} visible: ${sbVisible.join(", ")}`,
@@ -5056,10 +5080,13 @@ const EXPECTED_CHANGE_FIELDS = [
   "changeTime1",
   "changeAddress1",
   CHANGE_SOURCE_FIELD,
-  CHANGE_NOTES_FIELD,
+  // ⛔ The note is NOT here. It was `changeNotes`, this case's own field, until
+  // 2026-10-15 — now it is the shared one every form carries, which has no
+  // `showIf` and so is not part of any case's own block. §38 asserts it is on
+  // this case all the same.
 ];
 check(
-  "a two-anchor ride builds the declared six fields, in order",
+  "a two-anchor ride builds the declared five fields, in order",
   `${ids22a.length}: ${ids22a.join(", ")}`,
   ids22a.length === EXPECTED_CHANGE_FIELDS.length &&
     EXPECTED_CHANGE_FIELDS.every((id, i) => ids22a[i] === id),
@@ -5083,7 +5110,7 @@ const sourceField = built22a.supportCase.fields.find(
   (f) => f.id === CHANGE_SOURCE_FIELD,
 )!;
 const notesField = built22a.supportCase.fields.find(
-  (f) => f.id === CHANGE_NOTES_FIELD,
+  (f) => f.id === SUPPORT_NOTES_FIELD,
 )!;
 check(
   "who asked is required; the free-text box beside it is not",
@@ -5564,10 +5591,11 @@ const EXPECTED_ADD_FIELDS = [
   ADD_PICKUP_TIME_FIELD,
   ADD_DROPOFF_ADDRESS_FIELD,
   ADD_DROPOFF_TIME_FIELD,
-  ADD_NOTES_FIELD,
+  // ⛔ The note is NOT here — it was `addLegNotes` until 2026-10-15 and is now
+  // the shared field, which carries no `showIf`. See §38.
 ];
 check(
-  "the case at rest builds the declared eight fields, in order",
+  "the case at rest builds the declared seven fields, in order",
   `${ids19.length}: ${ids19.join(", ")}`,
   ids19.length === EXPECTED_ADD_FIELDS.length &&
     EXPECTED_ADD_FIELDS.every((id, i) => ids19[i] === id),
@@ -10032,9 +10060,16 @@ check(
 );
 /**
  * ⛔⛔ **The suppression is a property of the SCREEN, not of the case**, and it
- * has to be reachable both ways or one of the two paths is wrong. The no-show
- * form is opened from the screen (signed) and standalone from More Options
- * (not signed); Cancel at Door only ever from the screen.
+ * has to be reachable both ways or the parameter decides nothing. The no-show
+ * form is opened from the screen (which takes a DRIVER signature) and
+ * standalone from More Options (which takes none), so it suppresses on the
+ * first path only.
+ *
+ * ⭐ **Cancel at Door passes `false`, and that is a 2026-10-15 correction.**
+ * Its screen signs too — but `NO_SHOW_TYPE_FORMS` swaps the pad to `Member
+ * Signature` for that type alone, so the DRIVER had attested to nothing on the
+ * one no-show path where the member did. §-above asserts the swap; this
+ * asserts the caller.
  */
 const suppressed = buildSupportFormCase({ signatureTakenElsewhere: true });
 const asked = buildSupportFormCase({ signatureTakenElsewhere: false });
@@ -10048,9 +10083,14 @@ const CAD_FORM = codeOnly(readFileSync(join(ROOT, "components/support/cancel-at-
 const NS_FORM = codeOnly(readFileSync(join(ROOT, "components/support/rider-no-show-form.tsx"), "utf8"));
 check(
   "...and both callers pass what is true of their own screen",
-  `cancel-at-door ${/signatureTakenElsewhere: true/.test(CAD_FORM) ? "always" : "MISSING"}, no-show ${/signatureTakenElsewhere: !standalone/.test(NS_FORM) ? "only when the screen signed" : "MISSING"}`,
-  /signatureTakenElsewhere: true/.test(CAD_FORM) &&
-    /signatureTakenElsewhere: !standalone/.test(NS_FORM),
+  `cancel-at-door ${/signatureTakenElsewhere: false/.test(CAD_FORM) ? "asks (the screen took the member's)" : "MISSING"}, ` +
+    `no-show ${/signatureTakenElsewhere: !standalone/.test(NS_FORM) ? "only when the screen signed" : "MISSING"}`,
+  /signatureTakenElsewhere: false/.test(CAD_FORM) &&
+    /signatureTakenElsewhere: !standalone/.test(NS_FORM) &&
+    // ⛔ And the reason is the rule, not a comment: the swap really is Cancel
+    // At Door's alone.
+    noShowFormFor("Cancel At Door").signatureLabel === "Member Signature" &&
+    noShowFormFor("Member Not Home").signatureLabel === "Driver Signature",
 );
 
 // ---------------------------------------------------------------------------
@@ -12640,7 +12680,7 @@ check(
     // ⛔ Positive control: the fields really do exist on the case that asks.
     rf36Case.fields.filter(
       (f) => f.type === "seat-blocks" || f.id.startsWith("exception") || f.id === "actualSeats",
-    ).length === 5,
+    ).length === 4,
 );
 
 /* --- 36d-2. The pill: one half replaced, the other kept ------------------ */
@@ -13084,6 +13124,144 @@ check(
   new Set(rf37AreaCounts).size > 1 &&
     Math.max(...rf37AreaCounts) === EXPECTED_AREAS.length &&
     Math.min(...rf37AreaCounts) < EXPECTED_AREAS.length,
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n38. One optional note, on every form");
+// ---------------------------------------------------------------------------
+/**
+ * ⭐⭐ **It used to be six bespoke fields under two labels, and three cases had
+ * none at all.** `reachNotes`, `assignmentNotes`, `returnNotes`,
+ * `exceptionNotes`, `changeNotes` and `addLegNotes`, reading "Anything else
+ * Support should know?" on two cases and "…(optional)" on four — while Rider
+ * No-Show, Cancel at Door and Missed Swipe offered no way to say anything.
+ * Exactly the shape the driver signature was in before it was consolidated, and
+ * fixed the same way. (User direction, 2026-10-15.)
+ */
+const RF38_CASES: Array<{ why: string; built: ReturnType<typeof buildSupportFormCase> }> = [
+  { why: "rider no-show", built: buildSupportFormCase({ askNoShowType: true }) },
+  { why: "cancel at door", built: buildSupportFormCase({ includeIssues: [ISSUE_CANCEL_AT_DOOR], askWaitTimes: false }) },
+  { why: "missed swipe", built: buildSupportFormCase({ includeIssues: [ISSUE_MISSED_SWIPE], missedSwipe: [{ anchor: "dropoff", confirmed: false }] }) },
+  { why: "cannot reach", built: buildSupportFormCase({ includeIssues: [ISSUE_CANNOT_REACH_MEMBER], cannotReach: { contactOptions: [] } }) },
+  { why: "auto-assign", built: buildSupportFormCase({ includeIssues: [ISSUE_AUTO_ASSIGN_REQUEST], autoAssign: true }) },
+  { why: "send-back", built: buildSupportFormCase({ includeIssues: [ISSUE_SEND_BACK_REASON], sendBack: true }) },
+  { why: "rider declined", built: buildSupportFormCase({ includeIssues: [ISSUE_RIDER_DECLINED], riderDeclined: { legOptions: [] } }) },
+  { why: "trip change", built: buildTripChange(change22a, change22a.legs[0]).supportCase },
+  { why: "add leg", built: buildAddLeg(leg21a, leg21a.legs[0]).supportCase },
+  { why: "over capacity", built: buildOverCapacityException(rf36Request).supportCase },
+];
+/**
+ * ⛔⛔ **VISIBLE, not merely present.** The first version of this check asked
+ * whether the field was in the array, and a break test walked straight through
+ * it: putting a `showIf` back on the note leaves it in every case's field list
+ * while hiding it on all but one. Presence is not the property — the absence of
+ * a gate is, because that is what "it applies to every issue" means.
+ */
+const rf38Notes = (c: (typeof RF38_CASES)[number]) =>
+  c.built.fields.find((f) => f.id === SUPPORT_NOTES_FIELD);
+const rf38Without = RF38_CASES.filter((c) => {
+  const field = rf38Notes(c);
+  if (!field) return true;
+  // ⛔ No gate at all, and visible with nothing answered — the two halves of
+  // "on every form".
+  return Boolean(field.showIf) || !isFieldVisible(field, {});
+});
+check(
+  "every case carries the shared note, ungated and visible",
+  rf38Without.length
+    ? `MISSING or GATED on: ${rf38Without.map((c) => c.why).join(", ")}`
+    : `${RF38_CASES.length} of ${RF38_CASES.length} case(s), none gated`,
+  rf38Without.length === 0 &&
+    // ⛔ Non-vacuity: `isFieldVisible` really does refuse a gated field, or the
+    // clause above is true of anything.
+    !isFieldVisible({ ...rf38Notes(RF38_CASES[0])!, showIf: { field: "issue", equals: ["nope"] } }, {}) &&
+    // ⛔ Non-vacuity: the three that had none before are really in the sweep.
+    RF38_CASES.some((c) => c.why === "cancel at door") &&
+    RF38_CASES.some((c) => c.why === "rider no-show") &&
+    RF38_CASES.some((c) => c.why === "missed swipe") &&
+    RF38_CASES.length === 10,
+);
+/**
+ * ⛔⛔ **LAST BUT ONE, never after the signature.** The driver attests to what
+ * they wrote, so a note taken after the pad would be signed for before it
+ * existed — the same rule that puts the signature last.
+ */
+const rf38Misplaced = RF38_CASES.filter((c) => {
+  const ids = c.built.fields.map((f) => f.id);
+  const notes = ids.indexOf(SUPPORT_NOTES_FIELD);
+  const sig = ids.indexOf("signature");
+  return sig >= 0 ? notes !== sig - 1 : notes !== ids.length - 1;
+});
+check(
+  "...immediately before the signature, on every one of them",
+  rf38Misplaced.length
+    ? `MISPLACED: ${rf38Misplaced.map((c) => c.why).join(", ")}`
+    : `${RF38_CASES.length} of ${RF38_CASES.length}; e.g. ${RF38_CASES[0].built.fields.slice(-2).map((f) => f.id).join(" → ")}`,
+  rf38Misplaced.length === 0 &&
+    // ⛔ Non-vacuity: a signature really does follow it somewhere, or "before
+    // the signature" is a claim about a field that is never there.
+    RF38_CASES.some((c) => c.built.fields.some((f) => f.type === "signature")),
+);
+/**
+ * ⛔ One id and one label. Six ids under two labels is six things that can
+ * drift — and they had.
+ */
+const rf38Labels = [
+  ...new Set(
+    RF38_CASES.flatMap((c) =>
+      c.built.fields.filter((f) => f.id === SUPPORT_NOTES_FIELD).map((f) => f.label),
+    ),
+  ),
+];
+const REGISTRY_SRC = codeOnly(
+  readFileSync(join(ROOT, "lib/support-data/case-registry.ts"), "utf8"),
+);
+const rf38OldIds = ["reachNotes", "assignmentNotes", "returnNotes", "exceptionNotes", "changeNotes", "addLegNotes"];
+const rf38Survivors = rf38OldIds.filter((id) => REGISTRY_SRC.includes(`"${id}"`));
+check(
+  "one id and one label, and none of the six it replaced survive",
+  `${rf38Labels.length} label(s): ${rf38Labels.join(" | ")}; ` +
+    `old ids left: ${rf38Survivors.join(", ") || "none"}`,
+  rf38Labels.length === 1 &&
+    rf38Labels[0] === SUPPORT_NOTES_LABEL &&
+    rf38Survivors.length === 0 &&
+    // ⛔ Positive control: the registry really was read.
+    REGISTRY_SRC.includes("SUPPORT_NOTES_FIELD"),
+);
+/**
+ * ⛔ Optional, on every case. A note that blocked Submit would be the opposite
+ * of the thing — and it is the one field the driver may have nothing to say in.
+ */
+const rf38Required = RF38_CASES.filter((c) =>
+  c.built.fields.some((f) => f.id === SUPPORT_NOTES_FIELD && f.required),
+);
+check(
+  "...and it never gates Submit",
+  rf38Required.length ? `REQUIRED on: ${rf38Required.map((c) => c.why).join(", ")}` : `0 of ${RF38_CASES.length}`,
+  rf38Required.length === 0 &&
+    // ⛔ ...measured, not just read off the flag: a case with every other
+    // answer given submits with the note empty.
+    canSubmitCase(
+      RF38_CASES[5].built.fields,
+      { issue: ISSUE_SEND_BACK_REASON, returnReason: sendBackReasonOptions()[0].value, signature: "drawn" },
+    ),
+);
+/**
+ * ⚠️ The PLACEHOLDER still varies, because what is worth adding differs per
+ * case and a generic example teaches nothing. ⛔ But it must not be the SAME on
+ * every case, or the per-case chooser is a function that decides nothing.
+ */
+const rf38Placeholders = RF38_CASES.map(
+  (c) => c.built.fields.find((f) => f.id === SUPPORT_NOTES_FIELD)?.placeholder ?? "",
+);
+check(
+  "...while the example still fits the case it is on",
+  `${new Set(rf38Placeholders).size} distinct placeholder(s) across ${RF38_CASES.length} case(s)`,
+  new Set(rf38Placeholders).size > 1 &&
+    rf38Placeholders.every((t) => t.length > 0) &&
+    // ⛔ ...and the generic fallback really is reached, or the chooser is a
+    // lookup that happens to cover everything.
+    rf38Placeholders.includes(SUPPORT_NOTES_PLACEHOLDER),
 );
 
 // ---------------------------------------------------------------------------
