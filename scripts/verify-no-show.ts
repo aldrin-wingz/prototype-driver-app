@@ -86,7 +86,11 @@ const tagged = mockInProgressTrips.filter((trip) => trip.noShowDemo);
 // user story, so the assertion is INVERTED: the expected set is declared here as a
 // literal, and the seed must match it exactly. Declaring it rather than deriving it
 // from the seed is the point — a set derived from the thing it checks cannot fail.
-const EXPECTED_ROWS = ["3.1", "4.1"] as const;
+// ⚠️ Row 5 joined 2026-10-16 (D160). The treatment row had existed since the
+// matrix was written with NO RIDE CARRYING IT, so the one branch production can
+// never show was also the one branch this prototype could not walk — and two
+// approved stories disagreed about it for a day without any gate noticing.
+const EXPECTED_ROWS = ["3.1", "4.1", "5"] as const;
 const seededRows = new Set(tagged.map((t) => t.noShowDemo as NoShowDemoRow));
 check("the seed carries exactly the expected rows",
   seededRows.size === EXPECTED_ROWS.length &&
@@ -106,8 +110,22 @@ check("there are rows to check", seededRows.size > 0, `${seededRows.size}`);
 // check is what this script caught on its very first run; the pairing is kept.
 const AS_IS_EXEMPT = new Set(["5"]);
 const asIs = tagged.filter((t) => !String(t.noShowDemo).includes("."));
-check("the demo seeds no as-is rows", asIs.length === 0,
-  asIs.map((t) => t.noShowDemo).join(","));
+/**
+ * ⚠️ **Was `asIs.length === 0`.** Row 5 is an as-is row by name — no `.` — and
+ * is now seeded, because it is its OWN as-is row (`NO_SHOW_AS_IS_PAIR["5"] = "5"`):
+ * production's "no location points" message is unreachable, so there is no
+ * production behaviour to put beside it. The rule is unchanged for every other
+ * row; only the exempt set may appear.
+ */
+const asIsUnexpected = asIs.filter((t) => !AS_IS_EXEMPT.has(String(t.noShowDemo)));
+check("the demo seeds no as-is rows except the declared exemptions",
+  asIsUnexpected.length === 0,
+  asIsUnexpected.map((t) => t.noShowDemo).join(","));
+// ⛔ Non-vacuity: the exemption must be a real, non-empty carve-out and not a
+// way for this check to stop having a subject.
+check("...and the exemption is a declared, non-empty set with a seeded member",
+  AS_IS_EXEMPT.size > 0 && asIs.some((t) => AS_IS_EXEMPT.has(String(t.noShowDemo))),
+  `exempt=${[...AS_IS_EXEMPT].join(",")} seeded as-is=${asIs.map((t) => t.noShowDemo).join(",")}`);
 for (const trip of asIs) {
   if (AS_IS_EXEMPT.has(String(trip.noShowDemo))) continue;
   const t = treatmentFor(trip, PLAIN_MIRROR);
@@ -904,6 +922,9 @@ for (const trip of mockInProgressTrips) {
   for (const focus of [NOW, NOW_02, STRANGER]) {
     voiceSwept += 1;
     const t = treatmentFor(trip, focus);
+    // ⚠️ An exempt row has NO production voice to speak in — see AS_IS_EXEMPT.
+    // Asserted positively below rather than silently skipped.
+    if (AS_IS_EXEMPT.has(String(trip.noShowDemo))) continue;
     if (t.copy !== "production") spokeOurVoice.push(`${trip.id}/${focus.solutionId}: copy=${t.copy}`);
     if (t.offerForm) spokeOurVoice.push(`${trip.id}/${focus.solutionId}: offers the form`);
   }
@@ -918,6 +939,23 @@ check(
   voiceSwept === mockInProgressTrips.length * 3 && mockInProgressTrips.length > 5,
   `${mockInProgressTrips.length} ride(s) x 3 focus(es)`
 );
+/**
+ * ⛔ The exemption, asserted. Skipping a ride in the sweep above would otherwise
+ * be indistinguishable from the ride not existing — so the exempt row must
+ * actually speak in OUR voice and offer the form on its Now side, which is the
+ * whole reason it has no production pair.
+ */
+const exemptRides = mockInProgressTrips.filter((trip) =>
+  AS_IS_EXEMPT.has(String(trip.noShowDemo)));
+check(
+  "an exempt row's Now really is our voice, which is why it has no production pair",
+  exemptRides.length > 0 &&
+    exemptRides.every((trip) => {
+      const t = treatmentFor(trip, NOW);
+      return t.copy === "revised" && t.offerForm;
+    }),
+  `${exemptRides.length} exempt ride(s): ${exemptRides.map((r) => `${r.id}/${r.noShowDemo}`).join(", ")}`
+);
 
 // ── 9c · the toggle is not decorative on these two rows ──────────────────
 /**
@@ -930,9 +968,17 @@ const fingerprint = (t: ReturnType<typeof treatmentFor>) =>
 for (const trip of tagged) {
   const now = treatmentFor(trip, NOW);
   const fixed = treatmentFor(trip, FIXED_01);
+  // ⚠️ An exempt row is declared to be its OWN as-is row, so its two sides are
+  // deliberately IDENTICAL. Asserting that, rather than exempting it from the
+  // check, keeps a claim on the row instead of a hole.
+  const selfPaired = NO_SHOW_AS_IS_PAIR[trip.noShowDemo!] === trip.noShowDemo;
   check(
-    `${trip.noShowDemo} shows something different on each side`,
-    fingerprint(now) !== fingerprint(fixed),
+    selfPaired
+      ? `${trip.noShowDemo} is its own as-is row, so both sides are the same`
+      : `${trip.noShowDemo} shows something different on each side`,
+    selfPaired
+      ? fingerprint(now) === fingerprint(fixed)
+      : fingerprint(now) !== fingerprint(fixed),
     `now=${fingerprint(now)} fixed=${fingerprint(fixed)}`
   );
   check(
@@ -942,9 +988,9 @@ for (const trip of tagged) {
   );
 }
 check(
-  "the two demo rides are both actually present for that pair",
-  tagged.length === 2,
-  `${tagged.length} tagged ride(s): ${tagged.map((t) => t.noShowDemo).join(",")}`
+  "every declared demo ride is actually present",
+  tagged.length === EXPECTED_ROWS.length,
+  `${tagged.length} tagged ride(s): ${tagged.map((t) => t.noShowDemo).join(",")} — expected ${EXPECTED_ROWS.join(",")}`
 );
 
 // ── 9d · Fixed and the plain mirror are untouched ────────────────────────
@@ -1156,7 +1202,14 @@ const nowLabels = mockInProgressTrips.map((trip) => ({
   id: trip.id,
   label: refusalDismissLabel(treatmentFor(trip, { solutionId: "rider-no-show", mode: "now" })),
 }));
-const renamed = nowLabels.filter((r) => r.label !== REFUSAL_DISMISS_PRODUCTION);
+/**
+ * ⚠️ An exempt row is excluded: production never shows its refusal at all, so
+ * there is no captured button on it to preserve. Asserted the other way below.
+ */
+const exemptIds = new Set(exemptRides.map((r) => r.id));
+const renamed = nowLabels
+  .filter((r) => !exemptIds.has(r.id))
+  .filter((r) => r.label !== REFUSAL_DISMISS_PRODUCTION);
 check(
   "every ride still shows the captured OK on the production side",
   renamed.length === 0,
@@ -1321,11 +1374,15 @@ for (const trip of mockInProgressTrips) {
  * ⚠️ Declared, and the first version of this was a GUESS — `> 100`, carried
  * over from a wider sweep that walked three focuses and every pool. It failed
  * on the real number, which is the floor doing the one thing a floor is good
- * for. The literals below are the measured shape: 12 seeded in-progress rides
- * × 2 sides × 3 no-show types, of which 60 refuse and the rest file.
+ * for. The literals below are the measured shape: seeded in-progress rides
+ * × 2 sides × 3 no-show types, of which some refuse and the rest file.
+ *
+ * ⚠️ Moved 2026-10-16 (D160): 12 rides → 13, and 60 refusing → 66. The seeded
+ * no-location ride refuses on BOTH sides for all three types (6 more), because
+ * the outcome comes from the location walk, which no treatment flag reaches.
  */
-const EXPECTED_COMBINATIONS = 12 * DEMO_MODES.length * NO_SHOW_TYPES.length;
-const EXPECTED_REFUSING = 60;
+const EXPECTED_COMBINATIONS = 13 * DEMO_MODES.length * NO_SHOW_TYPES.length;
+const EXPECTED_REFUSING = 66;
 check(
   "the refusal sweep covers both sides of every seeded ride",
   shapes.length === EXPECTED_REFUSING &&

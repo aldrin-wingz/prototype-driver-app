@@ -281,6 +281,13 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   // the whole point. It does not collide with the no-show demo: that slice is
   // entered from More Options → Member No-Show, never from the swipe.
   "1049800377": "pickup",
+  // ⚠️ Row 5's no-location ride (`01b`), seeded 2026-10-16 (D160). Its
+  // `locationRecords` is EMPTY, so the trail has nothing to challenge any swipe
+  // with — quiet for the same reason as `1049800376` and `1049800393`, and for
+  // the opposite reason to `1049800377`, which has a trail that contradicts the
+  // claim. ⛔ Declared rather than left to fall through: an undeclared ride here
+  // is a ride whose swipe behaviour nobody decided.
+  "1049800378": "none",   // no trail at all — the point of the ride
   "1049800376": "none",   // no trail
   "1049800379": "none",   // every mark recorded
   // ⚠️ Row 09's scenario ride (`09a`, AMARA OKONKWO onboard). Added to this
@@ -320,9 +327,11 @@ for (const trip of mockInProgressTrips) {
 check("every in-progress ride was swept",
   swept === mockInProgressTrips.length && swept === Object.keys(EXPECTED_TRIGGER).length,
   `${swept} ridden, ${Object.keys(EXPECTED_TRIGGER).length} declared`);
+// ⚠️ Quiet count 9 → 10 on 2026-10-16 (D160) with the no-location ride. Both
+// arms stay populated, which is the only thing this check is for.
 check("the sweep covers rides that DO and DO NOT trigger",
   Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length === 3 &&
-    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 9,
+    Object.values(EXPECTED_TRIGGER).filter((v) => v === "none").length === 10,
   `${Object.values(EXPECTED_TRIGGER).filter((v) => v !== "none").length} fire of ${swept}`);
 
 // ⛔ The two rides that stay quiet AT the pick-up must be quiet for the right

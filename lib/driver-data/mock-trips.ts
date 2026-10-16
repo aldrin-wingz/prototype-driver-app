@@ -2925,6 +2925,71 @@ export const mockInProgressTrips: Trip[] = [
     clientEnrolledInIncentives: true,
   },
 
+  // ===== started — the phone reported no location at all =====
+  //
+  // ⚠️ Demo row 5, and until 2026-10-16 the matrix row existed with NO RIDE
+  // CARRYING IT. The treatment was declared, nothing could reach it, and two
+  // approved stories quietly disagreed about what it should do for a day —
+  // ticket 10437's AC said refuse, ticket 11299's TC-006 said treat it as away.
+  // Neither could be walked, so neither could be wrong out loud. Seeded on user
+  // direction once the decision landed: the form IS offered (D160).
+  //
+  // ⛔ `locationRecords: []` is the whole seed. `walkLocationRecords` returns
+  // `no_records`, which `resolveNoShow` turns into the `no_location_data` form
+  // gap — the one branch production can never show, because `canNoshow` inserts
+  // a row from the incoming lat/lng before it queries, so its own empty-set
+  // message is unreachable and the driver is told to wait ten minutes instead.
+  {
+    id: "1049800378",
+    date: "Thu, Jul 31, 2026",
+    rider: "Tobias Marchetti",
+    client: "Verida",
+    market: "GA",
+    passengerCount: 1,
+    distance: "6.2 mi",
+    totalRevenue: 38.75,
+    notes: "Driver reports the app is not showing their position",
+    legs: [
+      {
+        id: "1049800378",
+        legCode: "A",
+        type: "est-pickup",
+        label: "Est Pick-up Time",
+        time: "9:15 AM",
+        address: "812 Shallowford Rd, Marietta, GA 30062",
+        county: "Cobb County",
+        revenue: 38.75,
+        revenueNote: "Accepted by you",
+        progress: {
+          startedAt: "9:02 AM",
+          pickedUpAt: null,
+          droppedOffAt: null,
+        },
+        // ⛔ Empty, deliberately. Not a missing field — the absence IS the case.
+        locationRecords: [],
+      },
+      {
+        id: "1049800378-appt",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:00 AM",
+        address: "55 Whitlock Ave, Marietta, GA 30064",
+        county: "Cobb County",
+        revenue: 0,
+      },
+    ],
+    status: "in-progress",
+    noShowDemo: "5",
+    pills: [],
+    scenario: {
+      code: "01b",
+      label: "No location from the phone",
+      solutions: ["rider-no-show"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: true,
+  },
+
   // ===== picked-up — member on board, heading to drop-off =====
   {
     id: "1049800376",

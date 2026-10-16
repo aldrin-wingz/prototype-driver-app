@@ -938,7 +938,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 39;  // ⭐ +13 on 2026-10-15: row 19's manifest — 10 still on, 3 cancelled; +2: row 13's blocking rides
+const EXPECTED_SCENARIO_RIDES = 40;  // ⭐ +13 on 2026-10-15: row 19's manifest — 10 still on, 3 cancelled; +2: row 13's blocking rides; +1 on 2026-10-16: row 01's no-location ride `01b` (D160)
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -1214,7 +1214,12 @@ check(
 );
 /** Declared per row, so adding a scenario ride has to be a deliberate edit. */
 const EXPECTED_IN_PROGRESS: Record<string, number> = {
-  "rider-no-show": 2,
+  // ⭐ Three since 2026-10-16 (D160): `01a` away from the pick-up, `01b` no
+  // location from the phone, and `02a`, which row 01 shares with row 02 for the
+  // countdown branch. `01b` is the branch production can never show — its own
+  // treatment row had existed with no ride carrying it, so two approved stories
+  // disagreed about it without any gate able to notice.
+  "rider-no-show": 3,
   "cancel-at-door": 1,
   // ⚠️ Two, not three. The third ride demonstrated a drop-off the trail could
   // not place — which 1b and ride 2 now cover between them, so it was removed
@@ -10384,7 +10389,9 @@ console.log("\n30. One context block — trip, then the leg being filed against"
  * trip, and 3 have no drop-off stop at all.
  */
 const CONTEXT_LEGS = getLegOptions("all");
-const EXPECTED_CONTEXT_LEGS = 24;
+// ⚠️ 24 → 25 on 2026-10-16 (D160): the no-location ride carries a swipe mark,
+// so its leg reaches every form's picker like any other in-progress ride.
+const EXPECTED_CONTEXT_LEGS = 25;
 check(
   "the context sweep covers every selectable leg",
   `${CONTEXT_LEGS.length} of ${EXPECTED_CONTEXT_LEGS}`,
