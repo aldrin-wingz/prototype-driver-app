@@ -768,6 +768,12 @@ export const SOLUTIONS: Solution[] = [
     proposedFeature:
       "Cancelled rides kept in My Rides — in Upcoming on their own date behind a default-on Show cancelled trips toggle the driver can turn off, and in Needs Action until the driver acknowledges having seen it",
     tableSummary: "Keep cancelled rides in the manifest, behind one toggle.",
+    notionTickets: [
+      {
+        id: "11330",
+        url: "https://app.notion.com/p/3fbac7c6c89d81cb9636e43172a39acf",
+      },
+    ],
     klass: "surface",
     buildState: "in-prototype",
     entry: {

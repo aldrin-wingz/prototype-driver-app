@@ -13476,10 +13476,10 @@ console.log("\n41. The ticket column");
  * ⚠️ Row 14 carries TWO because its proposal is two stories (the reason form
  * and the standing-order redirect), exactly as row 01 does.
  */
-const EXPECTED_TICKETED_ROWS = 3;
-const EXPECTED_TICKETS = 5;
+const EXPECTED_TICKETED_ROWS = 4;  // ⭐ +1 on 2026-10-17: row 19 → 11330 (D161)
+const EXPECTED_TICKETS = 6;  // ⭐ +1 on 2026-10-17: ticket 11330
 /** ⛔ Declared too — a row set derived from the filter cannot disagree with it. */
-const EXPECTED_TICKETED_ORDERS = [1, 2, 14];
+const EXPECTED_TICKETED_ORDERS = [1, 2, 14, 19];
 const rf41Ticketed = SOLUTIONS.filter((s) => (s.notionTickets?.length ?? 0) > 0);
 const rf41All = rf41Ticketed.flatMap((s) => s.notionTickets ?? []);
 check(
