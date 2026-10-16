@@ -462,14 +462,16 @@ check("the screen passes the type to the guardrail",
 check("Submit opens the Cancel at Door form on the waiver paths",
   /usingWaiver[\s\S]{0,200}setCancelAtDoorOpen\(true\)/.test(SCREEN), "not wired");
 /**
- * ⚠️ Added because a mutation got through: hardcoding `atPickup={false}` left
- * every check green while asking a driver standing at the door to reconstruct
- * times they never needed. The variant is a DECISION and needs its own check.
+ * ⛔⛔ **These two used to assert the variant was computed and not hardcoded** —
+ * added after a mutation hardcoded `atPickup={false}` and left every check
+ * green. D148 removed the variant itself, so the property worth pinning
+ * inverted: the screen must pass NO variant, because there is only one form.
+ * The two checks that replace them live in the D148 block further down, with a
+ * positive control, since an absence check on an unread file passes silently.
  */
-check("the form variant is computed, not hardcoded",
-  /atPickup=\{cancelAtDoorAtPickup\}/.test(SCREEN), "variant hardcoded");
-check("and it is computed from whether the app placed the driver there",
-  /setCancelAtDoorAtPickup\(outcome\.kind === "files"\)/.test(SCREEN), "not derived");
+check("the screen renders the one Cancel at Door form",
+  /<CancelAtDoorForm[\s\S]{0,400}open=\{cancelAtDoorOpen\}/.test(SCREEN),
+  "the form is no longer rendered from the screen's own open state");
 /**
  * ⛔ The refused-waiver re-resolve went with the option that could trigger it.
  * What remains is the simpler property: every resolution leaves the screen.
@@ -477,6 +479,48 @@ check("and it is computed from whether the app placed the driver there",
 check("every Cancel at Door resolution leaves the screen",
   /onResolved=\{\(\) => router\.push\(backHref\)\}/.test(SCREEN),
   "a resolution branches somewhere this check does not describe");
+
+// ── D148: where a Cancel At Door AWAY from the pick-up goes ────────────────
+/**
+ * ⛔⛔ **The boundary ticket 11299 exists to draw.** The waiver covers the wait
+ * DURATION, never the presence requirement — so a driver the app cannot place
+ * at the pick-up is not waived, and does not get the Cancel-at-Door form at
+ * all. They get the **away support form**, which asks when they arrived, when
+ * they left, where they waited and whether they knocked.
+ *
+ * ⚠️ The defect this replaces was in the SCREEN, not the guardrail.
+ * `resolveNoShow` has always returned `form` / `not_at_pickup` here (checked
+ * above); the screen read that `form` as a waiver path and opened the
+ * Cancel-at-Door form in an "away" shape — who came to the door, plus the two
+ * times. Different evidence reached Support depending on a branch nobody had
+ * approved. Found 2026-10-16 by the approved story disagreeing with the code.
+ *
+ * ⚠️ Reachable only in the PLAIN MIRROR: scenario `01a` (the away ride) is
+ * tagged `rider-no-show` alone, so the focused row-02 view never shows it.
+ * That is why it survived to approval — the focused walk could not reach it.
+ */
+const WAIVER_EXPR = SCREEN.match(/const usingWaiver =[\s\S]*?;\n/)?.[0] ?? "";
+check("the waiver expression was found", WAIVER_EXPR.length > 0,
+  "the screen no longer computes `usingWaiver` under that name");
+check("⛔ D148 — the waiver path is the one the app PLACED at the pick-up",
+  /outcome\.kind === "files" && outcome\.presenceWaitWaived/.test(WAIVER_EXPR),
+  WAIVER_EXPR.trim());
+check("⛔ D148 — ...and a `form` outcome is NOT a waiver path",
+  WAIVER_EXPR.length > 0 && !/outcome\.kind === "form"/.test(WAIVER_EXPR),
+  WAIVER_EXPR.trim());
+/**
+ * ⚠️ The negative control for the pair above. Removing the branch is only a fix
+ * if the driver lands somewhere — and the only thing that opens the away form
+ * is the refusal, which fires on a `form` outcome and nothing else.
+ */
+check("⛔ D148 — ...so an away Cancel At Door falls through to the refusal",
+  /if \(outcome\.kind !== "files"\) \{\s*setRefusal\(outcome\);/.test(SCREEN),
+  "the fall-through to the refusal is gone, so the away driver lands nowhere");
+check("...and the refusal's only form is the away support form",
+  /refusalOffersForm[\s\S]{0,400}setFormOpen\(true\)/.test(SCREEN) &&
+    !/refusalOffersForm[\s\S]{0,400}setCancelAtDoorOpen/.test(SCREEN),
+  "the refusal offers something other than the away support form");
+
 
 // ── The form asks four questions and no attachment ─────────────────────────
 const form = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
@@ -577,20 +621,21 @@ check("no relation option is a person's name",
   CONTACT_RELATION_OPTIONS.every((o) => /^[A-Z][a-z]+( or [a-z]+| [a-z]+)*$/.test(o.label)),
   CONTACT_RELATION_OPTIONS.map((o) => o.label).join(" | "));
 
-// ── The two variants ask different things ─────────────────────────────────
+// ── Cancel at Door has ONE shape, and it is the at-the-pick-up one ────────
 /**
- * ⚠️ `signatureTakenElsewhere: false` on both, MIRRORING `cancel-at-door-form`.
- * A check below pins that the real caller agrees, so this mirror cannot drift
- * into testing a form the app does not build.
+ * ⚠️ `signatureTakenElsewhere: false`, MIRRORING `cancel-at-door-form`. A check
+ * below pins that the real caller agrees, so this mirror cannot drift into
+ * testing a form the app does not build.
+ *
+ * ⛔⛔ **There used to be a second one here** — `askWaitTimes: true`, the away
+ * variant — and six checks asserting the pair differed. It went with its caller
+ * on 2026-10-16 (D148): a Cancel At Door the app cannot place at the pick-up is
+ * not waived and does not reach this form at all. The checks it needed are
+ * replaced below by the ones that say where that driver DOES go.
  */
 const cadAtPickup = buildSupportFormCase({
   includeIssues: [ISSUE_CANCEL_AT_DOOR],
   askWaitTimes: false,
-  signatureTakenElsewhere: false,
-});
-const cadAway = buildSupportFormCase({
-  includeIssues: [ISSUE_CANCEL_AT_DOOR],
-  askWaitTimes: true,
   signatureTakenElsewhere: false,
 });
 /**
@@ -622,27 +667,47 @@ check("⛔ Cancel at Door asks for the DRIVER's signature — the screen took th
 check("...while the no-show form suppresses only on the path that signed",
   /signatureTakenElsewhere: !standalone/.test(NO_SHOW_SRC),
   "the no-show form suppresses unconditionally, so the standalone entry never signs");
-/** ⛔ And the field really lands on both variants, not just in the parameter. */
-check("...so both Cancel at Door variants end with the driver signature",
-  cadAtPickup.fields.at(-1)?.id === "signature" && cadAway.fields.at(-1)?.id === "signature",
-  `${cadAtPickup.fields.at(-1)?.id} / ${cadAway.fields.at(-1)?.id}`);
+/** ⛔ And the field really lands on the form, not just in the parameter. */
+check("...so the Cancel at Door form ends with the driver signature",
+  cadAtPickup.fields.at(-1)?.id === "signature",
+  `${cadAtPickup.fields.at(-1)?.id}`);
 const atPickupIds = cadAtPickup.fields.map((f) => f.id);
-const awayIds = cadAway.fields.map((f) => f.id);
 
-check("the at-pick-up variant has fields", atPickupIds.length > 0, `${atPickupIds.length}`);
-check("both variants ask who was at the door",
-  atPickupIds.includes("spokeWithWho") && awayIds.includes("spokeWithWho"),
-  `${atPickupIds.join(",")} || ${awayIds.join(",")}`);
+check("the Cancel at Door form has fields", atPickupIds.length > 0, `${atPickupIds.length}`);
+check("it asks who was at the door", atPickupIds.includes("spokeWithWho"),
+  atPickupIds.join(","));
 check("⚠️ a driver standing at the door is NOT asked to reconstruct times",
   !atPickupIds.includes("waitedFrom") && !atPickupIds.includes("leftAt"),
   atPickupIds.join(","));
-check("a driver who has left IS asked when they arrived and left",
-  awayIds.includes("waitedFrom") && awayIds.includes("leftAt"),
-  awayIds.join(","));
-// ⚠️ The pair must genuinely differ, or `askWaitTimes` is doing nothing.
-check("the two variants are different forms",
-  atPickupIds.join(",") !== awayIds.join(","),
-  `${atPickupIds.length} vs ${awayIds.length} fields`);
+/**
+ * ⛔⛔ **D148, at the field level.** The away driver's questions now come from
+ * the AWAY SUPPORT FORM and from nowhere else, so the two forms must not be the
+ * same form wearing two hats: this one never asks the times, and the away one
+ * always does. `plainIds` below is the away form, built straight from the
+ * registry — the comparison is between two real cases, not against a literal.
+ */
+check("⛔ D148 — the form the driver reaches instead DOES ask the times",
+  ["waitedFrom", "leftAt"].every((id) =>
+    buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] })
+      .fields.map((f) => f.id).includes(id)),
+  "the away support form stopped asking when the driver arrived and left");
+/**
+ * ⛔ The source-level half. A build-time check cannot see a component that
+ * still takes the variant as a prop and decides for itself — and that prop is
+ * exactly what D148 removed.
+ */
+check("⛔ D148 — the Cancel at Door form takes no at-pick-up variant",
+  !/atPickup/.test(stripComments(readFileSync("components/support/cancel-at-door-form.tsx", "utf8"))),
+  "the away variant is still expressible");
+check("⛔ D148 — ...and the screen no longer computes one",
+  !/cancelAtDoorAtPickup/.test(stripComments(SCREEN)),
+  "the screen still picks a variant");
+/**
+ * ⚠️ The positive control for the two absence checks above. Both would pass on
+ * a file that failed to read or a stripper that returned an empty string.
+ */
+check("...both read a real file", stripComments(SCREEN).includes("CancelAtDoorForm"),
+  "the screen scan is reading nothing, so its absence checks are vacuous");
 
 // Rider No-Show keeps its own shape — the new block must not leak into it.
 const plainNoShow = buildSupportFormCase({ includeIssues: [ISSUE_RIDER_NO_SHOW] });
@@ -692,11 +757,28 @@ check("and can once they do",
   }));
 check("the form is blocked with the question unanswered",
   !canSubmitCase(cadAtPickup.fields, CAD_BASE));
-check("the away form needs its times too",
-  !canSubmitCase(cadAway.fields, { ...CAD_BASE, spokeWithWho: SPOKE_WITH_MEMBER }));
+/**
+ * ⛔ D148 — what replaced "the away form needs its times too". The away driver
+ * is on the away support form now, and it must be gated on the same two times
+ * the retired variant was, or the fix traded a wrong form for a weaker one.
+ */
+const awaySupportForm = buildSupportFormCase({
+  includeIssues: [ISSUE_RIDER_NO_SHOW],
+  signatureTakenElsewhere: true,
+});
+const AWAY_BASE = {
+  issue: ISSUE_RIDER_NO_SHOW,
+  noShowType: "Cancel At Door",
+  legId: "1049800377",
+  waitedWhere: "Main entrance, west tower",
+  knocked: "yes",
+};
+check("⛔ D148 — the away support form still needs its times",
+  !canSubmitCase(awaySupportForm.fields, AWAY_BASE),
+  "an away Cancel At Door can now be filed without saying when the driver was there");
 check("and submits once they are given",
-  canSubmitCase(cadAway.fields, {
-    ...CAD_BASE, spokeWithWho: SPOKE_WITH_MEMBER, waitedFrom: "10:31", leftAt: "10:56",
+  canSubmitCase(awaySupportForm.fields, {
+    ...AWAY_BASE, waitedFrom: "10:31", leftAt: "10:56",
   }));
 
 // ── A submitted no-show shows the driver NOTHING afterwards ──────────────

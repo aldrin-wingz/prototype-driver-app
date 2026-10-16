@@ -6,8 +6,6 @@ import { SupportFormSheet } from "./support-form-sheet";
 import { buildSupportFormCase } from "@/lib/support-data/case-registry";
 import { ISSUE_CANCEL_AT_DOOR } from "@/lib/support-data/issue-types";
 import { buildPrefilledValues } from "@/lib/support/prefill";
-import { resolveTripContext } from "@/lib/support/trip-context";
-import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import {
   CONTACT_RELATION_OPTIONS,
   SPOKE_WITH_OPTIONS,
@@ -28,25 +26,33 @@ import type { Trip, TripLeg } from "@/lib/driver-data/mock-trips";
  * about production's ~9.1% of mis-typed Cancel At Door filings is an OPEN
  * question for that screen, not for this one.
  */
-export type CancelAtDoorResolution = "filed" | "sent";
+export type CancelAtDoorResolution = "filed";
 
 /**
  * Build the Cancel at Door case for one leg.
  *
- * ⚠️ `atPickup` is the whole variant. A driver still standing at the door has
- * nothing to reconstruct, so they are asked only who turned them away. A driver
- * the app could not place there is asked when they arrived and when they left as
- * well — the same two questions Rider No-Show asks, for the same reason.
+ * ⛔⛔ **One shape, and it is the at-the-pick-up one (D148, ticket 11299).**
+ * There was an `atPickup` variant here that added "what time did you arrive"
+ * and "what time did you leave" for a driver the app could not place at the
+ * pick-up. The approved story says that driver is not waived at all — they go
+ * to the **away support form** (arrived · left · where · knocked), which is a
+ * different form asking different questions. So the away variant had nothing
+ * left that could reach it, and an unreachable branch can be neither right nor
+ * wrong. Removed with its caller, 2026-10-16. (Same reasoning as
+ * `"waiver-refused"` above.)
+ *
+ * ⚠️ `askWaitTimes: false` is therefore unconditional, not a default: a driver
+ * standing at the door has nothing to reconstruct, and the app already placed
+ * them there.
  */
 export function buildCancelAtDoor(
   trip: Trip,
   leg: TripLeg | undefined,
-  noShowType: string,
-  atPickup: boolean
+  noShowType: string
 ) {
   const supportCase = buildSupportFormCase({
     includeIssues: [ISSUE_CANCEL_AT_DOOR],
-    askWaitTimes: !atPickup,
+    askWaitTimes: false,
     /**
      * ⛔⛔ **FALSE, and the comment that said otherwise was the defect.** It
      * read "the Member No-Show screen takes a signature before the form
@@ -85,12 +91,15 @@ function labelFor(
  * Opens straight after Submit on the Member No-Show screen — never from a tile —
  * because it exists to justify a waiver, and there is no waiver to justify
  * anywhere else.
+ *
+ * ⛔ And on exactly one path: the app placed the driver at the pick-up and the
+ * only thing short was the duration. Away, or with no fix at all, the screen
+ * refuses and offers the away support form instead (D148).
  */
 export function CancelAtDoorForm({
   trip,
   leg,
   noShowType,
-  atPickup,
   open,
   onOpenChange,
   onResolved,
@@ -98,20 +107,12 @@ export function CancelAtDoorForm({
   trip: Trip;
   leg: TripLeg | undefined;
   noShowType: string;
-  /** True when the app CAN place the driver at the pick-up right now. */
-  atPickup: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onResolved?: (resolution: CancelAtDoorResolution) => void;
 }) {
   const { toast } = useToast();
-  const { submitForm } = useRideFlow();
-  const { supportCase, initialValues } = buildCancelAtDoor(
-    trip,
-    leg,
-    noShowType,
-    atPickup
-  );
+  const { supportCase, initialValues } = buildCancelAtDoor(trip, leg, noShowType);
 
   return (
     <SupportFormSheet
@@ -123,36 +124,26 @@ export function CancelAtDoorForm({
       onSubmit={(values) => {
         onOpenChange(false);
 
-        if (atPickup) {
-          const who =
-            values.spokeWithWho === "point-of-contact"
-              ? `${labelFor(CONTACT_RELATION_OPTIONS, values.spokeWithRelation)} (${labelFor(SPOKE_WITH_OPTIONS, values.spokeWithWho)})`
-              : labelFor(SPOKE_WITH_OPTIONS, values.spokeWithWho);
-          // ⚠️ No support request on this path, deliberately — the app action IS
-          // the submission, and inventing a CS queue record would misrepresent
-          // what happened. Same reasoning as the plain no-show filing.
-          toast({
-            title: "Member No-Show submitted",
-            description: `${who} refused the ride at the door, so the 10-minute wait does not apply. Not wired further in the prototype.`,
-          });
-          onResolved?.("filed");
-          return;
-        }
-
-        submitForm({
-          caseId: supportCase.id,
-          issue: ISSUE_CANCEL_AT_DOOR,
-          ...resolveTripContext(supportCase, values),
-          values,
-          // Zendesk is the destination, so there is no status to read back.
-          appTracksStatus: false,
-        });
+        const who =
+          values.spokeWithWho === "point-of-contact"
+            ? `${labelFor(CONTACT_RELATION_OPTIONS, values.spokeWithRelation)} (${labelFor(SPOKE_WITH_OPTIONS, values.spokeWithWho)})`
+            : labelFor(SPOKE_WITH_OPTIONS, values.spokeWithWho);
+        /**
+         * ⚠️ No support request on this path, deliberately — the app action IS
+         * the submission, and inventing a CS queue record would misrepresent
+         * what happened. Same reasoning as the plain no-show filing.
+         *
+         * ⭐ Which answers an open question by removing its other half: a
+         * waived Cancel At Door raises NO ticket, and the away one raises one
+         * through the away support form, which is a Rider No-Show request. The
+         * two outcomes no longer share a form, so they no longer share a
+         * destination either.
+         */
         toast({
-          title: supportCase.successMessage ?? "Sent to Support",
-          description:
-            "Support has your report. The app will not show its progress — they will contact you if they need more.",
+          title: "Member No-Show submitted",
+          description: `${who} refused the ride at the door, so the 10-minute wait does not apply. Not wired further in the prototype.`,
         });
-        onResolved?.("sent");
+        onResolved?.("filed");
       }}
     />
   );

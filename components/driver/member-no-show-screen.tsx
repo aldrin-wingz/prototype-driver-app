@@ -103,8 +103,6 @@ export function MemberNoShowScreen({
   const [leaving, setLeaving] = useState<NoShowOutcome | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [cancelAtDoorOpen, setCancelAtDoorOpen] = useState(false);
-  /** Whether the app can place the driver at the pick-up — picks the variant. */
-  const [cancelAtDoorAtPickup, setCancelAtDoorAtPickup] = useState(false);
 
   const swipeLegs = trip.legs.filter((leg) => leg.progress);
   const activeLeg =
@@ -172,17 +170,29 @@ export function MemberNoShowScreen({
      * ⛔ **Cancel at Door does not end here — it ends in the form below.**
      *
      * The waiver is a claim that the member came out and refused, and nothing
-     * has yet asked whether that is what happened. So on every path the waiver
-     * touches, Submit opens the two questions instead of resolving:
+     * has yet asked whether that is what happened. So on the one path the
+     * waiver touches, Submit opens the two questions instead of resolving:
      *
      *   at the pick-up, short of ten minutes → `files` with the waiver set
-     *   not at the pick-up, or no fix at all → `form`
+     *
+     * ⛔⛔ **And ONLY that path — `form` is not one of them (D148, ticket
+     * 11299).** This read `|| outcome.kind === "form"` until 2026-10-16, which
+     * sent a driver the app could NOT place at the pick-up into the same form
+     * in an "away" shape: who came to the door, plus the two times. The
+     * approved story says that driver is not waived at all and goes to the
+     * **away support form** — arrived, left, where they waited, whether they
+     * knocked. Different evidence reaches Support, so this is not a shape
+     * preference; it is which questions Support gets to answer the claim with.
+     *
+     * ⚠️ The guardrail was never wrong. `resolveNoShow` returns `form` /
+     * `not_at_pickup` for a Cancel At Door exactly as it does for the other two
+     * types — the waiver has always been duration-only. This branch is what
+     * overrode it afterwards.
      *
      * ⚠️ It deliberately bypasses `treatment.offerForm`, which exists to stop a
      * form appearing on a timer — "a form here would be a way to skip the wait".
      * That rule still holds for the other two types. It does not apply here
-     * because THIS form is what decides whether the wait is skipped, and it
-     * refuses the waiver when the answer does not support it.
+     * because THIS form is what decides whether the wait is skipped.
      *
      * ⚠️ A ride that has genuinely served the ten minutes is NOT included: the
      * outcome carries no waiver, so there is nothing to justify and production's
@@ -190,10 +200,8 @@ export function MemberNoShowScreen({
      */
     const usingWaiver =
       waivesPresenceWait(noShowType, demo) &&
-      ((outcome.kind === "files" && outcome.presenceWaitWaived) ||
-        outcome.kind === "form");
+      outcome.kind === "files" && outcome.presenceWaitWaived;
     if (usingWaiver) {
-      setCancelAtDoorAtPickup(outcome.kind === "files");
       setCancelAtDoorOpen(true);
       return;
     }
@@ -462,17 +470,14 @@ export function MemberNoShowScreen({
           type remounts the subtree so the initialiser re-runs with the real
           value. Caught in the browser; the field looked present and correct in
           the diff. */}
-      {/* ⚠️ Re-keyed on the variant as well as the type: the sheet seeds its
-          values in a `useState` initialiser that runs once at mount, and the two
-          variants have different field sets. Without the variant in the key, a
-          driver who hit the away form first would carry its time fields into the
-          at-pick-up one. */}
+      {/* ⛔ The variant that used to be in this key went with the away shape
+          (D148). One form, one field set, so the type alone is what has to
+          re-seed it. */}
       <CancelAtDoorForm
-        key={`cad-${noShowType}-${cancelAtDoorAtPickup}`}
+        key={`cad-${noShowType}`}
         trip={trip}
         leg={activeLeg}
         noShowType={noShowType}
-        atPickup={cancelAtDoorAtPickup}
         open={cancelAtDoorOpen}
         onOpenChange={setCancelAtDoorOpen}
         /**
