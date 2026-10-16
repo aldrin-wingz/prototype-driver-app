@@ -366,12 +366,8 @@ import { focusParams, SOLUTION_PARAM } from "../lib/solutions/solution-context";
 import {
   isClientCancelled,
   cancelAlertBody,
-  cancelledRides,
-  needsAcknowledgement,
   showsCancelledRides,
   upcomingRides,
-  ACKNOWLEDGE_CANCELLATION_LABEL,
-  CANCELLATION_ACKNOWLEDGED_PILL,
   CANCELLED_BANNER_BODY,
   CANCELLED_BANNER_TITLE,
   CANCELLED_SUBTITLE,
@@ -9878,20 +9874,16 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
   out["cancelled-manifest"] = upcomingRides(mockUpcomingTrips, focus)
     .map((t) => t.id)
     .join(",");
-  out["cancelled-tasks"] = cancelledRides(mockUpcomingTrips, focus)
-    .map((t) => t.id)
-    .join(",");
+  // ⛔ `cancelled-tasks` removed 2026-10-17 (D168) — Needs Action no longer
+  // holds cancellations, so there is no second list to fingerprint.
   // ⚠️ Shaped like the member filter's: what the control offers, and what
   // survives it. ⛔ `false` is the interesting input — `applicableShowCancelled`
   // must fall back in Now, so passing the default would make both modes agree
   // and the fingerprint would stop distinguishing them (D162).
   out["rides-filter"] = `${showsCancelledToggle(focus)}/${applicableShowCancelled(false, focus)}`;
-  /**
-   * ⛔ The acknowledgement, which is the ONE gated thing on the cancelled
-   * screen. The screen itself is production's and must NOT appear here — if it
-   * did, this surface would differ for a reason that is not the proposal.
-   */
-  out["cancelled-acknowledge"] = String(showsCancelledRides(focus));
+  // ⛔ `cancelled-acknowledge` removed 2026-10-17 (D168). The Acknowledge
+  // button was the ONE gated thing on the cancelled screen; with it gone the
+  // mode decides exactly one thing, and that is `cancelled-manifest` above.
 
   // Rows 01 and 02 — the no-show treatment of every seeded ride.
   out["no-show"] = ALL_SEEDED.map((trip) => {
@@ -9952,15 +9944,20 @@ function changedSurfaces(row: Solution): string[] {
 
 const SURFACE_COUNT = Object.keys(surfaceFingerprint(SOLUTIONS[0], "now")).length;
 /**
- * ⭐ `+14` since 2026-10-15, up from `+10`: row 19 adds four rules beside its
- * gate — the manifest, the task list, the filter and the acknowledgement. A row
- * whose only moving surface is its own gate is the "decorative" failure 28a
- * exists to catch, so the four are what make it a build rather than a flag.
+ * ⭐ `+14` on 2026-10-15 when row 19 landed four rules beside its gate — the
+ * manifest, the task list, the filter and the acknowledgement. ⚠️ **`+12` since
+ * 2026-10-17 (D168): the task list and the acknowledgement are gone.** The
+ * filter became the toggle, so that surface survives under a new name; the
+ * other two have no rule left to fingerprint.
+ *
+ * ⛔ Row 19 still moves TWO surfaces beside its gate, which is what keeps it a
+ * build rather than a flag — a row whose only moving surface is its own gate is
+ * the "decorative" failure 28a exists to catch.
  */
-const EXPECTED_SURFACES = GATES.length + 14;
+const EXPECTED_SURFACES = GATES.length + 12;
 check(
   "the fingerprint covers every mode-sensitive surface in the app",
-  `${SURFACE_COUNT} surface(s) — ${GATES.length} gate(s) + 10 rule(s), over ${ALL_SEEDED.length} seeded ride(s)`,
+  `${SURFACE_COUNT} surface(s) — ${GATES.length} gate(s) + ${SURFACE_COUNT - GATES.length} rule(s), over ${ALL_SEEDED.length} seeded ride(s)`,
   SURFACE_COUNT === EXPECTED_SURFACES && ALL_SEEDED.length > 50,
 );
 
@@ -10813,8 +10810,10 @@ const CLIENT_COPY = [
   CANCELLED_BANNER_TITLE,
   CANCELLED_BANNER_BODY,
   CLIENT_CANCELLED_PILL,
-  ACKNOWLEDGE_CANCELLATION_LABEL,
-  CANCELLATION_ACKNOWLEDGED_PILL,
+  // ⚠️ 5 → 4 on 2026-10-17 (D168): the two acknowledgement strings went with
+  // the button. ⭐ The per-source pill joins instead, so the sweep still covers
+  // every string this flow renders.
+  CANCELLED_PILL_FOR.client,
 ];
 const DRIVER_COPY = [
   CANCELLATION_REQUESTED_TITLE,
@@ -10827,7 +10826,7 @@ const crossed = CLIENT_COPY.filter((a) =>
 check(
   "...and neither flow's copy appears inside the other's",
   `${crossed.length} of ${CLIENT_COPY.length} x ${DRIVER_COPY.length} string pair(s) overlap`,
-  crossed.length === 0 && CLIENT_COPY.length === 5 && DRIVER_COPY.length === 3,
+  crossed.length === 0 && CLIENT_COPY.length === 4 && DRIVER_COPY.length === 3,
 );
 
 /* --- 31c. Production's copy, including its own inconsistency ------------- */
@@ -10865,68 +10864,68 @@ check(
 );
 /** ⚠️ ...and what is OURS is declared as ours, so a fold-in cannot mistake it. */
 check(
-  "the acknowledgement is recorded as proposed, not captured",
-  `alert ${CLIENT_CANCELLATION_PROVENANCE.alert} · screen ${CLIENT_CANCELLATION_PROVENANCE.screen} · acknowledgement ${CLIENT_CANCELLATION_PROVENANCE.acknowledgement}`,
+  "the provenance names both captures and claims nothing beyond them",
+  `alert ${CLIENT_CANCELLATION_PROVENANCE.alert} · screen ${CLIENT_CANCELLATION_PROVENANCE.screen}`,
   CLIENT_CANCELLATION_PROVENANCE.alert === "CAP-341" &&
     CLIENT_CANCELLATION_PROVENANCE.screen === "CAP-342" &&
-    CLIENT_CANCELLATION_PROVENANCE.acknowledgement === "ours",
+    // ⛔ The `acknowledgement: "ours"` entry went with the button (D168). An
+    // entry for a thing that no longer exists is a claim nobody can check.
+    !("acknowledgement" in CLIENT_CANCELLATION_PROVENANCE),
 );
 
-/* --- 31d. Acknowledging clears Needs Action and nothing else ------------- */
+/* --- 31d. A cancellation is in ONE tab ----------------------------------- */
 /**
- * ⛔⛔ **Measured, not trusted.** The guarantee is enforced by `upcomingRides`
- * never being GIVEN the acknowledged list — but a later edit could add the
- * parameter and nothing would complain. Driven both ways over the real seed.
+ * ⛔⛔ **SUPERSEDES D96, and this whole subsection inverted on 2026-10-17
+ * (D168).** It used to measure the PAIRING — acknowledging everything emptied
+ * Needs Action while the manifest stayed whole — because a cancellation was in
+ * two tabs by design. User direction removed the second tab and the Acknowledge
+ * button with it: a cancellation is part of what the day holds, and it is not a
+ * task, because production's own banner says *no action is required*.
+ *
+ * ⛔ **Retiring the old checks is not enough.** They proved the two lists were
+ * kept apart; nothing would notice if the task list quietly came back. These
+ * assert the ABSENCE, which is the claim now.
  */
 const FIXED_18 = FIXED("my-rides-cancelled");
-const allIds = mockUpcomingTrips.map((t) => t.id);
-/**
- * ⛔⛔ The PAIRING is the property, driven with everything acknowledged: the
- * manifest still holds all three cancellations while the task list holds none.
- *
- * ⚠️ The first version of this compared `upcomingRides(...)` to itself and
- * called the two results "before" and "after" — a restatement, passing on any
- * implementation at all, which is the exact trap this file documents twice.
- * `upcomingRides` cannot be driven both ways BECAUSE it has no such parameter;
- * the check below reads its body for that, and this one measures the outcome.
- */
-const manifestWhenAcknowledged = upcomingRides(mockUpcomingTrips, FIXED_18);
-const stillListed = manifestWhenAcknowledged.filter(isClientCancelled);
-const stillTasks = CANCELLED_SEED.filter((t) =>
-  needsAcknowledgement(t, allIds, FIXED_18),
-);
+const ROW19_PAGE_CODE = codeOnly(readFileSync(join(ROOT, "app/my-rides/page.tsx"), "utf8"));
+const ROW19_DETAIL_CODE = codeOnly(readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8"));
+const PAGE_HAS_ACK = /acknowledg/i.test(ROW19_PAGE_CODE);
 check(
-  "acknowledging everything empties the task list and leaves the manifest whole",
-  `manifest ${manifestWhenAcknowledged.length} ride(s) incl. ${stillListed.length} cancelled; ${stillTasks.length} still a task`,
-  manifestWhenAcknowledged.length === mockUpcomingTrips.length &&
-    stillListed.length === EXPECTED_ROW_18_CANCELLED &&
-    stillTasks.length === 0,
+  "the Needs Action list is the seeded one, with no cancellations added",
+  `page mentions acknowledg*: ${PAGE_HAS_ACK}; ` +
+    `needsActionList = ${/const needsActionList = withoutPending\(mockNeedsActionTrips\);/.test(ROW19_PAGE_CODE)}`,
+  /const needsActionList = withoutPending\(mockNeedsActionTrips\);/.test(ROW19_PAGE_CODE) &&
+    // ⛔ ...and nothing acknowledgement-shaped survives anywhere on the page.
+    !PAGE_HAS_ACK,
 );
 /**
- * ⛔⛔ The function's OWN body, sliced to the next `export`. The first version
- * of this looked 400 characters past the declaration, which ran clean through
- * `cancelledRides` and into `needsAcknowledgement`'s doc comment — so it
- * reported the word present and failed against correct code. A window is not
- * an anchor.
+ * ⛔⛔ **The rule module no longer offers a task list at all**, which is the
+ * strongest form of this claim: a page cannot put cancellations in Needs Action
+ * using a function that does not exist. Read off the module's exports.
  */
-const upcomingBody = (() => {
-  const code = codeOnly(CC_SRC);
-  const from = code.indexOf("export function upcomingRides");
-  const to = code.indexOf("export ", from + 1);
-  return code.slice(from, to === -1 ? undefined : to);
-})();
+const CC_EXPORTS = codeOnly(CC_SRC);
+const RETIRED_RULES = ["cancelledRides", "needsAcknowledgement", "ACKNOWLEDGE_CANCELLATION_LABEL", "CANCELLATION_ACKNOWLEDGED_PILL"];
+const survivingRules = RETIRED_RULES.filter((n) => CC_EXPORTS.includes("export const " + n) || CC_EXPORTS.includes("export function " + n));
 check(
-  "...because the rule is never given the list — its own body says so",
-  `${upcomingBody.length} chars, mentions acknowledg*: ${/acknowledg/i.test(upcomingBody)}`,
-  upcomingBody.length > 80 && !/acknowledg/i.test(upcomingBody),
+  "...and the task-list rules are gone from the module, not merely unused",
+  survivingRules.length ? `still exported: ${survivingRules.join(", ")}` : `${RETIRED_RULES.length} of ${RETIRED_RULES.length} retired`,
+  survivingRules.length === 0,
 );
-/** ⛔ The positive control: the rule that DOES take the list responds to it. */
-const ackSeen = CANCELLED_SEED.filter((t) => needsAcknowledgement(t, [], FIXED_18));
-const ackGone = CANCELLED_SEED.filter((t) => needsAcknowledgement(t, allIds, FIXED_18));
+/**
+ * ⛔⛔ **The cancelled screen has NO footer, on either side of the toggle.**
+ * The Acknowledge button was the only gated thing on that screen; with it gone
+ * the mode decides exactly ONE thing — whether the ride is in a list. A footer
+ * reappearing here is the clearest sign the removal was half-done.
+ */
 check(
-  "...while the Needs Action rule drains to nothing once they are acknowledged",
-  `${ackSeen.length} unacknowledged → ${ackGone.length} acknowledged`,
-  ackSeen.length === EXPECTED_ROW_18_CANCELLED && ackGone.length === 0,
+  "the cancelled ride's screen offers no footer in either mode",
+  `named branch ${/\{state === "cancelled" \? null :/.test(ROW19_DETAIL_CODE)}; ` +
+    `gated footer ${/showsCancelledRides\(demo\) \? \(/.test(ROW19_DETAIL_CODE)}`,
+  // ⛔ Still NAMED, not left to the chain's trailing catch-all — "no footer"
+  // reached by accident is indistinguishable from "nobody got to it yet".
+  /\{state === "cancelled" \? null :/.test(ROW19_DETAIL_CODE) &&
+    !/showsCancelledRides\(demo\) \? \(/.test(ROW19_DETAIL_CODE) &&
+    !/acknowledg/i.test(ROW19_DETAIL_CODE),
 );
 
 /* --- 31e. The Now side strips the list, never the app -------------------- */
@@ -10934,16 +10933,16 @@ const NOW_18 = demoFocus("my-rides-cancelled", "now");
 check(
   "in Now the cancellations are gone from the manifest",
   `${upcomingRides(mockUpcomingTrips, NOW_18).length} of ${mockUpcomingTrips.length} ride(s), ` +
-    `${cancelledRides(mockUpcomingTrips, NOW_18).length} cancelled visible`,
+    `${upcomingRides(mockUpcomingTrips, NOW_18).filter(isClientCancelled).length} cancelled visible`,
   upcomingRides(mockUpcomingTrips, NOW_18).length ===
     mockUpcomingTrips.length - EXPECTED_ROW_18_CANCELLED &&
-    cancelledRides(mockUpcomingTrips, NOW_18).length === 0,
+    upcomingRides(mockUpcomingTrips, NOW_18).filter(isClientCancelled).length === 0,
 );
 check(
   "...and in Proposed they are back, in the same array",
-  `${upcomingRides(mockUpcomingTrips, FIXED_18).length} ride(s), ${cancelledRides(mockUpcomingTrips, FIXED_18).length} cancelled`,
+  `${upcomingRides(mockUpcomingTrips, FIXED_18).length} ride(s), ${upcomingRides(mockUpcomingTrips, FIXED_18).filter(isClientCancelled).length} cancelled`,
   upcomingRides(mockUpcomingTrips, FIXED_18).length === mockUpcomingTrips.length &&
-    cancelledRides(mockUpcomingTrips, FIXED_18).length === EXPECTED_ROW_18_CANCELLED,
+    upcomingRides(mockUpcomingTrips, FIXED_18).filter(isClientCancelled).length === EXPECTED_ROW_18_CANCELLED,
 );
 /**
  * ⛔⛔ **The ride is stripped from the LIST, not from the app** — which is what
@@ -11130,15 +11129,12 @@ check(
  */
 const LAYOUT_CODE = codeOnly(LAYOUT_SRC);
 const CANCELLED_REGIONS: Array<[string, RegExp]> = [
+  // ⚠️ The footer pair went on 2026-10-17 (D168) — the Acknowledge button was
+  // the only thing that rendered there, and 31d now asserts its ABSENCE.
   // ⛔ Per SOURCE since 2026-10-17 (D163) — the banner names who cancelled,
   // so the screen resolves it from the trip rather than a single constant.
   ["the banner", /\{state === "cancelled" && \([\s\S]{0,400}cancelledBannerFor\(trip\)\.title/],
   ["the greyed timeline", /state === "cancelled" && "opacity-/],
-  // ⛔ The branch is still NAMED, it just now holds the gated Acknowledge
-  // button instead of a bare `null`. What matters is that `cancelled` is
-  // decided here and not left to the chain's trailing catch-all.
-  ["the named footer branch", /\{state === "cancelled" \? \(/],
-  ["no footer in Now", /showsCancelledRides\(demo\) \? \([\s\S]{0,1600}\) : null/],
 ];
 const missingRegions = CANCELLED_REGIONS.filter(([, re]) => !re.test(LAYOUT_CODE));
 check(
@@ -11397,16 +11393,12 @@ check(
  */
 const CC_SURFACES: Array<[string, (f: DemoFocus) => boolean]> = [
   ["manifest holds them", (f) => upcomingRides(mockUpcomingTrips, f).some(isClientCancelled)],
-  ["task list holds them", (f) => cancelledRides(mockUpcomingTrips, f).length > 0],
+
   ["toggle is offered", (f) => showsCancelledToggle(f)],
   // ⛔ `false` is the interesting input: `true` is the fall-back value, so a
   // surface driven with it would agree in both modes and stop distinguishing
   // them — the sweep would sweep nothing (D162).
   ["toggle keeps an `off`", (f) => applicableShowCancelled(false, f) === false],
-  [
-    "a cancellation is still a task",
-    (f) => CANCELLED_SEED.some((t) => needsAcknowledgement(t, [], f)),
-  ],
 ];
 let ccSweep = 0;
 const ccDisagreements: string[] = [];

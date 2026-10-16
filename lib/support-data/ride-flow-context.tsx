@@ -230,9 +230,6 @@ interface RideFlowValue {
    * needs work* — production's own banner says no action is required, and the
    * proposal does not argue with it.
    */
-  acknowledgedClientCancellations: string[];
-  acknowledgeClientCancellation: (tripId: string) => void;
-  isClientCancellationAcknowledged: (tripId: string) => boolean;
 
   // ---- Update Trip Details (catalogue row 22) ---------------------------
   /**
@@ -312,9 +309,10 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
   const [sentBack, setSentBack] = useState<string[]>([]);
   // Trips the member declined — annotated in My Rides, never removed.
   const [cancelRequested, setCancelRequested] = useState<string[]>([]);
-  // Wingz cancellations the driver has ticked off — cleared from Needs Action,
-  // kept in the manifest. ⛔ NOT the list above; see the interface.
-  const [ackedCancellations, setAckedCancellations] = useState<string[]>([]);
+  // ⛔⛔ REMOVED 2026-10-17 (D168): `ackedCancellations`. Wingz cancellations
+  // the driver had ticked off, which cleared them from Needs Action. Needs
+  // Action no longer holds cancellations, so there was nothing left to clear —
+  // and the Acknowledge button that wrote this list went with it.
   const [tripChanges, setTripChanges] = useState<Record<string, TripChange[]>>(
     {}
   );
@@ -410,14 +408,6 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
         ]),
       isCancellationRequested: (tripId) => cancelRequested.includes(tripId),
 
-      acknowledgedClientCancellations: ackedCancellations,
-      acknowledgeClientCancellation: (tripId) =>
-        setAckedCancellations((previous) =>
-          previous.includes(tripId) ? previous : [...previous, tripId]
-        ),
-      isClientCancellationAcknowledged: (tripId) =>
-        ackedCancellations.includes(tripId),
-
       tripChangeRequests: tripChanges,
       requestTripChange: (tripId, changes) =>
         setTripChanges((previous) => ({ ...previous, [tripId]: changes })),
@@ -439,7 +429,6 @@ export function RideFlowProvider({ children }: { children: React.ReactNode }) {
       preferredOptOuts,
       sentBack,
       cancelRequested,
-      ackedCancellations,
       tripChanges,
       addLegs,
     ]

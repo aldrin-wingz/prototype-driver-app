@@ -107,8 +107,6 @@ import { ReachRiderModal } from "./reach-rider-modal";
 import type { DetailState } from "@/lib/driver-data/ride-detail-state";
 import {
   showsCancelledRides,
-  ACKNOWLEDGE_CANCELLATION_LABEL,
-  CANCELLATION_ACKNOWLEDGED_PILL,
   cancelledBannerFor,
   CANCELLED_SUBTITLE,
 } from "@/lib/driver-data/client-cancellation";
@@ -393,8 +391,6 @@ export function RideDetailLayout({
     addLegRequest,
     preferredDriverOptOuts,
     optOutOfPreferredDriverAsk,
-    acknowledgeClientCancellation,
-    isClientCancellationAcknowledged,
   } = useRideFlow();
   const { demo } = useSolution();
 
@@ -1161,43 +1157,22 @@ export function RideDetailLayout({
         ⭐ Row 19's PROPOSAL is the one thing that does render here, gated —
         see below.
       */}
-      {state === "cancelled" ? (
-        /**
-         * ⭐⭐ Catalogue row 19's proposal: a way to say "I have seen this".
-         *
-         * ⛔ **Gated, and it is the ONLY gated thing on this screen.** The
-         * banner, the greyed timeline and the missing footer are all
-         * production's. This button is ours — `CLIENT_CANCELLATION_PROVENANCE`
-         * records it as such — and it does not fold into `driver-app-base`.
-         *
-         * ⛔ Not orange. `#F97316` is "I Reached Out to Confirm"'s colour and
-         * in this app it means go and do something about the member.
-         * Acknowledging is a read receipt; production's own banner says no
-         * action is required, and the proposal does not argue with it.
-         */
-        showsCancelledRides(demo) ? (
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-white px-4 py-4 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
-            {isClientCancellationAcknowledged(trip.id) ? (
-              /* ⛔ A static chip, never a vanishing footer. The ride is still
-                 reachable from Upcoming, and a footer that disappeared would
-                 read as the page having lost its state — which is why
-                 `CANCELLATION_REQUESTED_PILL` exists two states below. */
-              <div className="flex h-16 w-full items-center justify-center rounded-full bg-[#FEF3C7] text-sm font-bold uppercase tracking-wide text-[#92400E]">
-                {CANCELLATION_ACKNOWLEDGED_PILL}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => acknowledgeClientCancellation(trip.id)}
-                className="flex h-16 w-full items-center justify-center gap-2 rounded-full bg-[#282828] text-sm font-bold uppercase tracking-wide text-white"
-              >
-                <Check className="h-5 w-5" strokeWidth={3} />
-                {ACKNOWLEDGE_CANCELLATION_LABEL}
-              </button>
-            )}
-          </div>
-        ) : null
-      ) : state === "before-taken" && isOverCapacity(trip) ? (
+      {/*
+        ⛔⛔ **A cancelled ride has NO footer, and since 2026-10-17 that is
+        production's answer and ours alike (D168).**
+
+        Row 19's proposal used to put an Acknowledge button here, gated — the
+        only gated thing on this screen. It existed to drain Needs Action, and
+        Needs Action no longer holds cancellations, so the button had nothing
+        left to do. A control whose effect the driver cannot observe is worse
+        than no control.
+
+        ⛔ The branch is still NAMED rather than left to the chain's trailing
+        catch-all. This file's documented trap is a state absorbed by a
+        catch-all: "no footer" reached by accident is indistinguishable from
+        "nobody got to it yet".
+      */}
+      {state === "cancelled" ? null : state === "before-taken" && isOverCapacity(trip) ? (
         /*
           ⭐⭐ Catalogue rows 11, 12 and 13 — production's over-capacity screen,
           and it is NOT a block. `CAP-340`: the accept control is simply absent,

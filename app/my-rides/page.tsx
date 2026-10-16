@@ -26,9 +26,7 @@ import {
   writeShowCancelled,
 } from "@/lib/driver-data/show-cancelled-preference";
 import {
-  cancelledRides,
   isClientCancelled,
-  needsAcknowledgement,
   upcomingRides,
   visibleUpcoming,
   applicableShowCancelled,
@@ -77,7 +75,6 @@ export default function MyRidesPage() {
     isTripMemberSignatureMissing,
     sentBackTrips,
     isCancellationRequested,
-    acknowledgedClientCancellations,
   } = useRideFlow();
   const { active, demo } = useSolution();
 
@@ -279,32 +276,22 @@ export default function MyRidesPage() {
   );
 
   /**
-   * ⛔⛔ **A cancellation is in TWO tabs, and that is deliberate.**
+   * ⛔⛔ **A cancellation is in ONE tab, and that is a 2026-10-17 reversal.**
    *
-   * The rule this page already states — *"a ride waiting on Support MOVES to
-   * Pending; otherwise the driver cannot tell which rides still need them"* —
-   * is about two TASK lists. Upcoming is the manifest: it answers "what does my
-   * day hold", and a cancelled ride is part of that answer. Needs Action is the
-   * task list, and it counts only the cancellations the driver has not yet
-   * acknowledged, so it still drains to zero.
+   * D96 put it in two — Upcoming as the manifest, Needs Action until
+   * acknowledged — and named the cost: the tab counts then summed to more than
+   * the number of distinct rides, which is exactly what this page's original
+   * rule was protecting.
    *
-   * ⚠️ The cost, named: the tab counts now sum to more than the number of
-   * distinct rides. That is new, and it is what the original rule was
-   * protecting.
+   * User direction superseded it (D168). A cancellation is part of what the day
+   * holds, and it is **not a task**: production's own banner says *no action is
+   * required*, and a task list counting it was arguing with that banner. The
+   * toggle is the whole answer now.
    *
-   * ⛔ Cancellations go FIRST — they are the newest thing that happened to the
-   * day, and this tab is read top-down.
+   * ⛔ The Acknowledge button went with it — draining this list was its only
+   * job. See `client-cancellation.ts`.
    */
-  const unacknowledged = cancelledRides(
-    withoutPending(mockUpcomingTrips),
-    demo
-  ).filter((trip) =>
-    needsAcknowledgement(trip, acknowledgedClientCancellations, demo)
-  );
-  const needsActionList = [
-    ...unacknowledged,
-    ...withoutPending(mockNeedsActionTrips),
-  ];
+  const needsActionList = withoutPending(mockNeedsActionTrips);
 
   const tabs: TabConfig[] = [
     {

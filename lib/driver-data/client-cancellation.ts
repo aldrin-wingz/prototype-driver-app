@@ -141,28 +141,26 @@ export function upcomingRides(trips: readonly Trip[], focus: DemoFocus): Trip[] 
   return trips.filter((trip) => !isClientCancelled(trip));
 }
 
-/** Every cancelled ride the driver can see — none in `"now"`, where they are gone. */
-export function cancelledRides(trips: readonly Trip[], focus: DemoFocus): Trip[] {
-  if (!showsCancelledRides(focus)) return [];
-  return trips.filter(isClientCancelled);
-}
-
 /**
- * Whether this cancellation is still a task.
+ * ⛔⛔ **REMOVED 2026-10-17 (D168): `cancelledRides` and `needsAcknowledgement`.**
  *
- * ⚠️ Needs Action here means *you have not seen this yet*, not *the ride needs
- * work* — production's own banner says no action is required and the proposal
- * does not contradict it. Acknowledging is a read receipt, which is why it
- * drains this list and leaves the manifest alone.
+ * D96 put a cancellation in TWO tabs — Upcoming as the manifest, and Needs
+ * Action until the driver acknowledged it — and named the cost at the time: the
+ * tab counts then summed to more than the number of distinct rides.
+ *
+ * User direction supersedes it. The toggle is now the whole answer: a
+ * cancellation is part of what the day holds, and it is not a task, because
+ * production's own banner says **no action is required**. A task list that
+ * counted it was arguing with that banner.
+ *
+ * ⛔ **The Acknowledge button went with it, and had to.** Draining Needs Action
+ * was its only job — D95 recorded that the mode decides exactly two things, and
+ * one of them was whether that footer exists. Keeping the button would have
+ * left a control whose effect the driver could not observe.
+ *
+ * ⭐ So the mode now decides exactly ONE thing: whether the ride is in a list.
+ * That is a smaller claim than this module used to make, and a truer one.
  */
-export function needsAcknowledgement(
-  trip: Trip,
-  acknowledged: readonly string[],
-  focus: DemoFocus,
-): boolean {
-  if (!showsCancelledRides(focus)) return false;
-  return isClientCancelled(trip) && !acknowledged.includes(trip.id);
-}
 
 // ---- The toggle --------------------------------------------------------
 //
@@ -331,20 +329,19 @@ export const CANCELLED_SUBTITLE = "Ride";
 
 /**
  * ⛔ **Ours, not production's.** Production never lists a cancelled ride, so it
- * has no pill for one and no acknowledgement at all. These four strings are the
- * proposal, and `CLIENT_CANCELLATION_PROVENANCE` is where that is written down
- * so a fold-in audit cannot mistake them for captured copy.
+ * has no pill for one. `CLIENT_CANCELLATION_PROVENANCE` is where that is
+ * written down so a fold-in audit cannot mistake it for captured copy.
+ *
+ * ⚠️ **Three acknowledgement strings were removed here on 2026-10-17 (D168)**
+ * along with the button that used them. They are not worth keeping "in case" —
+ * dead copy reads as a feature to the next person.
  */
 export const CLIENT_CANCELLED_PILL = "Cancelled";
-export const ACKNOWLEDGE_CANCELLATION_LABEL = "Acknowledge cancellation";
-export const CANCELLATION_ACKNOWLEDGED_PILL = "CANCELLATION ACKNOWLEDGED";
 export const CLIENT_CANCELLED_NOTICE_PREFIX = "Wingz told you";
 
 export const CLIENT_CANCELLATION_PROVENANCE = {
   alert: "CAP-341",
   screen: "CAP-342",
-  /** ⛔ Not captured, not inferred — proposed. It does not fold into the base. */
-  acknowledgement: "ours",
 } as const;
 
 /**
