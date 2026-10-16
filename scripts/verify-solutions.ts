@@ -11586,8 +11586,22 @@ check(
  * describes neither.
  */
 const ROW_19 = SOLUTIONS.find((r) => r.id === "my-rides-cancelled")!;
-const ROW_19_COPY = `${ROW_19.proposedFeature} ${ROW_19.tableSummary} ${ROW_19.entry?.label ?? ""}`;
-const RETIRED_WORDING = ["All / Active / Cancelled", "filtered and acknowledged", "filter"];
+/**
+ * ⚠️ **Every string the row renders, including the ALTERNATES’ labels.**
+ * The first version of this read `proposedFeature`, `tableSummary` and
+ * `entry.label` only — and a stale sentence advertising the Acknowledge
+ * button survived in `entry.alternates[0].label` through a full gate run AND a
+ * browser walk. A sweep that misses a field is a sweep with no denominator.
+ */
+const ROW_19_COPY = [
+  ROW_19.proposedFeature,
+  ROW_19.tableSummary,
+  ROW_19.entry?.label ?? "",
+  ...(ROW_19.entry?.alternates ?? []).flatMap((alt) => [alt.short, alt.label]),
+].join(" ");
+// ⛔ Includes the acknowledgement vocabulary since D168 — the feature is gone,
+// so copy describing it is a promise the app no longer keeps.
+const RETIRED_WORDING = ["All / Active / Cancelled", "filtered and acknowledged", "filter", "Acknowledge button", "Needs Action"];
 const staleWording = RETIRED_WORDING.filter((w) => ROW_19_COPY.includes(w));
 check(
   "row 19's copy describes the toggle, and no longer the filter it replaced",

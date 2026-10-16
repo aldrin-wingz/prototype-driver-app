@@ -766,7 +766,7 @@ export const SOLUTIONS: Solution[] = [
     useCase:
       "Wingz cancels an accepted trip → an alert offers Go to ride → the driver taps OK mid-drive → the ride is in no tab and the id is gone → calls Support to work out which of the day's rides went",
     proposedFeature:
-      "Cancelled rides kept in My Rides — in Upcoming on their own date behind a default-on Show cancelled trips toggle the driver can turn off, and in Needs Action until the driver acknowledges having seen it",
+      "Cancelled rides kept in My Rides — in Upcoming on their own date, each marked with who cancelled it, behind a default-on Show cancelled trips toggle the driver can turn off and that is remembered on the device",
     tableSummary: "Keep cancelled rides in the manifest, behind one toggle.",
     notionTickets: [
       {
@@ -785,7 +785,7 @@ export const SOLUTIONS: Solution[] = [
           route: "/my-rides/1049800412",
           short: "The ride the alert opens",
           label:
-            "The cancelled ride itself — production's screen, unchanged on both sides: subtitle Ride, a pink Cancelled by Wingz banner and a greyed-out leg. The one thing the proposal adds is the Acknowledge button in the footer, which clears it from Needs Action and deliberately leaves it in the manifest.",
+            "The cancelled ride itself — production's screen, identical on both sides: subtitle Ride, a pink banner naming who cancelled the trip, a greyed-out leg and no footer at all. The proposal adds nothing here; what it changes is that the driver can reach this screen from the manifest instead of only from the alert.",
         },
       ],
     },
