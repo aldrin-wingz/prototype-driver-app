@@ -63,6 +63,59 @@ export function showsCancelledRides(focus: DemoFocus): boolean {
   return showsProposal(focus, CLIENT_CANCELLATION_SOLUTIONS);
 }
 
+// ---- Who cancelled it ---------------------------------------------------
+
+/**
+ * ⛔⛔ **Declared as a union, so a third source is a compile error at every
+ * site that switches on it** — not a string that renders as an empty pill.
+ *
+ * ⚠️ **Only these two have evidence, and that is the whole list today.**
+ * `wingz` is `CAP-342`'s banner, photographed. `client` is the pill driver-app
+ * PR #175 shipped on 2026-04-17. Any further source — a facility, a member —
+ * is an open question for Eng, not something to invent here: a variant with no
+ * fixture is an unfalsifiable spec (D160), and a fixture invented from a guess
+ * is worse than no fixture.
+ *
+ * ⛔ A DRIVER's own send-back is NOT one of these and must never be added.
+ * That is `rider-declined.ts`, it travels the other way, and this module's
+ * header says why the two can never merge.
+ */
+export type CancellationSource = "wingz" | "client";
+
+/** ⛔ Declared, so a sweep over the sources has a denominator. */
+export const CANCELLATION_SOURCES: readonly CancellationSource[] = ["wingz", "client"];
+
+/**
+ * ⛔⛔ **Production's own words for each, and they are NOT ours to tidy.**
+ * `CAP-342` says "Cancelled by Wingz"; PR #175 shipped "Cancelled by Client".
+ * One label reading "Cancelled" for both would be the prototype deciding the
+ * driver does not need to know who, which is the question they rang about.
+ *
+ * ⚠️ **The pill in a LIST has never been captured** — production had no list to
+ * put one in when `CAP-341`/`CAP-342` were shot. These strings are production's
+ * for the banner and the shipped pill; using them here is the closest thing to
+ * evidence available, and it is still an open question for Phase 0.
+ */
+export const CANCELLED_PILL_FOR: Record<CancellationSource, string> = {
+  wingz: "Cancelled by Wingz",
+  client: "Cancelled by Client",
+};
+
+/**
+ * Who cancelled it, with the pre-2026-10-17 seeds reading as Wingz.
+ *
+ * ⛔ The default is not a guess: every cancellation seeded before the source
+ * existed was `CAP-342`'s Wingz cancellation, and all three carried its banner.
+ */
+export function cancellationSourceOf(trip: Trip): CancellationSource {
+  return trip.cancelledBy ?? "wingz";
+}
+
+/** The pill this ride's card carries. */
+export function cancelledPillFor(trip: Trip): string {
+  return CANCELLED_PILL_FOR[cancellationSourceOf(trip)];
+}
+
 // ---- The rides ----------------------------------------------------------
 
 /** Presence of the notice is the whole predicate. */
@@ -245,6 +298,34 @@ function padClock(clock: string): string {
 export const CANCELLED_BANNER_TITLE = "Cancelled by Wingz";
 export const CANCELLED_BANNER_BODY =
   "This ride was cancelled by Wingz. No action is required.";
+
+/**
+ * The same banner, per source.
+ *
+ * ⛔⛔ **The Wingz pair is `CAP-342` verbatim and must stay byte-identical to
+ * the constants above** — a check asserts it. The client pair is the same
+ * sentence with the party changed, which is the smallest honest extension: the
+ * capture shows the shape, and only the name of who acted differs.
+ *
+ * ⚠️ Production's alert spells it "canceled" and its banner "Cancelled"; that
+ * inconsistency is replicated, not tidied, and is checked. Do not normalise the
+ * one L into the two here.
+ */
+export const CANCELLED_BANNER_FOR: Record<
+  CancellationSource,
+  { title: string; body: string }
+> = {
+  wingz: { title: CANCELLED_BANNER_TITLE, body: CANCELLED_BANNER_BODY },
+  client: {
+    title: "Cancelled by Client",
+    body: "This ride was cancelled by the client. No action is required.",
+  },
+};
+
+/** The banner this ride's screen carries. */
+export function cancelledBannerFor(trip: Trip): { title: string; body: string } {
+  return CANCELLED_BANNER_FOR[cancellationSourceOf(trip)];
+}
 /** ⛔ `Ride`, not `Will-Call Ride` — the subtitle the capture shows. */
 export const CANCELLED_SUBTITLE = "Ride";
 

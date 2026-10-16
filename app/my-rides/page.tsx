@@ -34,7 +34,7 @@ import {
   applicableShowCancelled,
   showsCancelledToggle,
   CLIENT_CANCELLATION_SOLUTIONS,
-  CLIENT_CANCELLED_PILL,
+  cancelledPillFor,
   SHOW_CANCELLED_DEFAULT,
   SHOW_CANCELLED_LABEL,
   HIDDEN_EMPTY_TITLE,
@@ -157,7 +157,7 @@ export default function MyRidesPage() {
         ? {
             ...trip,
             statusPills: [
-              { label: CLIENT_CANCELLED_PILL, variant: "danger" as const },
+              { label: cancelledPillFor(trip), variant: "danger" as const },
             ],
           }
         : trip

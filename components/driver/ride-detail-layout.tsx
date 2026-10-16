@@ -109,8 +109,7 @@ import {
   showsCancelledRides,
   ACKNOWLEDGE_CANCELLATION_LABEL,
   CANCELLATION_ACKNOWLEDGED_PILL,
-  CANCELLED_BANNER_BODY,
-  CANCELLED_BANNER_TITLE,
+  cancelledBannerFor,
   CANCELLED_SUBTITLE,
 } from "@/lib/driver-data/client-cancellation";
 
@@ -837,10 +836,10 @@ export function RideDetailLayout({
               <Ban className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#991B1B]" />
               <div className="min-w-0">
                 <p className="font-semibold text-[#991B1B]">
-                  {CANCELLED_BANNER_TITLE}
+                  {cancelledBannerFor(trip).title}
                 </p>
                 <p className="mt-0.5 text-sm text-[#991B1B]">
-                  {CANCELLED_BANNER_BODY}
+                  {cancelledBannerFor(trip).body}
                 </p>
               </div>
             </div>
@@ -1114,7 +1113,7 @@ export function RideDetailLayout({
           {state === "cancelled" && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-block rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#991B1B]">
-                {CANCELLED_BANNER_TITLE}
+                {cancelledBannerFor(trip).title}
               </span>
             </div>
           )}

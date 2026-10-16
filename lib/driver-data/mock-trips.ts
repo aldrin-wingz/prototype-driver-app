@@ -1,5 +1,9 @@
 import type { IncentiveType } from "@/lib/data/incentives";
 import type { NoShowDemoRow } from "./no-show-rules";
+// ⛔ `import type`, deliberately. `client-cancellation.ts` imports `Trip` from
+// here, so a VALUE import either way would be a runtime cycle. A type-only one
+// is erased entirely.
+import type { CancellationSource } from "./client-cancellation";
 
 /**
  * The day the prototype pretends it is.
@@ -392,6 +396,20 @@ export interface Trip {
    * required" and gives neither a reason nor who asked.
    */
   clientCancelNoticeAt?: string;
+  /**
+   * WHO cancelled it.
+   *
+   * ⛔⛔ **Separate from the notice, because the notice answers "was it
+   * cancelled" and this answers "by whom" — and the driver rang Support about
+   * the second one.** A manifest that lists every cancellation but says only
+   * "Cancelled" has told them a ride is off without telling them which party
+   * took it off, which is the next call.
+   *
+   * ⚠️ Optional, and absent means `"wingz"` — see `cancellationSourceOf`. The
+   * three rides seeded before 2026-10-17 all carried Wingz's notice and no
+   * source, so a required field would have been a lie about what was captured.
+   */
+  cancelledBy?: CancellationSource;
   /**
    * Pills a SCREEN adds at render time, e.g. "Waiting on Support".
    *
@@ -1799,6 +1817,17 @@ export const mockUpcomingTrips: Trip[] = [
     totalRevenue: 30.70,
     notes: "",
     clientCancelNoticeAt: "Sun, Aug 2, 2026 · 7:48 PM",
+    /**
+     * ⛔⛔ **The second source's fixture, and the reason it exists.** D160: a
+     * declared variant with no seeded ride is an unfalsifiable spec — the
+     * widening to "all cancellation sources" cannot fail a test unless more
+     * than one source is actually on the manifest.
+     *
+     * ⚠️ Converted from Wingz rather than added as a fourth ride, so the
+     * manifest's declared totals do not move. The mix is also the better
+     * demonstration: two sources side by side is what the driver sees.
+     */
+    cancelledBy: "client",
     contacts: {
       riderPhone: "(404) 555-0155",
     },
@@ -1827,7 +1856,7 @@ export const mockUpcomingTrips: Trip[] = [
     pills: [],
     scenario: {
       code: "19f",
-      label: "Cancelled by Wingz",
+      label: "Cancelled by Client",
       solutions: ["my-rides-cancelled"],
       silent: true,
     },

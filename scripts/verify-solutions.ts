@@ -383,6 +383,10 @@ import {
   showsCancelledToggle,
   SHOW_CANCELLED_DEFAULT,
   SHOW_CANCELLED_LABEL,
+  cancellationSourceOf,
+  CANCELLATION_SOURCES,
+  CANCELLED_PILL_FOR,
+  CANCELLED_BANNER_FOR,
 } from "../lib/driver-data/client-cancellation";
 import {
   readShowCancelled,
@@ -11126,7 +11130,9 @@ check(
  */
 const LAYOUT_CODE = codeOnly(LAYOUT_SRC);
 const CANCELLED_REGIONS: Array<[string, RegExp]> = [
-  ["the banner", /\{state === "cancelled" && \([\s\S]{0,400}CANCELLED_BANNER_TITLE/],
+  // ⛔ Per SOURCE since 2026-10-17 (D163) — the banner names who cancelled,
+  // so the screen resolves it from the trip rather than a single constant.
+  ["the banner", /\{state === "cancelled" && \([\s\S]{0,400}cancelledBannerFor\(trip\)\.title/],
   ["the greyed timeline", /state === "cancelled" && "opacity-/],
   // ⛔ The branch is still NAMED, it just now holds the gated Acknowledge
   // button instead of a bare `null`. What matters is that `cancelled` is
@@ -11659,6 +11665,82 @@ check(
   applicableShowCancelled(false, NOW_FOCUS) === SHOW_CANCELLED_DEFAULT &&
     applicableShowCancelled(false, TOGGLE_FOCUS) === false &&
     applicableShowCancelled(true, TOGGLE_FOCUS) === true,
+);
+
+/* --- 32f. Every cancellation source, and a fixture for each -------------- */
+/**
+ * ⛔⛔ **D160's lesson, applied before it can be relearned: a declared variant
+ * with no seeded ride is an unfalsifiable spec.** Row 19 widened from
+ * client-only to every cancellation source (D163). Declaring a second source
+ * and seeding none would leave every check below passing on a manifest that
+ * only ever shows one — which is exactly how demo row "5" sat in the no-show
+ * matrix unexercised until D160 found it.
+ */
+const sourceFixtures = CANCELLATION_SOURCES.map((src) => ({
+  src,
+  rides: mockUpcomingTrips.filter((t) => isClientCancelled(t) && cancellationSourceOf(t) === src),
+}));
+const unfixtured = sourceFixtures.filter((f) => f.rides.length === 0);
+check(
+  "every declared cancellation source has at least one ride on the manifest",
+  sourceFixtures.map((f) => `${f.src}:${f.rides.length}`).join(", "),
+  unfixtured.length === 0 &&
+    // ⛔ Non-vacuity. An empty source list would pass `every` perfectly.
+    CANCELLATION_SOURCES.length > 1,
+);
+/**
+ * ⛔⛔ **The pill NAMES the source, and no two sources share a label.** A
+ * manifest that lists cancellations from two parties under one word
+ * "Cancelled" has told the driver a ride is off without telling them who took
+ * it off — which is the question they rang Support about, so the pill would
+ * leave the support call exactly where it was.
+ */
+const pillLabels = CANCELLATION_SOURCES.map((src) => CANCELLED_PILL_FOR[src]);
+check(
+  "...and each source's pill names it, with no two sources sharing a label",
+  pillLabels.join(" | "),
+  new Set(pillLabels).size === CANCELLATION_SOURCES.length &&
+    pillLabels.every((l) => l.length > 0) &&
+    // ⛔ ...and a bare "Cancelled" is not one of them.
+    !pillLabels.includes("Cancelled"),
+);
+/**
+ * ⛔⛔ **`CAP-342`'s banner stays byte-identical.** The per-source map must
+ * CONTAIN the captured strings, not paraphrase them — the moment the Wingz
+ * entry is reworded to match the client one's phrasing, the prototype is
+ * disagreeing with the photograph it is derived from.
+ */
+check(
+  "the Wingz banner in the per-source map is still CAP-342's, byte for byte",
+  `title ${CANCELLED_BANNER_FOR.wingz.title === CANCELLED_BANNER_TITLE}; ` +
+    `body ${CANCELLED_BANNER_FOR.wingz.body === CANCELLED_BANNER_BODY}`,
+  CANCELLED_BANNER_FOR.wingz.title === CANCELLED_BANNER_TITLE &&
+    CANCELLED_BANNER_FOR.wingz.body === CANCELLED_BANNER_BODY,
+);
+/**
+ * ⛔ A seed carrying the notice but no source reads as Wingz — which is what
+ * the three rides seeded before the field existed actually were. The default
+ * is evidence, not a guess, and this check is what keeps it one.
+ */
+const legacyShaped = mockUpcomingTrips.filter((t) => isClientCancelled(t) && !t.cancelledBy);
+check(
+  "a cancellation with no source recorded reads as Wingz, as the captures show",
+  `${legacyShaped.length} legacy-shaped ride(s), all → ${legacyShaped.map(cancellationSourceOf).join(",") || "n/a"}`,
+  legacyShaped.length > 0 && legacyShaped.every((t) => cancellationSourceOf(t) === "wingz"),
+);
+/**
+ * ⛔⛔ **A driver's own send-back is NOT a cancellation source.** The two
+ * concepts travel in opposite directions and this module's header forbids the
+ * merge; `CANCELLATION_TRACKED_BY_APP` is `false` for one and `true` for the
+ * other. A `"driver"` entry appearing here is the merge beginning.
+ */
+check(
+  "...and no source names the driver, whose send-back travels the other way",
+  CANCELLATION_SOURCES.join(", "),
+  // ⚠️ The companion claim — that this module and `rider-declined.ts` disagree
+  // about `TRACKED_BY_APP` — is asserted in 31b. Restating it here is a
+  // comparison TypeScript can prove, which is a check that cannot fail.
+  !CANCELLATION_SOURCES.some((src) => /driver|sendback|send-back/i.test(src)),
 );
 
 /* --- 32e. The setting survives closing the app --------------------------- */
