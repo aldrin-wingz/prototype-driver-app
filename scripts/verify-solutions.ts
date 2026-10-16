@@ -13762,12 +13762,19 @@ console.log("\n41. The ticket column");
  * same array it checks cannot fail — and the whole point of this column is to
  * say which rows have a ticket, so the number has to be asserted from outside.
  *
- * ⚠️ One row of 28 today. That is not a gap: only Rider No-Show has stories
- * written, let alone ticketed. Rows 02 and 14 get theirs once their tickets
- * exist, and this literal moving is how that lands deliberately.
+ * ⚠️ **Three rows of 28 as of 2026-10-16**, up from one. Rows 02 and 14 were
+ * always going to get theirs "once their tickets exist" (plan decision F7);
+ * the tickets landed in Phase D and the column was not updated with them, so
+ * this literal sat one behind for a day. It failing is how that was caught —
+ * which is the whole argument for declaring it rather than counting it.
+ *
+ * ⚠️ Row 14 carries TWO because its proposal is two stories (the reason form
+ * and the standing-order redirect), exactly as row 01 does.
  */
-const EXPECTED_TICKETED_ROWS = 1;
-const EXPECTED_TICKETS = 2;
+const EXPECTED_TICKETED_ROWS = 3;
+const EXPECTED_TICKETS = 5;
+/** ⛔ Declared too — a row set derived from the filter cannot disagree with it. */
+const EXPECTED_TICKETED_ORDERS = [1, 2, 14];
 const rf41Ticketed = SOLUTIONS.filter((s) => (s.notionTickets?.length ?? 0) > 0);
 const rf41All = rf41Ticketed.flatMap((s) => s.notionTickets ?? []);
 check(
@@ -13777,9 +13784,12 @@ check(
     .join(" ")}`,
   rf41Ticketed.length === EXPECTED_TICKETED_ROWS &&
     rf41All.length === EXPECTED_TICKETS &&
-    // ⭐ Row 01 is two stories — the countdown branch and the form branch — so
-    // the multi-ticket shape is exercised rather than merely permitted.
-    rf41Ticketed[0]?.order === 1,
+    // ⛔ WHICH rows, not just how many — a count alone would pass on three
+    // tickets landing on the wrong three rows.
+    rf41Ticketed.map((s) => s.order).join(",") === EXPECTED_TICKETED_ORDERS.join(",") &&
+    // ⭐ Rows 01 and 14 are two stories each, so the multi-ticket shape is
+    // exercised rather than merely permitted.
+    rf41Ticketed.filter((s) => (s.notionTickets ?? []).length > 1).length === 2,
 );
 /**
  * ⛔⛔ Every url is a real Notion link. A relative path or a pasted CS Tool URL
@@ -13794,7 +13804,7 @@ check(
     rf41All.length > 0 &&
     !`https://example.com/x`.startsWith(`https://${NOTION_HOST}/`),
 );
-/** ⚠️ Ids are unique across the whole catalogue — one ticket, one row, today. */
+/** ⚠️ Ids are unique across the whole catalogue — one ticket, one row. */
 check(
   "...and no ticket id appears twice",
   `${new Set(rf41All.map((t) => t.id)).size} distinct of ${rf41All.length}`,

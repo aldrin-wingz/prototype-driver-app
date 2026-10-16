@@ -164,7 +164,7 @@ export interface Solution {
   /**
    * The Notion tickets that build this row, if any yet.
    *
-   * ⚠️ Absent on most rows and that is not a gap — only 1 of 28 has stories
+   * ⚠️ Absent on most rows and that is not a gap — only 3 of 28 have stories
    * written, let alone ticketed. The column renders an em dash, which says
    * "no ticket" rather than "no value".
    */
@@ -249,6 +249,14 @@ export const SOLUTIONS: Solution[] = [
     tableSummary: "Skip the ten-minute wait by answering who came to the door.",
     klass: "form",
     buildState: "in-prototype",
+    /**
+     * ⭐ One ticket, because row 02 is one story: the waiver needs the driver
+     * AT the pick-up and the type Cancel At Door. The away branch is row 01's
+     * form, which is why it is not a second ticket here.
+     */
+    notionTickets: [
+      { id: "11299", url: "https://app.notion.com/p/3fbac7c6c89d814aa8b8c5c6f01af269" },
+    ],
     entry: {
       route: "/my-rides/1049800373/more",
       label:
@@ -565,6 +573,17 @@ export const SOLUTIONS: Solution[] = [
     tableSummary: "Every send-back collects a reason; a standing order goes straight to Support chat.",
     klass: "form",
     buildState: "in-prototype",
+    /**
+     * ⭐ Two tickets for one row, and they are the two halves of its proposal:
+     * `11300` is the reason on every send-back, `11301` the standing-order
+     * redirect. Row 14's text covers both because the driver meets them on the
+     * same tap — but a standing order never reaches the reason form, so they
+     * could not be written as one story.
+     */
+    notionTickets: [
+      { id: "11300", url: "https://app.notion.com/p/3fbac7c6c89d815ebd95c24d32fa5576" },
+      { id: "11301", url: "https://app.notion.com/p/3fbac7c6c89d81579669ed2cd716555c" },
+    ],
     entry: {
       route: "/my-rides/1049800394/more",
       label:
