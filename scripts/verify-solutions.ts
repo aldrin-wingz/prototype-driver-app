@@ -3127,6 +3127,40 @@ check(
     ROW_09.proposedFeature.includes("Standing Order Offers"),
 );
 
+/**
+ * ⚠️ **The same boundary for row 19, and the third instance of the pattern**
+ * (D166). `Ride Card Pill - Cancelled Trips Visibility` SHIPPED the listing and
+ * the pill in driver-app PR #175 on 2026-04-17; this row carries the toggle,
+ * which that project did not build.
+ *
+ * ⛔⛔ **And the contradiction is asserted, not just the pointer.** `CAP-341`
+ * and `CAP-342` were shot six months after that release and show the ride in no
+ * tab — so the catalogue must record that the `"now"` side follows the
+ * PHOTOGRAPH while the question is open. A row that named the project and
+ * quietly dropped the disagreement would read as "already solved", and the next
+ * person would delete this row's Now side as a mistake.
+ *
+ * ⚠️ Read from the raw source, because the claim lives in the row's doc comment
+ * — `codeOnly` would strip exactly the text being checked.
+ */
+const CATALOGUE_RAW = readFileSync(join(ROOT, "lib/solutions/catalogue.ts"), "utf8");
+const ROW_19_AT = CATALOGUE_RAW.indexOf('id: "my-rides-cancelled"');
+const ROW_19_DOC = ROW_19_AT < 0 ? "" : CATALOGUE_RAW.slice(Math.max(0, ROW_19_AT - 2600), ROW_19_AT);
+const ROW_19_CLAIMS: Array<[string, string]> = [
+  ["names the shipped project", "Ride Card Pill - Cancelled Trips Visibility"],
+  ["names the release", "PR #175"],
+  ["names the captures that disagree", "CAP-341"],
+  ["says the Now side follows the capture", "PHOTOGRAPH"],
+];
+const row19Missing = ROW_19_CLAIMS.filter(([, text]) => !ROW_19_DOC.includes(text));
+check(
+  "row 19 names the project that shipped the listing, and the capture that disagrees",
+  row19Missing.length
+    ? `missing: ${row19Missing.map(([what]) => what).join(", ")}`
+    : `${ROW_19_CLAIMS.length} of ${ROW_19_CLAIMS.length} claim(s)`,
+  ROW_19_AT >= 0 && row19Missing.length === 0,
+);
+
 // ---------------------------------------------------------------------------
 console.log("\n12. Send-back — row 14, a reason on every send-back");
 // ---------------------------------------------------------------------------
@@ -11538,6 +11572,30 @@ check(
   `useState(SHOW_CANCELLED_DEFAULT) ${/useState\(SHOW_CANCELLED_DEFAULT\)/.test(PAGE_CODE)}`,
   /useState\(SHOW_CANCELLED_DEFAULT\)/.test(PAGE_CODE) &&
     !/useState\(true\)/.test(PAGE_CODE),
+);
+
+/**
+ * ⛔⛔ **The catalogue's own copy describes the toggle, not the filter it
+ * replaced — and a break test is why this check exists.** Reverting row 19's
+ * `proposedFeature` to "behind an All / Active / Cancelled filter" left the
+ * whole suite green: every behavioural check drives `lib/`, and the catalogue
+ * is prose nothing executed. The table is what a reviewer reads to decide what
+ * the proposal IS, so prose that outlived its feature is a wrong answer given
+ * confidently.
+ *
+ * ⚠️ Asserted in BOTH directions. "Mentions the toggle" passes on copy that
+ * describes both controls; "does not mention the filter" passes on copy that
+ * describes neither.
+ */
+const ROW_19 = SOLUTIONS.find((r) => r.id === "my-rides-cancelled")!;
+const ROW_19_COPY = `${ROW_19.proposedFeature} ${ROW_19.tableSummary} ${ROW_19.entry?.label ?? ""}`;
+const RETIRED_WORDING = ["All / Active / Cancelled", "filtered and acknowledged", "filter"];
+const staleWording = RETIRED_WORDING.filter((w) => ROW_19_COPY.includes(w));
+check(
+  "row 19's copy describes the toggle, and no longer the filter it replaced",
+  `toggle named ${ROW_19_COPY.includes("Show cancelled trips")}; ` +
+    `stale: ${staleWording.join(", ") || "none"}`,
+  ROW_19_COPY.includes("Show cancelled trips") && staleWording.length === 0,
 );
 
 /* --- 32b. Off removes the cancellations, and nothing else ---------------- */

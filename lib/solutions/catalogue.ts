@@ -737,6 +737,24 @@ export const SOLUTIONS: Solution[] = [
    * submitted requests — and six built forms depend on it being unbuilt. This
    * is the opposite direction: a cancellation nobody submitted, arriving from
    * Wingz, which the driver can reach exactly once.
+   *
+   * ⛔⛔ **This row is DELIBERATELY thin on the listing and the pill, because
+   * `Ride Card Pill - Cancelled Trips Visibility` shipped them** (Notion
+   * project, Status Done; driver-app PR #175, released 2026-04-17: *"Introduces
+   * `Cancelled by Client` pill and banner · Cancelled rides can be viewed on
+   * the Upcoming tab"*). What this row carries is the part that project did not
+   * build — the **toggle** — and the support call the pair of them answers.
+   *
+   * ⚠️ **The captures disagree with that release, and the disagreement is not
+   * resolved.** `CAP-341`/`CAP-342` were shot 2026-10-14, six months after it
+   * shipped, and show the ride in no tab. The likeliest reading is that the
+   * pill system is per-client/market and was off for the captured market —
+   * ⛔ but that is a reading, not a measurement, and it is an open question
+   * with an owner. Until it is answered, the `"now"` side here mirrors the
+   * PHOTOGRAPH, because a capture is evidence and a release note is a claim.
+   *
+   * Third instance of the thin-row pattern, after row 09 (`Project - Standing
+   * Order Offers`) and row 23 (in-app chat).
    */
   {
     id: "my-rides-cancelled",
@@ -748,14 +766,14 @@ export const SOLUTIONS: Solution[] = [
     useCase:
       "Wingz cancels an accepted trip → an alert offers Go to ride → the driver taps OK mid-drive → the ride is in no tab and the id is gone → calls Support to work out which of the day's rides went",
     proposedFeature:
-      "Cancelled rides kept in My Rides — in Upcoming on their own date behind an All / Active / Cancelled filter, and in Needs Action until the driver acknowledges having seen it",
-    tableSummary: "Keep cancelled rides in the manifest, filtered and acknowledged.",
+      "Cancelled rides kept in My Rides — in Upcoming on their own date behind a default-on Show cancelled trips toggle the driver can turn off, and in Needs Action until the driver acknowledges having seen it",
+    tableSummary: "Keep cancelled rides in the manifest, behind one toggle.",
     klass: "surface",
     buildState: "in-prototype",
     entry: {
       route: "/my-rides",
       label:
-        "My Rides, with the row focused. In Now, production's alert fires over the Upcoming tab — tap Go to ride and the cancelled ride is there, banner and all; tap OK and it is in no tab at all, which is the dead end. Flip to Proposed without leaving the tab and three rides appear in place, in date order, each marked Cancelled, with an All / Active / Cancelled bar above them.",
+        "My Rides, with the row focused. In Now, production's alert fires over the Upcoming tab — tap Go to ride and the cancelled ride is there, banner and all; tap OK and it is in no tab at all, which is the dead end. Flip to Proposed without leaving the tab and three rides appear in place, in date order, each marked Cancelled, with a Show cancelled trips toggle above them — on by default, and the setting survives a reload.",
       alternates: [
         {
           route: "/my-rides/1049800412",
