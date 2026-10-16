@@ -384,6 +384,11 @@ import {
   SHOW_CANCELLED_DEFAULT,
   SHOW_CANCELLED_LABEL,
 } from "../lib/driver-data/client-cancellation";
+import {
+  readShowCancelled,
+  writeShowCancelled,
+  SHOW_CANCELLED_KEY,
+} from "../lib/driver-data/show-cancelled-preference";
 import { legOptionFor } from "../lib/support-data/leg-options";
 import { ADD_LEG_GROUP } from "../lib/driver-data/add-leg-request";
 import { fieldChange } from "../lib/support/field-rules";
@@ -11275,8 +11280,10 @@ check(
   /filteredToNothing =[\s\S]{0,160}upcomingVisible\.length > 0/.test(PAGE_CODE) &&
     /filteredToNothing \?/.test(PAGE_CODE) &&
     /HIDDEN_EMPTY_TITLE/.test(PAGE_CODE) &&
-    // ⛔ ...and the way out is the control itself, not a dead "Clear filters".
-    /setShowCancelled\(true\)/.test(PAGE_CODE),
+    // ⛔ ...and the way out is the control itself, not a dead "Clear filters"
+    // — through the PERSISTING handler, so a driver who escapes this state
+    // does not meet it again on the next launch.
+    /chooseShowCancelled\(true\)/.test(PAGE_CODE),
 );
 /**
  * ⛔⛔ **The toggle states no rule of its own — told, never asks.** A control
@@ -11594,6 +11601,136 @@ check(
   applicableShowCancelled(false, NOW_FOCUS) === SHOW_CANCELLED_DEFAULT &&
     applicableShowCancelled(false, TOGGLE_FOCUS) === false &&
     applicableShowCancelled(true, TOGGLE_FOCUS) === true,
+);
+
+/* --- 32e. The setting survives closing the app --------------------------- */
+/**
+ * ⛔⛔ **Driven against a stubbed storage, not read off the source.** A regex
+ * proving `localStorage.getItem` appears cannot tell a correct parse from
+ * `Boolean("false")`, which is `true` — and that is the defect this feature is
+ * most likely to ship.
+ */
+function withStorage<T>(store: Record<string, string> | null, run: () => T): T {
+  const g = globalThis as { window?: unknown };
+  const had = "window" in g;
+  const previous = g.window;
+  g.window = {
+    localStorage: store
+      ? {
+          getItem: (k: string) => (k in store ? store[k] : null),
+          setItem: (k: string, v: string) => {
+            store[k] = v;
+          },
+        }
+      : // ⛔ The private-window case: access THROWS, it does not return null.
+        new Proxy(
+          {},
+          {
+            get() {
+              throw new Error("SecurityError: storage is disabled");
+            },
+          },
+        ),
+  };
+  try {
+    return run();
+  } finally {
+    if (had) g.window = previous;
+    else delete g.window;
+  }
+}
+const PARSES: Array<[string | null, boolean, string]> = [
+  ["false", false, "an explicit off is honoured"],
+  ["true", true, "an explicit on is honoured"],
+  [null, SHOW_CANCELLED_DEFAULT, "nothing stored falls back to the default"],
+  // ⛔⛔ The one that matters: `Boolean("nonsense")` is `true`, and a corrupt
+  // value must land on the default rather than on whichever side is truthy.
+  ["nonsense", SHOW_CANCELLED_DEFAULT, "an unreadable value falls back"],
+  ["", SHOW_CANCELLED_DEFAULT, "an empty string falls back"],
+];
+const parseWrong = PARSES.filter(([raw, want]) => {
+  const store: Record<string, string> = {};
+  if (raw !== null) store[SHOW_CANCELLED_KEY] = raw;
+  return withStorage(store, readShowCancelled) !== want;
+});
+check(
+  "the stored preference parses exactly, and anything else falls back",
+  parseWrong.length
+    ? `wrong: ${parseWrong.map(([raw, , what]) => `${JSON.stringify(raw)} (${what})`).join("; ")}`
+    : `${PARSES.length} of ${PARSES.length} case(s)`,
+  parseWrong.length === 0 &&
+    // ⛔ Non-vacuity: the table must contain a case that differs from the
+    // default, or a `readShowCancelled` that ignored storage entirely would
+    // pass every row.
+    PARSES.some(([, want]) => want !== SHOW_CANCELLED_DEFAULT),
+);
+/** ⛔ ...and what is written comes back, through the real pair. */
+const roundTrip = withStorage({}, () => {
+  writeShowCancelled(false);
+  return readShowCancelled();
+});
+check(
+  "...and a choice written comes back on the next read",
+  `wrote false, read ${roundTrip}`,
+  roundTrip === false,
+);
+/**
+ * ⛔⛔ **A private window throws on ACCESS, and the manifest must still
+ * render.** `typeof localStorage` is not a safe probe — the getter itself
+ * raises. If this is unguarded the page crashes for every driver with site data
+ * blocked, and it crashes on a code path no happy-path walk reaches.
+ */
+let threw = false;
+let fallback: boolean | null = null;
+try {
+  fallback = withStorage(null, readShowCancelled);
+  withStorage(null, () => writeShowCancelled(false));
+} catch {
+  threw = true;
+}
+check(
+  "storage that throws on access degrades to the default, it does not crash",
+  threw ? "THREW — a blocked-storage browser would see a broken page" : `fell back to ${fallback}`,
+  !threw && fallback === SHOW_CANCELLED_DEFAULT,
+);
+/**
+ * ⛔⛔ **The stored value is adopted in an EFFECT, never in `useState`.** This
+ * route is prerendered by `next build`, and the server has no storage — so a
+ * read during render makes the first client paint disagree with the HTML and
+ * React discards the tree. The page looks fine in `next dev` and breaks in the
+ * build, which is the fourth-oracle problem exactly.
+ */
+check(
+  "the page renders the default and adopts the stored value after mount",
+  `useState(SHOW_CANCELLED_DEFAULT) ${/useState\(SHOW_CANCELLED_DEFAULT\)/.test(PAGE_CODE)}; ` +
+    `read in an effect ${/useEffect\(\(\) => \{\s*setShowCancelled\(readShowCancelled\(\)\);\s*\}, \[\]\)/.test(PAGE_CODE)}`,
+  /useState\(SHOW_CANCELLED_DEFAULT\)/.test(PAGE_CODE) &&
+    /useEffect\(\(\) => \{\s*setShowCancelled\(readShowCancelled\(\)\);\s*\}, \[\]\)/.test(PAGE_CODE) &&
+    // ⛔ ...and never during render, in either spelling.
+    !/useState\(readShowCancelled/.test(PAGE_CODE) &&
+    !/useState\(\(\) => readShowCancelled/.test(PAGE_CODE),
+);
+/**
+ * ⛔⛔ **One writer, and it is the handler.** An effect on `showCancelled` would
+ * also fire for the mount-time adoption, writing back the value it had just
+ * read — which turns "never chosen" into "chose the default" and makes the two
+ * indistinguishable forever after.
+ */
+const writeCalls = (PAGE_CODE.match(/writeShowCancelled\(/g) ?? []).length;
+check(
+  "...and the choice is written by the handler, never by an effect on the state",
+  `${writeCalls} write call site(s); handler ${/const chooseShowCancelled = \(next: boolean\) => \{/.test(PAGE_CODE)}`,
+  writeCalls === 1 &&
+    /const chooseShowCancelled = \(next: boolean\) => \{\s*setShowCancelled\(next\);\s*writeShowCancelled\(next\);/.test(PAGE_CODE) &&
+    /onCheckedChange=\{chooseShowCancelled\}/.test(PAGE_CODE) &&
+    // ⛔ No effect depends on the state it would write.
+    !/useEffect\([\s\S]{0,120}writeShowCancelled/.test(PAGE_CODE),
+);
+/** ⛔ The key is declared once; the page never spells it. */
+check(
+  "the storage key is declared in lib, and spelled nowhere else",
+  `key "${SHOW_CANCELLED_KEY}"; page spells it ${PAGE_CODE.includes(SHOW_CANCELLED_KEY)}`,
+  SHOW_CANCELLED_KEY.length > 0 && !PAGE_CODE.includes(SHOW_CANCELLED_KEY),
 );
 
 /* --- 32d. Order holds with cancellations interleaved --------------------- */

@@ -22,6 +22,10 @@ import {
 import { ClientCancellationAlert } from "@/components/driver/client-cancellation-alert";
 import { ShowCancelledToggle } from "@/components/driver/show-cancelled-toggle";
 import {
+  readShowCancelled,
+  writeShowCancelled,
+} from "@/lib/driver-data/show-cancelled-preference";
+import {
   cancelledRides,
   isClientCancelled,
   needsAcknowledgement,
@@ -220,7 +224,34 @@ export default function MyRidesPage() {
    * `visibleUpcoming`, in `lib/`, so this page cannot get them the wrong way
    * round — see D162.
    */
+  /**
+   * ⛔⛔ **Initialised to the DEFAULT, not to what is stored.** The stored value
+   * is adopted in an effect below, after mount. Reading storage here would make
+   * the first client paint disagree with the prerendered HTML and React would
+   * throw the tree away — and `next build` prerenders this route, so the bug
+   * ships in the build rather than in development.
+   */
   const [showCancelled, setShowCancelled] = useState(SHOW_CANCELLED_DEFAULT);
+  /**
+   * Adopt the stored preference once, on mount.
+   *
+   * ⚠️ Empty dependency list, deliberately. This runs after the first paint and
+   * never again: re-reading storage when the demo focus changed would overwrite
+   * a choice the driver had just made in this session.
+   */
+  useEffect(() => {
+    setShowCancelled(readShowCancelled());
+  }, []);
+  /**
+   * ⛔ ONE writer, and it is the handler — not an effect on `showCancelled`.
+   * An effect would also fire for the mount-time adoption above, writing back
+   * the value it had just read, which turns a missing key into a stored one and
+   * makes "never chosen" indistinguishable from "chose the default".
+   */
+  const chooseShowCancelled = (next: boolean) => {
+    setShowCancelled(next);
+    writeShowCancelled(next);
+  };
   // ⛔ ONE answer, read by the list, the tab count and the toggle's own
   // position — see `applicableShowCancelled`. Reading `showCancelled` directly
   // anywhere below is how row 10 shipped a feed narrowed by a control nobody
@@ -440,7 +471,7 @@ export default function MyRidesPage() {
       {showsToggle && (
         <ShowCancelledToggle
           checked={showCancelledApplied}
-          onCheckedChange={setShowCancelled}
+          onCheckedChange={chooseShowCancelled}
         />
       )}
       </div>
@@ -461,7 +492,7 @@ export default function MyRidesPage() {
               <p className="text-sm text-gray-500">{HIDDEN_EMPTY_BODY}</p>
               <button
                 type="button"
-                onClick={() => setShowCancelled(true)}
+                onClick={() => chooseShowCancelled(true)}
                 className="mt-2 rounded-full border border-[#10B981] px-5 py-2 text-sm font-semibold text-[#047857]"
               >
                 {SHOW_CANCELLED_LABEL}
