@@ -111,56 +111,93 @@ export function needsAcknowledgement(
   return isClientCancelled(trip) && !acknowledged.includes(trip.id);
 }
 
-// ---- The filter ---------------------------------------------------------
+// ---- The toggle --------------------------------------------------------
 //
-// Shape borrowed from `lib/driver-data/ride-history.ts`: a declared list of
-// options, a default, a label lookup and a pure `apply`. That one is replicated
-// from captures `04-02`/`04-03`; this one is ours, and says so below.
+// ⛔⛔ **SUPERSEDED 2026-10-17 (D162). This was an All / Active / Cancelled
+// filter, and the filter was the whole of `lib/driver-data/ride-filters.ts` —
+// seven keys, a chip row and a sheet.** The approved solution is one default-on
+// toggle instead, so the registry, the bar, the sheet and the icon map are
+// retired with their only caller.
+//
+// The old reasoning is kept here because it is the argument the new checks have
+// to beat: the filter fell back rather than refusing, so a `cancelled`
+// selection surviving a mode flip landed on the full list instead of an empty
+// one. ⭐ **That shape is preserved below** — `applicableShowCancelled` is the
+// same "strip, never refuse" rule with a boolean in place of three keys. The
+// thing that changed is the control, not the gate.
 
-export type RidesFilter = "all" | "active" | "cancelled";
+/**
+ * ⛔ **Declared, never derived.** A check asserts this literal, not whatever the
+ * component happens to initialise its state to — a default read off the thing it
+ * checks cannot fail.
+ */
+export const SHOW_CANCELLED_DEFAULT = true;
 
-/** ⛔ Declared as a literal, so a check has a denominator. */
-export const MY_RIDES_FILTERS: Array<{ key: RidesFilter; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "cancelled", label: "Cancelled" },
-];
+/** ⛔ Ours, not production's — see `CLIENT_CANCELLATION_PROVENANCE`. */
+export const SHOW_CANCELLED_LABEL = "Show cancelled trips";
 
-export const DEFAULT_RIDES_FILTER: RidesFilter = "all";
+/**
+ * What Upcoming says when the toggle is the only reason it is empty.
+ *
+ * ⛔⛔ **An empty tab and a hidden list are different answers, and saying the
+ * wrong one sends the driver looking for a ride that is there.** "No rides in
+ * this tab" over a manifest the driver has just hidden the cancellations from
+ * reads as the day being empty. Inherited from the filter this replaces, where
+ * the same trap existed with seven ways to spring it.
+ */
+export const HIDDEN_EMPTY_TITLE = "Cancelled trips are hidden";
+export const HIDDEN_EMPTY_BODY =
+  "Every ride on this tab is cancelled, and the toggle is off.";
 
-export function ridesFilterLabel(key: RidesFilter): string {
-  return MY_RIDES_FILTERS.find((f) => f.key === key)!.label;
-}
-
-export function applyRidesFilter(trips: readonly Trip[], key: RidesFilter): Trip[] {
-  switch (key) {
-    case "all":
-      return [...trips];
-    case "active":
-      return trips.filter((trip) => !isClientCancelled(trip));
-    case "cancelled":
-      return trips.filter(isClientCancelled);
-  }
+/**
+ * Whether the toggle is offered at all.
+ *
+ * ⛔ One name, one rule. The old build wrote the gate twice — once for the
+ * header icon and once for the chip row — and a check had to assert they were
+ * read from one expression. One control means one reader, so that whole class
+ * of drift is gone rather than guarded.
+ */
+export function showsCancelledToggle(focus: DemoFocus): boolean {
+  return showsCancelledRides(focus);
 }
 
 /**
- * The filter that actually applies, once a proposed one is taken back out.
+ * The setting that actually applies, once a proposed one is taken back out.
  *
- * ⛔⛔ **One answer, read by everything downstream** — the list, the tab count,
- * the bar's own visibility and the bar's current value. The obvious build gates
- * the bar and stops there, and that ships a list narrowed to `cancelled` by
- * state the driver can no longer see or clear. This is row 10's lesson,
- * applied before it can be relearned: production has no such filter, so in
- * `"now"` there is nothing to show, nothing to count and nothing to undo.
- *
- * ⭐ It falls back rather than refusing, so a `cancelled` selection surviving a
- * mode flip lands on the full list instead of an empty one.
+ * ⛔⛔ **This is row 10's lesson, carried over verbatim from the filter it
+ * replaces.** Production has no such control, so in `"now"` there is nothing to
+ * show and nothing to undo — and a driver whose `off` survived a mode flip must
+ * not land on a manifest narrowed by a control they can no longer see. It falls
+ * back to the default rather than refusing.
  */
-export function applicableRidesFilter(
-  key: RidesFilter,
+export function applicableShowCancelled(
+  showCancelled: boolean,
   focus: DemoFocus,
-): RidesFilter {
-  return showsCancelledRides(focus) ? key : DEFAULT_RIDES_FILTER;
+): boolean {
+  return showsCancelledToggle(focus) ? showCancelled : SHOW_CANCELLED_DEFAULT;
+}
+
+/**
+ * What the Upcoming tab finally renders.
+ *
+ * ⛔⛔ **The order is load-bearing and there is exactly one correct sequence**,
+ * because a wrong one still renders a plausible list:
+ *
+ *     upcomingRides(…, focus)  →  applicableShowCancelled  →  this filter
+ *
+ * The Now-strip runs FIRST. Applying the toggle first would let it act on rides
+ * that `"now"` says do not exist, so the control would populate a list the mode
+ * had just emptied. The two steps are composed here, in `lib/`, so no screen can
+ * get the order wrong by writing them in the other sequence.
+ */
+export function visibleUpcoming(
+  trips: readonly Trip[],
+  focus: DemoFocus,
+  showCancelled: boolean,
+): Trip[] {
+  const listed = upcomingRides(trips, focus);
+  if (applicableShowCancelled(showCancelled, focus)) return listed;
+  return listed.filter((trip) => !isClientCancelled(trip));
 }
 
 // ---- Copy ---------------------------------------------------------------

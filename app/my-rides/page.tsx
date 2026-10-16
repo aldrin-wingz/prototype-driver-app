@@ -20,27 +20,22 @@ import {
   ridesForSolution,
 } from "@/lib/solutions/scenario-rides";
 import { ClientCancellationAlert } from "@/components/driver/client-cancellation-alert";
-import { RidesFilterBar } from "@/components/driver/rides-filter-bar";
+import { ShowCancelledToggle } from "@/components/driver/show-cancelled-toggle";
 import {
   cancelledRides,
   isClientCancelled,
   needsAcknowledgement,
   upcomingRides,
+  visibleUpcoming,
+  applicableShowCancelled,
+  showsCancelledToggle,
   CLIENT_CANCELLATION_SOLUTIONS,
   CLIENT_CANCELLED_PILL,
+  SHOW_CANCELLED_DEFAULT,
+  SHOW_CANCELLED_LABEL,
+  HIDDEN_EMPTY_TITLE,
+  HIDDEN_EMPTY_BODY,
 } from "@/lib/driver-data/client-cancellation";
-import { RidesFilterSheet } from "@/components/driver/rides-filter-sheet";
-import {
-  addedFilterCount,
-  applicableRideFilters,
-  applyRideFilters,
-  showsRidesFilter,
-  FILTER_EMPTY_BODY,
-  FILTER_EMPTY_TITLE,
-  NO_RIDE_FILTERS,
-  type RideFilterKey,
-  type RideFilterValues,
-} from "@/lib/driver-data/ride-filters";
 import { groupByRideDay, sortByRideDate } from "@/lib/driver-data/ride-date";
 
 type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
@@ -214,51 +209,43 @@ export default function MyRidesPage() {
   /**
    * Catalogue row 19 — the manifest, and the task list.
    *
-   * ⛔⛔ **The filter order has exactly one correct sequence**, and a wrong one
-   * still renders a plausible list:
+   * ⛔⛔ **The order has exactly one correct sequence**, and a wrong one still
+   * renders a plausible list:
    *
    *     focused() → withoutPending() → upcomingRides(…, demo)
-   *               → applyRidesFilter → sortByRideDate → groupByRideDay
+   *               → «show-cancelled» → sortByRideDate → groupByRideDay
    *
-   * Applying the filter before the Now-strip would let `cancelled` select rides
-   * that Now says do not exist, so the bar would populate a list the mode had
-   * just emptied.
+   * Applying the toggle before the Now-strip would let it act on rides that Now
+   * says do not exist. ⭐ The first two steps are composed inside
+   * `visibleUpcoming`, in `lib/`, so this page cannot get them the wrong way
+   * round — see D162.
    */
-  const [rideFilters, setRideFilters] = useState<RideFilterValues>(NO_RIDE_FILTERS);
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [filterSheetKey, setFilterSheetKey] = useState<RideFilterKey | null>(null);
-  // ⛔ ONE answer, read by the list, the tab count, the chips and the badge —
-  // see `applicableRideFilters`. Reading `rideFilters` directly anywhere below
-  // is how row 10 shipped a feed narrowed by a filter nobody could see.
-  const appliedFilters = applicableRideFilters(rideFilters, demo);
+  const [showCancelled, setShowCancelled] = useState(SHOW_CANCELLED_DEFAULT);
+  // ⛔ ONE answer, read by the list, the tab count and the toggle's own
+  // position — see `applicableShowCancelled`. Reading `showCancelled` directly
+  // anywhere below is how row 10 shipped a feed narrowed by a control nobody
+  // could see.
+  const showCancelledApplied = applicableShowCancelled(showCancelled, demo);
   /**
-   * Whether the filter is offered at all — BOTH the header icon and the chip
-   * row, from one expression.
+   * Whether the toggle is offered at all.
    *
-   * ⛔⛔ **Two conditions, and the tab is one of them.** The filter narrows the
+   * ⛔⛔ **Two conditions, and the tab is one of them.** The toggle acts on the
    * manifest and nothing else, so on In Progress, Needs Action and Pending it
-   * can do nothing — and an icon that opens a sheet whose every control is
-   * inert is worse than no icon. (User direction, 2026-10-15: the chip row was
-   * already tab-scoped and the icon was not, which left the control visible on
-   * three tabs it could not act on.)
+   * can do nothing — and a control that cannot act is worse than no control.
+   * (User direction, 2026-10-15, carried over from the filter it replaces.)
    *
-   * ⛔ ONE name, read by both. Writing `showsRidesFilter(demo) && activeTab ===
-   * "upcoming"` at each site is the same rule stated twice, and the two drift
-   * the moment one of them gains a third condition — which is exactly what had
-   * just happened here. A check asserts `showsRidesFilter` is read once.
-   *
-   * ⚠️ The VALUES survive a tab change. A driver who filters Upcoming, reads
-   * Needs Action and comes back finds their filter still applied, which is why
-   * `rideFilters` is not cleared here.
+   * ⭐ One control now, so one reader. The old build stated this rule twice —
+   * once for the header icon, once for the chip row — and needed a check to
+   * prove they were read from one expression. That class of drift is gone.
    */
-  const showsFilter = showsRidesFilter(demo) && activeTab === "upcoming";
-  const openFilterSheet = (key: RideFilterKey | null) => {
-    setFilterSheetKey(key);
-    setFilterSheetOpen(true);
-  };
+  const showsToggle = showsCancelledToggle(demo) && activeTab === "upcoming";
 
   const upcomingVisible = upcomingRides(withoutPending(mockUpcomingTrips), demo);
-  const upcomingList = applyRideFilters(upcomingVisible, appliedFilters);
+  const upcomingList = visibleUpcoming(
+    withoutPending(mockUpcomingTrips),
+    demo,
+    showCancelled,
+  );
 
   /**
    * ⛔⛔ **A cancellation is in TWO tabs, and that is deliberate.**
@@ -325,22 +312,6 @@ export default function MyRidesPage() {
   };
 
   /**
-   * The numbers the chips carry.
-   *
-   * ⛔ The LIST'S OWN LENGTH, handed to the chip row rather than counted there
-   * — the list, the tab count and the chips must agree, and three places that
-   * each count for themselves is three chances to disagree.
-   *
-   * ⚠️ Only the always-shown chip carries one, deliberately. Every other chip
-   * would print the same number: a chip's count under the OTHER filters, with
-   * its own value applied, IS the filtered list. Seven copies of one number
-   * reads as seven facts.
-   */
-  const filterCounts: Partial<Record<RideFilterKey, number>> = {
-    status: upcomingList.length,
-  };
-
-  /**
    * ⚠️ **The landing tab follows the solution in focus.**
    *
    * Keyed on `active?.id` so it fires when the focus CHANGES, not on every
@@ -393,15 +364,9 @@ export default function MyRidesPage() {
   
   return (
     <div className="flex min-h-screen flex-col pb-20">
-      {/* ⛔ The icon and the chip row share one condition — see `showsFilter`.
-          The badge counts the filters BEYOND the always-shown chip; see
-          `addedFilterCount` for why the status chip is not in it. */}
-      <Header
-        title="My Rides"
-        showFilter={showsFilter}
-        onFilterClick={() => openFilterSheet(null)}
-        filterBadge={addedFilterCount(appliedFilters)}
-      />
+      {/* ⛔ No filter icon. The toggle is the only control and it lives above
+          the list, where the thing it acts on is visible — see D162. */}
+      <Header title="My Rides" />
 
       {/*
         The tab row AND the chip row, pinned under the header as one box.
@@ -425,12 +390,16 @@ export default function MyRidesPage() {
 
         ⛔⛔ **A z-index opens a stacking context, so nothing that has to
         outrank the bottom nav may be rendered inside this box.** The nav is
-        `fixed bottom-0 z-50` and a sibling of this div; a sheet mounted in
+        `fixed bottom-0 z-50` and a sibling of this div; anything mounted in
         here tops out at this box's `z-40` however large its own z-index is,
-        and the nav paints over its Update button — which is a bug this page
-        has already shipped once. `RidesFilterBar` is only chips and belongs
-        here; `RidesFilterSheet` is mounted at the page root for exactly that
-        reason, and a check asserts the pair stay on their own sides.
+        and the nav paints over it — which is a bug this page has already
+        shipped once.
+
+        ⭐ The toggle is safe here precisely because it opens nothing: it is a
+        switch and a label, with no layer of its own. The sheet that used to
+        live at the page root for this reason is gone with the filter (D162),
+        so the hazard is now a rule about what may be ADDED here, not a pair
+        to keep apart.
       */}
       <div className="sticky top-14 z-40 bg-white">
       <div className="flex border-b border-gray-200 bg-white">
@@ -461,14 +430,17 @@ export default function MyRidesPage() {
         ))}
       </div>
       
-      {/* ⛔ Only on Upcoming, and only in Proposed. A bar offering `Cancelled`
-          on a tab that cannot hold one, or in a mode where none exists, is a
-          control that can never match anything. */}
-      {showsFilter && (
-        <RidesFilterBar
-          values={appliedFilters}
-          counts={filterCounts}
-          onOpen={openFilterSheet}
+      {/* ⛔ Only on Upcoming, and only in Proposed. A toggle on a tab that
+          cannot hold a cancelled ride, or in a mode where none exists, is a
+          control that can never do anything.
+
+          ⛔ It reads `showCancelledApplied`, not `showCancelled` — so a setting
+          that survives a mode flip shows the driver the position actually in
+          force rather than the one they last chose. */}
+      {showsToggle && (
+        <ShowCancelledToggle
+          checked={showCancelledApplied}
+          onCheckedChange={setShowCancelled}
         />
       )}
       </div>
@@ -485,14 +457,14 @@ export default function MyRidesPage() {
            */
           filteredToNothing ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <p className="font-semibold text-gray-900">{FILTER_EMPTY_TITLE}</p>
-              <p className="text-sm text-gray-500">{FILTER_EMPTY_BODY}</p>
+              <p className="font-semibold text-gray-900">{HIDDEN_EMPTY_TITLE}</p>
+              <p className="text-sm text-gray-500">{HIDDEN_EMPTY_BODY}</p>
               <button
                 type="button"
-                onClick={() => setRideFilters(NO_RIDE_FILTERS)}
+                onClick={() => setShowCancelled(true)}
                 className="mt-2 rounded-full border border-[#10B981] px-5 py-2 text-sm font-semibold text-[#047857]"
               >
-                Clear filters
+                {SHOW_CANCELLED_LABEL}
               </button>
             </div>
           ) : (
@@ -546,21 +518,6 @@ export default function MyRidesPage() {
       {/* ⛔ Mounted at the page root, not inside a tab — production raises it
           over whatever the driver is looking at, and `Go to ride` navigates
           away from here entirely. */}
-      {/* ⛔⛔ Mounted HERE, at the page root, and not inside the sticky tab box
-          — that box's `z-40` opens a stacking context the sheet cannot climb
-          out of, and the bottom nav then covers its Update button. */}
-      <RidesFilterSheet
-        open={filterSheetOpen}
-        openKey={filterSheetKey}
-        values={appliedFilters}
-        trips={upcomingVisible}
-        onClose={() => setFilterSheetOpen(false)}
-        onApply={(next) => {
-          setRideFilters(next);
-          setFilterSheetOpen(false);
-        }}
-      />
-
       <ClientCancellationAlert
         trip={cancelAlertTrip}
         onOpenChange={(open) => {

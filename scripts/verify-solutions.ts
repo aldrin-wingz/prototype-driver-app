@@ -364,8 +364,6 @@ import {
 } from "../lib/solutions/demo-mode";
 import { focusParams, SOLUTION_PARAM } from "../lib/solutions/solution-context";
 import {
-  applicableRidesFilter,
-  applyRidesFilter,
   isClientCancelled,
   cancelAlertBody,
   cancelledRides,
@@ -380,38 +378,12 @@ import {
   CLIENT_CANCELLATION_PROVENANCE,
   CLIENT_CANCELLATION_TRACKED_BY_APP,
   CLIENT_CANCELLED_PILL,
-  DEFAULT_RIDES_FILTER,
-  MY_RIDES_FILTERS,
-  type RidesFilter,
+  visibleUpcoming,
+  applicableShowCancelled,
+  showsCancelledToggle,
+  SHOW_CANCELLED_DEFAULT,
+  SHOW_CANCELLED_LABEL,
 } from "../lib/driver-data/client-cancellation";
-import {
-  addedFilterCount,
-  applicableRideFilters,
-  applyRideFilters,
-  chipRowKeys,
-  chipText,
-  clearsOnRetap,
-  isFilterSet,
-  narrowedOptions,
-  narrowedRangeOptions,
-  rangeBounds,
-  rideFilter,
-  setFilterKeys,
-  showsRidesFilter,
-  withRangeBound,
-  withRideFilter,
-  ALL_DAY_RANGE,
-  NO_RIDE_FILTERS,
-  PICKUP_TIME_BANDS,
-  RIDE_FILTERS,
-  TIME_CHOICES,
-  type RideFilterKey,
-  type RideFilterValues,
-} from "../lib/driver-data/ride-filters";
-import {
-  missingFilterIcons,
-  RIDE_FILTER_ICONS,
-} from "../components/driver/ride-filter-icon";
 import { legOptionFor } from "../lib/support-data/leg-options";
 import { ADD_LEG_GROUP } from "../lib/driver-data/add-leg-request";
 import { fieldChange } from "../lib/support/field-rules";
@@ -9866,8 +9838,11 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
   out["cancelled-tasks"] = cancelledRides(mockUpcomingTrips, focus)
     .map((t) => t.id)
     .join(",");
-  // ⚠️ Shaped like the member filter's: what the bar offers, and what survives it.
-  out["rides-filter"] = `${showsCancelledRides(focus)}/${applicableRidesFilter("cancelled", focus)}`;
+  // ⚠️ Shaped like the member filter's: what the control offers, and what
+  // survives it. ⛔ `false` is the interesting input — `applicableShowCancelled`
+  // must fall back in Now, so passing the default would make both modes agree
+  // and the fingerprint would stop distinguishing them (D162).
+  out["rides-filter"] = `${showsCancelledToggle(focus)}/${applicableShowCancelled(false, focus)}`;
   /**
    * ⛔ The acknowledgement, which is the ONE gated thing on the cancelled
    * screen. The screen itself is production's and must NOT appear here — if it
@@ -10937,40 +10912,47 @@ check(
   `${CANCELLED_SEED.length} cancelled ride(s), ${CANCELLED_SEED.filter((t) => ALL_SEEDED.some((x) => x.id === t.id)).length} findable by id`,
   CANCELLED_SEED.every((t) => ALL_SEEDED.some((x) => x.id === t.id)),
 );
-/** ⛔ The filter falls back rather than refusing, for the same reason. */
-const FILTER_CASES: Array<[RidesFilter, DemoFocus, RidesFilter]> = [
-  ["cancelled", FIXED_18, "cancelled"],
-  ["cancelled", NOW_18, "all"],
-  ["active", NOW_18, "all"],
-  ["all", FIXED_18, "all"],
-  ["cancelled", FIXED(null), "cancelled"],
-  ["cancelled", FIXED("rider-no-show"), "all"],
+/**
+ * ⛔ The toggle falls back rather than refusing, for the same reason.
+ *
+ * ⛔⛔ **SUPERSEDED 2026-10-17 (D162).** This drove six cases over an All /
+ * Active / Cancelled key. The control is now a boolean, so the case table is
+ * `off` against every focus that does not offer the control — and `off` is the
+ * only interesting input, because `on` is the fall-back value and would agree
+ * everywhere by construction.
+ */
+const FALLBACK_CASES: Array<[DemoFocus, boolean]> = [
+  [FIXED_18, false],
+  [NOW_18, SHOW_CANCELLED_DEFAULT],
+  [FIXED(null), false],
+  [FIXED("rider-no-show"), SHOW_CANCELLED_DEFAULT],
 ];
-const filterWrong = FILTER_CASES.filter(
-  ([key, focus, want]) => applicableRidesFilter(key, focus) !== want,
+const fallbackWrong = FALLBACK_CASES.filter(
+  ([focus, want]) => applicableShowCancelled(false, focus) !== want,
 );
 check(
-  "the filter falls back to All wherever the bar is not offered",
-  `${filterWrong.length} wrong of ${FILTER_CASES.length} case(s)`,
-  filterWrong.length === 0,
+  "an `off` falls back to the default wherever the toggle is not offered",
+  `${fallbackWrong.length} wrong of ${FALLBACK_CASES.length} case(s)`,
+  fallbackWrong.length === 0 &&
+    // ⛔ Non-vacuity: at least one case must actually fall back, or a toggle
+    // that was offered everywhere would pass this table.
+    FALLBACK_CASES.some(([, want]) => want === SHOW_CANCELLED_DEFAULT),
 );
+/** ⛔ ...and the label is declared in `lib/`, beside the rule it names. */
 check(
-  "...and the three options are declared, in order",
-  MY_RIDES_FILTERS.map((f) => `${f.key}:${f.label}`).join(" | "),
-  MY_RIDES_FILTERS.map((f) => f.key).join(",") === "all,active,cancelled" &&
-    DEFAULT_RIDES_FILTER === "all",
+  "...and the control's label is the one the driver asked for",
+  `SHOW_CANCELLED_LABEL = "${SHOW_CANCELLED_LABEL}"`,
+  SHOW_CANCELLED_LABEL === "Show cancelled trips",
 );
-/** ⛔ ...and `applyRidesFilter` partitions the manifest, with both halves real. */
-const partition = (["all", "active", "cancelled"] as RidesFilter[]).map(
-  (k) => applyRidesFilter(mockUpcomingTrips, k).length,
-);
+/** ⛔ ...and the toggle partitions the manifest, with both halves real. */
+const onCount = visibleUpcoming(mockUpcomingTrips, FIXED_18, true).length;
+const offCount = visibleUpcoming(mockUpcomingTrips, FIXED_18, false).length;
 check(
-  "...and the three options partition the manifest",
-  `all ${partition[0]} = active ${partition[1]} + cancelled ${partition[2]}`,
-  partition[0] === mockUpcomingTrips.length &&
-    partition[1] + partition[2] === partition[0] &&
-    partition[1] > 0 &&
-    partition[2] === EXPECTED_ROW_18_CANCELLED,
+  "...and the two positions partition the manifest",
+  `on ${onCount} = off ${offCount} + cancelled ${onCount - offCount}`,
+  onCount === mockUpcomingTrips.length &&
+    offCount > 0 &&
+    onCount - offCount === EXPECTED_ROW_18_CANCELLED,
 );
 
 /* --- 31f. The ride order, and the headings over it ----------------------- */
@@ -11207,222 +11189,131 @@ check(
     /case "upcoming":\s*return upcomingList;/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **The filter runs AFTER the Now-strip, and the order is the property.**
- * Reversed, a `cancelled` status would select rides Now says do not exist — so
- * the chips populate a list the mode had just emptied, and every count still
- * looks plausible. Asserted on the composition, which is the only place it
- * exists.
+ * ⛔⛔ **The Now-strip runs BEFORE the toggle, and the order is the property.**
+ * Reversed, the toggle would act on rides Now says do not exist — so it would
+ * populate a list the mode had just emptied, and every count would still look
+ * plausible.
+ *
+ * ⭐ The composition now lives in `visibleUpcoming`, in `lib/` (D162), so the
+ * page cannot write the two steps in the other order. This check is therefore
+ * about the page CALLING it rather than rolling its own — which is the form the
+ * mistake can still take.
  */
-const stripThenFilter =
-  /upcomingRides\(withoutPending\(mockUpcomingTrips\), demo\)[\s\S]{0,120}applyRideFilters\(upcomingVisible, appliedFilters\)/;
 check(
-  "the Now-strip runs before the filter, never after",
-  stripThenFilter.test(PAGE_CODE)
-    ? "upcomingRides(…) → applyRideFilters(…)"
-    : "REVERSED or rewritten — a `cancelled` filter would select rides Now hides",
-  stripThenFilter.test(PAGE_CODE) &&
-    // ⛔ ...and the filter is never handed the raw seed, which is the same bug
-    // written another way.
-    !/applyRideFilters\(withoutPending\(mockUpcomingTrips\)/.test(PAGE_CODE),
+  "the manifest comes from visibleUpcoming, which composes the strip then the toggle",
+  `visibleUpcoming ${/const upcomingList = visibleUpcoming\(/.test(PAGE_CODE)}; ` +
+    `hand-rolled filter ${/upcomingList[\s\S]{0,80}\.filter\([\s\S]{0,40}isClientCancelled/.test(PAGE_CODE)}`,
+  /const upcomingList = visibleUpcoming\(\s*withoutPending\(mockUpcomingTrips\),\s*demo,\s*showCancelled,\s*\)/.test(PAGE_CODE) &&
+    // ⛔ ...and the page never filters cancellations itself. A second filter
+    // beside the composed one is the same bug written another way.
+    !/upcomingList[\s\S]{0,80}\.filter\([\s\S]{0,40}isClientCancelled/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **The filter touches ONE tab.** The driver's own constraint, and the
- * reason for it is that Needs Action, In Progress and Pending are TASK lists —
- * a filter that hid work waiting on the driver would be worse than no filter.
- * Upcoming is the manifest, and narrowing a manifest loses nothing.
+ * ⛔⛔ **The toggle touches ONE tab.** The driver's own constraint, carried over
+ * from the filter: Needs Action, In Progress and Pending are TASK lists, and a
+ * control that hid work waiting on the driver would be worse than no control.
+ * Upcoming is the manifest, and hiding a cancellation there loses nothing.
  *
  * ⚠️ Asserted by counting call sites, not by reading the guard. A second call
- * inside `getTripsForTab` would narrow a task list while every other check
- * here still passed.
+ * inside `getTripsForTab` would narrow a task list while every other check here
+ * still passed.
  */
-const filterCalls = (PAGE_CODE.match(/applyRideFilters\(/g) ?? []).length;
+const visibleCalls = (PAGE_CODE.match(/visibleUpcoming\(/g) ?? []).length;
 check(
-  "the filter is applied in exactly one place, and it is the manifest",
-  `${filterCalls} call site(s); the one is upcomingVisible ${/const upcomingList = applyRideFilters\(upcomingVisible, appliedFilters\)/.test(PAGE_CODE)}`,
-  filterCalls === 1 &&
-    /const upcomingList = applyRideFilters\(upcomingVisible, appliedFilters\)/.test(PAGE_CODE),
+  "the toggle is applied in exactly one place, and it is the manifest",
+  `${visibleCalls} call site(s)`,
+  visibleCalls === 1,
 );
 /**
- * ⛔⛔ **One answer, five readers.** The chips' values, the list, the counts,
- * the header badge and the chip row's own visibility must all come from
- * `applicableRideFilters` / `showsRidesFilter` — never from the raw
- * `rideFilters` state. Feeding the chips the raw values leaves a `Cancelled`
- * chip lit in a mode that has no cancellations, which is row 10's half-truth
- * exactly.
+ * ⛔⛔ **One answer, three readers.** The list, the tab count and the toggle's
+ * own position must all come from `applicableShowCancelled` — never from the
+ * raw `showCancelled` state. Feeding the switch the raw value leaves it sitting
+ * `off` in a mode that has no cancellations to hide, which is row 10's
+ * half-truth exactly.
  */
 check(
-  "the chips and the badge are fed the applicable filters, never the raw state",
-  `values={appliedFilters} ${/values=\{appliedFilters\}/.test(PAGE_CODE)}; ` +
-    `badge from applied ${/filterBadge=\{addedFilterCount\(appliedFilters\)\}/.test(PAGE_CODE)}`,
-  /const appliedFilters = applicableRideFilters\(rideFilters, demo\)/.test(PAGE_CODE) &&
-    /values=\{appliedFilters\}/.test(PAGE_CODE) &&
-    /filterBadge=\{addedFilterCount\(appliedFilters\)\}/.test(PAGE_CODE) &&
-    !/values=\{rideFilters\}/.test(PAGE_CODE) &&
-    !/addedFilterCount\(rideFilters\)/.test(PAGE_CODE),
+  "the toggle is fed the applicable setting, never the raw state",
+  `applied ${/const showCancelledApplied = applicableShowCancelled\(showCancelled, demo\)/.test(PAGE_CODE)}; ` +
+    `checked={showCancelledApplied} ${/checked=\{showCancelledApplied\}/.test(PAGE_CODE)}`,
+  /const showCancelledApplied = applicableShowCancelled\(showCancelled, demo\)/.test(PAGE_CODE) &&
+    /checked=\{showCancelledApplied\}/.test(PAGE_CODE) &&
+    !/checked=\{showCancelled\}/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **Both ways in share ONE condition, and the tab is part of it.** The
- * filter narrows the manifest and nothing else, so on In Progress, Needs
- * Action and Pending it can do nothing — and an icon that opens a sheet whose
- * every control is inert is worse than no icon. (User-reported, 2026-10-15:
- * the chip row was tab-scoped and the icon was not.)
+ * ⛔⛔ **One control, so one reader — and that is the point of D162.**
  *
- * ⛔ The two halves are asserted separately because each alone passes on a
- * half-build: a page could gate the row and not the icon — which is the state
- * this check was written in response to — or name the rule once and then read
- * `showsRidesFilter` again somewhere else.
+ * The filter had two ways in (a header icon and a chip row) and needed a check
+ * proving both were gated from a single expression, because a page could gate
+ * one and not the other. A toggle has one way in. The guard is still asserted,
+ * and so is the ABSENCE of the header icon: a page that kept `showFilter` would
+ * be offering a door to a sheet that no longer exists.
  */
-const sharedGuard = /const showsFilter = showsRidesFilter\(demo\) && activeTab === "upcoming"/;
-const gateReads = (PAGE_CODE.match(/showsRidesFilter\(/g) ?? []).length;
+const toggleGuard = /const showsToggle = showsCancelledToggle\(demo\) && activeTab === "upcoming"/;
+const toggleGateReads = (PAGE_CODE.match(/showsCancelledToggle\(/g) ?? []).length;
 check(
-  "...and both ways in are offered only on the tab the filter can act on",
-  `one rule ${sharedGuard.test(PAGE_CODE)}; ` +
-    `icon ${/showFilter=\{showsFilter\}/.test(PAGE_CODE)}, row ${/\{showsFilter && \(/.test(PAGE_CODE)}; ` +
-    `gate read ${gateReads}x`,
-  sharedGuard.test(PAGE_CODE) &&
-    /showFilter=\{showsFilter\}/.test(PAGE_CODE) &&
-    /\{showsFilter && \(/.test(PAGE_CODE) &&
-    // ⛔ Read ONCE. A second reader is the same rule stated twice, and the two
-    // drift the moment one of them gains a third condition.
-    gateReads === 1,
+  "...and it is offered only on the tab it can act on, from one rule read once",
+  `one rule ${toggleGuard.test(PAGE_CODE)}; ` +
+    `mounted ${/\{showsToggle && \(/.test(PAGE_CODE)}; ` +
+    `gate read ${toggleGateReads}x; ` +
+    `header filter icon ${/showFilter=/.test(PAGE_CODE)}`,
+  toggleGuard.test(PAGE_CODE) &&
+    /\{showsToggle && \(/.test(PAGE_CODE) &&
+    toggleGateReads === 1 &&
+    // ⛔ The retired door stays shut.
+    !/showFilter=/.test(PAGE_CODE) &&
+    !/filterBadge=/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **The sheet counts against the UNFILTERED manifest.** Handed
- * `upcomingList` it would count every option against the filters already
- * applied, so every option but the chosen ones would read `0` and the driver
- * could never widen a selection — the sheet would be a one-way door. Handed the
- * raw seed it would offer days the mode strips.
+ * ⛔⛔ **An empty tab and a hidden list are different answers.** "No rides in
+ * this category" over a manifest whose every ride is cancelled and hidden reads
+ * as the day being empty, and sends the driver looking for a ride that is
+ * there. The test has to be the list BEFORE the toggle.
  */
 check(
-  "the sheet counts its options against the manifest, not the filtered list",
-  `trips={upcomingVisible} ${/trips=\{upcomingVisible\}/.test(PAGE_CODE)}`,
-  /trips=\{upcomingVisible\}/.test(PAGE_CODE) &&
-    !/trips=\{upcomingList\}/.test(PAGE_CODE) &&
-    !/trips=\{mockUpcomingTrips\}/.test(PAGE_CODE),
-);
-/**
- * ⛔⛔ **An empty tab and a filter that matched nothing are different answers.**
- * "No rides in this category" over a manifest the driver has just narrowed to
- * one client reads as the day being empty, and sends them looking for a ride
- * that is there. The test has to be the UNFILTERED list.
- */
-check(
-  "an empty filtered manifest says so, rather than claiming the tab is empty",
+  "a manifest emptied by the toggle says so, rather than claiming the tab is empty",
   `predicate reads upcomingVisible ${/filteredToNothing =[\s\S]{0,160}upcomingVisible\.length > 0/.test(PAGE_CODE)}`,
   /filteredToNothing =[\s\S]{0,160}upcomingVisible\.length > 0/.test(PAGE_CODE) &&
     /filteredToNothing \?/.test(PAGE_CODE) &&
-    /FILTER_EMPTY_TITLE/.test(PAGE_CODE),
+    /HIDDEN_EMPTY_TITLE/.test(PAGE_CODE) &&
+    // ⛔ ...and the way out is the control itself, not a dead "Clear filters".
+    /setShowCancelled\(true\)/.test(PAGE_CODE),
 );
 /**
- * ⛔⛔ **The chip row states no rule of its own.** Which chips are shown is
- * `chipRowKeys`, what each says is `chipText`, and whether the row renders at
- * all is the page's. A row that read the demo focus, or decided its own
- * membership, would be a second reader of a rule the list already uses — and
- * the two could disagree.
+ * ⛔⛔ **The toggle states no rule of its own — told, never asks.** A control
+ * that read the demo focus would be a second reader of the gate the list
+ * already uses, and the two could disagree. That is how row 10 shipped a feed
+ * narrowed by a filter nobody could see.
  */
-const FILTER_SRC = codeOnly(
-  readFileSync(join(ROOT, "components/driver/rides-filter-bar.tsx"), "utf8"),
+const SHOW_CANCELLED_SRC = codeOnly(
+  readFileSync(join(ROOT, "components/driver/show-cancelled-toggle.tsx"), "utf8"),
 );
 check(
-  "the chip row is one chip per applied filter, and decides none of it",
-  `chipRowKeys ${/chipRowKeys\(values\)/.test(FILTER_SRC)}, ` +
-    `chipText ${/chipText\(key, values\)/.test(FILTER_SRC)}, ` +
-    `reads the focus ${/useSolution|showsRidesFilter|DemoFocus/.test(FILTER_SRC)}`,
-  /chipRowKeys\(values\)/.test(FILTER_SRC) &&
-    /chipText\(key, values\)/.test(FILTER_SRC) &&
-    /onOpen\(key\)/.test(FILTER_SRC) &&
-    !/useSolution|showsRidesFilter|DemoFocus/.test(FILTER_SRC),
+  "the toggle renders what it is handed, and decides none of it",
+  `reads the focus ${/useSolution|showsCancelledToggle|DemoFocus|applicableShowCancelled/.test(SHOW_CANCELLED_SRC)}; ` +
+    `label from lib ${/SHOW_CANCELLED_LABEL/.test(TOGGLE_SRC)}`,
+  /checked=\{checked\}/.test(SHOW_CANCELLED_SRC) &&
+    /onCheckedChange=\{onCheckedChange\}/.test(SHOW_CANCELLED_SRC) &&
+    /SHOW_CANCELLED_LABEL/.test(SHOW_CANCELLED_SRC) &&
+    !/useSolution|showsCancelledToggle|DemoFocus|applicableShowCancelled/.test(SHOW_CANCELLED_SRC),
 );
 /**
- * ⛔⛔ **The sheet renders the REGISTRY, not a list of its own.** The whole
- * point of the feature is that the eighth filter is one object literal; a sheet
- * that named its seven sections would quietly stop at seven.
+ * ⛔⛔ **The retired filter is GONE, not merely unmounted.** D162 removed the
+ * registry, the chip row, the sheet and the icon map with their only caller. A
+ * half-revert that restored the files without remounting them would leave 1,250
+ * lines of dead rules that every other check here would ignore — and the next
+ * reader would reasonably believe the feature still exists.
  */
-const RIDES_SHEET_SRC = codeOnly(
-  readFileSync(join(ROOT, "components/driver/rides-filter-sheet.tsx"), "utf8"),
-);
+const RETIRED = [
+  "lib/driver-data/ride-filters.ts",
+  "components/driver/rides-filter-bar.tsx",
+  "components/driver/rides-filter-sheet.tsx",
+  "components/driver/ride-filter-icon.tsx",
+];
+const survivors = RETIRED.filter((rel) => existsSync(join(ROOT, rel)));
 check(
-  "the sheet renders every filter in the registry, naming none of them",
-  `maps RIDE_FILTERS ${/RIDE_FILTERS\.map\(/.test(RIDES_SHEET_SRC)}; ` +
-    `filter keys spelled in the sheet: ${RIDE_FILTERS.filter((f) => RIDES_SHEET_SRC.includes(`"${f.key}"`)).length}`,
-  /RIDE_FILTERS\.map\(/.test(RIDES_SHEET_SRC) &&
-    RIDE_FILTERS.every((f) => !RIDES_SHEET_SRC.includes(`"${f.key}"`)),
-);
-/**
- * ⛔⛔ **The sheet edits a DRAFT that `Update` applies**, or `Update` is
- * decorative and `Clear Filters` is ambiguous — the driver cannot tell whether
- * clearing has already taken effect. Exactly one call site applies it; an
- * option that applied on tap would call it from the chip as well.
- */
-const applyCalls = (RIDES_SHEET_SRC.match(/onApply\(/g) ?? []).length;
-const updateButtons = (RIDES_SHEET_SRC.match(/onClick=\{\(\) => commit\(draft\)\}/g) ?? []).length;
-check(
-  "...and it edits a draft that Update applies, through one commit",
-  `draft state ${/const \[draft, setDraft\] = useState<RideFilterValues>/.test(RIDES_SHEET_SRC)}; ` +
-    `onApply calls ${applyCalls}; Update buttons ${updateButtons}`,
-  /const \[draft, setDraft\] = useState<RideFilterValues>/.test(RIDES_SHEET_SRC) &&
-    // ⛔ ONE call site, and it is `commit`. Three controls reach it — this
-    // sheet's Update, the time-range sub-sheet's, and a pick in a chip-opened
-    // sub-sheet — and three `onApply` calls is three chances to disagree about
-    // what "applying" closes.
-    applyCalls === 1 &&
-    /const commit = \(next: RideFilterValues\) => \{\s*onApply\(next\);/.test(RIDES_SHEET_SRC) &&
-    // ⛔ Both Update buttons go through it, and there are exactly two.
-    updateButtons === 2,
-);
-/**
- * ⛔⛔ **A chip-opened sub-sheet APPLIES on pick; one reached from inside the
- * sheet goes back and waits.** Production's `Mode` sub-sheet, opened from the
- * chip row, has no Update at all — the tick is the decision. Reached through
- * `Edit ›` it is one section of a sheet the driver is still filling in.
- *
- * ⛔ And a BOUND pick never applies however it was reached: `Start` is half of
- * a range, and committing it alone narrows the manifest to a filter the driver
- * is in the middle of choosing.
- */
-check(
-  "a chip-opened sub-sheet applies on pick, and a half-set range never does",
-  `guard: ${/if \(at\.fromChip && !at\.bound\) commit\(next\);/.test(RIDES_SHEET_SRC)}; ` +
-    `chips open their own sub-sheet: ${/setEditing\(openKey \? \{ key: openKey, fromChip: true \} : null\)/.test(RIDES_SHEET_SRC)}`,
-  /if \(at\.fromChip && !at\.bound\) commit\(next\);/.test(RIDES_SHEET_SRC) &&
-    // ⛔ ...and EVERY control opens one from the bar, not only `list`. A chip
-    // that opened the full seven-section sheet would make the driver find the
-    // control again, which is the opposite of what a chip is for.
-    /setEditing\(openKey \? \{ key: openKey, fromChip: true \} : null\)/.test(RIDES_SHEET_SRC) &&
-    !/control === "list" \? \{ key: openKey \}/.test(RIDES_SHEET_SRC),
-);
-check(
-  "...and Clear Filters resets the draft without closing the sheet",
-  `setDraft(NO_RIDE_FILTERS) ${/setDraft\(NO_RIDE_FILTERS\)/.test(RIDES_SHEET_SRC)}`,
-  /setDraft\(NO_RIDE_FILTERS\)/.test(RIDES_SHEET_SRC) &&
-    !/setDraft\(NO_RIDE_FILTERS\);\s*onClose\(\)/.test(RIDES_SHEET_SRC),
-);
-/**
- * ⛔⛔ **The sheet sits ABOVE the bottom nav**, and a walk is what found this.
- * The nav is `fixed bottom-0 z-50` and comes later in the document, so at an
- * equal z-index it wins — and what it covers is the `Update` button. The sheet
- * opened, looked correct in a screenshot, and could not be applied.
- */
-const NAV_SRC = codeOnly(readFileSync(join(ROOT, "components/driver/bottom-nav.tsx"), "utf8"));
-const navZ = Number(/z-\[?(\d+)\]?/.exec(NAV_SRC)?.[1] ?? "0");
-const sheetZ = Number(/fixed inset-0 z-\[(\d+)\]/.exec(RIDES_SHEET_SRC)?.[1] ?? "0");
-check(
-  "the filter sheet outranks the bottom nav, which covers its Update button",
-  `sheet z-${sheetZ} vs nav z-${navZ}`,
-  sheetZ > navZ && navZ > 0,
-);
-/**
- * ⛔ Every icon name the registry uses is mapped. The map is typed
- * `Record<RideFilterIcon, …>`, so a NEW name fails to compile — this is the
- * other direction, where a name is dropped from the union and the map keeps a
- * dead entry while a filter renders with nothing.
- */
-check(
-  "every filter in the registry has an icon the renderer can draw",
-  `${missingFilterIcons().length} unmapped of ${RIDE_FILTERS.length}; ` +
-    `${Object.keys(RIDE_FILTER_ICONS).length} icon(s) declared`,
-  missingFilterIcons().length === 0 &&
-    Object.keys(RIDE_FILTER_ICONS).length === RIDE_FILTERS.length,
+  "the seven-filter sheet is removed from the tree, not just unmounted",
+  survivors.length ? `still present: ${survivors.join(", ")}` : `${RETIRED.length} of ${RETIRED.length} removed`,
+  survivors.length === 0,
 );
 /**
  * ⛔⛔ **Two pill maps, composed, never merged.** Both write `statusPills`, and
@@ -11460,8 +11351,11 @@ check(
 const CC_SURFACES: Array<[string, (f: DemoFocus) => boolean]> = [
   ["manifest holds them", (f) => upcomingRides(mockUpcomingTrips, f).some(isClientCancelled)],
   ["task list holds them", (f) => cancelledRides(mockUpcomingTrips, f).length > 0],
-  ["bar is offered", (f) => showsCancelledRides(f)],
-  ["bar keeps a cancelled selection", (f) => applicableRidesFilter("cancelled", f) === "cancelled"],
+  ["toggle is offered", (f) => showsCancelledToggle(f)],
+  // ⛔ `false` is the interesting input: `true` is the fall-back value, so a
+  // surface driven with it would agree in both modes and stop distinguishing
+  // them — the sweep would sweep nothing (D162).
+  ["toggle keeps an `off`", (f) => applicableShowCancelled(false, f) === false],
   [
     "a cancellation is still a task",
     (f) => CANCELLED_SEED.some((t) => needsAcknowledgement(t, [], f)),
@@ -11572,14 +11466,20 @@ function jsxExtent(src: string, openTag: string): string {
 }
 const tabRowExtent = jsxExtent(PAGE_CODE, `<div className="${tabRowTag}"`);
 /**
- * ⛔⛔ **The chip row belongs INSIDE and the sheet belongs OUTSIDE**, and the
- * difference is the whole point of this check. `RidesFilterBar` is chips; it
- * has to stay put while the manifest scrolls. `RidesFilterSheet` is an overlay
- * that must outrank the bottom nav, and no z-index can lift it out of this
- * box's stacking context.
+ * ⛔⛔ **The toggle belongs INSIDE; any overlay belongs OUTSIDE.** The toggle
+ * has to stay put while the manifest scrolls, and it is safe here precisely
+ * because it opens nothing — a switch and a label, with no layer of its own.
+ *
+ * ⚠️ **The hazard outlived the sheet that taught it.** D162 removed
+ * `RidesFilterSheet`, so this check could no longer name it — and the obvious
+ * move, deleting the outside-list with it, would retire the only guard against
+ * the next overlay being mounted here. It is kept as a rule about the SHAPE of
+ * what may be added: nothing that paints over the page may live in this box,
+ * because the bottom nav (`fixed bottom-0 z-50`, a sibling) wins against
+ * anything trapped at `z-40` however large its own z-index is.
  */
-const MUST_STAY_OUTSIDE = ["RidesFilterSheet", "fixed inset-0"];
-const MUST_BE_INSIDE = ["tabs.map(", "<RidesFilterBar"];
+const MUST_STAY_OUTSIDE = ["fixed inset-0", "role=\"dialog\"", "<AlertDialog"];
+const MUST_BE_INSIDE = ["tabs.map(", "<ShowCancelledToggle"];
 const trapped = MUST_STAY_OUTSIDE.filter((what) => tabRowExtent.includes(what));
 const escaped = MUST_BE_INSIDE.filter((what) => !tabRowExtent.includes(what));
 check(
@@ -11594,619 +11494,140 @@ check(
 
 /* === 32. The My Rides filter feature ====================================== */
 /**
- * ⛔⛔ **A FEATURE, so the checks are about the registry and not about seven
- * filters.** Row 19 shipped one `All | Active | Cancelled` control and the next
- * question was whether it could also filter by rider, client, day, time and
- * county. Seven hand-written filters is seven pieces of page state and seven
- * chances for the list and the chips to disagree; one registry is one rule
- * driven over every entry, with a denominator that grows when the eighth
- * arrives.
+ * Catalogue row 19's control — **one toggle, "Show cancelled trips", default on.**
  *
- * Everything below sweeps `RIDE_FILTERS` rather than naming a filter, except
- * where the point IS a particular filter.
- */
-console.log("\n32. My Rides filter — the registry, the narrowing and the gate");
-
-/* --- 32a. The registry is what it claims to be --------------------------- */
-/** ⛔ Declared as a literal so the sweeps below have a denominator. */
-const EXPECTED_FILTER_KEYS: RideFilterKey[] = [
-  "status",
-  "rider",
-  "client",
-  "pickupDay",
-  "pickupTime",
-  "pickupLocation",
-  "dropoffLocation",
-];
-check(
-  "the registry holds the seven filters the driver asked for, in order",
-  RIDE_FILTERS.map((f) => f.key).join(" → "),
-  RIDE_FILTERS.map((f) => f.key).join(",") === EXPECTED_FILTER_KEYS.join(",") &&
-    new Set(RIDE_FILTERS.map((f) => f.key)).size === EXPECTED_FILTER_KEYS.length,
-);
-/**
- * ⛔⛔ **Exactly one filter is always on the chip row**, and which one is the
- * driver's own instruction: status, because it answers "is this ride still on"
- * — the question the whole row exists for. Two would be production's Requests
- * screen (day and time); zero would be a chip row that vanishes.
- */
-const alwaysShown = RIDE_FILTERS.filter((f) => f.alwaysOnChipRow);
-check(
-  "...and exactly one of them is on the chip row whether set or not",
-  `${alwaysShown.length} of ${RIDE_FILTERS.length}: ${alwaysShown.map((f) => f.key).join(", ") || "none"}`,
-  alwaysShown.length === 1 && alwaysShown[0].key === "status",
-);
-/**
- * ⛔ A filter that offers nothing is a control the driver can open and not use.
- * Every definition must find real values in the manifest it will be given.
- */
-const emptyOptionSets = RIDE_FILTERS.filter((f) => {
-  const options = f.options(mockUpcomingTrips);
-  return options.length < 2 || options.some((o) => !o.value || !o.label);
-});
-check(
-  "every filter offers at least two real values over the seeded manifest",
-  RIDE_FILTERS.map((f) => `${f.key}=${f.options(mockUpcomingTrips).length}`).join(", "),
-  emptyOptionSets.length === 0,
-);
-/**
- * ⛔⛔ **Non-vacuity, per filter.** A `matches` that returned true for
- * everything would pass every composition check below perfectly and narrow
- * nothing. Each filter must have at least one option that leaves SOME rides and
- * excludes others — proven over the seed, with both halves counted.
- */
-const inertFilters = RIDE_FILTERS.filter((f) => {
-  const pool = mockUpcomingTrips;
-  return !f.options(pool).some((o) => {
-    const hit = pool.filter((t) => f.matches(t, o.value)).length;
-    return hit > 0 && hit < pool.length;
-  });
-});
-check(
-  "...and every filter has a value that really divides the manifest",
-  inertFilters.length
-    ? `inert: ${inertFilters.map((f) => f.key).join(", ")}`
-    : `${RIDE_FILTERS.length} of ${RIDE_FILTERS.length} divide it`,
-  inertFilters.length === 0,
-);
-
-/* --- 32b. Set, unset, and the chip row ----------------------------------- */
-/**
- * ⛔⛔ **"Not set" has exactly one spelling.** A default stored as a value
- * would leave `isFilterSet`, the chip row, the badge and the sheet each having
- * to know both forms. Driven over every filter: writing its default removes the
- * key outright.
- */
-const defaultStored = RIDE_FILTERS.filter((f) => {
-  const after = withRideFilter(NO_RIDE_FILTERS, f.key, f.defaultValue);
-  return f.key in after || isFilterSet(f.key, after);
-});
-check(
-  "writing a filter's default unsets it rather than storing the default",
-  defaultStored.length
-    ? `stored: ${defaultStored.map((f) => f.key).join(", ")}`
-    : `${RIDE_FILTERS.length} of ${RIDE_FILTERS.length} unset cleanly`,
-  defaultStored.length === 0,
-);
-/** ⛔ ...and a real value does set it, or the check above passes on a no-op. */
-const realValue = (key: RideFilterKey): string => {
-  const def = rideFilter(key);
-  return def.options(mockUpcomingTrips).find((o) => o.value !== def.defaultValue)!.value;
-};
-const notStored = RIDE_FILTERS.filter(
-  (f) => !isFilterSet(f.key, withRideFilter(NO_RIDE_FILTERS, f.key, realValue(f.key))),
-);
-check(
-  "...and a value that is not the default does set it",
-  notStored.length
-    ? `lost: ${notStored.map((f) => f.key).join(", ")}`
-    : `${RIDE_FILTERS.length} of ${RIDE_FILTERS.length} stored`,
-  notStored.length === 0,
-);
-/**
- * ⛔ At rest the chip row is the always-shown filter and nothing else; setting
- * any other filter adds exactly one chip, and the badge counts exactly the ones
- * beyond the always-shown. Three properties swept together because each alone
- * passes on a half-build.
- */
-const chipWrong: string[] = [];
-for (const f of RIDE_FILTERS) {
-  const values = withRideFilter(NO_RIDE_FILTERS, f.key, realValue(f.key));
-  const chips = chipRowKeys(values);
-  const wantChips = f.alwaysOnChipRow ? 1 : 2;
-  const wantBadge = f.alwaysOnChipRow ? 0 : 1;
-  if (chips.length !== wantChips) chipWrong.push(`${f.key} chips ${chips.length}≠${wantChips}`);
-  if (!chips.includes("status")) chipWrong.push(`${f.key} dropped the always-shown chip`);
-  if (addedFilterCount(values) !== wantBadge)
-    chipWrong.push(`${f.key} badge ${addedFilterCount(values)}≠${wantBadge}`);
-}
-check(
-  "the chip row carries the always-shown filter plus whatever is set",
-  `at rest ${chipRowKeys(NO_RIDE_FILTERS).join(",")} badge ${addedFilterCount(NO_RIDE_FILTERS)}; ` +
-    `${chipWrong.length} wrong of ${RIDE_FILTERS.length * 3} property checks` +
-    (chipWrong.length ? ` — ${chipWrong.slice(0, 3).join("; ")}` : ""),
-  chipRowKeys(NO_RIDE_FILTERS).join(",") === "status" &&
-    addedFilterCount(NO_RIDE_FILTERS) === 0 &&
-    chipWrong.length === 0,
-);
-/** ⛔ ...and the always-shown chip reads its value even when nothing is set. */
-check(
-  "...and the always-shown chip reads a value rather than a placeholder",
-  `at rest it says "${chipText("status", NO_RIDE_FILTERS)}"`,
-  chipText("status", NO_RIDE_FILTERS) === "All" &&
-    chipText("status", { status: "cancelled" }) === "Cancelled",
-);
-
-/* --- 32c. Applying ------------------------------------------------------- */
-/** ⛔ No filters is the whole manifest, in the same order. */
-const unfiltered = applyRideFilters(mockUpcomingTrips, NO_RIDE_FILTERS);
-check(
-  "no filters leaves the manifest whole and in order",
-  `${unfiltered.length} of ${mockUpcomingTrips.length} ride(s)`,
-  unfiltered.map((t) => t.id).join(",") === mockUpcomingTrips.map((t) => t.id).join(","),
-);
-/**
- * ⛔⛔ **Composition is intersection, and it is swept over every PAIR.** Seven
- * filters compose 21 ways, and a `reduce` that dropped all but the last value
- * would still look plausible on screen — the list narrows, just by the wrong
- * rule. Each pair is compared against the intersection of the two applied
- * alone, with a denominator.
- */
-let pairsSwept = 0;
-const pairDisagreements: string[] = [];
-for (let i = 0; i < RIDE_FILTERS.length; i++) {
-  for (let j = i + 1; j < RIDE_FILTERS.length; j++) {
-    const a = RIDE_FILTERS[i];
-    const b = RIDE_FILTERS[j];
-    const va = realValue(a.key);
-    const vb = realValue(b.key);
-    const both = applyRideFilters(mockUpcomingTrips, { [a.key]: va, [b.key]: vb });
-    const onlyA = applyRideFilters(mockUpcomingTrips, { [a.key]: va });
-    const onlyB = applyRideFilters(mockUpcomingTrips, { [b.key]: vb });
-    const wanted = onlyA.filter((t) => onlyB.some((x) => x.id === t.id));
-    pairsSwept += 1;
-    if (both.map((t) => t.id).join(",") !== wanted.map((t) => t.id).join(","))
-      pairDisagreements.push(`${a.key}+${b.key}`);
-  }
-}
-check(
-  "two filters applied together are the intersection of the two applied alone",
-  `${pairDisagreements.length} wrong of ${pairsSwept} pair(s)` +
-    (pairDisagreements.length ? ` — ${pairDisagreements.slice(0, 4).join(", ")}` : ""),
-  pairDisagreements.length === 0 &&
-    pairsSwept === (RIDE_FILTERS.length * (RIDE_FILTERS.length - 1)) / 2,
-);
-/**
- * ⛔ ...and at least one of those pairs really narrowed, or the intersection
- * above was proven on twenty-one copies of the whole manifest.
- */
-const narrowingPairs = (() => {
-  let n = 0;
-  for (let i = 0; i < RIDE_FILTERS.length; i++)
-    for (let j = i + 1; j < RIDE_FILTERS.length; j++) {
-      const a = RIDE_FILTERS[i];
-      const b = RIDE_FILTERS[j];
-      const both = applyRideFilters(mockUpcomingTrips, {
-        [a.key]: realValue(a.key),
-        [b.key]: realValue(b.key),
-      });
-      if (both.length < mockUpcomingTrips.length) n += 1;
-    }
-  return n;
-})();
-check(
-  "...and those pairs really narrow the manifest, so the comparison is not vacuous",
-  `${narrowingPairs} of ${pairsSwept} pair(s) returned fewer than ${mockUpcomingTrips.length} rides`,
-  narrowingPairs === pairsSwept,
-);
-/** ⛔ Every survivor of a filter satisfies it — swept over every value. */
-let survivorsSwept = 0;
-const survivorFailures: string[] = [];
-for (const f of RIDE_FILTERS) {
-  for (const option of f.options(mockUpcomingTrips)) {
-    const kept = applyRideFilters(mockUpcomingTrips, { [f.key]: option.value });
-    survivorsSwept += 1;
-    if (!kept.every((t) => f.matches(t, option.value)))
-      survivorFailures.push(`${f.key}=${option.value}`);
-    if (kept.length > mockUpcomingTrips.length) survivorFailures.push(`${f.key} grew the pool`);
-  }
-}
-check(
-  "every ride a filter keeps satisfies that filter, over every value it offers",
-  `${survivorFailures.length} wrong of ${survivorsSwept} value(s)`,
-  survivorFailures.length === 0 && survivorsSwept > RIDE_FILTERS.length,
-);
-
-/* --- 32d. Filters narrow each other -------------------------------------- */
-/**
- * ⛔⛔ **The counts beside each option are computed against the OTHER filters,
- * never against the whole pool.** Production's contract is explicit: *"options
- * such as pickup day and pickup county only offer what is still possible under
- * the filters you have already applied"*, and *"if you set the pickup county to
- * County A and County B does not appear under drop-off, that means no trip that
- * day runs from A to B"*. Counting against the whole pool renders the same
- * sheet with numbers that promise rides the Update button cannot deliver.
+ * ⛔⛔ **SUPERSEDES the seven-filter registry this section used to check
+ * (D162, 2026-10-17).** The old §32 swept `RIDE_FILTERS` over narrowing,
+ * chip-row membership, pick-up-time bands, range bounds and a draft-commit
+ * sheet — roughly 600 lines of checks for 1,250 lines of feature. The approved
+ * solution is a toggle instead, so the feature and its checks retire together.
  *
- * ⚠️ Swept over every (filter, other-filter, value) triple, each count compared
- * against actually applying both.
- */
-let countSwept = 0;
-const countWrong: string[] = [];
-for (const outer of RIDE_FILTERS) {
-  const context: RideFilterValues = { [outer.key]: realValue(outer.key) };
-  for (const inner of RIDE_FILTERS) {
-    if (inner.key === outer.key) continue;
-    for (const choice of narrowedOptions(inner.key, mockUpcomingTrips, context)) {
-      countSwept += 1;
-      const real = applyRideFilters(mockUpcomingTrips, {
-        ...context,
-        [inner.key]: choice.value,
-      }).length;
-      if (choice.count !== real)
-        countWrong.push(`${outer.key}→${inner.key}=${choice.value}: ${choice.count}≠${real}`);
-    }
-  }
-}
-check(
-  "each option's count is what selecting it would actually leave",
-  `${countWrong.length} wrong of ${countSwept} option(s)` +
-    (countWrong.length ? ` — ${countWrong.slice(0, 3).join("; ")}` : ""),
-  countWrong.length === 0 && countSwept > 50,
-);
-/**
- * ⛔⛔ **A value with nothing behind it is ABSENT, not greyed** — and the pair
- * the contract names is the one tested. Every seeded Lee County pick-up ends in
- * Lee County, so with the pick-up set to Lee the drop-off filter must offer Lee
- * and nothing else. The control is the same list with no pick-up set, which
- * offers four.
- */
-const dropoffsUnfiltered = narrowedOptions("dropoffLocation", mockUpcomingTrips, NO_RIDE_FILTERS);
-const dropoffsFromLee = narrowedOptions("dropoffLocation", mockUpcomingTrips, {
-  pickupLocation: "Lee County",
-});
-check(
-  "a drop-off no trip reaches from here is absent from the sheet, not greyed",
-  `from Lee County: ${dropoffsFromLee.map((o) => o.label).join(", ")} ` +
-    `(unfiltered: ${dropoffsUnfiltered.map((o) => o.label).join(", ")})`,
-  dropoffsFromLee.map((o) => o.label).join(",") === "Lee County" &&
-    // ⛔ ...and the control really was wider, or the narrowing proved nothing.
-    dropoffsUnfiltered.length > dropoffsFromLee.length &&
-    dropoffsUnfiltered.every((o) => o.count > 0),
-);
-/**
- * ⛔ Two values survive a zero count on purpose, and only two: the filter's own
- * default (or there is no way back to "all") and the value currently SET (or
- * the sheet omits a control the chip row is still showing). Swept.
- */
-let zeroSwept = 0;
-const zeroWrong: string[] = [];
-for (const f of RIDE_FILTERS) {
-  // ⛔ Only a `list` narrows — everything rendered in full keeps every option.
-  if (f.control !== "list") continue;
-  const context: RideFilterValues = { rider: "ROSALIND ACHTERBERG" };
-  for (const choice of narrowedOptions(f.key, mockUpcomingTrips, context)) {
-    zeroSwept += 1;
-    if (choice.count === 0 && choice.value !== f.defaultValue && choice.value !== context[f.key])
-      zeroWrong.push(`${f.key}=${choice.value}`);
-  }
-}
-check(
-  "...and in a seeded list a zero-count option survives only as the default or the current value",
-  `${zeroWrong.length} stray zero(s) of ${zeroSwept} option(s)` +
-    (zeroWrong.length ? ` — ${zeroWrong.slice(0, 3).join(", ")}` : ""),
-  zeroWrong.length === 0 && zeroSwept > RIDE_FILTERS.length,
-);
-/**
- * ⛔⛔ **...while a `chips` control keeps every option, however narrow the
- * pool.** Production renders all five pick-up time chips whether or not a trip
- * falls in them (`CAP-053`); a fixed vocabulary that reflowed from five chips
- * to four as another filter moved reads as a missing feature. Walked at :3028
- * and found exactly that — `Evening` vanished because the focused manifest has
- * no evening ride.
+ * ⛔ **Retiring checks is where a suite quietly stops testing.** The guard
+ * against that is §31h's last check: the four files must be ABSENT from the
+ * tree. If the registry ever comes back, that check fails and this section's
+ * disappearance becomes visible rather than silent.
  *
- * ⚠️ Driven against a context that really does empty some of them, with a
- * control proving at least one option is at zero and still rendered.
+ * What survives is the part that was never about the registry — the gate, the
+ * fall-back and the ordering — restated against a boolean.
  */
-const narrowContext: RideFilterValues = { pickupLocation: "Lee County" };
-const chipFilters = RIDE_FILTERS.filter((f) => f.control !== "list");
-const shrunkChipSets = chipFilters.filter(
-  (f) =>
-    narrowedOptions(f.key, mockUpcomingTrips, narrowContext).length !==
-    f.options(mockUpcomingTrips).length,
-);
-const zeroesKept = chipFilters.flatMap((f) =>
-  narrowedOptions(f.key, mockUpcomingTrips, narrowContext).filter((o) => o.count === 0),
-);
+console.log("\n32. My Rides — the Show cancelled trips toggle");
+
+/* --- 32a. The default, declared ------------------------------------------ */
+/**
+ * ⛔⛔ **Declared here as a literal, never read off the thing it checks.** The
+ * obvious check asserts the component initialises to `SHOW_CANCELLED_DEFAULT`,
+ * which passes whatever that constant says — including `false`. The driver's
+ * instruction was *default on*, so `true` is the claim and it is written here.
+ */
+const EXPECTED_SHOW_CANCELLED_DEFAULT = true;
 check(
-  "a fixed set of chips keeps every option, even the ones at zero",
-  `${shrunkChipSets.length} of ${chipFilters.length} chip set(s) shrank; ` +
-    `${zeroesKept.length} zero(s) still offered: ${zeroesKept.map((o) => o.label).join(", ") || "none"}`,
-  shrunkChipSets.length === 0 &&
-    chipFilters.length > 0 &&
-    // ⛔ ...and some really are at zero, or "kept every option" was free.
-    zeroesKept.length > 0,
+  "the toggle defaults to ON — the driver sees cancellations unless they say not to",
+  `SHOW_CANCELLED_DEFAULT = ${SHOW_CANCELLED_DEFAULT}, expected ${EXPECTED_SHOW_CANCELLED_DEFAULT}`,
+  SHOW_CANCELLED_DEFAULT === EXPECTED_SHOW_CANCELLED_DEFAULT,
+);
+/** ⛔ ...and the page starts there, rather than at a literal of its own. */
+check(
+  "...and the page's initial state is that constant, not a second copy of it",
+  `useState(SHOW_CANCELLED_DEFAULT) ${/useState\(SHOW_CANCELLED_DEFAULT\)/.test(PAGE_CODE)}`,
+  /useState\(SHOW_CANCELLED_DEFAULT\)/.test(PAGE_CODE) &&
+    !/useState\(true\)/.test(PAGE_CODE),
 );
 
-/* --- 32e. The pick-up time bands ----------------------------------------- */
+/* --- 32b. Off removes the cancellations, and nothing else ---------------- */
 /**
- * ⛔⛔ **Production shows five chips and never says what they mean**, so the
- * boundaries are declared rather than guessed at in a renderer. The three
- * disjoint ones must partition the day exactly; `Before noon` and `Morning`
- * overlap on purpose, because production lists both.
+ * ⛔⛔ **Two assertions, because a count alone cannot tell "hid the right
+ * rides" from "hid some rides".** A toggle that dropped one extra ride, or that
+ * emptied the list entirely, would still shrink it — and shrinking is all a
+ * length check sees. So: the survivors are exactly the non-cancelled ones, BY
+ * ID, and the cancelled ones are exactly what left.
  */
-const bandRange = (label: string) => {
-  const band = PICKUP_TIME_BANDS.find((b) => b.label === label)!;
-  return `${band.from}-${band.to}`;
-};
-const disjointBands = ["Before noon", "Afternoon", "Evening"];
-const bandCounts = disjointBands.map(
-  (label) => applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange(label) }).length,
+const TOGGLE_FOCUS = FIXED("my-rides-cancelled");
+const shownOn = visibleUpcoming(mockUpcomingTrips, TOGGLE_FOCUS, true);
+const shownOff = visibleUpcoming(mockUpcomingTrips, TOGGLE_FOCUS, false);
+const expectedOff = mockUpcomingTrips.filter((t) => !isClientCancelled(t)).map((t) => t.id);
+const removed = shownOn.filter((t) => !shownOff.some((o) => o.id === t.id)).map((t) => t.id);
+const expectedRemoved = mockUpcomingTrips.filter(isClientCancelled).map((t) => t.id);
+check(
+  "turning it off leaves exactly the rides that are still on",
+  `${shownOff.length} of ${shownOn.length} survive; ids match ${shownOff.map((t) => t.id).join(",") === expectedOff.join(",")}`,
+  shownOff.map((t) => t.id).join(",") === expectedOff.join(","),
 );
 check(
-  "the three disjoint pick-up bands partition the manifest",
-  `before noon ${bandCounts[0]} + afternoon ${bandCounts[1]} + evening ${bandCounts[2]} ` +
-    `= ${bandCounts.reduce((a, b) => a + b, 0)} of ${mockUpcomingTrips.length}`,
-  bandCounts.reduce((a, b) => a + b, 0) === mockUpcomingTrips.length &&
-    bandCounts.every((n) => n > 0),
+  "...and what it removed is exactly the cancellations, no more",
+  `removed ${removed.length}: ${removed.join(",") || "none"}; expected ${expectedRemoved.join(",")}`,
+  // ⛔ A non-vacuity guard. With no cancelled ride seeded, both sides are empty
+  // and this check would pass while proving nothing.
+  expectedRemoved.length > 0 && removed.join(",") === expectedRemoved.join(","),
 );
 check(
-  "...and Morning sits inside Before noon, which is production's own overlap",
-  `morning ${applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange("Morning") }).length} ⊆ ` +
-    `before noon ${bandCounts[0]}; bands declared ${PICKUP_TIME_BANDS.length}`,
-  PICKUP_TIME_BANDS.length === 5 &&
-    bandRange("All day") === ALL_DAY_RANGE &&
-    applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange("Morning") }).every((t) =>
-      applyRideFilters(mockUpcomingTrips, { pickupTime: bandRange("Before noon") }).some(
-        (x) => x.id === t.id,
-      ),
-    ),
-);
-/**
- * ⛔⛔ **A ride with no readable clock is in NO band but All day.** The parser
- * returns `-1` for a will-call leg, which is smaller than midnight — so a band
- * test written as `minutes <= band.to` files every one of them under
- * `Before noon`. Driven over a synthetic ride rather than the seed, because the
- * seed happens to have none and the check would otherwise be vacuous.
- */
-const clocklessRide = {
-  ...mockUpcomingTrips[0],
-  id: "clockless",
-  legs: [{ ...mockUpcomingTrips[0].legs[0], time: "Wait For Call" }],
-} as Trip;
-const bandsHit = PICKUP_TIME_BANDS.filter((b) =>
-  rideFilter("pickupTime").matches(clocklessRide, `${b.from}-${b.to}`),
-).map((b) => b.label);
-check(
-  "a ride with no readable pick-up clock falls in no band but All day",
-  `bands matched: ${bandsHit.join(", ") || "none"}`,
-  bandsHit.join(",") === "All day",
-);
-/**
- * ⛔ ...and the reason it does is that NO BAND STARTS BEFORE MIDNIGHT, which
- * is the only thing standing between the `-1` sentinel and `Before noon`.
- * Asserted separately because the check above passes for the right reason only
- * while this one holds.
- */
-const badFloors = PICKUP_TIME_BANDS.filter((b) => b.from < 0 || b.to < b.from);
-check(
-  "...because no band starts before midnight, which is what excludes the sentinel",
-  `${badFloors.length} bad of ${PICKUP_TIME_BANDS.length} band(s): ` +
-    PICKUP_TIME_BANDS.map((b) => `${b.label} ${b.from}-${b.to}`).join(", "),
-  badFloors.length === 0,
+  "...and turning it on hides nothing at all",
+  `${shownOn.length} shown of ${mockUpcomingTrips.length} seeded`,
+  shownOn.length === mockUpcomingTrips.length,
 );
 
-/* --- 32e-bis. Start and End are two doors onto one value ----------------- */
+/* --- 32c. The gate, and the fall-back ------------------------------------ */
 /**
- * ⛔⛔ **One key holds the whole PICKUP TIME RANGE block** — `Start`, `End` and
- * the five presets all write it (`CAP-053`). Three keys would let them
- * disagree, and the sheet would show a lit `Morning` over an `End` of 4 PM.
- * Proven by reaching a preset's exact value through the two ends and getting
- * the preset's own label back.
+ * ⛔⛔ **Two separate assertions, so a missing control and a missing strip
+ * cannot alias.** A build that forgot the Now-strip but also forgot the toggle
+ * would show an empty-looking diff on a single combined check.
  */
-const viaEnds = withRangeBound(
-  withRangeBound(ALL_DAY_RANGE, "from", 300),
-  "to",
-  719,
+const NOW_FOCUS = { solutionId: "my-rides-cancelled", mode: "now" as const };
+check(
+  "in Now the toggle is not offered — production has no such control",
+  `showsCancelledToggle(now) = ${showsCancelledToggle(NOW_FOCUS)}`,
+  showsCancelledToggle(NOW_FOCUS) === false,
 );
 check(
-  "a range set through Start and End is the same value a preset writes",
-  `ends → "${viaEnds}" (${rideFilter("pickupTime").chipLabel(viaEnds)}); ` +
-    `preset → "${bandRange("Morning")}"`,
-  viaEnds === bandRange("Morning") &&
-    rideFilter("pickupTime").chipLabel(viaEnds) === "Morning",
+  "...and in Now the cancellations are stripped from the list regardless",
+  `${visibleUpcoming(mockUpcomingTrips, NOW_FOCUS, true).filter(isClientCancelled).length} cancelled visible`,
+  visibleUpcoming(mockUpcomingTrips, NOW_FOCUS, true).filter(isClientCancelled).length === 0 &&
+    visibleUpcoming(mockUpcomingTrips, NOW_FOCUS, false).filter(isClientCancelled).length === 0,
 );
 /**
- * ⛔ ...and a range that is NOT a preset reads as its own times, never as the
- * preset it happens to sit inside. A label naming a band the ends contradict
- * is worse than no label.
+ * ⭐ **It falls back rather than refusing.** A driver who turned the toggle off
+ * and then flipped to Now must land on the full list, not an empty one — the
+ * same "strip, never refuse" shape the filter had, and row 10's lesson.
  */
-const oddRange = withRangeBound(withRangeBound(ALL_DAY_RANGE, "from", 420), "to", 660);
 check(
-  "...and a range no preset names reads as its own times",
-  `"${oddRange}" → ${rideFilter("pickupTime").chipLabel(oddRange)}`,
-  rideFilter("pickupTime").chipLabel(oddRange) === "7:00 AM – 11:00 AM" &&
-    // ⛔ ...and it really does sit inside Morning, so the check is not trivially
-    // true for a range that is simply out of every band.
-    rideFilter("pickupTime").matches(
-      { ...mockUpcomingTrips[0], legs: [{ ...mockUpcomingTrips[0].legs[0], time: "8:00 AM" }] } as Trip,
-      bandRange("Morning"),
-    ),
-);
-/** ⛔ Returning an end to `Any` returns it to the edge of the day, not to 0:00. */
-check(
-  "returning an end to Any widens it to the edge of the day",
-  `from-Any "${withRangeBound(bandRange("Morning"), "from", null)}", ` +
-    `to-Any "${withRangeBound(bandRange("Morning"), "to", null)}"`,
-  withRangeBound(bandRange("Morning"), "from", null) === `0-719` &&
-    withRangeBound(bandRange("Morning"), "to", null) === `300-1439` &&
-    withRangeBound(withRangeBound(bandRange("Morning"), "from", null), "to", null) ===
-      ALL_DAY_RANGE,
-);
-/**
- * ⛔⛔ **When the ends cross, the one the driver did NOT just touch moves.**
- * Setting `End` to 1:00 AM under a `Start` of 5:00 PM is a driver saying
- * "nothing after 1 AM", not a typo to reject — so the START widens and the end
- * they chose is kept. Refusing, silently keeping the old end, or storing a
- * backwards range no `matches` can satisfy are the three wrong answers.
- *
- * ⚠️ The result here really is a range no ride falls in, and that is a TRUE
- * answer the filtered-empty state explains. The check asserts the range stays
- * VALID and keeps the driver's own end — not that it still finds rides.
- */
-const rf32Crossed = withRangeBound(bandRange("Evening"), "to", 60);
-check(
-  "an end set before the start moves the other end, keeping the one just chosen",
-  `evening + end 1:00 AM → "${rf32Crossed}" ` +
-    `(${applyRideFilters(mockUpcomingTrips, { pickupTime: rf32Crossed }).length} ride(s), legitimately none)`,
-  rangeBounds(rf32Crossed).from <= rangeBounds(rf32Crossed).to &&
-    rangeBounds(rf32Crossed).to === 60 &&
-    rangeBounds(rf32Crossed).from === 0 &&
-    // ⛔ ...and the mirror case moves the END, not the start.
-    withRangeBound(bandRange("Before noon"), "from", 1020) === "1020-1439",
-);
-/** ⛔ Every time `Start`/`End` offers is a real clock, and `Any` leads. */
-const rangeChoices = narrowedRangeOptions("pickupTime", "from", mockUpcomingTrips, NO_RIDE_FILTERS);
-check(
-  "Start and End offer the hours of the day, led by Any",
-  `${rangeChoices.length} row(s): ${rangeChoices[0]?.label}, ${rangeChoices[1]?.label} … ${rangeChoices[rangeChoices.length - 1]?.label}`,
-  rangeChoices.length === TIME_CHOICES.length + 1 &&
-    rangeChoices[0].label === "Any" &&
-    rangeChoices[1].label === "12:00 AM" &&
-    rangeChoices[0].count === mockUpcomingTrips.length &&
-    // ⛔ ...and the counts are real: a later start keeps fewer rides.
-    rangeChoices[rangeChoices.length - 1].count < rangeChoices[1].count,
+  "an `off` that survives a mode flip falls back to the default, not to nothing",
+  `applicableShowCancelled(false, now) = ${applicableShowCancelled(false, NOW_FOCUS)}`,
+  applicableShowCancelled(false, NOW_FOCUS) === SHOW_CANCELLED_DEFAULT &&
+    applicableShowCancelled(false, TOGGLE_FOCUS) === false &&
+    applicableShowCancelled(true, TOGGLE_FOCUS) === true,
 );
 
+/* --- 32d. Order holds with cancellations interleaved --------------------- */
 /**
- * ⛔⛔ **Every option a rendered-in-full control offers must NAME ITSELF.**
- *
- * The lit chip IS one of the options, so `chipLabel(option.value)` has to come
- * back as `option.label` — otherwise tapping `Morning` sets a range the label
- * function does not recognise, the chip reads `5:00 AM – 12:00 PM`, and nothing
- * lights. A break test is what found this: shifting the presets' values by one
- * minute left the whole gate green, because the checks above read
- * `PICKUP_TIME_BANDS` directly and never the options the sheet actually
- * renders. **The band literals and the filter's own options are two different
- * things, and only one of them reaches the screen.**
- *
- * ⚠️ `list` filters are exempt by design: their chip shortens the value
- * (`"Fri, Aug 1, 2026"` → `"Fri, Aug 1"`) because a chip row is not a sheet.
+ * ⛔⛔ **A known sequence, not merely "sorted".** Asserting that the list is in
+ * ascending order passes on a list with the cancellations dropped, on a list
+ * with one ride, and on an empty one. The claim is that cancelled rides sit in
+ * their own pick-up position among the rides that are still on — so the check
+ * names the positions.
  */
-let selfNaming = 0;
-const rf32Misnamed: string[] = [];
-for (const def of RIDE_FILTERS) {
-  if (def.control === "list") continue;
-  for (const option of def.options(mockUpcomingTrips)) {
-    selfNaming += 1;
-    if (def.chipLabel(option.value) !== option.label)
-      rf32Misnamed.push(`${def.key}=${option.value}: "${def.chipLabel(option.value)}" ≠ "${option.label}"`);
-  }
-}
+const ordered = sortByRideDate(shownOn);
+const cancelledPositions = ordered
+  .map((t, i) => (isClientCancelled(t) ? i : -1))
+  .filter((i) => i >= 0);
+const interleaved =
+  cancelledPositions.length > 0 &&
+  cancelledPositions.some((i) => i > 0 && i < ordered.length - 1) &&
+  // ⛔ ...and they are NOT all adjacent, which is what a list that appended
+  // them to the end or pushed them to the front would look like.
+  cancelledPositions.some((i, n) => n > 0 && i - cancelledPositions[n - 1] > 1);
 check(
-  "every option a chip row renders names itself when it is the one selected",
-  `${rf32Misnamed.length} wrong of ${selfNaming} option(s)` +
-    (rf32Misnamed.length ? ` — ${rf32Misnamed.slice(0, 3).join("; ")}` : ""),
-  rf32Misnamed.length === 0 && selfNaming > RIDE_FILTERS.length,
+  "cancelled rides sit in their own pick-up position, not bunched at either end",
+  `positions ${cancelledPositions.join(",")} of 0..${ordered.length - 1}`,
+  interleaved,
+);
+/** ⛔ ...and the order is the SAME one the tab uses with the toggle off. */
+const orderedOff = sortByRideDate(shownOff).map((t) => t.id);
+const orderedOnMinusCancelled = ordered.filter((t) => !isClientCancelled(t)).map((t) => t.id);
+check(
+  "...and hiding them does not reorder what is left",
+  `${orderedOff.join(",") === orderedOnMinusCancelled.join(",") ? "identical" : "REORDERED"}`,
+  orderedOff.join(",") === orderedOnMinusCancelled.join(","),
 );
 
-/* --- 32e-ter. Chips, radio and toggle ------------------------------------ */
-/**
- * ⛔⛔ **A chips filter with no "all" option is a TOGGLE set.** `CAP-051` shows
- * `CLIENT` as a bare `Verida` pill with nothing beside it, so the only way back
- * to every client is to tap the lit chip again. A filter that HAS such an
- * option — `status` with `All`, `pickupTime` with `All day` — is a radio set,
- * and re-tapping must do nothing or the one control meaning "everything"
- * becomes a way to lose your selection.
- *
- * ⚠️ Derived from the registry rather than declared beside it, and swept: the
- * rule is "the default is not among the options", not a flag someone maintains.
- */
-const retapRows = RIDE_FILTERS.map(
-  (f) => `${f.key}:${clearsOnRetap(f.key) ? "toggle" : "radio"}`,
-);
-check(
-  "a chips filter clears on re-tap only where it has no 'all' option",
-  retapRows.join(" "),
-  clearsOnRetap("client") &&
-    !clearsOnRetap("status") &&
-    !clearsOnRetap("pickupTime") &&
-    // ⛔ No `list` filter ever toggles — its sub-sheet has an `Any` row.
-    RIDE_FILTERS.filter((f) => f.control === "list").every((f) => !clearsOnRetap(f.key)),
-);
-/** ⛔ ...and `client` really is rendered in full, not behind an `Edit ›`. */
-check(
-  "...and Client is pills, because a driver has one or two of them",
-  `client control ${rideFilter("client").control}, ` +
-    `${rideFilter("client").options(mockUpcomingTrips).length} option(s); ` +
-    `no 'all' option ${!rideFilter("client").options(mockUpcomingTrips).some((o) => o.value === "")}`,
-  rideFilter("client").control === "chips" &&
-    !rideFilter("client").options(mockUpcomingTrips).some((o) => o.value === ""),
-);
-
-/* --- 32f. One gate, for the whole feature -------------------------------- */
-/**
- * ⛔⛔ **Production's My Rides has no filter at all**, so in `"now"` every
- * value has to strip — not just the status one. The obvious build gates the
- * status filter, which it inherited from row 19, and leaves a manifest narrowed
- * to one rider by state with no control to clear it. That is row 10's defect,
- * written in the new feature's vocabulary.
- *
- * ⚠️ Driven with ALL SEVEN set, over every focus and both modes, with a
- * denominator.
- */
-const everythingSet: RideFilterValues = Object.fromEntries(
-  RIDE_FILTERS.map((f) => [f.key, realValue(f.key)]),
-);
-let rf32GateSwept = 0;
-const rf32GateWrong: string[] = [];
-for (const id of FOCUS_IDS) {
-  for (const mode of DEMO_MODES) {
-    const focus = demoFocus(id, mode);
-    const offered = showsRidesFilter(focus);
-    const applied = applicableRideFilters(everythingSet, focus);
-    rf32GateSwept += 1;
-    const kept = setFilterKeys(applied).length;
-    if (offered ? kept !== RIDE_FILTERS.length : kept !== 0)
-      rf32GateWrong.push(`${id ?? "no focus"}/${mode}: ${kept} kept, offered ${offered}`);
-  }
-}
-check(
-  "where the filter is not offered, every value strips — not only the status one",
-  `${rf32GateWrong.length} wrong of ${rf32GateSwept} focus/mode pair(s)` +
-    (rf32GateWrong.length ? ` — ${rf32GateWrong.slice(0, 3).join("; ")}` : ""),
-  rf32GateWrong.length === 0 && rf32GateSwept === FOCUS_IDS.length * DEMO_MODES.length,
-);
-/**
- * ⛔⛔ **One gate, two callers, proven never to diverge.** `applicableRideFilters`
- * and row 19's own `applicableRidesFilter` both decide whether a selection
- * survives, and a second predicate that happened to agree today is exactly the
- * shape a hidden filter ships in. Compared at every focus, in both modes.
- */
-let rf32AgreeSwept = 0;
-const rf32GateDisagreements: string[] = [];
-for (const id of FOCUS_IDS) {
-  for (const mode of DEMO_MODES) {
-    const focus = demoFocus(id, mode);
-    const viaFeature =
-      applicableRideFilters({ status: "cancelled" }, focus).status ?? DEFAULT_RIDES_FILTER;
-    const viaRow18 = applicableRidesFilter("cancelled", focus);
-    rf32AgreeSwept += 1;
-    if (viaFeature !== viaRow18)
-      rf32GateDisagreements.push(`${id ?? "no focus"}/${mode}: ${viaFeature} vs ${viaRow18}`);
-  }
-}
-check(
-  "...and the feature's gate and row 19's never give different answers",
-  `${rf32GateDisagreements.length} disagreement(s) of ${rf32AgreeSwept} pair(s)` +
-    (rf32GateDisagreements.length ? ` — ${rf32GateDisagreements.slice(0, 3).join("; ")}` : ""),
-  rf32GateDisagreements.length === 0 &&
-    rf32AgreeSwept === FOCUS_IDS.length * DEMO_MODES.length &&
-    // ⛔ ...and both outcomes really occur, or the two agreed on a constant.
-    FOCUS_IDS.some((id) => showsRidesFilter(demoFocus(id, "fixed"))) &&
-    FOCUS_IDS.some((id) => !showsRidesFilter(demoFocus(id, "fixed"))),
-);
-
-/* === 33. Every in-app form says which trip it is about =================== */
 /**
  * ⛔⛔ **A 950-check gate could not see this, and a walk found it.** Update Trip
  * Details rendered with no Trip details and no Current leg details — a form
