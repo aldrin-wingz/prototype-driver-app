@@ -243,6 +243,28 @@ export type NoShowFormGap = "not_at_pickup" | "no_location_data";
  */
 export type NoShowTimerReason = "presence" | "post-pickup";
 
+/**
+ * Is the refusal dialog's own Submit enabled?
+ *
+ * ⭐ Declared here, not inline in the dialog, because it is a correctness rule:
+ * it is the only thing standing between a driver and skipping the ten-minute
+ * wait. A rule written inline in JSX is a rule no check can reach.
+ *
+ * The gate is **a wait that is still running**, not "the outcome is a timer".
+ * Those differ in the case that matters: a driver who LEAVES the pick-up while
+ * the dialog is open stops having a wait to serve at all — their live outcome
+ * becomes `form` — so the Submit opens for them immediately and the tap takes
+ * them to the support form. Gating on `kind === "timer"` alone would strand
+ * them behind a countdown for a wait that no longer applies to them.
+ *
+ * ⛔ Takes the LIVE outcome, recomputed against the running clock — never the
+ * one frozen into the dialog at submit time. A gate read off a frozen number
+ * never opens.
+ */
+export function refusalSubmitEnabled(live: NoShowOutcome): boolean {
+  return !(live.kind === "timer" && live.minutesRemaining > 0);
+}
+
 export type NoShowOutcome =
   /**
    * `presenceWaitWaived` is how a caller tells the two ways of getting here

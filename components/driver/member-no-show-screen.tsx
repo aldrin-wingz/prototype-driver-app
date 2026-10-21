@@ -34,6 +34,7 @@ import {
   leaveWarningBody,
   noShowFormFor,
   refusalDismissLabel,
+  refusalSubmitEnabled,
   resolveNoShow,
   treatmentFor,
   waivesPresenceWait,
@@ -109,12 +110,17 @@ export function MemberNoShowScreen({
     swipeLegs.find((leg) => getLegStage(leg) !== "completed") ?? swipeLegs[0];
 
   /**
-   * The clock still runs here, because the Submit-time refusal is a real backstop
-   * for direct-URL entry and its remaining time has to be current.
+   * The clock runs here because this is where the refusal lives.
    *
-   * ⚠️ It no longer drives anything on the button. Every refusal fires on the
-   * More Options tile now, so a driver who reaches this screen is one whose
-   * no-show will succeed — the countdown belongs where the refusal is.
+   * ⛔ **Corrected 2026-10-21 (D176).** This used to read "every refusal fires on
+   * the More Options tile now, so a driver who reaches this screen is one whose
+   * no-show will succeed". That was already false: the tile's countdown pill and
+   * refusal dialog were SCRAPPED — see `more-options-screen.tsx`, "claiming
+   * knowledge the app does not have until the driver submits" — so Submit on THIS
+   * screen is the only place a guardrail refusal appears.
+   *
+   * ⚠️ The remaining time now drives a control, not just a sentence: the refusal
+   * dialog carries its own Submit, disabled until the wait is served.
    */
   const treatment = treatmentFor(trip, demo);
   /** The captured form contract for whatever is selected right now. */
@@ -211,6 +217,15 @@ export function MemberNoShowScreen({
       return;
     }
 
+    fileNoShow(outcome);
+  }
+
+  /**
+   * Filing, extracted 2026-10-21 (D176) so the refusal dialog's own Submit can
+   * reach it. ⛔ Nothing about the filing changed — it is the same toast and the
+   * same navigation; only the number of callers did.
+   */
+  function fileNoShow(filed: Extract<NoShowOutcome, { kind: "files" }>) {
     // Every condition met, so production files it and there is nothing to ask.
     // ⚠️ No support request is created on this path, on purpose: the app action
     // IS the submission, and inventing a queue record would misrepresent what
@@ -220,11 +235,39 @@ export function MemberNoShowScreen({
       // ⚠️ Two ways to reach `files` now, and they must not claim the same
       // thing. The waived path never observed ten minutes and does not pretend
       // to — it says what it DID see, and what stood in for the rest.
-      description: outcome.presenceWaitWaived
-        ? `${noShowType} — ${extraValue.trim()} refused at the door, so the 10-minute wait does not apply. We had you at the pick-up for ${Math.floor(outcome.qualifyingMinutes)} minutes. Not wired further in the prototype.`
-        : `We had you at the pick-up for ${Math.floor(outcome.qualifyingMinutes)} minutes. Not wired further in the prototype — this is the production action.`,
+      description: filed.presenceWaitWaived
+        ? `${noShowType} — ${extraValue.trim()} refused at the door, so the 10-minute wait does not apply. We had you at the pick-up for ${Math.floor(filed.qualifyingMinutes)} minutes. Not wired further in the prototype.`
+        : `We had you at the pick-up for ${Math.floor(filed.qualifyingMinutes)} minutes. Not wired further in the prototype — this is the production action.`,
     });
     router.push(backHref);
+  }
+
+  /**
+   * The driver tapped Submit INSIDE the refusal, with the wait served.
+   *
+   * ⛔⛔ It re-runs the guardrail rather than trusting the dialog. The dialog was
+   * opened against a clock that has since moved, and the driver may have walked
+   * off while it was open — so what unlocks is the right to be re-checked, never
+   * the right to file. `live` is the authority; `refusal` is only what was on
+   * screen.
+   */
+  function handleRefusalSubmit() {
+    if (live.kind === "files") {
+      setRefusal(null);
+      fileNoShow(live);
+      return;
+    }
+    if (live.kind === "form") {
+      // They left while the dialog was open. Same destination the away path
+      // would have given them at Submit — the wait stopped applying to them.
+      setRefusal(null);
+      setFormOpen(true);
+      return;
+    }
+    // Anything else (a wait that somehow still runs, `confirm-first`,
+    // `dead-end`): show the driver the current refusal rather than the stale
+    // one, and never silently do nothing.
+    setRefusal(live);
   }
 
   /** What the refusal dialog says — production's wording, or the revised copy. */
@@ -238,6 +281,18 @@ export function MemberNoShowScreen({
    * production does not — that dead end is precisely what the proposals fix.
    */
   const refusalOffersForm = refusal?.kind === "form" && treatment.offerForm;
+  /**
+   * ⛔ The LIVE outcome, against the running clock — `outcome`, never `refusal`.
+   *
+   * `refusal` is a snapshot taken at Submit and it never moves again. Reading the
+   * countdown off it is the bug that made the dialog sit at "6:10 to go" forever,
+   * and a Submit gated on that number would never have unlocked.
+   */
+  const live = outcome;
+  /** Only a timer refusal gets the gated Submit; a `form` refusal already has its own. */
+  const refusalIsTimer = refusal?.kind === "timer";
+  /** Zero once the wait is served, and zero too for a driver who has since left. */
+  const liveMinutesRemaining = live.kind === "timer" ? live.minutesRemaining : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -358,22 +413,58 @@ export function MemberNoShowScreen({
                 does. "Wait at least 10 minutes" with no idea how many are left is
                 the difference between a rule and an instruction, and it is gated
                 on the treatment so the as-is rows stay honest. */}
-            {refusal?.kind === "timer" && treatment.showTimer && (
+            {refusalIsTimer && treatment.showTimer && (
               <p className="pt-1 text-base font-bold text-gray-900">
-                {refusal.minutesRemaining > COUNTDOWN_MAX_MINUTES
-                  ? `About ${formatLongWait(refusal.minutesRemaining)} to go — stay at the pick-up and it will unlock.`
-                  : `${formatCountdown(refusal.minutesRemaining)} to go — stay at the pick-up and it will unlock.`}
+                {liveMinutesRemaining > COUNTDOWN_MAX_MINUTES
+                  ? `About ${formatLongWait(liveMinutesRemaining)} to go — stay at the pick-up and it will unlock.`
+                  : `${formatCountdown(liveMinutesRemaining)} to go — stay at the pick-up and it will unlock.`}
               </p>
             )}
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+            {/* ⭐ The refusal's own Submit — added 2026-10-21 (D176, story 10435).
+
+                Before this, a driver who waited out the countdown had to close
+                the dialog and start the whole screen again: re-pick the type,
+                re-sign, re-submit. The countdown told them when they could file
+                and then gave them nothing to file with.
+
+                ⛔ DISABLED while the wait runs, and the gate is
+                `refusalSubmitEnabled` in `no-show-rules.ts` — declared there so a
+                check can reach it. Enabling early would make this the way to skip
+                the wait, which is the one thing this dialog exists to prevent.
+
+                ⚠️ It does not file. It asks to be re-checked: `handleRefusalSubmit`
+                re-runs the guardrail, so a driver who walked off while the dialog
+                was open gets the support form, not a filed no-show. */}
+            {refusalIsTimer && (
+              <button
+                type="button"
+                disabled={!refusalSubmitEnabled(live)}
+                onClick={handleRefusalSubmit}
+                className="h-12 w-full rounded-lg text-base font-bold text-white disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
+                style={
+                  refusalSubmitEnabled(live)
+                    ? { backgroundColor: DRIVER_TEAL }
+                    : undefined
+                }
+              >
+                Submit
+              </button>
+            )}
             {/* The one thing production does not offer. Everything above this
                 line is the dialog the driver already knows; this is the way out
                 of it that used to be Zendesk.
 
-                ⚠️ And it appears ONLY on a form outcome. On a timer the driver is
-                standing at the pick-up and simply has not waited long enough —
-                offering a form there turns it into a way to skip the wait.
+                ⚠️ It appears ONLY on a `form` outcome, and that is still right.
+                ⛔ **Amended 2026-10-21 (D176).** This used to read "on a timer the
+                driver is standing at the pick-up and simply has not waited long
+                enough — offering a form there turns it into a way to skip the
+                wait." That reasoning holds and is why the Submit above is gated:
+                the form is still unreachable from a timer *while the wait runs*.
+                What changed is that once the wait is served, the re-check may
+                legitimately land on the form — because by then the driver has
+                left, and the wait no longer applies to them.
 
                 Labelled for the ARTEFACT, not the feeling — "Submit support
                 form" tells the driver what they are about to do and matches the

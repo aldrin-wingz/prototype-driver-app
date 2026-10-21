@@ -278,7 +278,11 @@ import {
 } from "../lib/support/field-rules";
 import { getTimeOrderWarnings } from "../lib/support/time-order";
 import { ID_BADGE } from "../lib/driver-data/id-badge";
-import { noShowFormFor } from "../lib/driver-data/no-show-rules";
+import {
+  noShowFormFor,
+  refusalSubmitEnabled,
+  type NoShowOutcome,
+} from "../lib/driver-data/no-show-rules";
 import {
   SUPPORT_NOTES_FIELD,
   SUPPORT_NOTES_LABEL,
@@ -13578,6 +13582,101 @@ check(
   "...and a ticket link leaves for a new tab, safely",
   `target: ${/target="_blank"/.test(B6_TABLE_CODE)}; rel: ${/rel="noreferrer"/.test(B6_TABLE_CODE)}`,
   /target="_blank"/.test(B6_TABLE_CODE) && /rel="noreferrer"/.test(B6_TABLE_CODE),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n42. The refusal's own Submit (story 10435, D176)");
+
+const MNSS_SRC = readFileSync(
+  join(ROOT, "components/driver/member-no-show-screen.tsx"),
+  "utf8",
+);
+
+/**
+ * ⛔ NON-VACUITY FIRST. Every check below is a regex over this file, and a regex
+ * that matches nothing is indistinguishable from a regex whose subject is simply
+ * absent. If the dialog itself is gone, these must fail LOUDLY rather than pass
+ * by matching nothing.
+ */
+check(
+  "the refusal dialog is still in this file at all",
+  `title: ${MNSS_SRC.includes("Unable to complete action")}; footer: ${MNSS_SRC.includes("AlertDialogFooter")}`,
+  MNSS_SRC.includes("Unable to complete action") && MNSS_SRC.includes("AlertDialogFooter"),
+);
+
+/**
+ * ⛔⛔ The bug this story depends on. `refusal` is the snapshot frozen at Submit;
+ * reading the countdown off it is why the dialog sat at "6:10 to go" forever, and
+ * a Submit gated on that number could never unlock. The live outcome is the only
+ * legitimate source.
+ */
+check(
+  "the countdown reads the LIVE outcome, never the frozen refusal",
+  `refusal.minutesRemaining occurrences: ${(MNSS_SRC.match(/refusal\.minutesRemaining/g) ?? []).length} (want 0)`,
+  !/refusal\.minutesRemaining/.test(MNSS_SRC),
+);
+
+check(
+  "...and the dialog renders a live value that can reach zero",
+  `liveMinutesRemaining used: ${MNSS_SRC.includes("liveMinutesRemaining")}`,
+  MNSS_SRC.includes("liveMinutesRemaining"),
+);
+
+check(
+  "the timer refusal carries its own Submit",
+  `gated button present: ${/refusalIsTimer && \(/.test(MNSS_SRC)}`,
+  /refusalIsTimer && \(/.test(MNSS_SRC),
+);
+
+/**
+ * ⛔ The gate is the declared rule, not an inline expression. An inline
+ * `minutesRemaining > 0` in JSX is a correctness rule no check can reach.
+ */
+check(
+  "...gated on the DECLARED rule, not an inline comparison",
+  `disabled={!refusalSubmitEnabled(live)}: ${MNSS_SRC.includes("disabled={!refusalSubmitEnabled(live)}")}`,
+  MNSS_SRC.includes("disabled={!refusalSubmitEnabled(live)}"),
+);
+
+check(
+  "...and tapping it re-runs the guardrail rather than filing",
+  `handleRefusalSubmit re-reads live: ${/function handleRefusalSubmit\(\)[\s\S]{0,400}live\.kind === "files"/.test(MNSS_SRC)}`,
+  /function handleRefusalSubmit\(\)[\s\S]{0,400}live\.kind === "files"/.test(MNSS_SRC),
+);
+
+/**
+ * The rule itself, exercised directly rather than read off the component.
+ * ⭐ Expectations are DECLARED here, never derived from the function under test.
+ */
+const GATE_CASES: ReadonlyArray<{ what: string; outcome: NoShowOutcome; enabled: boolean }> = [
+  { what: "a wait still running", outcome: { kind: "timer", reason: "presence", minutesRemaining: 6.17 }, enabled: false },
+  { what: "the last fraction of a minute", outcome: { kind: "timer", reason: "presence", minutesRemaining: 0.01 }, enabled: false },
+  { what: "the wait served", outcome: { kind: "timer", reason: "presence", minutesRemaining: 0 }, enabled: true },
+  { what: "the driver has left", outcome: { kind: "form", gap: "not_at_pickup", detail: "" }, enabled: true },
+  { what: "no location at all", outcome: { kind: "form", gap: "no_location_data", detail: "" }, enabled: true },
+  { what: "it would file", outcome: { kind: "files", qualifyingMinutes: 10, presenceWaitWaived: false }, enabled: true },
+];
+
+for (const c of GATE_CASES) {
+  check(
+    `refusalSubmitEnabled — ${c.what}`,
+    `want ${c.enabled}, got ${refusalSubmitEnabled(c.outcome)}`,
+    refusalSubmitEnabled(c.outcome) === c.enabled,
+  );
+}
+
+/**
+ * ⛔ The one that matters most, stated as its own assertion rather than left
+ * implicit in the table: while a wait is running the gate is CLOSED. A driver
+ * who can tap Submit mid-wait has been handed the way to skip it.
+ */
+check(
+  "⛔ no running wait ever enables the Submit",
+  `${GATE_CASES.filter((c) => c.outcome.kind === "timer" && c.outcome.minutesRemaining > 0).length} running-wait case(s), all disabled`,
+  GATE_CASES.filter((c) => c.outcome.kind === "timer" && c.outcome.minutesRemaining > 0).length >= 2 &&
+    GATE_CASES.filter((c) => c.outcome.kind === "timer" && c.outcome.minutesRemaining > 0).every(
+      (c) => refusalSubmitEnabled(c.outcome) === false,
+    ),
 );
 
 // ---------------------------------------------------------------------------
