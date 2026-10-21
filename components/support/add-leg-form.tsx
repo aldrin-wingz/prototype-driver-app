@@ -90,7 +90,7 @@ function legOrderConfig(legs: GroupLeg[], slot: number): LegOrderConfig {
 }
 
 /**
- * Everything row 21 works out from a set of answers.
+ * Everything row 23 works out from a set of answers.
  *
  * ⭐ **One function, called from three places** — the case builder, the derived
  * values and the submit handler — so the shifts the form shows, the times it
@@ -158,7 +158,7 @@ export function buildAddLegCase(
 }
 
 /**
- * Build the Add Leg to Trip case at rest — catalogue row 21.
+ * Build the Add Leg to Trip case at rest — catalogue row 23.
  *
  * Exported so `scripts/verify-solutions.ts` can build the same case all three
  * entry points do: the More Options tile, the completed ride's own button, and
@@ -186,7 +186,7 @@ export function buildAddLeg(trip: Trip, leg: TripLeg | undefined) {
  * the prop and the check that was meant to prove the key and the patch are
  * disjoint compared two RESTATEMENTS of them declared in the check itself — so
  * a break that added a patched field to the real key produced no failure at all.
- * Same shape as the label defect row 22's break tests found.
+ * Same shape as the label defect row 24's break tests found.
  */
 export function addLegDerive(trip: Trip, values: Record<string, string>) {
   /**
@@ -371,7 +371,7 @@ export function AddLegForm({
           issue: ISSUE_ADD_LEG_REQUEST,
           // ⛔ Passed explicitly — this case carries no leg picker, so the
           // generic resolver would file a trip-less request. Same hand-off as
-          // rows 17 and 22.
+          // rows 19 and 24.
           tripId: trip.id,
           legId: leg?.id,
           values,

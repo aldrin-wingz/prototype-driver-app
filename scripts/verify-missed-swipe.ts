@@ -305,7 +305,7 @@ const EXPECTED_TRIGGER: Record<string, string> = {
   "1049800395": "none",
   // Row 14's standing-order ride (`14c`) — same shape as the two above.
   "1049800396": "none",
-  // ⚠️ Row 22's second scenario ride (`22b`), the one with the pick-up already
+  // ⚠️ Row 24's second scenario ride (`22b`), the one with the pick-up already
   // made. It carries no `locationRecords`, so the trail has nothing to challenge
   // the drop-off with. Declared rather than left to fall through — an undeclared
   // ride here is one whose swipe behaviour nobody decided.
@@ -1306,7 +1306,7 @@ check("the proposal is reachable only from row 03 and the plain mirror",
   borrowed.length === 0,
   `${borrowed.length} of ${sweepCount} wrong — ${borrowed.slice(0, 5).join(", ")}`);
 check("...and that sweep is the size it claims",
-  sweepCount === FOCUS_ROWS.length * DEMO_MODES.length * 2 && FOCUS_ROWS.length === 29,  // ⭐ 28 catalogue rows + the plain mirror
+  sweepCount === FOCUS_ROWS.length * DEMO_MODES.length * 2 && FOCUS_ROWS.length === 31,  // ⭐ 30 catalogue rows + the plain mirror (+2 on 2026-10-22: rows 16 and 17)
   `${FOCUS_ROWS.length} focus(es) x ${DEMO_MODES.length} mode(s) x 2 swipe(s) = ${sweepCount}`);
 /** ⛔ ...and every other row sees production's refusal, not nothing at all. */
 const strangerRoutes = new Set(

@@ -68,6 +68,7 @@ import {
 import { AddLegForm } from "@/components/support/add-leg-form";
 import { SendBackReasonForm } from "@/components/support/send-back-reason-form";
 import { SendBackPenaltyDialog } from "@/components/driver/send-back-penalty-dialog";
+import { sendbackPenaltyFor } from "@/lib/driver-data/sendback-penalty";
 import { SendBackConfirmDialog } from "@/components/driver/send-back-confirm-dialog";
 import { StandingOrderWarningDialog } from "@/components/driver/standing-order-warning-dialog";
 import { SendBackDeniedDialog } from "@/components/driver/send-back-denied-dialog";
@@ -75,7 +76,6 @@ import {
   isShortNoticeSendBack,
   isStandingOrder,
   sendBackSteps,
-  SEND_BACK_PENALTY_USD,
   type SendBackStep,
 } from "@/lib/driver-data/send-back-reasons";
 import { supportChatRoute } from "@/lib/driver-data/support-chat";
@@ -295,7 +295,7 @@ const TRIP_CHANGE_TILE: OptionTile = {
  * reserved for the two tiles that report something going wrong.
  *
  * ⚠️ Ahead of `trip-change` in `PROPOSED_TILES`, because that array is in
- * CATALOGUE order and row 21 precedes row 22 — not in the order they were built.
+ * CATALOGUE order and row 23 precedes row 24 — not in the order they were built.
  * The two Trip / Ride Modification rows end up adjacent either way.
  * ⛔ Anchored to the production tile `calendar` like its neighbour, because
  * `after` names a PRODUCTION tile — anchoring a proposal to another proposal
@@ -679,7 +679,7 @@ export function MoreOptionsScreen({
    * `Contact Support` on the standing-order block.
    *
    * ⛔⛔ **Nothing is sent back.** The trip stays on the manifest and the
-   * driver leaves the ride for the chat, exactly as row 17's dead end does —
+   * driver leaves the ride for the chat, exactly as row 19's dead end does —
    * except here that is the destination rather than the complaint, because the
    * block is production's and is not ours to lift.
    *
@@ -688,7 +688,7 @@ export function MoreOptionsScreen({
    * back to be penalised for. Four screens became one.
    *
    * ⚠️ The topic is named, so the chat auto-sends the standing-order template
-   * rather than row 17's *"my member no longer needs transportation"* — which
+   * rather than row 19's *"my member no longer needs transportation"* — which
    * would be a false statement, auto-sent, under the driver's name.
    */
   function handleContactSupport() {
@@ -725,7 +725,7 @@ export function MoreOptionsScreen({
     toast({
       title: "Trip sent back",
       description: isShortNoticeSendBack(trip)
-        ? `It is back with the client, and a $${SEND_BACK_PENALTY_USD} penalty applies. Your reason went to Support with it.`
+        ? `It is back with the client, and a $${sendbackPenaltyFor(trip)} penalty applies. Your reason went to Support with it.`
         : "It is back with the client. Your reason went to Support with it.",
     });
     router.push("/my-rides");
@@ -973,6 +973,7 @@ export function MoreOptionsScreen({
         onContactSupport={handleContactSupport}
       />
       <SendBackPenaltyDialog
+        amount={sendbackPenaltyFor(trip)}
         open={sendBackPenaltyOpen}
         onOpenChange={(next) => {
           setSendBackPenaltyOpen(next);

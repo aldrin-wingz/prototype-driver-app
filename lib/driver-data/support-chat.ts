@@ -7,14 +7,14 @@ import { zendeskStandingOrderMessage } from "./send-back-reasons";
  *
  * ⛔⛔ **Added because routing a second case at that screen would have LIED.**
  * `ZendeskChatScreen` auto-sends its template the moment it opens, and until now
- * that template was hard-wired to `zendeskDeclineMessage` — row 17's. Sending a
+ * that template was hard-wired to `zendeskDeclineMessage` — row 19's. Sending a
  * standing-order driver there unchanged would have opened a chat whose first and
  * only message says *"My member no longer needs transportation"*, over a trip
  * whose member needs it fine. A false statement on screen, auto-sent, with the
  * driver's name on it.
  *
  * ⚠️ The screen itself is unchanged in every other way, and deliberately so: the
- * chat is a dead end for row 17 and a destination for row 14, but it is the same
+ * chat is a dead end for row 19 and a destination for row 14, but it is the same
  * surface, and two copies of it would drift.
  *
  * ⛔ Two topics is not a pattern yet. Resist adding a third until something asks
@@ -28,9 +28,9 @@ export interface SupportChatMessage {
 }
 
 /**
- * ⛔ The default is row 17's, so every URL that existed before this module is
+ * ⛔ The default is row 19's, so every URL that existed before this module is
  * byte-identical after it. `supportChatRoute` emits no parameter at all for the
- * default, and a check asserts that — a query string appearing on row 17's link
+ * default, and a check asserts that — a query string appearing on row 19's link
  * would be this module changing a screen it was meant to leave alone.
  */
 export const DEFAULT_SUPPORT_CHAT_TOPIC: SupportChatTopic = "rider-declined";

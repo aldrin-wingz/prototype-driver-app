@@ -19,7 +19,7 @@ import type { Trip } from "@/lib/driver-data/mock-trips";
  * PROPOSED destination for a standing order.
  *
  * ⛔⛔ **One surface, two valences, and that is not a contradiction.** For
- * row 17 the chat is the dead end the proposal exists to replace: the app could
+ * row 19 the chat is the dead end the proposal exists to replace: the app could
  * have handled it and did not. For row 14 the block is real and is NOT being
  * lifted, so Support genuinely has to do it — and chat beats production's
  * *"call into support"*. Same screen, opposite argument, which is why it takes
@@ -55,7 +55,7 @@ export function ZendeskChatScreen({
 }: {
   trip: Trip;
   /**
-   * ⛔ Which conversation this is. Defaults to row 17's, so every existing
+   * ⛔ Which conversation this is. Defaults to row 19's, so every existing
    * caller renders exactly what it rendered before this prop existed — the
    * screen gained a second topic, it did not change its first.
    */

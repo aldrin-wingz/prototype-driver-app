@@ -53,7 +53,13 @@ import { PreferredDriverPrompt } from "@/components/driver/preferred-driver-prom
 import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-form";
 import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
+import {
+  isShortNoticeSendBack,
+  sendbackPenaltyFor,
+  showsShortNoticeAtTake,
+} from "@/lib/driver-data/sendback-penalty";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
+import { ShortNoticeAcceptDialog } from "@/components/driver/short-notice-accept-dialog";
 import {
   OVER_CAPACITY_SWIPE_REQUEST,
   OVER_CAPACITY_SWIPE_LABEL,
@@ -266,7 +272,7 @@ function LegCard({
   isLast: boolean;
   state: DetailState;
   /**
-   * Catalogue row 22 — open Update Trip Details for this anchor.
+   * Catalogue row 24 — open Update Trip Details for this anchor.
    *
    * ⛔ Optional, and the decision of whether to pass it is NOT taken here. Which
    * anchors can be changed, whether the ride's state admits a request at all and
@@ -393,14 +399,24 @@ export function RideDetailLayout({
     optOutOfPreferredDriverAsk,
   } = useRideFlow();
   const { demo } = useSolution();
+  /**
+   * Catalogue row 16 — whether this request earns a warning before it is taken.
+   *
+   * ⛔ Declared in `lib/`, like `isOverCapacity` and `isStandingOrder`. The
+   * condition is "a send-back would cost something", which is a market rule,
+   * not a property of this screen.
+   */
+  const [shortNoticeAcceptOpen, setShortNoticeAcceptOpen] = useState(false);
 
   // Any swipe the driver made in this session, laid over the seed. Everything
   // below reads the overlaid trip, so a drop-off recorded a moment ago moves the
   // stage, the header and the swipe record together.
   const trip = applySessionSwipes(seededTrip);
+  const warnsShortNotice =
+    showsShortNoticeAtTake(demo) && isShortNoticeSendBack(trip);
   const pendingRequest = getPendingRequest(trip.id);
   /**
-   * The member declined and Support has the report — catalogue row 17.
+   * The member declined and Support has the report — catalogue row 19.
    *
    * ⛔ NOT a cancellation. The ride is still here and still on the manifest;
    * what changes is that nobody is waiting on the driver any more.
@@ -408,7 +424,7 @@ export function RideDetailLayout({
   const cancellationRequested = isCancellationRequested(trip.id);
 
   /**
-   * Catalogue row 22 — the change this ride is waiting on, if any.
+   * Catalogue row 24 — the change this ride is waiting on, if any.
    *
    * ⛔ The ride below still shows its OLD times and addresses, because nothing
    * about it has changed and nothing will until the client acts. That is exactly
@@ -455,7 +471,7 @@ export function RideDetailLayout({
   );
 
   /**
-   * Catalogue row 21 — the leg this TRIP GROUP is waiting on, if any.
+   * Catalogue row 23 — the leg this TRIP GROUP is waiting on, if any.
    *
    * ⛔ Looked up by GROUP, so the sibling leg the driver was not looking at when
    * they filed also says that its own pick-up time is part of a request.
@@ -1023,7 +1039,7 @@ export function RideDetailLayout({
             ))}
           </div>
 
-          {/* ⭐ Catalogue row 21's third entry point, and the only action a
+          {/* ⭐ Catalogue row 23's third entry point, and the only action a
               COMPLETED ride offers. In the BODY, under the timeline, never in a
               footer — the completed state deliberately renders no footer at all
               and the capture has none, so putting it there would rewrite
@@ -1154,14 +1170,14 @@ export function RideDetailLayout({
         bar: there is nothing to do to a ride Wingz has already cancelled, and
         production says so in the banner above.
 
-        ⭐ Row 19's PROPOSAL is the one thing that does render here, gated —
+        ⭐ Row 21's PROPOSAL is the one thing that does render here, gated —
         see below.
       */}
       {/*
         ⛔⛔ **A cancelled ride has NO footer, and since 2026-10-17 that is
         production's answer and ours alike (D168).**
 
-        Row 19's proposal used to put an Acknowledge button here, gated — the
+        Row 21's proposal used to put an Acknowledge button here, gated — the
         only gated thing on this screen. It existed to drain Needs Action, and
         Needs Action no longer holds cancellations, so the button had nothing
         left to do. A control whose effect the driver cannot observe is worse
@@ -1276,9 +1292,23 @@ export function RideDetailLayout({
             <span className="relative z-10 pr-8 text-sm font-bold uppercase text-white">
               {REQUEST_SWIPE_REJECT}
             </span>
-            <span className="relative z-10 pl-8 text-sm font-bold uppercase text-white">
+            {/* ⛔⛔ A <button>, not a <span>, since 2026-10-22 — and the ONLY
+                reference to the accept constant in this file. Wrapping it or
+                adding a second pill would break the check that asserts exactly
+                one footer draws this half (row 13 replaced it on its own
+                screen). ⚠️ Still inert unless this trip earns a warning: with
+                no handler it behaves exactly as the span did. */}
+            <button
+              type="button"
+              onClick={
+                warnsShortNotice
+                  ? () => setShortNoticeAcceptOpen(true)
+                  : undefined
+              }
+              className="relative z-10 pl-8 text-sm font-bold uppercase text-white"
+            >
               {REQUEST_SWIPE_ACCEPT}
-            </span>
+            </button>
           </div>
         </div>
       ) : state === "in-progress" ? (
@@ -1438,6 +1468,15 @@ export function RideDetailLayout({
 
       {/* ⭐ Row 03's Now side, mounted beside the proposal's prompt — one tap,
           two answers, and `routeSwipeTap` is what picks. */}
+      <ShortNoticeAcceptDialog
+        open={shortNoticeAcceptOpen}
+        onOpenChange={setShortNoticeAcceptOpen}
+        amount={sendbackPenaltyFor(trip)}
+        // ⚠️ Continue closes the warning and nothing else. This prototype has no
+        // accept path at all — see `request-swipe.ts` — so the trip stays on the
+        // feed. Row 16's proposal is the warning, not the acceptance.
+        onConfirm={() => setShortNoticeAcceptOpen(false)}
+      />
       <SwipeTooFarDialog
         anchor={tooFarAnchor}
         onOpenChange={(open) => { if (!open) setTooFarAnchor(null); }}

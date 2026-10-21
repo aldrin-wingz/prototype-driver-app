@@ -17,7 +17,7 @@ import {
 } from "@/lib/driver-data/mock-trips";
 
 /**
- * ⭐ Production's Zendesk chat, as its own route — catalogue row 17's Now side.
+ * ⭐ Production's Zendesk chat, as its own route — catalogue row 19's Now side.
  *
  * ⛔ A ROUTE rather than a sheet, because that is what production does: the
  * driver LEAVES the ride. The ride is not sitting behind this screen, and
@@ -39,7 +39,7 @@ export default function SupportChatPage({
   /**
    * ⛔ Which conversation to open with. `supportChatTopicFrom` STRIPS an
    * unknown value rather than refusing it, so a stale or hand-typed link still
-   * opens the driver's chat instead of 404ing — and row 17's parameterless URL
+   * opens the driver's chat instead of 404ing — and row 19's parameterless URL
    * resolves to its own topic, unchanged.
    */
   const topic = supportChatTopicFrom(use(searchParams)[SUPPORT_CHAT_TOPIC_PARAM]);

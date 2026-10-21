@@ -4,7 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { SHOW_CANCELLED_LABEL } from "@/lib/driver-data/client-cancellation";
 
 /**
- * Catalogue row 19's control — **"Show cancelled trips"**, default on.
+ * Catalogue row 21's control — **"Show cancelled trips"**, default on.
  *
  * ⛔⛔ **This replaces a seven-filter sheet (D162).** The approved solution is a
  * toggle rather than a filter, and the difference is not cosmetic: a filter

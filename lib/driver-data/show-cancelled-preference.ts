@@ -1,7 +1,7 @@
 import { SHOW_CANCELLED_DEFAULT } from "./client-cancellation";
 
 /**
- * Catalogue row 19 — where the "Show cancelled trips" setting is kept.
+ * Catalogue row 21 — where the "Show cancelled trips" setting is kept.
  *
  * ⛔⛔ **The driver app's FIRST real use of `localStorage`, and the reason it is
  * a module rather than two lines in the page.** Production stores My Rides

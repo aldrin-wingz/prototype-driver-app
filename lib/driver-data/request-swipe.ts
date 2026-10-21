@@ -11,9 +11,11 @@
  * ⚠️ **Replicated copy, not ours.** Both strings below are production's, read
  * off the request screen the base mirrors.
  *
- * ⛔⛔ **Decorative, on every request in this app.** The pill is a replica: the
- * base has no accept handler and no reject handler, because accepting a trip is
- * not what any of these prototypes are about. Row 13's proposal makes the
+ * ⛔⛔ **Decorative, with ONE exception since 2026-10-22.** The pill is a
+ * replica: the base has no reject handler at all, and no accept handler except
+ * on a short-notice request under catalogue row 16, where the accept half opens
+ * a penalty warning and nothing more — Continue closes it and the trip stays on
+ * the feed. There is still no acceptance anywhere in this app. Row 13's proposal makes the
  * REQUEST half live — that is the slice — and leaves the reject half exactly as
  * inert as it is on every other request screen. ⚠️ So "the driver can still
  * reject" means the affordance production offers is back on screen, not that

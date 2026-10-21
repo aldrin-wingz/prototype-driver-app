@@ -1,13 +1,21 @@
 import { DEFAULT_DEMO_MODE, type DemoMode } from "./demo-mode";
 
 /**
- * The 28 proposed features from the support call analysis, made executable.
+ * The 28 proposed features from the support call analysis, made executable —
+ * plus 2 proposed since.
  *
  * Source: `References/Support Call Volume by Subject Area - Problems and
  * Proposed Features.xlsx`. One entry per row of that table, so the prototype
  * selector is a faithful mirror of the analysis rather than a convenient subset
  * of it — including the rows there is nothing to build for, which carry a
  * reason instead of an entry point.
+ *
+ * ⛔⛔ **Rows 16 and 17 are NOT in that spreadsheet.** They were proposed by the
+ * user on 2026-10-22, after the analysis, and the mirror claim above is exactly
+ * 28 rows wide — not 30. Nothing checks the claim (§1 never opens the file), so
+ * it is stated here instead: a reader diffing this array against the xlsx will
+ * find two extra rows, and they are these. ⚠️ Any further row from outside the
+ * analysis belongs in this note too, or the claim quietly stops being true.
  *
  * ⚠️ `calls` is the SUBJECT AREA's total, not the row's. Several rows share one
  * subject area, exactly as the spreadsheet merges those cells. Summing `calls`
@@ -133,7 +141,7 @@ export interface Solution {
    * ⭐ Added rather than substituted. `proposedFeature` runs to 535 characters
    * on row 03 because the spreadsheet says that much; a cell that long turns
    * the table into a wall of prose and the prototype is standing right beside
-   * it, saying the same thing better. ⚠️ Rows 18 and 20 carry the SAME
+   * it, saying the same thing better. ⚠️ Rows 20 and 22 carry the SAME
    * sentence, because they carry the same `proposedFeature` — one tray, listed
    * twice in the source. A check asserts that is the only pair.
    */
@@ -619,9 +627,83 @@ export const SOLUTIONS: Solution[] = [
     buildState: "not-yet",
     entry: null,
   },
+  /**
+   * ⭐⭐ **Rows 16 and 17 are not from the spreadsheet.** Every other row mirrors
+   * `Support Call Volume by Subject Area - Problems and Proposed Features.xlsx`
+   * one-for-one; these two came from the user on 2026-10-22, after the analysis.
+   * They carry the Send-back area's `calls` because they belong to it, and that
+   * number moves no total — `calls` is the AREA's, shared across its rows, so
+   * `covered` (summed over distinct areas) is unchanged at 6,665.
+   *
+   * ⚠️ **No call volume of their own, and the user said so first:** "This
+   * doesn't have an exact call volume issue but does tie into the Sendbacks
+   * Topic." Recorded here rather than smoothed over, because a reader comparing
+   * this file to the spreadsheet will find two rows the spreadsheet lacks.
+   *
+   * ⛔ **Inserted at 16-17, INSIDE the Send-back run, deliberately.**
+   * `subjectAreaGroups()` groups adjacent rows only — appending them at the end
+   * would have made `Send-back` appear twice, giving 16 areas of 15 and
+   * double-counting 609 into `covered`. The same trap the row-13 comment below
+   * records from a break test.
+   *
+   * ⚠️ **`in-prototype` is a BUILD state, not an approval.** These are built and
+   * not approved; the catalogue has no field that can say so, and
+   * `General Plan` warns that anything in the prototype reads as decided.
+   * Approval lives in `Story Tracker.md`.
+   */
+  {
+    id: "short-notice-at-take",
+    order: 16,
+    subjectArea: "Send-back",
+    calls: 609,
+    problem:
+      "A trip can already carry a send-back penalty, and nothing says so until the driver tries to hand it back",
+    useCase:
+      "Driver takes a trip → cannot do it after all → taps Send Back → meets a penalty they had no way to see before accepting → calls Support to ask why they are being charged",
+    proposedFeature:
+      "Say what a send-back costs BEFORE the trip is taken, in the two places the decision is made: a pill on the Request Feed card naming the amount, and a warning at the accept swipe carrying production's own penalty copy — ⛔ the amount is the market's, read from one ladder, never a constant — ⚠️ the warning informs and does not block; a driver who wants the trip still gets it",
+    tableSummary:
+      "A Request Feed card names what a send-back costs, and the accept swipe warns first.",
+    klass: "surface",
+    buildState: "in-prototype",
+    entry: {
+      route: "/requests/1049800443",
+      label:
+        "A Verida GA request already in the top band of its market's ladder — $25 to hand back, the moment it is accepted. The card carries the amount; swiping to accept raises production's own penalty copy first. ⚠️ The warning does not block: Continue takes the trip. ⛔ Today neither exists, and the figure is first seen on the send-back screen, after the driver has committed.",
+      alternates: [
+        {
+          route: "/requests/1049800444",
+          short: "A free request — no warning at all",
+          label:
+            "The same screen on a trip outside the 48-hour band. The card carries NO price pill and the accept swipe raises nothing. ⚠️ Silence, not a 'Free to send back' pill — that label belongs to row 17's Upcoming ladder, where free is a rung worth naming; the feed is unfiltered, so a free pill would land on every request whose market has a rule and bury the one that costs something. ⛔ Without this branch, a warning seen on every accept is indistinguishable from a warning that means something.",
+        },
+      ],
+    },
+  },
+  {
+    id: "short-notice-countdown",
+    order: 17,
+    subjectArea: "Send-back",
+    calls: 609,
+    problem:
+      "Nothing tells a driver how long is left before a send-back starts costing, or costs more",
+    useCase:
+      "Driver is holding a trip they may not be able to do → no way to see when the free window closes → either calls Support to ask, or sends it back a few hours late and is charged for it",
+    proposedFeature:
+      "Two pills on an Upcoming card: what a send-back costs today, and what it will cost next with the time remaining — ⛔ the countdown runs to the market rule's own next boundary, NOT to a fixed number of hours before pickup, because the measured charge data shows the penalty does not scale with closeness to pickup",
+    tableSummary:
+      "An Upcoming card says what a send-back costs now, and what it costs next and when.",
+    klass: "surface",
+    buildState: "in-prototype",
+    entry: {
+      route: "/my-rides",
+      label:
+        "Three Upcoming trips on Verida GA's real three-band ladder, side by side: free, $10, and $25. The middle one is the case — it is already being charged today with nothing on screen to say so, and its second pill says the figure more than doubles in six hours. ⛔ The top band carries no countdown, because there is no band above it to announce. ⚠️ The bands are SEEDED: the prototype has no clock, and most markets' boundaries are wall-clock times, not hours before pickup.",
+    },
+  },
   {
     id: "account-self-service",
-    order: 16,
+    order: 18,
     subjectArea: "Other / not listed (catch-all)",
     calls: 567,
     problem: "Driver cannot update their own account details in the app",
@@ -639,7 +721,7 @@ export const SOLUTIONS: Solution[] = [
       logged in."*
 
       ⛔ `/login` still exists, but it is NOT listed here any more: with the
-      proposal gone it is pure replication, carrying nothing of row 16's. It
+      proposal gone it is pure replication, carrying nothing of row 18's. It
       stays because the CAPTURED Logout row lands on a sign-in screen in
       production and until this slice there was nowhere for it to go.
 
@@ -672,7 +754,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "rider-initiated-cancellation",
-    order: 17,
+    order: 19,
     subjectArea: "Trip / Ride Cancellation",
     calls: 509,
     problem:
@@ -693,14 +775,14 @@ export const SOLUTIONS: Solution[] = [
           route: "/my-rides/1049800399",
           short: "Filed from the return leg",
           label:
-            "The SAME decline filed from the return leg. The outbound is offered too — untick it to say the family drove her there and she still needs the ride home. ⛔ Neither filing cancels anything: the ride stays on the manifest marked 'Cancellation requested', because the client owns the cancellation and row 18's tray is what would tell the driver when it lands.",
+            "The SAME decline filed from the return leg. The outbound is offered too — untick it to say the family drove her there and she still needs the ride home. ⛔ Neither filing cancels anything: the ride stays on the manifest marked 'Cancellation requested', because the client owns the cancellation and row 20's tray is what would tell the driver when it lands.",
         },
       ],
     },
   },
   {
     id: "requests-tray",
-    order: 18,
+    order: 20,
     subjectArea: "Trip / Ride Cancellation",
     calls: 509,
     problem: "Driver cannot easily see whether the cancellation went through",
@@ -711,29 +793,32 @@ export const SOLUTIONS: Solution[] = [
     tableSummary: "One tray listing every request the driver has submitted, and its state.",
     klass: "surface",
     buildState: "not-yet",
-    // ⚠️ Added 2026-10-09. Row 20 has always pointed here; this never pointed
+    // ⚠️ Added 2026-10-09. Row 22 has always pointed here; this never pointed
     // back, so the relationship existed in one direction only. Invisible while
     // the picker's label was hardcoded — it printed "17" regardless of which
-    // row you opened, which is the right answer for row 20 and the reason
-    // nobody noticed row 18 was silent.
+    // row you opened, which is the right answer for row 22 and the reason
+    // nobody noticed row 20 was silent.
     sharedBuildWith: "requests-tray-modifications",
     entry: null,
   },
   /**
-   * ⛔⛔ **Inserted 2026-10-15, which is why rows 20-28 moved.** It had to take
+   * ⛔⛔ **Inserted 2026-10-15, which is why every row below it moved.** ⚠️ The
+   * range is stated as "below it" rather than as numbers because a later
+   * insertion sweeps numbers in prose and would silently rewrite this sentence
+   * into a claim about the wrong rows. It had to take
    * an `order` INSIDE the `Trip / Ride Cancellation` run, and that is what
    * forced the renumber — not where it sits in this array.
    *
    * ⚠️ The distinction cost a break test to find. `subjectAreaGroups()` sorts
    * by `order` and only THEN groups adjacent rows, so moving this literal to
    * the bottom of the file changes nothing and every check stays green. Give it
-   * `order: 28` instead and `Trip / Ride Cancellation` appears twice in the
+   * `order: 30` instead and `Trip / Ride Cancellation` appears twice in the
    * group list — area count 16 of 15, the area order stops matching the
    * spreadsheet, and covered calls reconcile at 7174 against a declared 6665.
    * Three §1 checks, and the first version of this comment blamed the wrong
    * one of the two.
    *
-   * ⚠️ Not a flip of row 18. That one is the requests TRAY — a list of
+   * ⚠️ Not a flip of row 20. That one is the requests TRAY — a list of
    * submitted requests — and six built forms depend on it being unbuilt. This
    * is the opposite direction: a cancellation nobody submitted, arriving from
    * Wingz, which the driver can reach exactly once.
@@ -754,11 +839,11 @@ export const SOLUTIONS: Solution[] = [
    * PHOTOGRAPH, because a capture is evidence and a release note is a claim.
    *
    * Third instance of the thin-row pattern, after row 09 (`Project - Standing
-   * Order Offers`) and row 23 (in-app chat).
+   * Order Offers`) and row 25 (in-app chat).
    */
   {
     id: "my-rides-cancelled",
-    order: 19,
+    order: 21,
     subjectArea: "Trip / Ride Cancellation",
     calls: 509,
     problem:
@@ -792,7 +877,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "requests-tray-modifications",
-    order: 20,
+    order: 22,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem:
@@ -809,7 +894,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "add-leg-request",
-    order: 21,
+    order: 23,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem: "A leg needs to be added",
@@ -847,7 +932,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "change-pickup-dropoff",
-    order: 22,
+    order: 24,
     subjectArea: "Trip / Ride Modification",
     calls: 364,
     problem: "A leg's pick-up/drop-off address or time needs changing",
@@ -874,7 +959,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "eta-send-back-explicit",
-    order: 23,
+    order: 25,
     subjectArea: "ETA Request",
     calls: 196,
     problem: "Driver needs the member told about a changed arrival",
@@ -889,7 +974,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "compliance-status",
-    order: 24,
+    order: 26,
     subjectArea: "Compliance Related",
     calls: 167,
     problem: "Driver confirming their requirements were received",
@@ -904,7 +989,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "dispatch-chat",
-    order: 25,
+    order: 27,
     subjectArea: "Trip Requests",
     calls: 156,
     problem: "Driver asking for more trips — not Support's role",
@@ -918,7 +1003,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "distribution-restriction",
-    order: 26,
+    order: 28,
     subjectArea: "Payment Issues",
     calls: 146,
     problem: "Driver wants to know when they will get paid",
@@ -933,7 +1018,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "technical-issues",
-    order: 27,
+    order: 29,
     subjectArea: "Technical Issues",
     calls: 127,
     problem: "Generic and varied — no single recurring cause",
@@ -949,7 +1034,7 @@ export const SOLUTIONS: Solution[] = [
   },
   {
     id: "otp-exclusion",
-    order: 28,
+    order: 30,
     subjectArea: "OTP",
     calls: 123,
     problem: "Drivers are dinged for lateness even when the delay was legitimate",

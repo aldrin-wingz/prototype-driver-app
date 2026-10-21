@@ -220,7 +220,6 @@ import {
   MAX_SEND_BACK_LABEL_CHARS,
   isStandingOrder,
   SEND_BACK_CONFIRM_BUILT,
-  SEND_BACK_PENALTY_USD,
   SEND_BACK_REASON_OTHER,
   SEND_BACK_TERMINAL_STEPS,
   sendBackReasonOptions,
@@ -235,6 +234,19 @@ import {
   sendBackSteps,
   type SendBackStep,
 } from "../lib/driver-data/send-back-reasons";
+import {
+  isShortNoticeSendBack as penaltyIsShortNotice,
+  nextPenaltyStepFor,
+  penaltyLadderFor,
+  penaltyPillFor,
+  requestPenaltyPillFor,
+  nextPenaltyPillFor,
+  sendbackPenaltyFor,
+  sendbackPenaltyPills,
+  showsSendbackPenaltyPills,
+  showsShortNoticeAtTake,
+  PENALTY_LADDERS,
+} from "../lib/driver-data/sendback-penalty";
 import {
   ISSUE_RIDER_DECLINED,
   ISSUE_SEND_BACK_REASON,
@@ -444,7 +456,7 @@ const FIXED = (solutionId: string | null): DemoFocus => ({ solutionId, mode: "fi
 const PLAIN: DemoFocus = { solutionId: null, mode: "now" };
 
 // ── Declared expectations ────────────────────────────────────────────────
-const EXPECTED_ROWS = 28;  // ⭐ +1 on 2026-10-15: row 19, cancelled rides in My Rides; +1: ⭐ +1 on 2026-10-15: row 13, the over-capacity exception request
+const EXPECTED_ROWS = 30;  // ⭐ +1 on 2026-10-15: row 21, cancelled rides in My Rides; +1: ⭐ +1 on 2026-10-15: row 13, the over-capacity exception request
 const EXPECTED_DENOMINATOR = 7483;
 const EXPECTED_COVERED = 6665;
 /** The 15 subject areas, in call order, exactly as the spreadsheet lists them. */
@@ -541,11 +553,17 @@ console.log("\n1b. The source calls each row by its CURRENT number");
 /**
  * ⛔⛔ **A row number lives in sixty comments and in no check.**
  *
- * Inserting row 19 on 2026-10-15 renumbered nine rows and shifted 99 prose
- * mentions of `row NN` across 23 files. Every gate in this repo keys on the
- * row's **id**, so a sweep that missed a file would have passed all 850 checks
- * while leaving comments pointing at the wrong feature — the failure mode this
- * project fears most, a check that goes on printing `ok`.
+ * Inserting `my-rides-cancelled` on 2026-10-15 renumbered nine rows and shifted
+ * 99 prose mentions of `row NN` across 23 files. Inserting `short-notice-at-take`
+ * and `short-notice-countdown` at orders 16-17 on 2026-10-22 shifted 267 across
+ * 43. Every gate in this repo keys on the row's **id**, so a sweep that missed a
+ * file would have passed every check while leaving comments pointing at the wrong
+ * feature — the failure mode this project fears most, a check that goes on
+ * printing `ok`.
+ *
+ * ⛔⛔ **Past renumbers are named by ID above, not by number.** The 2026-10-22
+ * sweep rewrote this paragraph's own numbers when they were written as `row NN`,
+ * turning a true record of one event into a false claim about another.
  *
  * Two cheap assertions catch the two directions a sweep goes wrong.
  */
@@ -754,18 +772,18 @@ check("entry routes were actually checked", `${routesChecked} checked across ${b
  *     only ever seen on the way to a warning cannot be told apart from part of
  *     that warning.
  *
- * ⏸️ Row 16 had a second branch — the LOCKED-OUT half at `/login` — until the
+ * ⏸️ Row 18 had a second branch — the LOCKED-OUT half at `/login` — until the
  * pre-auth flow was parked on 2026-10-13. It has one entry again, and the count
  * below went back to 6 rather than being left at 7 with a row quietly failing
  * to supply its alternate.
  */
 /**
- * ⭐ 12 since 2026-10-14: row 21 gained a THIRD trip shape. Its three
+ * ⭐ 12 since 2026-10-14: row 23 gained a THIRD trip shape. Its three
  * alternates are the one-leg trip, the three-leg trip, and the two-leg group
  * reached from its live half — so the row demonstrates adding a leg to a trip
  * of one, two and three legs, which is what the user asked for.
  */
-const EXPECTED_ALTERNATES = 13;  // ⭐ +1 on 2026-10-15: row 19's cancelled ride
+const EXPECTED_ALTERNATES = 14;  // ⭐ +1 on 2026-10-15: row 21's cancelled ride; +1 on 2026-10-22: row 16's free request, the control the warning is read against
 check(
   "the multi-branch slice still exposes both branches",
   `${alternatesChecked} alternate(s), expected ${EXPECTED_ALTERNATES}`,
@@ -919,7 +937,7 @@ const ALL_SEEDED = [
 const tagged = scenarioRides(ALL_SEEDED);
 
 /** Declared, never counted off the seed — a derived total cannot fail. */
-const EXPECTED_SCENARIO_RIDES = 40;  // ⭐ +13 on 2026-10-15: row 19's manifest — 10 still on, 3 cancelled; +2: row 13's blocking rides; +1 on 2026-10-16: row 01's no-location ride `01b` (D160)
+const EXPECTED_SCENARIO_RIDES = 45;  // ⭐ +5 on 2026-10-22: row 17's three bands and row 16's priced/free request pair —  // ⭐ +13 on 2026-10-15: row 21's manifest — 10 still on, 3 cancelled; +2: row 13's blocking rides; +1 on 2026-10-16: row 01's no-location ride `01b` (D160)
 check(
   "the seed carries the declared number of scenario rides",
   `${tagged.length} of ${ALL_SEEDED.length} seeded rides (expected ${EXPECTED_SCENARIO_RIDES})`,
@@ -941,11 +959,11 @@ check(
  * ⛔⛔ **A handle's number must be the order of a row it claims.**
  *
  * The handle is the first thing on a scenario pill and the only thing four
- * check scripts cite a ride by, so `19a` has to mean row 19. Nothing enforced
+ * check scripts cite a ride by, so `19a` has to mean row 21. Nothing enforced
  * that until now, and it had already failed twice without a single check
- * noticing: inserting row 19 on 2026-10-15 renumbered Add Leg and Update Trip
- * Details and left their handles behind, so `19a`–`19f` sat on row 20 and
- * `20a`/`20b` on row 21 — six pills naming the requests tray, which is not
+ * noticing: inserting row 21 on 2026-10-15 renumbered Add Leg and Update Trip
+ * Details and left their handles behind, so `19a`–`19f` sat on row 22 and
+ * `20a`/`20b` on row 23 — six pills naming the requests tray, which is not
  * built, and two naming Add Leg, which is something else. Corrected to
  * `21a`–`21f` and `22a`/`22b` with the row 13 insertion.
  *
@@ -994,7 +1012,7 @@ check(
 /**
  * ⛔⛔ **A declared exemption, not a weakened check.**
  *
- * Catalogue row 16 is the first built row with no ride anywhere in its demo —
+ * Catalogue row 18 is the first built row with no ride anywhere in its demo —
  * both of its entry points are account surfaces, and a driver changing their
  * password is not on a trip. The guarantee the check below defends ("a built
  * row can actually be demonstrated") still holds for it; it simply is not
@@ -1005,7 +1023,17 @@ check(
  * have had rides. A row may only sit here if every one of its routes is a
  * surface route — assert that rather than trust it.
  */
-const RIDELESS_ROWS = new Set(["account-self-service"]);
+const RIDELESS_ROWS = new Set([
+  "account-self-service",
+  /**
+   * ⭐ Added 2026-10-22. Row 16's whole demo is the Request Feed — a card that
+   * names a price and a swipe that warns. Both its routes are `/requests/…`, so
+   * it lands on NO My Rides tab, and declaring one would be inventing a tab it
+   * never uses. ⚠️ Its sibling row 17 is NOT exempt: its three rides are the
+   * Upcoming manifest and it is declared there.
+   */
+  "short-notice-at-take",
+]);
 const wronglyExempt = [...RIDELESS_ROWS].filter((id) => {
   const row = SOLUTIONS.find((s) => s.id === id);
   if (!row || row.buildState !== "in-prototype") return true;
@@ -1082,9 +1110,9 @@ check(
  * or the reverse — cannot keep the total intact while changing what was
  * actually tested. The first number is the one that carries the assertion above.
  */
-const EXPECTED_RIDE_ROUTES = 21;  // ⭐ +1 on 2026-10-15: row 19's cancelled ride
-/** `/requests` (row 10) ×2, plus row 16's `/options/account`. */
-const EXPECTED_SURFACE_ROUTES = 6;  // ⭐ +1 on 2026-10-15: row 19's entry, /my-rides itself; +1: row 13's request screen
+const EXPECTED_RIDE_ROUTES = 21;  // ⭐ +1 on 2026-10-15: row 21's cancelled ride
+/** `/requests` (row 10) ×2, plus row 18's `/options/account`. */
+const EXPECTED_SURFACE_ROUTES = 9;  // ⭐ +3 on 2026-10-22: row 16's two /requests screens and row 17's /my-rides —  // ⭐ +1 on 2026-10-15: row 21's entry, /my-rides itself; +1: row 13's request screen
 check(
   "...and the two kinds of route were counted as declared",
   `${rideRoutes} ride (expected ${EXPECTED_RIDE_ROUTES}), ${surfaceRoutes} surface (expected ${EXPECTED_SURFACE_ROUTES})`,
@@ -1132,7 +1160,7 @@ check(
  * the point: `tagged[0]` above is a loud one, so without this the rule would be
  * checked in one direction only.
  *
- * Row 19's demo is the LIST — thirteen rides of which three are cancelled — so
+ * Row 21's demo is the LIST — thirteen rides of which three are cancelled — so
  * each ride is the backdrop, not the exhibit. Labelling every card
  * `18a · Still on` put the same sentence on ten of them and competed with the
  * one pill carrying the only distinction that matters. (User direction,
@@ -1140,7 +1168,7 @@ check(
  *
  * ⚠️ Silence is about the PILL and nothing else. These rides are still scenario
  * rides everywhere that counts them, which the second check below measures —
- * dropping `scenario` instead would empty the tab the moment row 19 was focused.
+ * dropping `scenario` instead would empty the tab the moment row 21 was focused.
  */
 const SILENT_SCENARIO_ROWS = ["my-rides-cancelled"];
 const EXPECTED_SILENT_RIDES = 13;
@@ -1216,7 +1244,7 @@ const EXPECTED_IN_PROGRESS: Record<string, number> = {
   // `14c` standing order. The second is the negative control for both.
   "send-back-reason-form": 3,
   // ⭐ ONE, and it is the `22b` ride with the pick-up already made — the only
-  // demo of the passed-anchor rule. Row 22's OTHER ride is in Needs Action, so
+  // demo of the passed-anchor rule. Row 24's OTHER ride is in Needs Action, so
   // this row is declared in BOTH maps: a row with rides in two tabs that named
   // only one would hide half its demo behind a number that still looked right.
   "change-pickup-dropoff": 1,
@@ -1243,9 +1271,9 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
   // still editable. See the note beside its In Progress entry above.
   "change-pickup-dropoff": 1,
   /**
-   * ⛔⛔ THREE of row 21's SIX scenario rides, and the other three are in a
+   * ⛔⛔ THREE of row 23's SIX scenario rides, and the other three are in a
    * pool no My Rides tab counts — see `EXPECTED_COMPLETED_SCENARIOS` below.
-   * Row 21 is the only built row whose demo lives half outside the tabbed
+   * Row 23 is the only built row whose demo lives half outside the tabbed
    * pools, so a number here that looked right would be hiding half of it.
    *
    * ⭐ `21b` is the two-leg group's live half; `21e` and `21f` are the
@@ -1260,8 +1288,8 @@ const EXPECTED_NEEDS_ACTION: Record<string, number> = {
  *
  * ⛔⛔ **A denominator the tab maps structurally cannot supply.** My Rides has
  * four tabs and none of them is "completed", so every count above is taken over
- * live pools only. Until row 21 that was harmless — no scenario ride was
- * finished. Row 21's entry point IS a finished ride, so without this a row could
+ * live pools only. Until row 23 that was harmless — no scenario ride was
+ * finished. Row 23's entry point IS a finished ride, so without this a row could
  * declare "1 ride" while demonstrating three.
  */
 const EXPECTED_COMPLETED_SCENARIOS: Record<string, number> = {
@@ -1303,20 +1331,27 @@ for (const [id, expected] of Object.entries(EXPECTED_NEEDS_ACTION)) {
 /**
  * Scenario rides in the UPCOMING tab — new on 2026-10-15.
  *
- * ⛔⛔ **There was no such record until row 19, and that is the gap this fills.**
+ * ⛔⛔ **There was no such record until row 21, and that is the gap this fills.**
  * Every built row up to now demonstrated on a live or a finished ride, so
- * `declaredRows` only ever looked at In Progress and Needs Action. Row 19's
+ * `declaredRows` only ever looked at In Progress and Needs Action. Row 21's
  * demo is a manifest: thirteen upcoming rides, which is the whole argument.
  * Without this entry the coverage check below would have been satisfied by a
  * row that declared nothing anywhere.
  */
 const EXPECTED_UPCOMING: Record<string, number> = {
-  // Ten still on and three cancelled — the manifest row 19 argues over.
+  // Ten still on and three cancelled — the manifest row 21 argues over.
   "my-rides-cancelled": 13,
   // ⭐ Row 13's two blocking rides. They are not the demo — the demo is the
   // REQUEST screen — but they are what its evidence panel names, and a reviewer
   // who opens My Rides after focusing row 13 has to find them.
   "over-capacity-exception": 2,
+  /**
+   * ⭐ Row 17's three bands of Verida GA's ladder — free, $10 and $25. THREE is
+   * the number that matters and not an accident of seeding: two rides can show
+   * "priced" against "free" but cannot show a MIDDLE band, and the whole claim
+   * of the second pill is that the figure goes up again.
+   */
+  "short-notice-countdown": 3,
 };
 for (const [id, expected] of Object.entries(EXPECTED_UPCOMING)) {
   const shown = ridesForSolution(mockUpcomingTrips, id);
@@ -1342,7 +1377,7 @@ const declaredRows = new Set([
   ...Object.keys(EXPECTED_NEEDS_ACTION),
   ...Object.keys(EXPECTED_UPCOMING),
 ]);
-/** ⚠️ Same declared exemption as above — row 16's demo is not on a ride. */
+/** ⚠️ Same declared exemption as above — row 18's demo is not on a ride. */
 const countableRows = builtRows.filter((row) => !RIDELESS_ROWS.has(row.id));
 check(
   "every built row's ride count was declared, in one tab or the other",
@@ -1483,7 +1518,7 @@ for (const [name, list] of [["standard", standard], ["same-day", sameDay]] as co
  * ⛔⛔ **A proposal belongs to its own build — swept over every focus.**
  *
  * Found by the user, 2026-10-13: the fourth option rendered on EVERY focus, so
- * a reviewer walking row 17's decline met "I can't reach the member" on the way
+ * a reviewer walking row 19's decline met "I can't reach the member" on the way
  * past. `buildGridTiles` has enforced this on the More Options grid since
  * Phase 6; the modal was missed.
  *
@@ -1833,7 +1868,7 @@ check(
 );
 /**
  * ⛔ All FOUR, not the two this list carried until B1. `PROPOSED_TILES` has had
- * `add-leg` and `trip-change` in it since rows 21 and 22 were built, and the
+ * `add-leg` and `trip-change` in it since rows 23 and 24 were built, and the
  * sweeps below silently covered half the grid — a denominator that looked like
  * a sweep and was a spot check.
  */
@@ -1892,7 +1927,7 @@ const EXPECTED_GRIDS: Array<{
     // Nothing focused: no filtering, so every proposal shows. TEN tiles now —
     // even, so nothing is full-width and `send-back` takes a column. ⚠️ That is
     // the packing rule working, not a regression: full-width is a function of
-    // the COUNT, and row 22's tile changed the count's parity.
+    // the COUNT, and row 24's tile changed the count's parity.
     focus: null,
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
@@ -1905,7 +1940,7 @@ const EXPECTED_GRIDS: Array<{
     fullWidth: "send-back",
   },
   {
-    // Row 21 focused — its own tile and ⛔ no other proposal. Eight tiles.
+    // Row 23 focused — its own tile and ⛔ no other proposal. Eight tiles.
     focus: "add-leg-request",
     tiles: [
       "map-pickup", "map-dropoff", "call", "email-support", "calendar",
@@ -1914,7 +1949,7 @@ const EXPECTED_GRIDS: Array<{
     fullWidth: null,
   },
   {
-    // Row 22 focused — its own tile and ⛔ no other proposal, after Add Event To
+    // Row 24 focused — its own tile and ⛔ no other proposal, after Add Event To
     // Calendar so No-Show and Send Back Trip still end the grid side by side.
     // Eight tiles, four clean rows of two.
     focus: "change-pickup-dropoff",
@@ -2144,7 +2179,7 @@ check(
 /**
  * ⛔⛔ **The "same build as NN" label was HARDCODED to 17.**
  *
- * Written when rows 18 and 20 were the only shared pair, so it printed the
+ * Written when rows 20 and 22 were the only shared pair, so it printed the
  * right number by accident for a year. The moment rows 04 and 05 became a
  * shared build, the picker told you row 05 shared one with the requests tray.
  * A fact about one row, written as a literal in another row's JSX, is a fact
@@ -2219,20 +2254,20 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   "auto-assign-request": "in-progress",
   "request-feed-member-filter": "in-progress",
   "send-back-reason-form": "in-progress",
-  // Row 17 is reached during member confirmation, which is the unconfirmed
+  // Row 19 is reached during member confirmation, which is the unconfirmed
   // phase — so both its rides are Needs Action, like rows 04 and 05.
   "rider-initiated-cancellation": "needs-action",
   /**
    * ⚠️ **In Progress, which is the ALTERNATE's tab and not the entry's.**
    *
-   * Row 22 is the first built row with rides in two tabs, and `firstTabWithRides`
-   * walks `TAB_ORDER` — In Progress first. So a reviewer who focuses row 22 and
+   * Row 24 is the first built row with rides in two tabs, and `firstTabWithRides`
+   * walks `TAB_ORDER` — In Progress first. So a reviewer who focuses row 24 and
    * then opens My Rides meets `22b`, the ride with its pick-up behind it, rather
    * than `22a`.
    *
    * Declared rather than fixed. The selector routes to `entry.route` directly,
    * so the entry is still what OPENS; this only decides which tab a later tap on
-   * My Rides lands on, and both rides are row 22's. Changing the rule to prefer
+   * My Rides lands on, and both rides are row 24's. Changing the rule to prefer
    * the entry's tab would mean teaching `firstTabWithRides` about entries, which
    * is a bigger claim than this row has earned.
    */
@@ -2240,7 +2275,7 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
   /**
    * ⚠️ Needs Action — its only TABBED ride is the group's live half. The entry
    * point and the second alternate are both completed rides, which no tab shows
-   * at all, so a reviewer who focuses row 21 and then opens My Rides sees one
+   * at all, so a reviewer who focuses row 23 and then opens My Rides sees one
    * of its three demos. The selector routes to `entry.route` directly, so the
    * entry is still what opens.
    */
@@ -2258,9 +2293,11 @@ const EXPECTED_LANDING_TAB: Record<string, (typeof TAB_ORDER)[number]> = {
    * which is what this rule is for.
    */
   "over-capacity-exception": "upcoming",
+  /** ⭐ Row 17 — Upcoming, and unlike row 13 it is genuinely where the demo is. */
+  "short-notice-countdown": "upcoming",
 };
 /**
- * ⚠️ Row 16 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
+ * ⚠️ Row 18 lands on no tab at all. Focused, My Rides is legitimately EMPTY —
  * which the catalogue already anticipates ("the solution's scenario rides or an
  * empty tab that says so by name"). Writing it in here as a tab it does not use
  * would be the `"cannot-reach-member": 0` mistake the comment above warns about.
@@ -3132,7 +3169,7 @@ check(
 );
 
 /**
- * ⚠️ **The same boundary for row 19, and the third instance of the pattern**
+ * ⚠️ **The same boundary for row 21, and the third instance of the pattern**
  * (D166). `Ride Card Pill - Cancelled Trips Visibility` SHIPPED the listing and
  * the pill in driver-app PR #175 on 2026-04-17; this row carries the toggle,
  * which that project did not build.
@@ -3158,7 +3195,7 @@ const ROW_19_CLAIMS: Array<[string, string]> = [
 ];
 const row19Missing = ROW_19_CLAIMS.filter(([, text]) => !ROW_19_DOC.includes(text));
 check(
-  "row 19 names the project that shipped the listing, and the capture that disagrees",
+  "row 21 names the project that shipped the listing, and the capture that disagrees",
   row19Missing.length
     ? `missing: ${row19Missing.map(([what]) => what).join(", ")}`
     : `${ROW_19_CLAIMS.length} of ${ROW_19_CLAIMS.length} claim(s)`,
@@ -3557,16 +3594,23 @@ check(
  * short-notice. This is the check that would have caught the old four-screen
  * path surviving the rewrite.
  */
-const RF24_BOTH = sendBackSteps({ ...SO_RIDE, sameDay: true }, PLAIN);
+// ⛔⛔ `penaltyBand`, not `sameDay` — see STANDING_AND_SHORT below for the same
+// correction. Synthesising with `sameDay` made this fixture NOT short-notice
+// after 2026-10-22, so the check passed while testing nothing of the kind.
+const RF24_BOTH = sendBackSteps({ ...SO_RIDE, penaltyBand: 2 }, PLAIN);
 check(
   "...and a standing order never reaches it, short-notice or not",
   `both-properties path: ${RF24_BOTH.join(" → ")}; shortNotice=${isShortNoticeSendBack({
     ...SO_RIDE,
-    sameDay: true,
+    penaltyBand: 2,
   })}`,
   // ⛔ Non-vacuity: the trip really is short-notice, so "no penalty" is a
   // decision and not an input that never qualified.
-  isShortNoticeSendBack({ ...SO_RIDE, sameDay: true }) &&
+  //
+  // ⛔⛔ This GUARD was itself built on `sameDay`, which is why it is called out
+  // here: fixing only the path above would have left the guard reading false,
+  // and the check would have gone vacuous while still printing `ok`.
+  isShortNoticeSendBack({ ...SO_RIDE, penaltyBand: 2 }) &&
     !RF24_BOTH.includes("penalty") &&
     RF24_EARNED.includes("penalty"),
 );
@@ -3763,11 +3807,28 @@ check(
   /<AlertDialogCancel[\s\S]{0,200}Cancel\s*<\/AlertDialogCancel>/.test(SB_SOURCES.penalty) &&
     /<AlertDialogAction[\s\S]{0,300}Continue\s*<\/AlertDialogAction>/.test(SB_SOURCES.penalty),
 );
+/**
+ * ⛔⛔ **Was `SEND_BACK_PENALTY_USD`, a module constant, until 2026-10-22.** The
+ * old check asserted the copy read that constant rather than a literal, which
+ * was the right check while every penalty was $25. Row 16 added a $10 band, and
+ * a shared constant then guarantees the opposite of what it was protecting: the
+ * card says $10 and the dialog it opens says $25. The amount is now a PROP, so
+ * what has to be asserted is that the dialog has no figure of its own at all.
+ */
 check(
-  "the penalty amount is seeded, not hardcoded into the copy",
-  `$${SEND_BACK_PENALTY_USD}`,
-  SB_SOURCES.penalty.includes("SEND_BACK_PENALTY_USD") &&
-    !/\$25/.test(SB_SOURCES.penalty),
+  "the penalty amount reaches the dialog as a prop, with no figure in the copy",
+  "amount prop + no $NN literal",
+  // ⚠️ Comments stripped first. The doc comment on this dialog EXPLAINS the $25
+  // it replaced, so testing the raw source failed on the explanation rather than
+  // on the copy. What matters is that no figure reaches a driver's screen.
+  /amount: number/.test(SB_SOURCES.penalty) &&
+    /\$\{amount\}/.test(SB_SOURCES.penalty) &&
+    !/\$\d/.test(
+      SB_SOURCES.penalty
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "")
+        .replace(/\$\{amount\}/g, ""),
+    ),
 );
 
 // ---- the trip actually leaves ---------------------------------------------
@@ -3890,7 +3951,7 @@ check(
     /row 15|scoring/i.test(RF_ROW14_TAIL),
 );
 check(
-  "...and rows 15 and 21 stay unbuilt, still gated on the scoring policy",
+  "...and rows 15 and 23 stay unbuilt, still gated on the scoring policy",
   ["send-back-scoring", "eta-send-back-explicit"]
     .map((id) => `${id}=${SOLUTIONS.find((r) => r.id === id)?.buildState}`)
     .join(" "),
@@ -3899,7 +3960,7 @@ check(
   ),
 );
 
-console.log("\n13. Account self-service — catalogue row 16");
+console.log("\n13. Account self-service — catalogue row 18");
 
 /**
  * ⛔ Reads the RULES module and the two pages, never the catalogue text. The
@@ -3907,7 +3968,7 @@ console.log("\n13. Account self-service — catalogue row 16");
  */
 /**
  * ⛔⛔ **A grep for a banned string matches this repo's own explanation of why
- * it is banned.** That happened THREE times building row 16 — on `111-1111`,
+ * it is banned.** That happened THREE times building row 18 — on `111-1111`,
  * on `fill="white"`, and on `type="password"` — and each time the check failed
  * against correct code, which is the failure mode most likely to get a good
  * check deleted rather than fixed.
@@ -3977,7 +4038,7 @@ check(
     !codeOnly(A_SOURCES.login).includes("No longer have access"),
 );
 /**
- * ⛔ `/login` is no longer row 16's entry. With the proposal gone it carries
+ * ⛔ `/login` is no longer row 18's entry. With the proposal gone it carries
  * nothing of the row's — it exists because the CAPTURED Logout row lands on a
  * sign-in screen in production. A catalogue entry pointing at it would claim a
  * demo that is not there.
@@ -3994,11 +4055,11 @@ const ROW_15_ROUTES = [
  * not have.
  *
  * ⛔ `/login` still appears in neither. With the pre-auth proposal gone it
- * carries nothing of row 16's — it exists because the captured Logout row lands
+ * carries nothing of row 18's — it exists because the captured Logout row lands
  * on a sign-in screen in production.
  */
 check(
-  "...and row 16 demonstrates the MENU, with the Account screen as its alternate",
+  "...and row 18 demonstrates the MENU, with the Account screen as its alternate",
   `${ROW_15_ROUTES.length} route(s): ${ROW_15_ROUTES.join(", ")}`,
   ROW_15_ROUTES.length === 2 &&
     ROW_15_ROUTES[0] === "/options" &&
@@ -4240,7 +4301,7 @@ check(
   buildOptionsRows(FIXED("rider-no-show")).length === CAPTURED_OPTIONS_ROWS,
 );
 check(
-  "...and exactly one row appears when row 16 is focused",
+  "...and exactly one row appears when row 18 is focused",
   `${buildOptionsRows(FIXED(ACCOUNT_SOLUTION_ID)).length} row(s), expected ${CAPTURED_OPTIONS_ROWS + 1}`,
   buildOptionsRows(FIXED(ACCOUNT_SOLUTION_ID)).length === CAPTURED_OPTIONS_ROWS + 1,
 );
@@ -4293,9 +4354,9 @@ check(
 /**
  * ⚠️ Logout is one of the CAPTURED eleven and in production it lands on the
  * sign-in screen. It toasted here only because no such screen existed until
- * row 16 built one, so wiring it is replication catching up — NOT a proposal,
+ * row 18 built one, so wiring it is replication catching up — NOT a proposal,
  * and deliberately not gated. An unfocused run therefore lands on the plain
- * replicated sign-in with row 16's recovery link absent, which is what
+ * replicated sign-in with row 18's recovery link absent, which is what
  * production does.
  */
 check(
@@ -4687,7 +4748,7 @@ check(
 
 const ROW_15 = SOLUTIONS.find((s) => s.id === ACCOUNT_SOLUTION_ID)!;
 check(
-  "row 16 is in the prototype, demonstrated from the Options menu",
+  "row 18 is in the prototype, demonstrated from the Options menu",
   `${ROW_15.buildState} · ${ROW_15.entry?.route} + ${(ROW_15.entry?.alternates ?? []).length} alternate(s)`,
   ROW_15.buildState === "in-prototype" &&
     ROW_15.entry?.route === "/options" &&
@@ -4710,7 +4771,7 @@ check(
 
 
 // ---------------------------------------------------------------------------
-console.log("\n14. Rider declined the trip — catalogue row 17");
+console.log("\n14. Rider declined the trip — catalogue row 19");
 // ---------------------------------------------------------------------------
 
 const D_SOURCES = {
@@ -4727,7 +4788,7 @@ for (const [name, src] of Object.entries(D_SOURCES)) {
 
 const ROW_16 = SOLUTIONS.find((s) => s.id === "rider-initiated-cancellation")!;
 check(
-  "row 17 is in the prototype, entered from a needs-action ride",
+  "row 19 is in the prototype, entered from a needs-action ride",
   `${ROW_16.buildState} · ${ROW_16.entry?.route} · ${(ROW_16.entry?.alternates ?? []).length} alternate(s)`,
   ROW_16.buildState === "in-prototype" &&
     ROW_16.entry?.route === "/my-rides/1049800398" &&
@@ -4753,7 +4814,7 @@ for (const sameDay of [false, true]) {
     options.filter((o) => o.value === "declined").length === 1,
   );
   check(
-    `...and row 17's focus carries no OTHER row's proposal`,
+    `...and row 19's focus carries no OTHER row's proposal`,
     `${options.filter((o) => o.proposed).length} proposal(s) of ${options.length}`,
     options.filter((o) => o.proposed).length === 0 && options.length === 3,
   );
@@ -5092,7 +5153,7 @@ check(
 /* --- 14h. It is NOT a send-back, and NOT a cancellation ------------------ */
 
 /**
- * ⛔⛔ The whole argument for row 17 is that a member's decline must not be
+ * ⛔⛔ The whole argument for row 19 is that a member's decline must not be
  * recorded as a driver send-back — the send-back is the charged route. A check
  * should say so in code, not only in prose.
  */
@@ -5155,7 +5216,7 @@ check(
  * the cancellation was with Support while the chip beside the leg details still
  * said "Not Confirmed", and the My Rides card said nothing at all. One
  * contradiction fixed in a big font is not the contradiction fixed — a driver
- * scanning the list is exactly the one who rings back, which is row 18's whole
+ * scanning the list is exactly the one who rings back, which is row 20's whole
  * subject area.
  */
 check(
@@ -5170,10 +5231,13 @@ const ridesCode = codeOnly(
 );
 check(
   "...and the My Rides card carries it as a status pill",
-  "withCancellation(currentTrips)",
+  "withCancellation(priced)",
   /isCancellationRequested\(trip\.id\)/.test(ridesCode) &&
     /statusPills: \[[\s\S]{0,200}CANCELLATION_REQUESTED_TITLE/.test(ridesCode) &&
-    /withCancellation\(currentTrips\)/.test(ridesCode),
+    // ⚠️ `priced` is `currentTrips` with row 17's send-back prices applied on
+    // the Upcoming tab; both are asserted so the chain cannot be cut.
+    /withCancellation\(priced\)/.test(ridesCode) &&
+    /const priced =[\s\S]{0,300}currentTrips/.test(ridesCode),
 );
 
 /* --- 14j. No internal markers in anything a driver reads ----------------- */
@@ -5190,7 +5254,7 @@ const DECLINE_DRIVER_FACING = [
 ];
 const declineLeaks = DECLINE_DRIVER_FACING.filter((text) => /⛔|⭐/.test(text));
 check(
-  "no internal marker reaches row 17's driver-facing copy",
+  "no internal marker reaches row 19's driver-facing copy",
   `${declineLeaks.length} leak(s) of ${DECLINE_DRIVER_FACING.length} string(s)`,
   declineLeaks.length === 0,
 );
@@ -5241,7 +5305,7 @@ check(
 
 
 // ===========================================================================
-console.log("\n15. Update Trip Details — catalogue row 22");
+console.log("\n15. Update Trip Details — catalogue row 24");
 
 const TRIP_CHANGE_ENTRY_RIDE = "1049800400";
 const TRIP_CHANGE_ALT_RIDE = "1049800401";
@@ -5515,7 +5579,7 @@ check(
 // ---- 15f · Who can open it ----------------------------------------------
 /**
  * ⛔ Three doors closed for three different reasons, and each refusal says
- * which. A `completed` ride is row 03's case; an unaccepted offer is row 23's.
+ * which. A `completed` ride is row 03's case; an unaccepted offer is row 25's.
  */
 const REFUSAL_CASES: Array<[string, string | null]> = [
   ["needs-action", null],
@@ -5576,20 +5640,20 @@ const TRIP_CHANGE_DRIVER_FACING = [
     .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
 ];
 check(
-  "no internal marker reaches row 22's driver-facing copy",
+  "no internal marker reaches row 24's driver-facing copy",
   `${TRIP_CHANGE_DRIVER_FACING.filter((t) => /⛔|⭐/.test(t)).length} leak(s) of ${TRIP_CHANGE_DRIVER_FACING.length} string(s)`,
   TRIP_CHANGE_DRIVER_FACING.every((t) => !/⛔|⭐/.test(t)),
 );
 /**
  * ⛔ Help text cannot see field ORDER — the copy lives in the registry's field
  * literals and the order lives in the array around them — so "the field above"
- * is a claim it is in no position to make. Row 17 shipped three of these.
+ * is a claim it is in no position to make. Row 19 shipped three of these.
  */
 const placed = TRIP_CHANGE_DRIVER_FACING.filter((t) =>
   /\b(above|below)\b/i.test(t),
 );
 check(
-  "no row 22 copy claims where another field sits",
+  "no row 24 copy claims where another field sits",
   `${placed.length} of ${TRIP_CHANGE_DRIVER_FACING.length} string(s)`,
   placed.length === 0,
 );
@@ -5617,14 +5681,14 @@ check(
  * declared fact rather than a comment.
  */
 check(
-  "row 22 does NOT claim to track what happens next",
+  "row 24 does NOT claim to track what happens next",
   `TRIP_CHANGE_TRACKED_BY_APP=${TRIP_CHANGE_TRACKED_BY_APP}`,
   TRIP_CHANGE_TRACKED_BY_APP === false,
 );
 
 
 // ===========================================================================
-console.log("\n16. Add Leg to Trip — catalogue row 21");
+console.log("\n16. Add Leg to Trip — catalogue row 23");
 
 const ADD_ENTRY = "1049800402";   // 19a — the FINISHED leg of the group
 const ADD_LIVE = "1049800403";    // 19b — its live half
@@ -5640,8 +5704,8 @@ check(
 
 // ---- 16a · ⛔⛔ Two pools, one matcher ------------------------------------
 /**
- * The finding this whole slice turns on. Row 17 must NOT see a completed leg
- * (you cannot report that a member declined a ride they already took); row 21
+ * The finding this whole slice turns on. Row 19 must NOT see a completed leg
+ * (you cannot report that a member declined a ride they already took); row 23
  * must, because a finished leg is its commonest entry point. One function
  * serving both would be wrong for one of them.
  */
@@ -5651,12 +5715,12 @@ check(
   ALL_POOLS.length > LIVE_POOLS.length,
 );
 check(
-  "⛔ row 17 CANNOT see the finished half of the group",
+  "⛔ row 19 CANNOT see the finished half of the group",
   `legsInGroup(21b) → ${legsInGroup(leg21b).map((t) => t.id).join(", ")}`,
   legsInGroup(leg21b).length === 1 && legsInGroup(leg21b)[0].id === ADD_LIVE,
 );
 check(
-  "⭐ ...and row 21 CAN",
+  "⭐ ...and row 23 CAN",
   `groupLegs(21b) → ${groupLegs(leg21b).map((l) => `${l.letter}:${l.trip.id}`).join(", ")}`,
   groupLegs(leg21b).length === 2 &&
     groupLegs(leg21b).some((l) => l.trip.id === ADD_ENTRY),
@@ -6123,7 +6187,7 @@ const shapeWrong = SHAPES.filter(([id, size]) => {
   return !trip || groupLegs(trip).length !== size;
 });
 check(
-  "row 21 is demonstrated on a one-, two- and three-leg trip",
+  "row 23 is demonstrated on a one-, two- and three-leg trip",
   `${SHAPES.map(([id, n]) => `${id}:${ALL_SEEDED.find((t) => t.id === id) ? groupLegs(ALL_SEEDED.find((t) => t.id === id)!).length : "missing"}/${n}`).join(" · ")}`,
   shapeWrong.length === 0 && new Set(SHAPES.map(([, n]) => n)).size === 3,
 );
@@ -6399,11 +6463,11 @@ check(
 /**
  * ⭐ The completed state is included — user direction 1.1 — and it is the only
  * state in this app that offers a support action from a finished ride.
- * ⛔ Row 22 refuses `completed` for the opposite reason: that one would be
+ * ⛔ Row 24 refuses `completed` for the opposite reason: that one would be
  * CORRECTING a finished leg, which is row 03's case.
  */
 check(
-  "⭐ row 21 accepts a COMPLETED ride and row 22 refuses one",
+  "⭐ row 23 accepts a COMPLETED ride and row 24 refuses one",
   `add-leg ${canRequestAddLeg("completed", false)} · trip-change ${tripChangeRefusal(change22a, "completed", false) === null}`,
   canRequestAddLeg("completed", false) === true &&
     tripChangeRefusal(change22a, "completed", false) !== null,
@@ -6424,7 +6488,7 @@ check(
   `19a ${groupKey(leg21a)} · 19b ${groupKey(leg21b)} · 19c ${groupKey(leg21c)}`,
   groupKey(leg21a) === groupKey(leg21b) && groupKey(leg21c) !== groupKey(leg21a),
 );
-/** ⛔⛔ A proposal belongs to its own build — row 21's THIRD surface. */
+/** ⛔⛔ A proposal belongs to its own build — row 23's THIRD surface. */
 const ADD_ENTRY_SCOPE: Array<[string | null, boolean]> = [
   [null, true],
   ["add-leg-request", true],
@@ -6438,7 +6502,7 @@ for (const [focus, expected] of ADD_ENTRY_SCOPE) {
     showsAddLegEntry(FIXED(focus)) === expected,
   );
 }
-/** ⛔ Four options, not row 22's five — nobody notices a leg that does not exist. */
+/** ⛔ Four options, not row 24's five — nobody notices a leg that does not exist. */
 check(
   "⛔ 'who asked' is its OWN field, with its own shorter list",
   `add-leg ${ADD_SOURCE_OPTIONS.length} vs trip-change ${CHANGE_SOURCE_OPTIONS.length}; ids ${ADD_SOURCE_FIELD} / ${CHANGE_SOURCE_FIELD}`,
@@ -6462,21 +6526,21 @@ const ADD_DRIVER_FACING = [
     .flatMap((f) => [f.label, f.helpText ?? "", f.placeholder ?? ""]),
 ];
 check(
-  "no internal marker reaches row 21's driver-facing copy",
+  "no internal marker reaches row 23's driver-facing copy",
   `${ADD_DRIVER_FACING.filter((t) => /⛔|⭐/.test(t)).length} leak(s) of ${ADD_DRIVER_FACING.length} string(s)`,
   ADD_DRIVER_FACING.every((t) => !/⛔|⭐/.test(t)),
 );
 check(
-  "no row 21 copy claims where another field sits",
+  "no row 23 copy claims where another field sits",
   `${ADD_DRIVER_FACING.filter((t) => /\b(above|below)\b/i.test(t)).length} of ${ADD_DRIVER_FACING.length} string(s)`,
   !ADD_DRIVER_FACING.some((t) => /\b(above|below)\b/i.test(t)),
 );
 check(
-  "row 21 does NOT claim to track what happens next",
+  "row 23 does NOT claim to track what happens next",
   `ADD_LEG_TRACKED_BY_APP=${ADD_LEG_TRACKED_BY_APP}`,
   ADD_LEG_TRACKED_BY_APP === false,
 );
-/** ⛔ A notice would block Submit forever — the row 22 lesson, re-asserted. */
+/** ⛔ A notice would block Submit forever — the row 24 lesson, re-asserted. */
 check(
   "no notice field on this case either",
   `${built19.supportCase.fields.filter((f) => f.type === "notice" && f.showIf?.equals.includes(ISSUE_ADD_LEG_REQUEST)).length} of ${ids19.length}`,
@@ -6541,7 +6605,7 @@ check(
 
 /**
  * ⭐ The overnight notice, which is the ONE place a `notice` is the right answer
- * rather than row 22's trap. It blocks Submit, and here that is the behaviour
+ * rather than row 24's trap. It blocks Submit, and here that is the behaviour
  * wanted: a schedule crossing midnight is one the app genuinely cannot work out.
  */
 const overnightCase = buildAddLegCase(leg21a, {
@@ -6575,7 +6639,7 @@ check(
 
 /** ⛔ No diff gate here — an added leg has no baseline to differ from. */
 check(
-  "⛔ row 21 declares NO diff gate — row 22's rule does not transfer",
+  "⛔ row 23 declares NO diff gate — row 24's rule does not transfer",
   `requireChangedFrom=${built19.supportCase.requireChangedFrom ?? "undefined"}`,
   built19.supportCase.requireChangedFrom === undefined,
 );
@@ -6749,7 +6813,7 @@ console.log("\n18. The feature table reconstructs the spreadsheet's merged shape
 const EXPECTED_MERGED_AREA = 7;
 const EXPECTED_MERGED_PROBLEM = 4;
 const EXPECTED_MERGED_USECASE = 2;
-const EXPECTED_TABLE_ROWS = 28;  // ⭐ +1 on 2026-10-15: row 19; +1: row 13
+const EXPECTED_TABLE_ROWS = 30;  // ⭐ +1 on 2026-10-15: row 21; +1: row 13
 
 const tRows = tableRows();
 check(
@@ -7048,8 +7112,16 @@ const GATES: Array<{
    * declaration and not to itself.
    */
   { name: "showsMemberFilter", owners: ["auto-assign-request", "request-feed-member-filter"], shown: (f) => showsMemberFilter(f) },
-  /** ⭐ Added 2026-10-15 — row 19. The lists, the bar and the Acknowledge button. */
+  /** ⭐ Added 2026-10-15 — row 21. The lists, the bar and the Acknowledge button. */
   { name: "showsCancelledRides", owners: ["my-rides-cancelled"], shown: (f) => showsCancelledRides(f) },
+  /**
+   * ⭐ Added 2026-10-22 — rows 16 and 17. ⛔ TWO gates, not one: row 16 is the
+   * Request Feed pill and the accept warning, row 17 the two Upcoming pills.
+   * Owners written out as literals so this compares each gate to a declaration
+   * rather than to itself.
+   */
+  { name: "showsShortNoticeAtTake", owners: ["short-notice-at-take"], shown: (f) => showsShortNoticeAtTake(f) },
+  { name: "showsSendbackPenaltyPills", owners: ["short-notice-countdown"], shown: (f) => showsSendbackPenaltyPills(f) },
   /**
    * ⭐ Added 2026-10-15 — row 13. ⛔ Owned by ONE row, not the three that share
    * the screen: rows 11 and 12 propose backend work and still show production's
@@ -7093,7 +7165,7 @@ check(
   `${GATES.length} gate(s) x ${FOCUS_IDS.length} focus(es) x ${DEMO_MODES.length} mode(s)`,
   gateSweep === GATES.length * FOCUS_IDS.length * DEMO_MODES.length &&
     FOCUS_IDS.length === EXPECTED_ROWS + 1 &&
-    GATES.length === 15,
+    GATES.length === 17,  // ⭐ +2 on 2026-10-22: rows 16 and 17
 );
 /**
  * ⛔ Non-vacuity: a sweep where every gate said `false` everywhere would agree
@@ -7161,7 +7233,16 @@ for (const want of PRE_B1) {
  * rest, and together they have to account for every gate. A gate in NEITHER is
  * a gate whose behaviour nothing here describes.
  */
-const ADDED_AFTER_B1 = ["showsMemberFilter", "showsCancelledRides", "showsCapacityException"];
+const ADDED_AFTER_B1 = [
+  "showsMemberFilter",
+  "showsCancelledRides",
+  "showsCapacityException",
+  // ⭐ 2026-10-22 — rows 16 and 17. Neither existed at B1, so neither can carry
+  // a pre-B1 baseline; naming them here is what keeps the arithmetic below
+  // (`PRE_B1 + ADDED === GATES`) a real check rather than a tautology.
+  "showsShortNoticeAtTake",
+  "showsSendbackPenaltyPills",
+];
 check(
   "with the mode pinned to fixed, every gate answers what it answered before B1",
   movedBehaviour.length
@@ -7564,7 +7645,7 @@ check(
  * ⛔⛔ **Declared membership, not a count against itself.** The first version
  * compared `builtRows.filter(hasNowState).length` with `ROWS_AWAITING_NOW.length`
  * — and `hasNowState` is derived from that very list, so the two could never
- * disagree. A break test deleting row 17 from the list passed cleanly: the app
+ * disagree. A break test deleting row 19 from the list passed cleanly: the app
  * would have claimed a production screen it does not have, and said so on
  * screen, with the gate green.
  *
@@ -7605,8 +7686,8 @@ check(
  * one above stops being empty. Both edits, or the pair disagrees.
  */
 const builtWithNow = builtRows.filter((row) => hasNowState(row.id));
-const EXPECTED_WITH_NOW = 14;  // ⭐ +1 on 2026-10-15: row 19; +1: row 13
-const EXPECTED_BUILT = 14;  // ⭐ +1 on 2026-10-15: row 19; +1: row 13
+const EXPECTED_WITH_NOW = 16;  // ⭐ +1 on 2026-10-15: row 21; +1: row 13
+const EXPECTED_BUILT = 16;  // ⭐ +1 on 2026-10-15: row 21; +1: row 13
 check(
   "...and every built row has a production side to compare against",
   `${builtWithNow.length} with a production screen, ${builtRows.length - builtWithNow.length} awaiting, of ${builtRows.length} built`,
@@ -7765,7 +7846,7 @@ check(
 
 
 // ---------------------------------------------------------------------------
-console.log("\n23. Row 17 — what happens when the rider declines");
+console.log("\n23. Row 19 — what happens when the rider declines");
 // ---------------------------------------------------------------------------
 /**
  * B3c. ⛔⛔ Until this, the declined sheet was the PROPOSAL unconditionally —
@@ -7797,14 +7878,14 @@ const SHEET_CASES: Array<{
   goesTo: "zendesk" | "form";
 }> = [
   {
-    why: "row 17 focused, Now",
+    why: "row 19 focused, Now",
     focus: demoFocus("rider-initiated-cancellation", "now"),
     body: "Please chat with support to remove it from your manifest.",
     primaryLabel: "Chat with Support",
     goesTo: "zendesk",
   },
   {
-    why: "row 17 focused, Proposed",
+    why: "row 19 focused, Proposed",
     focus: demoFocus("rider-initiated-cancellation", "fixed"),
     body: "Support needs a few details before we can remove it from your manifest.",
     primaryLabel: "Continue",
@@ -7945,7 +8026,7 @@ check(
 const DECLINE_TRIP = mockNeedsActionTrips.find((t) => t.scenario?.solutions.includes("rider-initiated-cancellation"))
   ?? mockInProgressTrips.find((t) => t.scenario?.solutions.includes("rider-initiated-cancellation"));
 check(
-  "a row 17 scenario ride is seeded, so the template below is built on a real trip",
+  "a row 19 scenario ride is seeded, so the template below is built on a real trip",
   DECLINE_TRIP ? `${DECLINE_TRIP.id} (${DECLINE_TRIP.scenario?.code})` : "NONE — the checks below are vacuous",
   DECLINE_TRIP !== undefined,
 );
@@ -8029,7 +8110,7 @@ const formReachable = (["now", "fixed"] as const).flatMap((mode) =>
   SOLUTIONS.map((row) => ({ row: row.id, mode, sheet: declinedSheetFor(demoFocus(row.id, mode)) }))
 ).filter((entry) => entry.sheet.primaryGoesTo === "form");
 check(
-  "the in-app form is reachable only from row 17's proposal",
+  "the in-app form is reachable only from row 19's proposal",
   `${formReachable.length} of ${SOLUTIONS.length * 2} (row x mode) reach the form — ${formReachable.map((e) => `${e.row}/${e.mode}`).join(", ") || "none"}`,
   formReachable.length === 1 &&
     formReachable[0].row === "rider-initiated-cancellation" &&
@@ -8138,7 +8219,12 @@ if (STANDING && PLAIN_SEND_BACK) {
    * the break to append, so the terminal claim was never exercised. The
    * synthesised trip is the only way to put a step after `denied` at all.
    */
-  const STANDING_AND_SHORT: Trip = { ...STANDING, sameDay: true };
+  // ⛔⛔ `penaltyBand`, not `sameDay`, since 2026-10-22. `sameDay` stopped being
+  // the short-notice test when row 16 added a $10 band — it now only PUTS a trip
+  // in the top band, and synthesising with it made this fixture silently
+  // not-short-notice, which is exactly the hole the comment above describes.
+  // STANDING is Verida GA, whose band 2 is "Same-day sendback".
+  const STANDING_AND_SHORT: Trip = { ...STANDING, penaltyBand: 2 };
   check(
     "a standing order that is ALSO short-notice can be built, so 'terminal' is testable",
     `standingOrder=${isStandingOrder(STANDING_AND_SHORT)} shortNotice=${isShortNoticeSendBack(STANDING_AND_SHORT)}`,
@@ -8542,7 +8628,7 @@ const unreachable = [...reachableBy]
 /**
  * ⛔⛔ The loop above seeds every row from its Proposed Feature cell, which
  * is only true while that column never merges. Asserted against the MARKUP, not
- * assumed: a `rowSpan` on that cell is the obvious tidy-up — rows 18 and 20 say
+ * assumed: a `rowSpan` on that cell is the obvious tidy-up — rows 20 and 22 say
  * the same thing, so why draw it twice — and it would take the second row of
  * that pair out of the table entirely, with nothing to see.
  */
@@ -8560,7 +8646,7 @@ check(
   unreachable.length === 0 &&
     reachableBy.size === EXPECTED_TABLE_ROWS &&
     // ⛔ Non-vacuity: the live set must not have quietly emptied.
-    liveRows.length === 16 &&
+    liveRows.length === 18 &&  // ⭐ +2 on 2026-10-22: rows 16 and 17
     PROPOSED_CELL_TAG.length > 0 && !proposedMerges,
 );
 /**
@@ -8857,7 +8943,7 @@ check(
     : `${INERT_ROWS.length} greyed, ${SINGLE_SIDED.length} one-sided, ` +
       `${SOLUTIONS.length - INERT_ROWS.length - SINGLE_SIDED.length} with both sides`,
   sidedDrift.length === 0 &&
-    INERT_ROWS.length + SINGLE_SIDED.length + 14 === EXPECTED_TABLE_ROWS,
+    INERT_ROWS.length + SINGLE_SIDED.length + 16 === EXPECTED_TABLE_ROWS,  // ⭐ 14 -> 16 on 2026-10-22: rows 16 and 17 have both sides
 );
 /**
  * ⛔⛔ **A greyed row really has nothing** — not an entry, not a `nowEntry`,
@@ -9025,7 +9111,7 @@ check(
 const ALTERNATES = SOLUTIONS.flatMap((s) =>
   (s.entry?.alternates ?? []).map((a) => ({ id: s.id, ...a })),
 );
-const EXPECTED_SHORTS = 13;  // ⭐ +1 on 2026-10-15: row 19's cancelled ride
+const EXPECTED_SHORTS = 14;  // ⭐ +1 on 2026-10-15: row 21's cancelled ride; +1 on 2026-10-22: row 16's
 const SHORT_MAX = 45;
 const SHORT_MIN = 20;
 const shortBad = ALTERNATES.filter(
@@ -9069,7 +9155,7 @@ check(
  */
 const SUMMARY_MAX = 95;
 const SUMMARY_MIN = 45;
-/** ⚠️ Row 27 has no proposal at all; both fields are an em dash. */
+/** ⚠️ Row 29 has no proposal at all; both fields are an em dash. */
 const NO_PROPOSAL_ID = "technical-issues";
 const summaryBad = SOLUTIONS.filter((s) => {
   if (s.id === NO_PROPOSAL_ID) return s.tableSummary !== "—" || s.proposedFeature !== "—";
@@ -9101,7 +9187,7 @@ check(
 );
 /**
  * ⛔⛔ Exactly one pair of rows says the same thing, and it is the pair that
- * says the same thing in the SOURCE — rows 18 and 20, one requests tray listed
+ * says the same thing in the SOURCE — rows 20 and 22, one requests tray listed
  * twice. A second duplicate would mean a summary had been copied rather than
  * written, and a summary copied onto the wrong row is invisible.
  */
@@ -9115,7 +9201,7 @@ const summaryDuplicateIds = dupes.flat().sort();
 check(
   "...and the only two rows that read alike are the two the source writes alike",
   dupes.length === 0
-    ? "NONE — rows 18 and 20 should share one sentence, as they share one proposedFeature"
+    ? "NONE — rows 20 and 22 should share one sentence, as they share one proposedFeature"
     : `${dupes.length} pair(s): ${dupes.map((ids) => ids.join(" + ")).join("; ")}`,
   dupes.length === 1 &&
     summaryDuplicateIds.join(",") === [...DUPLICATE_PAIR].sort().join(",") &&
@@ -9744,7 +9830,7 @@ check(
  *
  * ⚠️ The prose said "fourteen" while the assertion said 11 — stale since
  * before this slice, corrected here rather than left to rot further. The
- * number is 12 as of 2026-10-15: row 19 has a proposal in the catalogue and
+ * number is 12 as of 2026-10-15: row 21 has a proposal in the catalogue and
  * nothing built yet, which is exactly the gap these two questions measure.
  */
 const proposalVsPrototype = SOLUTIONS.filter(
@@ -9756,7 +9842,7 @@ check(
     `${SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length} can show one, ` +
     `${proposalVsPrototype.length} row(s) differ`,
   SOLUTIONS.filter(hasProposedSide).length === SOLUTIONS.length - 3 &&
-    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 14 &&
+    SOLUTIONS.filter((r) => demonstrableSides(r).includes("fixed")).length === 16 &&  // ⭐ +2 on 2026-10-22
     // ⭐ They must genuinely differ, or one is the other under a new name.
     proposalVsPrototype.length === 11,
 );
@@ -9868,7 +9954,7 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
   for (const gate of GATES) out[`gate:${gate.name}`] = String(gate.shown(focus));
 
   /**
-   * Row 19 — the manifest, the task list, the bar and the acknowledgement.
+   * Row 21 — the manifest, the task list, the bar and the acknowledgement.
    *
    * ⛔⛔ **Four surfaces, not one.** A row whose only moving part is its own
    * gate is the "decorative" failure 28a exists to catch, wearing a new
@@ -9898,7 +9984,7 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
   // Row 14 — the send-back path of every seeded ride.
   out["send-back"] = ALL_SEEDED.map((trip) => sendBackSteps(trip, focus).join(">")).join("|");
 
-  // Row 17 — the sheet production shows when the rider declines.
+  // Row 19 — the sheet production shows when the rider declines.
   const sheet = declinedSheetFor(focus);
   out["declined"] = `${sheet.primaryLabel}>${sheet.primaryGoesTo}`;
 
@@ -9924,7 +10010,7 @@ function surfaceFingerprint(row: Solution, wanted: DemoMode): Record<string, str
     .join("|");
   out["unblock"] = String(offeredSwipe("pick-up", true, focus));
 
-  // Row 16 — the Options menu, and rows 04/05 — the Reach Rider options.
+  // Row 18 — the Options menu, and rows 04/05 — the Reach Rider options.
   out["options"] = buildOptionsRows(focus).map((r) => `${r.label}:${r.proposed ?? false}`).join("|");
   out["reach"] = [true, false]
     .map((sameDay) => reachOptionsFor(sameDay, focus).map((o) => `${o.label}:${o.proposed ?? false}`).join(","))
@@ -9948,13 +10034,13 @@ function changedSurfaces(row: Solution): string[] {
 
 const SURFACE_COUNT = Object.keys(surfaceFingerprint(SOLUTIONS[0], "now")).length;
 /**
- * ⭐ `+14` on 2026-10-15 when row 19 landed four rules beside its gate — the
+ * ⭐ `+14` on 2026-10-15 when row 21 landed four rules beside its gate — the
  * manifest, the task list, the filter and the acknowledgement. ⚠️ **`+12` since
  * 2026-10-17 (D168): the task list and the acknowledgement are gone.** The
  * filter became the toggle, so that surface survives under a new name; the
  * other two have no rule left to fingerprint.
  *
- * ⛔ Row 19 still moves TWO surfaces beside its gate, which is what keeps it a
+ * ⛔ Row 21 still moves TWO surfaces beside its gate, which is what keeps it a
  * build rather than a flag — a row whose only moving surface is its own gate is
  * the "decorative" failure 28a exists to catch.
  */
@@ -9975,7 +10061,7 @@ check(
   builtUnchanged.length
     ? `DECORATIVE on ${builtUnchanged.length} of ${builtRows.length}: ${builtUnchanged.map((r) => `${r.order} ${r.id}`).join(", ")}`
     : `${builtRows.length} of ${builtRows.length} built row(s) change something`,
-  builtUnchanged.length === 0 && builtRows.length === 14,
+  builtUnchanged.length === 0 && builtRows.length === 16,
 );
 /**
  * ⛔⛔ **The measurement against the list.** `ROWS_AWAITING_NOW` is a line
@@ -10614,7 +10700,7 @@ check(
  * that a destination is not something a form can be filed against.
  */
 /**
- * ⭐ 7 since 2026-10-14: the two legs of row 17's round trip, the two of row
+ * ⭐ 7 since 2026-10-14: the two legs of row 19's round trip, the two of row
  * 19's two-leg group, and the three of its new three-leg group.
  */
 const EXPECTED_GROUPED_LEGS = 7;
@@ -10688,10 +10774,10 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-console.log("\n31. Row 19 — the manifest the cancellations sit in");
+console.log("\n31. Row 21 — the manifest the cancellations sit in");
 // ---------------------------------------------------------------------------
 /**
- * ⛔⛔ **The seed is the argument here.** Row 19 is about a cancelled ride being
+ * ⛔⛔ **The seed is the argument here.** Row 21 is about a cancelled ride being
  * findable among a day's worth of others, so a two-ride list would prove
  * nothing — and a list where all three cancellations fell on one date would
  * prove the opposite of "in the right date position, mixed in with the rest".
@@ -10713,7 +10799,7 @@ const row19Cancelled = row19.filter((t) => Boolean(t.clientCancelNoticeAt));
 const CANCELLED_SEED = row19Cancelled;
 const row19Dates = [...new Set(row19.map((t) => t.date))];
 check(
-  "row 19 is demonstrated on a whole manifest, not a pair of rides",
+  "row 21 is demonstrated on a whole manifest, not a pair of rides",
   `${row19.length} ride(s), ${row19Cancelled.length} cancelled, over ${row19Dates.length} date(s)`,
   row19.length === EXPECTED_ROW_18_RIDES &&
     row19Cancelled.length === EXPECTED_ROW_18_CANCELLED &&
@@ -10742,12 +10828,12 @@ check(
  */
 const row19WithProgress = row19.filter((t) => t.legs.some((l) => l.progress));
 check(
-  "none of row 19's rides carries a swipe mark, so none reaches a leg picker",
+  "none of row 21's rides carries a swipe mark, so none reaches a leg picker",
   `${row19WithProgress.length} of ${row19.length} with progress; picker offers ${getLegOptions("all").length}`,
   row19WithProgress.length === 0 &&
     getLegOptions("all").length === EXPECTED_CONTEXT_LEGS,
 );
-/** ⛔ ...and none joins a trip group, which would pull them into row 17/21's pools. */
+/** ⛔ ...and none joins a trip group, which would pull them into row 19/21's pools. */
 const row19Grouped = row19.filter((t) => Boolean(t.tripGroup));
 check(
   "...and none of them joins a trip group",
@@ -11052,13 +11138,20 @@ check(
 /** ⛔ Every ride sits under exactly one heading, and no heading is empty. */
 const days = groupByRideDay(mockUpcomingTrips);
 /**
- * ⭐ Nine: the four days row 19 seeds, `UP-001` on Aug 7, the three rides
+ * ⭐ Nine: the four days row 21 seeds, `UP-001` on Aug 7, the three rides
  * `lib/data/payout.ts` pins to April and May and that therefore cannot be
  * re-dated, and Sep 24 — the day row 13's two blocking rides share with the
  * over-capacity request. The focused demo filters the pinned three out; only
  * the plain mirror shows them.
  */
-const EXPECTED_UPCOMING_DAYS = 9;  // ⭐ +1 on 2026-10-15: Sep 24, row 13's two blocking rides
+/**
+ * ⭐ +1 on 2026-10-22: Jul 31. Row 17's top band is a SAME-DAY send-back, so its
+ * ride has to sit on `MOCK_TODAY` for the date on the card to agree with the
+ * band on it — and no upcoming ride was dated today before. The other two sit on
+ * days that already existed (Aug 1, Aug 4), which is why one date buys three
+ * bands.
+ */
+const EXPECTED_UPCOMING_DAYS = 10;  // ⭐ +1 on 2026-10-15: Sep 24, row 13's two blocking rides
 check(
   "every ride sits under exactly one date heading",
   `${days.length} day(s) over ${mockUpcomingTrips.length} ride(s): ${days.map((d) => `${d.label.replace(/^\w{3}, /, "")}=${d.trips.length}`).join(", ")}`,
@@ -11073,7 +11166,7 @@ check(
  * ⛔⛔ **The cancelled ride's own screen is NOT gated, and that is easy to
  * regress into a gate.** `CAP-342` is a photograph of production showing it;
  * gating it would make the prototype claim production has no cancelled view.
- * What row 19 proposes is a way to REACH it other than the alert.
+ * What row 21 proposes is a way to REACH it other than the alert.
  *
  * Enforced by signature, like `upcomingRides`: the rule is never given a focus,
  * so it cannot consult one.
@@ -11148,9 +11241,9 @@ check(
     : `${CANCELLED_REGIONS.length} of ${CANCELLED_REGIONS.length} region(s)`,
   missingRegions.length === 0,
 );
-/** ⛔ ...and it never borrows row 17's banner copy, which says the opposite. */
+/** ⛔ ...and it never borrows row 19's banner copy, which says the opposite. */
 check(
-  "...and the cancelled banner is not row 17's",
+  "...and the cancelled banner is not row 19's",
   `CANCELLATION_REQUESTED_TITLE within the cancelled block: ${/\{state === "cancelled" && \([\s\S]{0,500}CANCELLATION_REQUESTED/.test(LAYOUT_CODE)}`,
   !/\{state === "cancelled" && \([\s\S]{0,500}CANCELLATION_REQUESTED/.test(LAYOUT_CODE),
 );
@@ -11182,7 +11275,7 @@ check(
 /**
  * ⛔⛔ **The alert itself is ungated; only its trigger is scoped.** Production
  * raises it on both sides of the toggle — the proposal does not remove it. The
- * prototype has no push, so the stand-in fires while row 19 is focused; that
+ * prototype has no push, so the stand-in fires while row 21 is focused; that
  * scoping is scaffolding and says so.
  */
 const MY_RIDES_CODE = codeOnly(readFileSync(join(ROOT, "app/my-rides/page.tsx"), "utf8"));
@@ -11369,8 +11462,11 @@ check(
  */
 check(
   "both pill maps run, with the Wingz one outermost",
-  `composed: ${/withClientCancellation\(withCancellation\(currentTrips\)\)/.test(PAGE_CODE)}`,
-  /withClientCancellation\(withCancellation\(currentTrips\)\)/.test(PAGE_CODE) &&
+  // ⚠️ The NESTING is what this means, not the innermost argument. It pinned
+  // `currentTrips` until 2026-10-22, when row 17's price map was composed
+  // inside — which broke a check whose subject had not changed at all.
+  `composed: ${/withClientCancellation\(withCancellation\(/.test(PAGE_CODE)}`,
+  /withClientCancellation\(withCancellation\(/.test(PAGE_CODE) &&
     /const withClientCancellation = /.test(PAGE_CODE) &&
     /const withCancellation = /.test(PAGE_CODE),
 );
@@ -11537,7 +11633,7 @@ check(
 
 /* === 32. The My Rides filter feature ====================================== */
 /**
- * Catalogue row 19's control — **one toggle, "Show cancelled trips", default on.**
+ * Catalogue row 21's control — **one toggle, "Show cancelled trips", default on.**
  *
  * ⛔⛔ **SUPERSEDES the seven-filter registry this section used to check
  * (D162, 2026-10-17).** The old §32 swept `RIDE_FILTERS` over narrowing,
@@ -11578,7 +11674,7 @@ check(
 
 /**
  * ⛔⛔ **The catalogue's own copy describes the toggle, not the filter it
- * replaced — and a break test is why this check exists.** Reverting row 19's
+ * replaced — and a break test is why this check exists.** Reverting row 21's
  * `proposedFeature` to "behind an All / Active / Cancelled filter" left the
  * whole suite green: every behavioural check drives `lib/`, and the catalogue
  * is prose nothing executed. The table is what a reviewer reads to decide what
@@ -11608,7 +11704,7 @@ const ROW_19_COPY = [
 const RETIRED_WORDING = ["All / Active / Cancelled", "filtered and acknowledged", "filter", "Acknowledge button", "Needs Action"];
 const staleWording = RETIRED_WORDING.filter((w) => ROW_19_COPY.includes(w));
 check(
-  "row 19's copy describes the toggle, and no longer the filter it replaced",
+  "row 21's copy describes the toggle, and no longer the filter it replaced",
   `toggle named ${ROW_19_COPY.includes("Show cancelled trips")}; ` +
     `stale: ${staleWording.join(", ") || "none"}`,
   ROW_19_COPY.includes("Show cancelled trips") && staleWording.length === 0,
@@ -11680,7 +11776,7 @@ check(
 /* --- 32f. Every cancellation source, and a fixture for each -------------- */
 /**
  * ⛔⛔ **D160's lesson, applied before it can be relearned: a declared variant
- * with no seeded ride is an unfalsifiable spec.** Row 19 widened from
+ * with no seeded ride is an unfalsifiable spec.** Row 21 widened from
  * client-only to every cancellation source (D163). Declaring a second source
  * and seeding none would leave every check below passing on a manifest that
  * only ever shows one — which is exactly how demo row "5" sat in the no-show
@@ -12741,12 +12837,19 @@ check(
     `reject: ${rf36RejectTag.slice(0, 5)}, base accept: ${rf36AcceptTag.slice(0, 5)}`,
   rf36RequestTag.startsWith("<button") &&
     /setCapacityFormOpen\(true\)/.test(rf36RequestTag) &&
-    // ⛔ Non-vacuity: the OTHER halves really are not buttons, or "is a button"
-    // is a property of every element in the file.
+    // ⛔ Non-vacuity: the REJECT half really is not a button, or "is a button"
+    // is a property of every element in the file. ⚠️ The base accept half used
+    // to serve as the second witness and no longer can — row 16 made it a
+    // button on 2026-10-22. The reject half carries the non-vacuity alone now,
+    // which it always could: it is the half nothing in this repo ever wires.
     rf36RejectTag.startsWith("<span") &&
-    rf36AcceptTag.startsWith("<span") &&
     !/onClick/.test(rf36RejectTag) &&
-    !/onClick/.test(rf36AcceptTag),
+    // ⛔⛔ ...and the base accept is GATED, not live. An unconditional handler
+    // here would make every request in the app interceptable, which is exactly
+    // what `request-swipe.ts` says this prototype does not do. The gate name is
+    // asserted, so deleting the condition fails even though the button remains.
+    rf36AcceptTag.startsWith("<button") &&
+    /warnsShortNotice/.test(rf36AcceptTag),
 );
 
 /* --- 36e. Submitting accepts nothing ------------------------------------- */
@@ -13273,7 +13376,7 @@ console.log("\n39. A row's copy cannot offer a door answer the picker does not")
  * a word everywhere is a ban nobody can keep.
  *
  * ⛔ Reads the COPY FIELDS, never the file text. `catalogue.ts` has comments
- * saying "nobody" about something else entirely ("nobody noticed row 18 was
+ * saying "nobody" about something else entirely ("nobody noticed row 20 was
  * silent"), so a grep over the source would fail on its own prose.
  */
 const RF39_DENIAL = /\bno[- ]?one\b|\bnobody\b/i;
@@ -13338,7 +13441,7 @@ console.log("\n40. The support chat opens on the right conversation");
 /**
  * ⛔⛔ **Routing a second case at the chat screen would have LIED.**
  * `ZendeskChatScreen` auto-sends its template the instant it opens, and that
- * template was hard-wired to row 17's. A standing-order driver sent there
+ * template was hard-wired to row 19's. A standing-order driver sent there
  * unchanged would have opened a chat whose first and only message reads *"My
  * member no longer needs transportation"* — over a trip whose member needs it
  * fine, auto-sent, under the driver's own name.
@@ -13390,13 +13493,13 @@ if (RF40_SO) {
     !standing.lines.some((l) => /reason|why/i.test(l.label)),
   );
   /**
-   * ⛔⛔ **The screen picks by topic, and the default is row 17's.** Every URL
+   * ⛔⛔ **The screen picks by topic, and the default is row 19's.** Every URL
    * that existed before this module resolves to exactly what it did before —
-   * a query parameter appearing on row 17's link would be this change reaching
+   * a query parameter appearing on row 19's link would be this change reaching
    * a screen it was meant to leave alone.
    */
   check(
-    "the default topic is row 17's, and its route is unchanged",
+    "the default topic is row 19's, and its route is unchanged",
     `default=${DEFAULT_SUPPORT_CHAT_TOPIC}; route=${supportChatRoute(RF40_SO.id, DEFAULT_SUPPORT_CHAT_TOPIC)}`,
     DEFAULT_SUPPORT_CHAT_TOPIC === "rider-declined" &&
       supportChatRoute(RF40_SO.id, DEFAULT_SUPPORT_CHAT_TOPIC) === `/support-chat/${RF40_SO.id}` &&
@@ -13486,10 +13589,13 @@ console.log("\n41. The ticket column");
  * ⚠️ Row 14 carries TWO because its proposal is two stories (the reason form
  * and the standing-order redirect), exactly as row 01 does.
  */
-const EXPECTED_TICKETED_ROWS = 4;  // ⭐ +1 on 2026-10-17: row 19 → 11330 (D161)
+const EXPECTED_TICKETED_ROWS = 4;  // ⭐ +1 on 2026-10-17: row 21 → 11330 (D161)
 const EXPECTED_TICKETS = 6;  // ⭐ +1 on 2026-10-17: ticket 11330
 /** ⛔ Declared too — a row set derived from the filter cannot disagree with it. */
-const EXPECTED_TICKETED_ORDERS = [1, 2, 14, 19];
+// ⛔⛔ Numbers, not prose — the 2026-10-22 renumber sweep could not see this
+// line, and it is the ONLY declared row-order literal in the repo. `21` is
+// `my-rides-cancelled`, which was 19 before rows 16-17 were inserted.
+const EXPECTED_TICKETED_ORDERS = [1, 2, 14, 21];
 const rf41Ticketed = SOLUTIONS.filter((s) => (s.notionTickets?.length ?? 0) > 0);
 const rf41All = rf41Ticketed.flatMap((s) => s.notionTickets ?? []);
 check(
@@ -13680,6 +13786,231 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+console.log("\n43. The send-back price, before it bites (rows 16 and 17)");
+// ---------------------------------------------------------------------------
+/**
+ * ⛔⛔ **The failure this section exists to catch is DISAGREEMENT, not absence.**
+ * The price used to be `SEND_BACK_PENALTY_USD = 25`, read by the penalty dialog
+ * and the completion toast. Both were right while every penalty was $25. Rows 16
+ * and 17 add a $10 band, and the moment they do, a constant guarantees a card
+ * saying "$10 to send back" above a dialog saying "A $25 penalty will be
+ * applied" — one rule in several renderers, all agreeing, all wrong, which this
+ * repo has shipped once already.
+ */
+const SNP_ALL = [
+  ...mockRequestTrips,
+  ...mockUpcomingTrips,
+  ...mockInProgressTrips,
+  ...mockNeedsActionTrips,
+];
+check(
+  "the seed is big enough for this section to mean anything",
+  `${SNP_ALL.length} trip(s), ${Object.keys(PENALTY_LADDERS).length} market ladder(s)`,
+  SNP_ALL.length > 50 && Object.keys(PENALTY_LADDERS).length >= 4,
+);
+
+/* --- 43a. One rule, one answer ------------------------------------------- */
+/**
+ * ⛔ Declared, never derived. A table built from `sendbackPenaltyFor` would
+ * agree with whatever that function returned, including zero for everything.
+ */
+const SNP_CASES: Array<[string, number, boolean]> = [
+  // id, dollars, short-notice
+  ["1049800440", 0, false],   // row 17 — Verida GA band 0, "Greater than 48 hours"
+  ["1049800441", 10, true],   // row 17 — band 1, the middle band
+  ["1049800442", 25, true],   // row 17 — band 2, same-day
+  ["1049800443", 25, true],   // row 16 — a priced request
+  ["1049800444", 0, false],   // row 16 — the free control
+  ["1049800394", 25, true],   // row 14's short-notice ride, unchanged by the move
+  ["1049800395", 0, false],   // row 14's advance ride — the pre-existing control
+];
+const snpWrong = SNP_CASES.filter(([id, dollars, short]) => {
+  const trip = SNP_ALL.find((t) => t.id === id);
+  if (!trip) return true;
+  return sendbackPenaltyFor(trip) !== dollars || penaltyIsShortNotice(trip) !== short;
+});
+check(
+  "every declared trip is priced as declared, and short-notice follows the price",
+  snpWrong.length
+    ? snpWrong.map(([id]) => {
+        const t = SNP_ALL.find((x) => x.id === id);
+        return `${id}=${t ? sendbackPenaltyFor(t) : "MISSING"}`;
+      }).join(", ")
+    : SNP_CASES.map(([id, d]) => `${id}:$${d}`).join(" "),
+  snpWrong.length === 0,
+);
+/**
+ * ⛔⛔ **Non-vacuity, and it is THREE bands not two.** A table of $0 and $25
+ * would pass every assertion above while proving nothing about a middle band —
+ * and the middle band is the entire argument of row 17's second pill.
+ */
+const snpAmounts = new Set(SNP_CASES.map(([, d]) => d));
+check(
+  "...and the declared set really spans three distinct bands",
+  `amounts: ${[...snpAmounts].sort((a, b) => a - b).join(", ")}`,
+  snpAmounts.size === 3 && snpAmounts.has(0) && snpAmounts.has(10) && snpAmounts.has(25),
+);
+/**
+ * ⛔⛔ **The renderers cannot disagree, asserted on the RULE not on prose.**
+ * The dialog takes `amount`, the toast calls `sendbackPenaltyFor`, the pill is
+ * built in `lib/`. All three are driven here over the same trip.
+ */
+const snpSplit = SNP_ALL.filter((trip) => {
+  const amount = sendbackPenaltyFor(trip);
+  const pill = penaltyPillFor(trip);
+  if (!pill) return false;
+  const priced = amount > 0;
+  // The pill either names the figure, or says there is none. Never a third thing.
+  const names = pill.label.includes(`$${amount} `);
+  return priced ? !names : pill.label !== "Free to send back";
+});
+check(
+  "the card's pill and the rule's amount are the same number on every seeded trip",
+  `${snpSplit.length} disagree of ${SNP_ALL.filter((t) => penaltyPillFor(t)).length} priced trip(s)`,
+  snpSplit.length === 0 && SNP_ALL.filter((t) => penaltyPillFor(t)).length > 5,
+);
+const snpToast = codeOnly(
+  readFileSync(join(ROOT, "components/driver/more-options-screen.tsx"), "utf8"),
+);
+const snpDialogMount = /amount=\{sendbackPenaltyFor\(trip\)\}/.test(snpToast);
+check(
+  "...and neither the dialog nor the completion toast carries a figure of its own",
+  `dialog gets the rule: ${snpDialogMount}, toast calls it: ${/\$\{sendbackPenaltyFor\(trip\)\}/.test(snpToast)}`,
+  snpDialogMount &&
+    /\$\{sendbackPenaltyFor\(trip\)\}/.test(snpToast) &&
+    // ⛔ The deleted constant must stay deleted; re-exporting it would restore
+    // exactly the drift this section was written to end.
+    !/SEND_BACK_PENALTY_USD/.test(snpToast),
+);
+
+/* --- 43b. The step machine follows the price, not `sameDay` -------------- */
+/**
+ * ⛔⛔ **The regression this change most threatened.** `isShortNoticeSendBack`
+ * was `trip.sameDay === true` and is now "the penalty is more than zero". Row
+ * 14's two controls must survive that move unchanged, or the send-back slice
+ * silently lost its penalty step while every check went on printing `ok`.
+ */
+const snpShort = SNP_ALL.find((t) => t.id === "1049800394")!;
+const snpAdvance = SNP_ALL.find((t) => t.id === "1049800395")!;
+check(
+  "row 14's short-notice ride still reaches the penalty step, its advance ride still does not",
+  `${sendBackSteps(snpShort, PLAIN).join(">")} | ${sendBackSteps(snpAdvance, PLAIN).join(">")}`,
+  sendBackSteps(snpShort, PLAIN).includes("penalty") &&
+    !sendBackSteps(snpAdvance, PLAIN).includes("penalty"),
+);
+/**
+ * ⛔⛔ **A $10 trip is short-notice too, and that is the behaviour change.**
+ * Under the old `sameDay` test this trip reached no penalty step at all — the
+ * driver was charged $10 having been warned about nothing.
+ */
+const snpMiddle = SNP_ALL.find((t) => t.id === "1049800441")!;
+check(
+  "...and a MIDDLE-band trip now reaches it, which `sameDay` never would have",
+  `$${sendbackPenaltyFor(snpMiddle)}, sameDay=${snpMiddle.sameDay ?? false}, ${sendBackSteps(snpMiddle, PLAIN).join(">")}`,
+  sendBackSteps(snpMiddle, PLAIN).includes("penalty") &&
+    // ⛔ Non-vacuity: it really is NOT same-day, so the old test would have missed it.
+    snpMiddle.sameDay !== true &&
+    sendbackPenaltyFor(snpMiddle) === 10,
+);
+
+/* --- 43c. The countdown announces a band that exists --------------------- */
+/**
+ * ⛔⛔ **A countdown to nothing.** `hoursToNextPenalty` set on a trip already in
+ * its top band would render "$25 in 6 hrs" on a trip that can never reach a
+ * higher figure. The seed cannot express it and this is what says so.
+ */
+const snpOrphanCountdown = SNP_ALL.filter((trip) => {
+  const ladder = penaltyLadderFor(trip);
+  if (!ladder || trip.hoursToNextPenalty === undefined) return false;
+  return (trip.penaltyBand ?? 0) >= ladder.length - 1;
+});
+check(
+  "no trip counts down to a band above the top of its own ladder",
+  snpOrphanCountdown.length
+    ? snpOrphanCountdown.map((t) => t.id).join(", ")
+    : `${SNP_ALL.filter((t) => nextPenaltyStepFor(t)).length} trip(s) carry a live countdown`,
+  snpOrphanCountdown.length === 0 &&
+    SNP_ALL.filter((t) => nextPenaltyStepFor(t)).length > 0,
+);
+check(
+  "the top band carries no countdown pill, and the bands below it do",
+  `top=${nextPenaltyPillFor(SNP_ALL.find((t) => t.id === "1049800442")!)?.label ?? "none"}, ` +
+    `middle=${nextPenaltyPillFor(snpMiddle)?.label ?? "none"}`,
+  nextPenaltyPillFor(SNP_ALL.find((t) => t.id === "1049800442")!) === null &&
+    nextPenaltyPillFor(snpMiddle)?.label === "$25 in 6 hrs",
+);
+/**
+ * ⛔ A market with no row in the Rules matrix gets NO pill, not a $0 one.
+ * CareSource is the case: inventing a ladder for it would be worse than silence.
+ */
+const snpNoLadder = SNP_ALL.filter((t) => t.client === "CareSource");
+check(
+  "a market with no declared rule shows no price at all",
+  `${snpNoLadder.length} CareSource trip(s), ${snpNoLadder.filter((t) => penaltyPillFor(t)).length} priced`,
+  snpNoLadder.length > 0 && snpNoLadder.every((t) => penaltyPillFor(t) === null),
+);
+
+/**
+ * ⛔⛔ **The feed pill and the Upcoming pill differ, and the asymmetry is the
+ * point.** The Request Feed is not filtered by focus, so a "Free to send back"
+ * pill lands on every request whose market has a rule — on this seed that was 4
+ * free pills against the 1 priced one row 16 exists to point at. Upcoming keeps
+ * the free label because its three cards are a ladder and free is a rung.
+ */
+const snpFeedPriced = mockRequestTrips.filter((t) => requestPenaltyPillFor(t));
+const snpFeedAll = mockRequestTrips.filter((t) => penaltyPillFor(t));
+check(
+  "the Request Feed prices only what costs something, while Upcoming names the free band too",
+  `feed: ${snpFeedPriced.length} of ${snpFeedAll.length} pilled; ` +
+    `upcoming free pills: ${mockUpcomingTrips.filter((t) => penaltyPillFor(t)?.label === "Free to send back").length}`,
+  snpFeedPriced.every((t) => sendbackPenaltyFor(t) > 0) &&
+    // ⛔ Non-vacuity in both directions: the feed must really be SUPPRESSING
+    // some, and Upcoming must really be SHOWING some, or this is one rule twice.
+    snpFeedAll.length > snpFeedPriced.length &&
+    snpFeedPriced.length > 0 &&
+    mockUpcomingTrips.some((t) => penaltyPillFor(t)?.label === "Free to send back"),
+);
+
+/* --- 43d. Both gates are real, and they are two -------------------------- */
+/**
+ * ⛔⛔ **Neither pill nor warning exists in production.** Showing them on the
+ * Now side would make the prototype claim the app already tells a driver what a
+ * send-back costs — which is the precise thing both rows say it does not.
+ */
+const snpFocus16 = { solutionId: "short-notice-at-take", mode: "fixed" } as DemoFocus;
+const snpNow16 = { solutionId: "short-notice-at-take", mode: "now" } as DemoFocus;
+const snpFocus17 = { solutionId: "short-notice-countdown", mode: "fixed" } as DemoFocus;
+const snpNow17 = { solutionId: "short-notice-countdown", mode: "now" } as DemoFocus;
+check(
+  "each gate is open on its own proposal side and shut on its own Now side",
+  `16: ${showsShortNoticeAtTake(snpFocus16)}/${showsShortNoticeAtTake(snpNow16)}, ` +
+    `17: ${showsSendbackPenaltyPills(snpFocus17)}/${showsSendbackPenaltyPills(snpNow17)}`,
+  showsShortNoticeAtTake(snpFocus16) && !showsShortNoticeAtTake(snpNow16) &&
+    showsSendbackPenaltyPills(snpFocus17) && !showsSendbackPenaltyPills(snpNow17),
+);
+check(
+  "...and neither row lights the other's surface",
+  `16-gate on 17's focus: ${showsShortNoticeAtTake(snpFocus17)}, ` +
+    `17-gate on 16's focus: ${showsSendbackPenaltyPills(snpFocus16)}`,
+  !showsShortNoticeAtTake(snpFocus17) && !showsSendbackPenaltyPills(snpFocus16),
+);
+/**
+ * ⛔⛔ **The accept swipe is intercepted ONLY for a priced trip.**
+ * `request-swipe.ts` records that this control is decorative everywhere; row 16
+ * is the one exception, and an ungated handler would make every request in the
+ * app interceptable.
+ */
+const snpLayout = codeOnly(
+  readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8"),
+);
+check(
+  "the accept warning is gated on BOTH the focus and the price",
+  `gate: ${/showsShortNoticeAtTake\(demo\) &&\s*isShortNoticeSendBack\(trip\)/.test(snpLayout)}`,
+  /showsShortNoticeAtTake\(demo\) &&\s*isShortNoticeSendBack\(trip\)/.test(snpLayout) &&
+    /onClick=\{\s*warnsShortNotice/.test(snpLayout),
+);
+
 console.log(
   failures === 0
     ? "\n✅ verify-solutions: all checks passed\n"

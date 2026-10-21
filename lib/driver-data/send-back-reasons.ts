@@ -164,31 +164,20 @@ const DRIVER_FACING_LABELS: Record<string, string> = {
 export const MAX_SEND_BACK_LABEL_CHARS = 36;
 
 /**
- * The penalty a short-notice send-back attracts, in whole dollars.
- *
- * ⚠️ **Seeded, and market-configured in production.** TCI TN charges `$25` at or
- * after 10:00 AM on the day before pickup and `$0` before it, with a separate
- * weekend window; Verida TN and WellTrans Indiana each have their own. The
- * prototype carries one number because it demonstrates one trip — it must not
- * be read as the rule.
- *
- * ⛔ What actually decides the charge is `sendback_calculation_reason`, and the
- * measured charge rates are nothing like a flat threshold: `calc_before_cutoff`
- * charges 1.2% of the time, `calc_lead_time` 21.3%, and the three same-day-ish
- * rules 100%. Never explain the amount by "how close to pickup".
- */
-export const SEND_BACK_PENALTY_USD = 25;
-
-/**
  * Whether this send-back is short-notice — i.e. whether step 2 appears at all.
  *
- * ⚠️ Reads the seeded `sameDay` flag rather than comparing clocks. The prototype
- * has no clock; a derived version would flip on exactly one real-world day and
- * read as a bug on every other. Same reasoning as `Trip.sameDay` itself.
+ * ⛔⛔ **Moved to `sendback-penalty.ts` on 2026-10-22 and re-exported here**, so
+ * every existing call site keeps working while there is exactly one definition.
+ * It used to read `trip.sameDay === true`, which was right while $25 was the only
+ * price; catalogue row 16 adds a $10 band, and a trip in it is short-notice too.
+ *
+ * ⛔⛔ **`SEND_BACK_PENALTY_USD` was deleted with it.** A single constant read by
+ * the dialog and the completion toast was correct only while every penalty was
+ * the same number. The amount is now `sendbackPenaltyFor(trip)` and both of those
+ * renderers take it per trip — see that module's header for why.
  */
-export function isShortNoticeSendBack(trip: Trip): boolean {
-  return trip.sameDay === true;
-}
+import { isShortNoticeSendBack } from "./sendback-penalty";
+export { isShortNoticeSendBack };
 
 /**
  * Whether this trip belongs to a standing order.
@@ -333,7 +322,7 @@ export const STANDING_ORDER_BLOCK_CHAT = "Contact Support";
 export const STANDING_ORDER_BLOCK_DISMISS = "Close";
 
 /**
- * What the chat opens with, auto-sent the way row 17's is.
+ * What the chat opens with, auto-sent the way row 19's is.
  *
  * ⛔ **No reason line.** The block arrives before any form, so the driver has
  * not given one — and prefilling a field they never filled would be the form

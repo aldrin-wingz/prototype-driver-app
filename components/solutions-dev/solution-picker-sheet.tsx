@@ -96,8 +96,8 @@ function Row({ solution, onPick }: { solution: Solution; onPick: (s: Solution) =
           <span className="text-[10px] font-medium text-gray-500">
             {buildStateLabel(solution.buildState)}
           </span>
-          {/* ⛔⛔ This number was HARDCODED to 17. It was written when rows 18
-              and 19 were the only shared pair, so it read correctly by
+          {/* ⛔⛔ This number was HARDCODED to 17. It was written when rows 20
+              and 21 were the only shared pair, so it read correctly by
               accident — and when rows 04 and 05 became a shared build it told
               you row 05 shared one with the requests tray. A fact about one row
               written as a literal in another row's JSX is a fact nothing can

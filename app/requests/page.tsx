@@ -15,6 +15,10 @@ import {
   showsMemberFilter,
 } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
+import {
+  requestPenaltyPillFor,
+  showsShortNoticeAtTake,
+} from "@/lib/driver-data/sendback-penalty";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -120,8 +124,36 @@ function RequestsPageContent() {
     return result;
   }, [applied]);
 
+  /**
+   * Catalogue row 16 — a request card names what sending it back would cost.
+   *
+   * ⛔⛔ **Only the FIRST pill here, never the countdown.** Row 17's second pill
+   * answers "how long have I got", which is a question about a trip you are
+   * already holding. On a request the driver holds nothing yet, and a countdown
+   * beside an Accept swipe reads as "this offer expires", which is a different
+   * mechanism the feed already has its own pill for.
+   *
+   * ⛔ Gated: neither pill exists in production, and the whole of row 16 is that
+   * the Request Feed says nothing about this today.
+   *
+   * ⚠️ Applied BEFORE grouping, so the pill travels with the trip into whatever
+   * day bucket and detent it lands in rather than being re-derived per surface.
+   */
+  const priced = useMemo(
+    () =>
+      showsShortNoticeAtTake(demo)
+        ? filtered.map((trip) => {
+            const pill = requestPenaltyPillFor(trip);
+            return pill
+              ? { ...trip, statusPills: [...(trip.statusPills ?? []), pill] }
+              : trip;
+          })
+        : filtered,
+    [filtered, demo],
+  );
+
   // Grouped by pickup day — a day with no trips is ABSENT, not greyed out.
-  const groups = useMemo(() => groupByPickupDay(filtered), [filtered]);
+  const groups = useMemo(() => groupByPickupDay(priced), [priced]);
   const [dayKey, setDayKey] = useState<string | null>(null);
   const activeKey = dayKey ?? defaultDayKey(groups);
   const active = groups.find((g) => g.key === activeKey) ?? groups[0];

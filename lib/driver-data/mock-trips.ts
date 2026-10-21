@@ -330,6 +330,41 @@ export interface Trip {
    */
   sameDay?: boolean;
   /**
+   * Which band of its market's send-back penalty ladder this trip sits in now —
+   * `0` is the free band. Catalogue rows 16 and 17.
+   *
+   * ⚠️ **An index into a declared ladder, not an amount.** The amount belongs to
+   * the market rule (`PENALTY_LADDERS` in `sendback-penalty.ts`) and a figure
+   * seeded here would be a second place the price lives — the exact drift that
+   * module was written to end. Absent means band 0, which is the honest default:
+   * most trips cost nothing to hand back.
+   *
+   * ⛔ A band is a band of a NAMED market rule, never a distance from pickup.
+   * The measured data says 57h and 76h were charged nothing while 6h was charged
+   * $12.50; `sendback_calculation_reason` decides, not the clock.
+   *
+   * ⚠️ Clamped on read, so a seed pointing past the end of a short ladder lands
+   * on its top band rather than reading `undefined`.
+   */
+  penaltyBand?: number;
+  /**
+   * Hours until this trip moves to the NEXT penalty band.
+   *
+   * ⚠️ **Seeded, like `sameDay` and for the same reason.** The prototype is
+   * clockless; `formatLongWait` already records what real-clock arithmetic does
+   * to a seeded ride time — a 1:50 PM pick-up offering "available at 2:29 AM".
+   *
+   * ⛔ Absent means "no next step to announce", which is also the right answer
+   * for a trip already in its top band. A value here with no band above it is
+   * incoherent and a check rejects it.
+   *
+   * ⛔⛔ **A number, and the label is built from it.** `expiresInHours` in
+   * `map-view.ts` regex-parses "Expires in N hours" back out of a pill string,
+   * which makes the rendered label the source of truth for a rule. Not repeated
+   * here: the value is the value and `nextPenaltyPillFor` formats it.
+   */
+  hoursToNextPenalty?: number;
+  /**
    * The round trip this ride is one leg of.
    *
    * ⚠️ EXPLICIT, never inferred from rider name and date. Two members can share
@@ -338,7 +373,7 @@ export interface Trip {
    * never derived.
    *
    * Absent means a one-way ride, which is the honest answer for most of the
-   * seed — only catalogue row 17 needs the grouping, because production's own
+   * seed — only catalogue row 19 needs the grouping, because production's own
    * decline template removes several leg ids at once (`CAP-225`).
    */
   tripGroup?: string;
@@ -441,11 +476,22 @@ export interface TripScenario {
    * name them by.
    *
    * ⛔⛔ **Two of them moved TWICE, because the previous insertion forgot
-   * them.** Adding row 19 on 2026-10-15 renumbered Add Leg and Update Trip
-   * Details without touching their handles, so `19a`–`19f` sat on row 20 and
-   * `20a`/`20b` on row 21 — a pill naming a row that was something else
-   * entirely, and nothing failed. They are now `21a`–`21f` and `22a`/`22b`,
-   * and the check below is what makes a third silent drift impossible.
+   * them.** Adding `my-rides-cancelled` on 2026-10-15 renumbered
+   * `add-leg-request` and `change-pickup-dropoff` without touching their
+   * handles, so their pills named a row that was something else entirely, and
+   * nothing failed. The check below is what makes a silent drift impossible.
+   *
+   * ⛔⛔ **Named by ID here, deliberately, and this paragraph is why.** An
+   * earlier version of this comment told the story in row NUMBERS, and the next
+   * renumber swept them — leaving a history that contradicted itself, because
+   * the quoted handles are string literals a sweep cannot see while the prose
+   * around them moves. ⚠️ A sentence about a PAST renumber must name ids; only
+   * a sentence about the CURRENT catalogue may name a number.
+   *
+   * ⭐ Third shift, 2026-10-22: inserting `short-notice-at-take` and
+   * `short-notice-countdown` at orders 16-17 moved handles 16+ up by two
+   * (`17a`→`19a`, `19a`–`19m`→`21a`–`21m`, `21a`–`21f`→`23a`–`23f`,
+   * `22a`/`22b`→`24a`/`24b`).
    *
    * ⚠️ So it is NOT a key. `solutions` below is the link to the catalogue and
    * it is keyed by id, which no renumber touches; the handle is a label. A
@@ -459,7 +505,7 @@ export interface TripScenario {
   /**
    * Tagged for the solution, but carrying NO demo pill.
    *
-   * ⛔⛔ **For a row whose demo is the LIST, not any one ride in it.** Row 19's
+   * ⛔⛔ **For a row whose demo is the LIST, not any one ride in it.** Row 21's
    * argument is thirteen rides of which three are cancelled; each ride is the
    * backdrop, not the exhibit. Labelling every card `18a · Still on` put the
    * same sentence on ten cards and competed with the one pill that carries the
@@ -1326,6 +1372,103 @@ export const mockRequestTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
+
+  // ===== Catalogue row 16 — penalty-bearing BEFORE the driver takes it =====
+  //
+  // ⭐⭐ **A pair, and the pair is the point.** One request already sits in
+  // Verida GA's top band and one is free. A penalty pill seen only on a
+  // penalised trip cannot be told apart from a pill every request carries, and
+  // a warning seen on every accept is not a warning.
+  //
+  // ⚠️ Today a driver meets this figure for the first time on the send-back
+  // screen, after they have already accepted. That is the whole of row 16.
+  {
+    id: "1049800443",
+    date: "Thu, Sep 24, 2026",
+    rider: "ESPERANZA BUTTIGIEG",
+    client: "Verida",
+    market: "GA",
+    // Band 2 — "Same-day sendback", $25. Taking this trip costs $25 to undo,
+    // and nothing on the card or the request screen says so today.
+    penaltyBand: 2,
+    sameDay: true,
+    passengerCount: 1,
+    distance: "4.8 mi away",
+    totalRevenue: 22.40,
+    notes: "Same-day dialysis return",
+    legs: [
+      {
+        id: "leg-sn-a",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "11:30 AM",
+        address: "1240 Donald Lee Hollowell Pkwy NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 22.40,
+      },
+      {
+        id: "leg-sn-b",
+        type: "appointment",
+        label: "Est Drop-off Time",
+        time: "12:05 PM",
+        address: "550 Peachtree St NE, Atlanta, GA 30308",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "request",
+    pills: [],
+    scenario: {
+      code: "16a",
+      label: "Priced before it is taken",
+      solutions: ["short-notice-at-take"],
+    },
+    incentiveTypes: [],
+  },
+  {
+    id: "1049800444",
+    date: "Thu, Sep 24, 2026",
+    rider: "LEOPOLDO NAKASHIMA",
+    client: "Verida",
+    market: "GA",
+    // Band 0 — "Greater than 48 hours", $0. ⛔ The negative control for the
+    // accept warning: it must NOT fire here. A warning that fires on every
+    // request is a warning the driver learns to dismiss.
+    penaltyBand: 0,
+    hoursToNextPenalty: 12,
+    passengerCount: 1,
+    distance: "7.1 mi away",
+    totalRevenue: 27.85,
+    notes: "",
+    legs: [
+      {
+        id: "leg-sn-c",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "8:15 AM",
+        address: "3695 Cascade Rd SW, Atlanta, GA 30331",
+        county: "Fulton County",
+        revenue: 27.85,
+      },
+      {
+        id: "leg-sn-d",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "9:00 AM",
+        address: "1405 Clifton Rd NE, Atlanta, GA 30322",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "request",
+    pills: [],
+    scenario: {
+      code: "16b",
+      label: "Unpriced — the control",
+      solutions: ["short-notice-at-take"],
+    },
+    incentiveTypes: [],
+  },
 ];
 
 // Mock upcoming trips (accepted but not started)
@@ -1354,7 +1497,7 @@ export const mockUpcomingTrips: Trip[] = [
    * ⚠️ Invented members, and Arkansas addresses matching the request's own
    * counties.
    *
-   * ⛔ NOT `silent`, unlike row 19's manifest. That row silenced its pills
+   * ⛔ NOT `silent`, unlike row 21's manifest. That row silenced its pills
    * because ten of thirteen rides said the same thing and drowned the one that
    * did not. Here there are two rides and they say DIFFERENT things — which
    * seats, and when — and that is exactly what the driver is being asked to
@@ -1556,7 +1699,7 @@ export const mockUpcomingTrips: Trip[] = [
     clientEnrolledInIncentives: false,
   },
 
-  // ===== 19a-18m — catalogue row 19, cancelled rides in the manifest =====
+  // ===== 19a-18m — catalogue row 21, cancelled rides in the manifest =====
   //
   // Thirteen rides over four dates: **ten still on and three cancelled by
   // Wingz**, the cancellations spread across three of the four days so that
@@ -1565,7 +1708,7 @@ export const mockUpcomingTrips: Trip[] = [
   //
   // ⛔⛔ **All thirteen carry a `scenario`, including the ten that are fine.**
   // `ridesForSolution` filters to scenario rides whenever anything is focused,
-  // and it runs first — tag only the three cancellations and focusing row 19
+  // and it runs first — tag only the three cancellations and focusing row 21
   // gives a three-ride Upcoming list with a filter bar that has nothing to
   // filter. The demo collapses into its own punchline.
   //
@@ -1617,7 +1760,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19a",
+      code: "21a",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1662,7 +1805,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19b",
+      code: "21b",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1708,7 +1851,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19c",
+      code: "21c",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1753,7 +1896,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19d",
+      code: "21d",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1798,7 +1941,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19e",
+      code: "21e",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1855,7 +1998,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19f",
+      code: "21f",
       label: "Cancelled by Client",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1900,7 +2043,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19g",
+      code: "21g",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1945,7 +2088,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19h",
+      code: "21h",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -1990,7 +2133,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19i",
+      code: "21i",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -2036,7 +2179,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19j",
+      code: "21j",
       label: "Cancelled by Wingz",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -2081,7 +2224,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19k",
+      code: "21k",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -2126,7 +2269,7 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19l",
+      code: "21l",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
@@ -2171,10 +2314,167 @@ export const mockUpcomingTrips: Trip[] = [
     status: "upcoming",
     pills: [],
     scenario: {
-      code: "19m",
+      code: "21m",
       label: "Still on",
       solutions: ["my-rides-cancelled"],
       silent: true,
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+
+  // ===== Catalogue row 17 — the three bands of one market's ladder =====
+  //
+  // ⭐⭐ **Verida GA's REAL rule, not an invented ladder.** `Reference - Client
+  // Market Setup/Rules and SLA Matrix.md` row `Driver Sendback Penalty Rules`:
+  // "Greater than 48 hours: $0 / Less than 48 hours but not same day: $10 /
+  // Same-day sendback: $25". Three bands is why this market was chosen — it is
+  // the only shape in the seed that shows a MIDDLE band, and a two-band ladder
+  // cannot tell "penalised" apart from "penalised the most".
+  //
+  // ⚠️ The dates are readable against the bands on purpose: `MOCK_TODAY` is
+  // 2026-07-31, so Aug 4 is outside 48h, Aug 1 is inside it but not today, and
+  // Jul 31 is same-day. A reviewer can check the band against the date without
+  // running anything. ⛔ The band is still SEEDED — nothing derives it from the
+  // date, because the real rule is not an hours-from-pickup ladder for most
+  // markets and deriving it here would teach the wrong model.
+  {
+    id: "1049800440",
+    date: "Mon, Aug 4, 2026",
+    rider: "TAMSIN OKONKWO",
+    client: "Verida",
+    market: "GA",
+    // Band 0 — "Greater than 48 hours", $0. The negative control: without a
+    // free trip on screen, "penalised" has nothing to be read against.
+    penaltyBand: 0,
+    hoursToNextPenalty: 30,
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 31.20,
+    notes: "",
+    contacts: { riderPhone: "(404) 555-0161" },
+    legs: [
+      {
+        id: "1049800440",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "9:15 AM",
+        address: "2451 Bolton Rd NW, Atlanta, GA 30318",
+        county: "Fulton County",
+        revenue: 31.20,
+      },
+      {
+        id: "1049800440-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "10:00 AM",
+        address: "1968 Peachtree Rd NW, Atlanta, GA 30309",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "17a",
+      label: "Outside the 48-hour band",
+      solutions: ["short-notice-countdown"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800441",
+    date: "Fri, Aug 1, 2026",
+    rider: "GERALYN PETRAKIS",
+    client: "Verida",
+    market: "GA",
+    // Band 1 — "Less than 48 hours but not same day", $10. ⭐ The band the whole
+    // row exists for: today a driver holding this trip is already being charged
+    // and the app says nothing, and the figure is about to more than double.
+    penaltyBand: 1,
+    hoursToNextPenalty: 6,
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 24.75,
+    notes: "",
+    contacts: { riderPhone: "(404) 555-0162" },
+    legs: [
+      {
+        id: "1049800441",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "7:45 AM",
+        address: "3384 Memorial Dr, Decatur, GA 30032",
+        county: "DeKalb County",
+        revenue: 24.75,
+      },
+      {
+        id: "1049800441-b",
+        type: "appointment",
+        label: "Appointment Time",
+        time: "8:30 AM",
+        address: "2701 N Decatur Rd, Decatur, GA 30033",
+        county: "DeKalb County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "17b",
+      label: "Inside 48 hours, not same day",
+      solutions: ["short-notice-countdown"],
+    },
+    incentiveTypes: [],
+    clientEnrolledInIncentives: false,
+  },
+  {
+    id: "1049800442",
+    date: "Thu, Jul 31, 2026",
+    rider: "ODALYS FERREIRA",
+    client: "Verida",
+    market: "GA",
+    // Band 2 — "Same-day sendback", $25, the top. ⛔ No `hoursToNextPenalty`:
+    // there is no band above this one, and a countdown pill here would be
+    // announcing a step that does not exist. `nextPenaltyStepFor` returns null
+    // and the second pill does not render.
+    penaltyBand: 2,
+    sameDay: true,
+    passengerCount: 1,
+    distance: "",
+    totalRevenue: 19.60,
+    notes: "Will-call return",
+    contacts: { riderPhone: "(404) 555-0163" },
+    legs: [
+      {
+        id: "1049800442",
+        legCode: "A",
+        type: "scheduled",
+        label: "Scheduled Pick-up Time",
+        time: "2:10 PM",
+        address: "880 Johnson Ferry Rd NE, Atlanta, GA 30342",
+        county: "Fulton County",
+        revenue: 19.60,
+      },
+      {
+        id: "1049800442-b",
+        type: "appointment",
+        label: "Est Drop-off Time",
+        time: "2:55 PM",
+        address: "4700 Northside Dr, Sandy Springs, GA 30327",
+        county: "Fulton County",
+        revenue: 0,
+      },
+    ],
+    status: "upcoming",
+    pills: [],
+    scenario: {
+      code: "17c",
+      label: "Same day — the top band",
+      solutions: ["short-notice-countdown"],
     },
     incentiveTypes: [],
     clientEnrolledInIncentives: false,
@@ -2372,7 +2672,7 @@ export const mockNeedsActionTrips: Trip[] = [
 
   // ===== 17a / 17b — the member declined, and it is a ROUND TRIP =====
   //
-  // Catalogue row 17. TWO rides sharing one `tripGroup`, because that is what
+  // Catalogue row 19. TWO rides sharing one `tripGroup`, because that is what
   // the case is about: `CAP-225`'s decline template lists TWO leg ids, and a
   // member who is not going has usually dropped the return as well. A one-way
   // seed would have demonstrated a checklist with one box on it.
@@ -2429,7 +2729,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "17a",
+      code: "19a",
       label: "Member declined — the outbound leg",
       solutions: ["rider-initiated-cancellation"],
     },
@@ -2492,7 +2792,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "17b",
+      code: "19b",
       label: "Member declined — filed from the return",
       solutions: ["rider-initiated-cancellation"],
     },
@@ -2552,7 +2852,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "22a",
+      code: "24a",
       label: "Both ends still editable — the four-field form",
       solutions: ["change-pickup-dropoff"],
     },
@@ -2564,7 +2864,7 @@ export const mockNeedsActionTrips: Trip[] = [
   //
   // Catalogue row **19**. The other half of this group, `1049800402`, is
   // COMPLETED and lives in `mockCompletedTrips` — which is the whole point:
-  // `groupMembers(trip, ALL_POOLS)` finds it, and row 17's `legsInGroup` on
+  // `groupMembers(trip, ALL_POOLS)` finds it, and row 19's `legsInGroup` on
   // `LIVE_POOLS` deliberately does not.
   //
   // ⭐ 3:00 PM is chosen, not arbitrary. The estimate off this group's own legs
@@ -2616,7 +2916,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "21b",
+      code: "23b",
       label: "Add a leg from the LIVE half of the group",
       solutions: ["add-leg-request"],
     },
@@ -2675,7 +2975,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "21e",
+      code: "23e",
       label: "The three-leg group's middle leg",
       solutions: ["add-leg-request"],
     },
@@ -2728,7 +3028,7 @@ export const mockNeedsActionTrips: Trip[] = [
     status: "needs-action",
     pills: [{ label: "Not Confirmed", variant: "danger" }],
     scenario: {
-      code: "21f",
+      code: "23f",
       label: "The three-leg group's last leg — where the home tick box lands",
       solutions: ["add-leg-request"],
     },
@@ -3315,9 +3615,17 @@ export const mockInProgressTrips: Trip[] = [
 
   // ===== 14a — a SHORT-NOTICE send-back, which attracts the penalty =====
   //
-  // Catalogue row 14. `sameDay: true` is what makes production's step 2 penalty
-  // popup appear at all — per the story's AC, "The popup appears only for
+  // Catalogue row 14. Production's step 2 penalty popup appears at all because
+  // this trip is short-notice — per the story's AC, "The popup appears only for
   // short-notice trip send backs."
+  //
+  // ⛔⛔ **CORRECTED 2026-10-22 (row 16).** This comment used to say `sameDay:
+  // true` was what made the popup appear, and that stopped being true when
+  // `isShortNoticeSendBack` moved to `sendback-penalty.ts` and became
+  // "the penalty is more than zero". What drives it now is `penaltyBand: 2`
+  // against Verida GA's ladder. `sameDay` is still here and still real — it is
+  // what PUTS the trip in band 2, and it selects the Reach Rider same-day
+  // variant — but it is an input to the band, not the test.
   //
   // ⚠️ Accepted but not started: no swipe marks. A driver sends a trip back
   // because they cannot do it, which is a decision made BEFORE they set off.
@@ -3328,6 +3636,8 @@ export const mockInProgressTrips: Trip[] = [
     client: "Verida",
     market: "GA",
     sameDay: true,
+    // Verida GA band 2 — "Same-day sendback", $25. The top of its ladder.
+    penaltyBand: 2,
     passengerCount: 1,
     distance: "22.6 mi",
     totalRevenue: 41.80,
@@ -3541,7 +3851,7 @@ export const mockInProgressTrips: Trip[] = [
     status: "in-progress",
     pills: [],
     scenario: {
-      code: "22b",
+      code: "24b",
       label: "Pick-up already made — only the drop-off can change",
       solutions: ["change-pickup-dropoff"],
     },
@@ -3562,7 +3872,7 @@ export const mockCompletedTrips: Trip[] = [
   // "actually, I also need the pharmacy".
   //
   // ⛔⛔ Seeded in the COMPLETED pool with a `tripGroup`, which `legsInGroup`
-  // (row 17, `LIVE_POOLS`) cannot see and `groupLegs` (row 21, `ALL_POOLS`)
+  // (row 19, `LIVE_POOLS`) cannot see and `groupLegs` (row 23, `ALL_POOLS`)
   // must. Two cases, two pools, one matcher — see `trip-groups.ts`.
   {
     id: "1049800402",
@@ -3608,7 +3918,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     scenario: {
-      code: "21a",
+      code: "23a",
       label: "Add a leg from a FINISHED leg — the entry point",
       solutions: ["add-leg-request"],
     },
@@ -3675,7 +3985,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     scenario: {
-      code: "21d",
+      code: "23d",
       label: "Add a leg to a THREE-leg trip — the finished first leg",
       solutions: ["add-leg-request"],
     },
@@ -3723,7 +4033,7 @@ export const mockCompletedTrips: Trip[] = [
     status: "completed",
     pills: [],
     scenario: {
-      code: "21c",
+      code: "23c",
       label: "One finished leg, no group — the fallback estimate",
       solutions: ["add-leg-request"],
     },

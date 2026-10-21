@@ -14,6 +14,10 @@ import {
 } from "@/lib/driver-data/mock-trips";
 import { useRideFlow } from "@/lib/support-data/ride-flow-context";
 import { useSolution } from "@/lib/solutions/solution-context";
+import {
+  sendbackPenaltyPills,
+  showsSendbackPenaltyPills,
+} from "@/lib/driver-data/sendback-penalty";
 import { CANCELLATION_REQUESTED_TITLE } from "@/lib/driver-data/rider-declined";
 import {
   firstTabWithRides,
@@ -45,7 +49,7 @@ type TabValue = "in-progress" | "needs-action" | "upcoming" | "pending";
 /**
  * Whether production's cancellation alert has already been raised this session.
  *
- * ⛔⛔ **Scaffolding, and the only part of row 19's Now side that is.** In
+ * ⛔⛔ **Scaffolding, and the only part of row 21's Now side that is.** In
  * production a push raises this the moment Wingz cancels; the prototype has no
  * push, so something has to stand in for one. A module-level flag rather than
  * state because it must survive a remount — and because React's double-invoked
@@ -129,18 +133,18 @@ export default function MyRidesPage() {
   const withoutPending = visible;
 
   /**
-   * Catalogue row 17 — the card has to say it too.
+   * Catalogue row 19 — the card has to say it too.
    *
    * ⛔ Ride Details spells the cancellation out, but a driver scanning My Rides
    * sees a ride that still looks like any other unconfirmed one. That is the
-   * state that makes them ring back, which is row 18's whole subject area.
+   * state that makes them ring back, which is row 20's whole subject area.
    *
    * ⚠️ `statusPills`, not `pills`, for the reason the Pending block below gives:
    * a scenario ride replaces its seeded pills with its identifier, and this
    * marker has to outlive that swap.
    */
   /**
-   * Catalogue row 19 — a ride Wingz cancelled says so on its card.
+   * Catalogue row 21 — a ride Wingz cancelled says so on its card.
    *
    * ⛔⛔ **A SEPARATE map from `withCancellation` below, and they must stay
    * separate.** Both write `statusPills`, and one map that could write either
@@ -159,6 +163,44 @@ export default function MyRidesPage() {
           }
         : trip
     );
+
+  /**
+   * Catalogue row 17 — what a send-back costs today, and what it costs next.
+   *
+   * ⛔⛔ **APPENDS to `statusPills`; the two maps above REPLACE it.** They each
+   * own the only pill their ride can carry, so assigning a fresh array is right
+   * for them — but a cancelled ride reaching this map would lose its
+   * `Cancelled` pill to a send-back price, which is the wrong sentence on the
+   * wrong ride. Appending is what lets this one be chained at all.
+   *
+   * ⛔ `statusPills`, not `pills`, for the reason the other two give: a scenario
+   * ride replaces its seeded pills with its identifier and these must outlive
+   * that swap — and all three of these rides ARE scenario rides.
+   *
+   * ⛔⛔ **Gated on the demo focus, because neither pill exists in production.**
+   * The cancelled pill above is deliberately NOT gated — production has that
+   * screen and a capture proves it. These two are proposals; showing them on
+   * the Now side would make the prototype claim the app already tells a driver
+   * what a send-back costs, which is the exact thing row 17 says it does not.
+   *
+   * ⚠️ A cancelled ride is skipped outright. Nothing is being sent back, so
+   * there is no price to name — the same reasoning `sendBackSteps` uses when it
+   * refuses to put a penalty step after `denied`.
+   */
+  const withSendbackPenalty = (trips: Trip[]) =>
+    showsSendbackPenaltyPills(demo)
+      ? trips.map((trip) =>
+          isClientCancelled(trip)
+            ? trip
+            : {
+                ...trip,
+                statusPills: [
+                  ...(trip.statusPills ?? []),
+                  ...sendbackPenaltyPills(trip),
+                ],
+              }
+        )
+      : trips;
 
   const withCancellation = (trips: Trip[]) =>
     trips.map((trip) =>
@@ -208,7 +250,7 @@ export default function MyRidesPage() {
     }));
 
   /**
-   * Catalogue row 19 — the manifest, and the task list.
+   * Catalogue row 21 — the manifest, and the task list.
    *
    * ⛔⛔ **The order has exactly one correct sequence**, and a wrong one still
    * renders a plausible list:
@@ -357,12 +399,12 @@ export default function MyRidesPage() {
     activeTab === "upcoming" && currentTrips.length === 0 && upcomingVisible.length > 0;
 
   /**
-   * ⭐⭐ Production's cancellation alert — `CAP-341`, row 19's Now side.
+   * ⭐⭐ Production's cancellation alert — `CAP-341`, row 21's Now side.
    *
    * ⛔ **The ALERT is ungated; only its TRIGGER is scoped.** What the alert says
    * and does is production's on both sides of the toggle — the proposal does
    * not remove it, it adds somewhere to find the ride afterwards. But a push
-   * does not exist here, so the stand-in fires only while row 19 is the row
+   * does not exist here, so the stand-in fires only while row 21 is the row
    * being demonstrated. Raising a modal about a cancelled ride at every
    * reviewer who happens to open My Rides would be the scaffolding making a
    * claim the capture does not.
@@ -498,7 +540,13 @@ export default function MyRidesPage() {
           )
         ) : (
           (() => {
-            const cards = withClientCancellation(withCancellation(currentTrips));
+            // ⚠️ Upcoming only. A ride already under way or finished cannot be
+            // handed back, so a price for doing so would be noise on it.
+            const priced =
+              activeTab === "upcoming"
+                ? withSendbackPenalty(currentTrips)
+                : currentTrips;
+            const cards = withClientCancellation(withCancellation(priced));
             const card = (trip: Trip) => (
               <RideCard
                 key={trip.id}

@@ -10,7 +10,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { SEND_BACK_PENALTY_USD } from "@/lib/driver-data/send-back-reasons";
+/**
+ * ⛔⛔ **`amount` is a PROP, not a constant.** It was
+ * `SEND_BACK_PENALTY_USD = 25` until 2026-10-22. Catalogue row 16 introduced a
+ * $10 band, at which point a card saying "$10 to send back" opened a dialog
+ * saying "$25" — one rule in several renderers, all agreeing, all wrong.
+ */
 
 /**
  * Step 2 of production's send-back confirmation — the penalty warning.
@@ -38,10 +43,12 @@ export function SendBackPenaltyDialog({
   open,
   onOpenChange,
   onConfirm,
+  amount,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
+  amount: number;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +61,7 @@ export function SendBackPenaltyDialog({
             <div className="space-y-3 text-left text-sm text-gray-700">
               <ul className="list-disc space-y-2 pl-5">
                 <li>
-                  A ${SEND_BACK_PENALTY_USD} penalty will be applied and will be
+                  A ${amount} penalty will be applied and will be
                   offered as a bonus for another driver to accept the trip.
                 </li>
                 <li>
