@@ -247,6 +247,11 @@ import {
   PENALTY_LADDERS,
 } from "../lib/driver-data/sendback-penalty";
 import {
+  ACCEPT_CONFIRM_BUILT,
+  ACCEPT_STEP_ORDER,
+  acceptSteps,
+} from "../lib/driver-data/trip-acceptance";
+import {
   ISSUE_RIDER_DECLINED,
   ISSUE_SEND_BACK_REASON,
   ISSUE_OVER_CAPACITY_EXCEPTION,
@@ -14055,11 +14060,61 @@ check(
 const snpLayout = codeOnly(
   readFileSync(join(ROOT, "components/driver/ride-detail-layout.tsx"), "utf8"),
 );
+/**
+ * ⛔⛔ **The warning is a STEP of production's acceptance, not the whole of it.**
+ * User direction 2026-10-22: production's own pop-ups come first. The gate moved
+ * out of the layout's JSX and into `acceptSteps`, so this is now driven over the
+ * real function rather than regexed out of a component.
+ */
+const snpPricedReq = mockRequestTrips.find((t) => t.id === "1049800443")!;
+const snpFreeReq = mockRequestTrips.find((t) => t.id === "1049800444")!;
 check(
-  "the accept warning is gated on BOTH the focus and the price",
-  `gate: ${/showsShortNoticeAtTake\(demo\) &&\s*isShortNoticeSendBack\(trip\)/.test(snpLayout)}`,
-  /showsShortNoticeAtTake\(demo\) &&\s*isShortNoticeSendBack\(trip\)/.test(snpLayout) &&
-    /onClick=\{\s*warnsShortNotice/.test(snpLayout),
+  "the accept sequence fires on a priced trip, and on nothing else",
+  `priced/fixed: [${acceptSteps(snpPricedReq, snpFocus16).join(">")}] · ` +
+    `free/fixed: [${acceptSteps(snpFreeReq, snpFocus16).join(">")}] · ` +
+    `priced/now: [${acceptSteps(snpPricedReq, snpNow16).join(">")}]`,
+  acceptSteps(snpPricedReq, snpFocus16).includes("short-notice") &&
+    // ⛔ Both halves of the gate, separately: the price and the focus.
+    //
+    // ⛔⛔ Asserted on the SHORT-NOTICE step, not on the length of the list.
+    // A break test flipping `ACCEPT_CONFIRM_BUILT` caught this: production's
+    // confirmation fires on EVERY acceptance, so the moment it is built a free
+    // trip has one step and a length check would fail on correct behaviour —
+    // a check that stops testing what its name says, and starts failing for the
+    // wrong reason.
+    !acceptSteps(snpFreeReq, snpFocus16).includes("short-notice") &&
+    !acceptSteps(snpPricedReq, snpNow16).includes("short-notice"),
+);
+/**
+ * ⛔⛔ **Production's confirmation comes FIRST, and that is asserted as data.**
+ * `ACCEPT_CONFIRM_BUILT` is false — nothing in this vault records what
+ * production shows after a swipe-to-accept, and inventing the copy would be a
+ * declared screen nobody can check. The ORDER is still a real claim, and
+ * `ACCEPT_STEP_ORDER` is what makes it one while the step is unbuilt.
+ */
+check(
+  "...and production's own confirmation is declared ahead of the warning",
+  `order: ${ACCEPT_STEP_ORDER.join(" → ")}; confirm built: ${ACCEPT_CONFIRM_BUILT}`,
+  ACCEPT_STEP_ORDER.indexOf("confirm") <
+    ACCEPT_STEP_ORDER.indexOf("short-notice") &&
+    // ⛔ Non-vacuity: both steps are really in the list, or an index of -1
+    // satisfies the comparison by accident.
+    ACCEPT_STEP_ORDER.includes("confirm") &&
+    ACCEPT_STEP_ORDER.includes("short-notice") &&
+    // ⚠️ When the constant flips, the order must hold in the OUTPUT too. Today
+    // it cannot be observed there, which is exactly why the list is declared.
+    (!ACCEPT_CONFIRM_BUILT ||
+      acceptSteps(snpPricedReq, snpFocus16)[0] === "confirm"),
+);
+check(
+  "...and the layout drives that sequence rather than opening a dialog directly",
+  `step index: ${/setAcceptStepIndex\(0\)/.test(snpLayout)}, ` +
+    `advances: ${/onConfirm=\{nextAcceptStep\}/.test(snpLayout)}`,
+  /setAcceptStepIndex\(0\)/.test(snpLayout) &&
+    /acceptStep === "short-notice"/.test(snpLayout) &&
+    /onConfirm=\{nextAcceptStep\}/.test(snpLayout) &&
+    // ⛔ The old per-dialog boolean must be gone, or both models are live.
+    !/shortNoticeAcceptOpen/.test(snpLayout),
 );
 
 /**

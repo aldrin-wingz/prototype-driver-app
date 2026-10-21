@@ -54,11 +54,13 @@ import { AutoAssignRequestForm } from "@/components/support/auto-assign-request-
 import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
-  isShortNoticeSendBack,
   penaltyPillFor,
   sendbackPenaltyFor,
-  showsShortNoticeAtTake,
 } from "@/lib/driver-data/sendback-penalty";
+import {
+  acceptIntercepts,
+  acceptSteps,
+} from "@/lib/driver-data/trip-acceptance";
 import { getPillStyles } from "@/components/driver/ride-card";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import { ShortNoticeAcceptDialog } from "@/components/driver/short-notice-accept-dialog";
@@ -408,14 +410,32 @@ export function RideDetailLayout({
    * condition is "a send-back would cost something", which is a market rule,
    * not a property of this screen.
    */
-  const [shortNoticeAcceptOpen, setShortNoticeAcceptOpen] = useState(false);
+  /**
+   * How far along the acceptance sequence the driver is — an index into
+   * `acceptSteps`, or `null` when the swipe has not been tapped.
+   *
+   * ⛔⛔ **An index, not a boolean per dialog.** Row 16's warning is one step of
+   * production's sequence, not a screen of its own, and a `shortNoticeOpen`
+   * boolean said the opposite — it made the warning the only thing on the
+   * accept path. Production's confirmation comes first; it is declared in
+   * `acceptSteps` and is not built, so today the index only ever reaches the
+   * one step. Flipping `ACCEPT_CONFIRM_BUILT` lights the first.
+   */
+  const [acceptStepIndex, setAcceptStepIndex] = useState<number | null>(null);
 
   // Any swipe the driver made in this session, laid over the seed. Everything
   // below reads the overlaid trip, so a drop-off recorded a moment ago moves the
   // stage, the header and the swipe record together.
   const trip = applySessionSwipes(seededTrip);
-  const warnsShortNotice =
-    showsShortNoticeAtTake(demo) && isShortNoticeSendBack(trip);
+  const acceptPath = acceptSteps(trip, demo);
+  const warnsShortNotice = acceptIntercepts(trip, demo);
+  const acceptStep =
+    acceptStepIndex === null ? null : acceptPath[acceptStepIndex] ?? null;
+  /** ⛔ Advances; closes only when the sequence is spent. */
+  const nextAcceptStep = () =>
+    setAcceptStepIndex((i) =>
+      i === null || i + 1 >= acceptPath.length ? null : i + 1,
+    );
   const pendingRequest = getPendingRequest(trip.id);
   /**
    * The member declined and Support has the report — catalogue row 19.
@@ -1322,9 +1342,7 @@ export function RideDetailLayout({
             <button
               type="button"
               onClick={
-                warnsShortNotice
-                  ? () => setShortNoticeAcceptOpen(true)
-                  : undefined
+                warnsShortNotice ? () => setAcceptStepIndex(0) : undefined
               }
               className="relative z-10 pl-8 text-sm font-bold uppercase text-white"
             >
@@ -1490,13 +1508,17 @@ export function RideDetailLayout({
       {/* ⭐ Row 03's Now side, mounted beside the proposal's prompt — one tap,
           two answers, and `routeSwipeTap` is what picks. */}
       <ShortNoticeAcceptDialog
-        open={shortNoticeAcceptOpen}
-        onOpenChange={setShortNoticeAcceptOpen}
+        open={acceptStep === "short-notice"}
+        onOpenChange={(next) => {
+          // ⛔ Cancel abandons the whole sequence, not just this step — the same
+          // meaning Cancel carries on the send-back penalty warning.
+          if (!next) setAcceptStepIndex(null);
+        }}
         amount={sendbackPenaltyFor(trip)}
-        // ⚠️ Continue closes the warning and nothing else. This prototype has no
-        // accept path at all — see `request-swipe.ts` — so the trip stays on the
-        // feed. Row 16's proposal is the warning, not the acceptance.
-        onConfirm={() => setShortNoticeAcceptOpen(false)}
+        // ⚠️ Continue advances. With production's confirmation unbuilt this is
+        // the last step, so it closes — and the trip stays on the feed, because
+        // there is no accept path anywhere in this app. See `request-swipe.ts`.
+        onConfirm={nextAcceptStep}
       />
       <SwipeTooFarDialog
         anchor={tooFarAnchor}
