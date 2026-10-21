@@ -16,7 +16,7 @@ import {
 } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
-  requestPenaltyPillFor,
+  penaltyPillFor,
   showsShortNoticeAtTake,
 } from "@/lib/driver-data/sendback-penalty";
 import { useToast } from "@/hooks/use-toast";
@@ -143,7 +143,7 @@ function RequestsPageContent() {
     () =>
       showsShortNoticeAtTake(demo)
         ? filtered.map((trip) => {
-            const pill = requestPenaltyPillFor(trip);
+            const pill = penaltyPillFor(trip);
             return pill
               ? { ...trip, statusPills: [...(trip.statusPills ?? []), pill] }
               : trip;

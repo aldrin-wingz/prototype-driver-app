@@ -173,56 +173,51 @@ export function isShortNoticeSendBack(trip: Trip): boolean {
 }
 
 /**
- * The pill naming what a send-back costs today, or `null` when the market has
- * no rule to price it against.
+ * The pill naming the penalty a send-back attracts RIGHT NOW, or `null` when
+ * there is nothing to charge.
  *
  * ⛔ Built here, not in JSX. A label assembled in a list screen is a rule no
  * check can reach, and three screens render this one.
  *
- * ⚠️ **The free band gets a pill too.** "No pill" is indistinguishable from
- * "not built yet", and the whole point of row 16 is that silence is what the
- * driver gets today.
+ * ⛔⛔ **Nothing is rendered on the free band.** An earlier version showed
+ * "Free to send back", on the argument that silence is indistinguishable from
+ * "not built yet". User direction 2026-10-22 removed it, and the measurement
+ * backs the call: the Request Feed is not filtered by focus, so a free pill
+ * landed on 4 cards against the 1 that actually cost something. A pill is a
+ * warning; a card with nothing to warn about says nothing.
+ *
+ * ⚠️ **Always `danger`, never graded by band.** A $10 charge is not a milder
+ * event than a $25 one — it is the same event at a different price, and the
+ * driver is being charged either way. Grading the colour would have said
+ * "this one matters less" about money leaving someone's account.
+ *
+ * ⛔ The wording is deliberately long. "$10 to send back" read as a fare or a
+ * fee for a service; it has to say **penalty**, and it has to say the penalty
+ * is **already applied** rather than merely possible.
  */
 export function penaltyPillFor(trip: Trip): TripPill | null {
-  const ladder = penaltyLadderFor(trip);
-  if (!ladder) return null;
   const amount = sendbackPenaltyFor(trip);
-  const top = amount === ladder[ladder.length - 1].amount;
-  if (amount === 0) return { label: "Free to send back", variant: "success" };
+  if (amount === 0) return null;
   return {
-    label: `$${amount} to send back`,
-    variant: top ? "danger" : "warning",
+    label: `$${amount} Sendback Penalty applied`,
+    variant: "danger",
   };
 }
 
 /**
- * The Request Feed's pill — the SAME label, but only when there is a price.
+ * The pill naming the next step and when it lands. `null` when there is none.
  *
- * ⛔⛔ **Row 16 shows nothing on a free request, and row 17 shows "Free to send
- * back". The difference is not an inconsistency, it is the surface.** Row 17's
- * three Upcoming cards are a ladder seen side by side, where the free band is a
- * rung and naming it is the point. The Request Feed is not filtered by focus —
- * it shows every trip of the day, because the map needs them — so a free pill
- * lands on every request whose market has a rule. Measured on this seed: 4 free
- * pills against the 1 priced one the row exists to point at. The signal lost to
- * its own background.
- *
- * ⚠️ So on a feed, absence means "nothing to warn you about", which is also what
- * absence means for a market with no rule at all. That ambiguity is accepted
- * here and nowhere else: the feed's question is "which of these will cost me",
- * not "what does each one cost".
+ * ⚠️ **Orange against the applied pill's red, and the pair is the message.**
+ * This one is a deadline — something the driver can still act on — where the
+ * other is a charge they already carry. Same words for the same thing
+ * (`Sendback Penalty`), different tense and different colour.
  */
-export function requestPenaltyPillFor(trip: Trip): TripPill | null {
-  return sendbackPenaltyFor(trip) > 0 ? penaltyPillFor(trip) : null;
-}
-
-/** The pill naming the next step and when it lands. `null` when there is none. */
 export function nextPenaltyPillFor(trip: Trip): TripPill | null {
   const step = nextPenaltyStepFor(trip);
   if (!step) return null;
   return {
-    label: `$${step.amount} in ${step.hours} ${step.hours === 1 ? "hr" : "hrs"}`,
-    variant: "neutral",
+    label: `$${step.amount} Sendback Penalty in ${step.hours} ${step.hours === 1 ? "hr" : "hrs"}`,
+    variant: "warning",
   };
 }
 

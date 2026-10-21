@@ -675,7 +675,7 @@ export const SOLUTIONS: Solution[] = [
           route: "/requests/1049800444",
           short: "A free request — no warning at all",
           label:
-            "The same screen on a trip outside the 48-hour band. The card carries NO price pill and the accept swipe raises nothing. ⚠️ Silence, not a 'Free to send back' pill — that label belongs to row 17's Upcoming ladder, where free is a rung worth naming; the feed is unfiltered, so a free pill would land on every request whose market has a rule and bury the one that costs something. ⛔ Without this branch, a warning seen on every accept is indistinguishable from a warning that means something.",
+            "The same screen on a trip outside the 48-hour band. The card carries NO pill and the accept swipe raises nothing. ⚠️ Silence is deliberate everywhere, not just here: a pill is a warning, and a card with nothing to warn about says nothing. An earlier build labelled the free band and put that label on 4 feed cards against the 1 that actually cost something. ⛔ Without this branch, a warning seen on every accept is indistinguishable from a warning that means something.",
         },
       ],
     },
@@ -698,7 +698,7 @@ export const SOLUTIONS: Solution[] = [
     entry: {
       route: "/my-rides",
       label:
-        "Three Upcoming trips on Verida GA's real three-band ladder, side by side: free, $10, and $25. The middle one is the case — it is already being charged today with nothing on screen to say so, and its second pill says the figure more than doubles in six hours. ⛔ The top band carries no countdown, because there is no band above it to announce. ⚠️ The bands are SEEDED: the prototype has no clock, and most markets' boundaries are wall-clock times, not hours before pickup.",
+        "Three Upcoming trips on Verida GA's real three-band ladder, side by side. The middle one is the case — `$10 Sendback Penalty applied` in red, because the driver is already being charged today with nothing on screen to say so, beside `$25 Sendback Penalty in 6 hrs` in orange, because the figure more than doubles tonight. ⛔ The top band carries only the red pill: there is no band above it to count down to. ⛔ The free trip carries only the orange one — a deadline, and no charge yet. ⚠️ The bands are SEEDED: the prototype has no clock, and most markets' boundaries are wall-clock times, not hours before pickup.",
     },
   },
   {

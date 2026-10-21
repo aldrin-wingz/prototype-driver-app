@@ -239,7 +239,6 @@ import {
   nextPenaltyStepFor,
   penaltyLadderFor,
   penaltyPillFor,
-  requestPenaltyPillFor,
   nextPenaltyPillFor,
   sendbackPenaltyFor,
   sendbackPenaltyPills,
@@ -13798,6 +13797,11 @@ console.log("\n43. The send-back price, before it bites (rows 16 and 17)");
  * applied" — one rule in several renderers, all agreeing, all wrong, which this
  * repo has shipped once already.
  */
+/**
+ * ⛔ Declared, not counted. A non-vacuity guard written as `> 0` passes on a
+ * seed that has quietly lost every priced trip but one.
+ */
+const EXPECTED_PRICED_TRIPS = 4;  // 1049800441 · 1049800442 · 1049800443 · 1049800394
 const SNP_ALL = [
   ...mockRequestTrips,
   ...mockUpcomingTrips,
@@ -13857,18 +13861,19 @@ check(
  * built in `lib/`. All three are driven here over the same trip.
  */
 const snpSplit = SNP_ALL.filter((trip) => {
-  const amount = sendbackPenaltyFor(trip);
   const pill = penaltyPillFor(trip);
   if (!pill) return false;
-  const priced = amount > 0;
-  // The pill either names the figure, or says there is none. Never a third thing.
-  const names = pill.label.includes(`$${amount} `);
-  return priced ? !names : pill.label !== "Free to send back";
+  // ⛔ The figure in the label IS the rule's figure, and the label says what it
+  // is. "$10 to send back" read as a fare; the word `penalty` is load-bearing.
+  return pill.label !== `$${sendbackPenaltyFor(trip)} Sendback Penalty applied`;
 });
+const snpPilled = SNP_ALL.filter((t) => penaltyPillFor(t));
 check(
-  "the card's pill and the rule's amount are the same number on every seeded trip",
-  `${snpSplit.length} disagree of ${SNP_ALL.filter((t) => penaltyPillFor(t)).length} priced trip(s)`,
-  snpSplit.length === 0 && SNP_ALL.filter((t) => penaltyPillFor(t)).length > 5,
+  "the card's pill and the rule's amount are the same number, and it is named a penalty",
+  snpSplit.length
+    ? snpSplit.map((t) => `${t.id}:${penaltyPillFor(t)!.label}`).join(", ")
+    : `${snpPilled.length} priced trip(s), all agreeing`,
+  snpSplit.length === 0 && snpPilled.length === EXPECTED_PRICED_TRIPS,
 );
 const snpToast = codeOnly(
   readFileSync(join(ROOT, "components/driver/more-options-screen.tsx"), "utf8"),
@@ -13938,7 +13943,27 @@ check(
   `top=${nextPenaltyPillFor(SNP_ALL.find((t) => t.id === "1049800442")!)?.label ?? "none"}, ` +
     `middle=${nextPenaltyPillFor(snpMiddle)?.label ?? "none"}`,
   nextPenaltyPillFor(SNP_ALL.find((t) => t.id === "1049800442")!) === null &&
-    nextPenaltyPillFor(snpMiddle)?.label === "$25 in 6 hrs",
+    nextPenaltyPillFor(snpMiddle)?.label === "$25 Sendback Penalty in 6 hrs",
+);
+/**
+ * ⛔⛔ **The two pills are told apart by COLOUR as well as by words**, and the
+ * assignment is not graded by band: a $10 charge is the same event as a $25 one
+ * at a different price. Red is a charge already carried, orange a deadline the
+ * driver can still act on. ⚠️ Asserted because a variant is a one-word edit and
+ * nothing else in this repo would notice it changing.
+ */
+const snpVariants = SNP_ALL.flatMap((t) => [
+  penaltyPillFor(t)?.variant,
+  nextPenaltyPillFor(t)?.variant,
+]).filter(Boolean);
+check(
+  "applied is red and the countdown is orange, on every seeded trip",
+  `applied: ${[...new Set(SNP_ALL.map((t) => penaltyPillFor(t)?.variant).filter(Boolean))].join("/")}, ` +
+    `countdown: ${[...new Set(SNP_ALL.map((t) => nextPenaltyPillFor(t)?.variant).filter(Boolean))].join("/")}`,
+  SNP_ALL.every((t) => !penaltyPillFor(t) || penaltyPillFor(t)!.variant === "danger") &&
+    SNP_ALL.every((t) => !nextPenaltyPillFor(t) || nextPenaltyPillFor(t)!.variant === "warning") &&
+    // ⛔ Non-vacuity: both kinds are actually present in the sweep.
+    snpVariants.includes("danger") && snpVariants.includes("warning"),
 );
 /**
  * ⛔ A market with no row in the Rules matrix gets NO pill, not a $0 one.
@@ -13952,24 +13977,25 @@ check(
 );
 
 /**
- * ⛔⛔ **The feed pill and the Upcoming pill differ, and the asymmetry is the
- * point.** The Request Feed is not filtered by focus, so a "Free to send back"
- * pill lands on every request whose market has a rule — on this seed that was 4
- * free pills against the 1 priced one row 16 exists to point at. Upcoming keeps
- * the free label because its three cards are a ladder and free is a rung.
+ * ⛔⛔ **A pill is a warning, so the free band carries none — anywhere.**
+ * An earlier build showed "Free to send back" and the Request Feed, which is
+ * not filtered by focus, put it on 4 cards against the 1 that actually cost
+ * something. User direction 2026-10-22 removed it, which also removed the
+ * feed/Upcoming asymmetry a separate function existed to express.
+ *
+ * ⚠️ Asserted over EVERY seeded trip, not just the demo rides, because the
+ * surfaces that render this are unfiltered.
  */
-const snpFeedPriced = mockRequestTrips.filter((t) => requestPenaltyPillFor(t));
-const snpFeedAll = mockRequestTrips.filter((t) => penaltyPillFor(t));
+const snpFreePilled = SNP_ALL.filter(
+  (t) => sendbackPenaltyFor(t) === 0 && penaltyPillFor(t) !== null,
+);
 check(
-  "the Request Feed prices only what costs something, while Upcoming names the free band too",
-  `feed: ${snpFeedPriced.length} of ${snpFeedAll.length} pilled; ` +
-    `upcoming free pills: ${mockUpcomingTrips.filter((t) => penaltyPillFor(t)?.label === "Free to send back").length}`,
-  snpFeedPriced.every((t) => sendbackPenaltyFor(t) > 0) &&
-    // ⛔ Non-vacuity in both directions: the feed must really be SUPPRESSING
-    // some, and Upcoming must really be SHOWING some, or this is one rule twice.
-    snpFeedAll.length > snpFeedPriced.length &&
-    snpFeedPriced.length > 0 &&
-    mockUpcomingTrips.some((t) => penaltyPillFor(t)?.label === "Free to send back"),
+  "no trip without a penalty carries an applied pill",
+  `${snpFreePilled.length} free trip(s) pilled, of ${SNP_ALL.filter((t) => sendbackPenaltyFor(t) === 0).length} free`,
+  snpFreePilled.length === 0 &&
+    // ⛔ Non-vacuity: there really are free trips with a ladder, or "none are
+    // pilled" is true because none could have been.
+    SNP_ALL.some((t) => sendbackPenaltyFor(t) === 0 && penaltyLadderFor(t)),
 );
 
 /* --- 43d. Both gates are real, and they are two -------------------------- */
