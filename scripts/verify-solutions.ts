@@ -1169,8 +1169,22 @@ check(
  * rides everywhere that counts them, which the second check below measures —
  * dropping `scenario` instead would empty the tab the moment row 21 was focused.
  */
-const SILENT_SCENARIO_ROWS = ["my-rides-cancelled"];
-const EXPECTED_SILENT_RIDES = 13;
+/**
+ * ⭐ 2026-10-22 — rows 16 and 17 joined row 21, on user direction. Their cards
+ * now carry pills that NAME the thing (`$25 Sendback Penalty applied`), so the
+ * `17a` handle beside them was scaffolding competing with the exhibit — the
+ * same argument that silenced row 21, reached from the opposite direction.
+ *
+ * ⛔ Declared PER ROW, not as one total. The old shape compared the whole silent
+ * population against a single row's ride count, which was only ever correct
+ * while exactly one row was silent.
+ */
+const SILENT_SCENARIO_ROWS: Array<[string, number]> = [
+  ["my-rides-cancelled", 13],
+  ["short-notice-at-take", 2],
+  ["short-notice-countdown", 3],
+];
+const EXPECTED_SILENT_RIDES = 18;
 const silentRides = ALL_SEEDED.filter((t) => t.scenario?.silent);
 const loudRides = tagged.filter((t) => !t.scenario?.silent);
 check(
@@ -1183,14 +1197,25 @@ check(
     loudRides.length > 0 &&
     loudRides.every((t) => pillsFor(t).some((p) => p.label.startsWith(t.scenario!.code))),
 );
+const silentOwners = [...new Set(silentRides.flatMap((t) => t.scenario!.solutions))];
+const silentMiscount = SILENT_SCENARIO_ROWS.filter(
+  ([id, n]) => ridesForSolution(ALL_SEEDED, id).length !== n,
+);
 check(
-  "...and silence is declared, on one row, which still filters normally",
-  `${[...new Set(silentRides.flatMap((t) => t.scenario!.solutions))].join(", ")}; ` +
-    `ridesForSolution sees ${ridesForSolution(mockUpcomingTrips, SILENT_SCENARIO_ROWS[0]).length}`,
-  [...new Set(silentRides.flatMap((t) => t.scenario!.solutions))].join(",") ===
-    SILENT_SCENARIO_ROWS.join(",") &&
-    ridesForSolution(mockUpcomingTrips, SILENT_SCENARIO_ROWS[0]).length ===
-      EXPECTED_SILENT_RIDES,
+  "...and silence is declared per row, and each still filters normally",
+  silentMiscount.length
+    ? silentMiscount.map(([id, n]) => `${id}: ${ridesForSolution(ALL_SEEDED, id).length} not ${n}`).join("; ")
+    : SILENT_SCENARIO_ROWS.map(([id, n]) => `${id}:${n}`).join(" "),
+  // ⚠️ Compared as a SET, not a sequence. `silentOwners` comes out in seed
+  // traversal order — which array a ride happens to live in — and the registry
+  // is a list of rows, not an ordering. Sorting both is what makes "no extras,
+  // none missing" the claim, which is the claim worth making.
+  silentOwners.slice().sort().join(",") ===
+    SILENT_SCENARIO_ROWS.map(([id]) => id).sort().join(",") &&
+    silentMiscount.length === 0 &&
+    // ⛔ The per-row counts must add up to the population, or one of the two
+    // declarations is drifting and the other is covering for it.
+    SILENT_SCENARIO_ROWS.reduce((sum, [, n]) => sum + n, 0) === EXPECTED_SILENT_RIDES,
 );
 /**
  * ⛔ ...and the cancelled ones still say so. Silencing the scaffolding must not
@@ -14036,6 +14061,37 @@ check(
   /showsShortNoticeAtTake\(demo\) &&\s*isShortNoticeSendBack\(trip\)/.test(snpLayout) &&
     /onClick=\{\s*warnsShortNotice/.test(snpLayout),
 );
+
+/**
+ * ⛔⛔ **Row 16's price and its warning are on the SAME screen, and this check
+ * is here because they were not.** The pill began life only on the Request Feed
+ * card, which no focused route can reach: the feed is unfiltered, and narrowing
+ * it means `/requests?member=…`, which is row 10's proposal — `applicableFilters`
+ * strips the member filter under any other focus. So the half of row 16 that
+ * says what a trip COSTS had no screen a reviewer could be sent to, which is
+ * D160's lesson in a new place: a declared behaviour nobody can walk to.
+ */
+const snpEntryRoute = findSolution("short-notice-at-take")!.entry!.route;
+check(
+  "row 16's entry lands on a screen carrying BOTH the price and the warning",
+  `${snpEntryRoute}; chips-row pill: ${/warnsShortNotice && penaltyPillFor\(trip\)/.test(snpLayout)}`,
+  // ⛔ A detail route, not a feed query — a `?member=` entry here silently shows
+  // every trip of the day under this row's focus.
+  /^\/requests\/\d+$/.test(snpEntryRoute) &&
+    /warnsShortNotice && penaltyPillFor\(trip\)/.test(snpLayout) &&
+    // ⛔ One colour map, imported rather than retyped — a second literal map
+    // beside the card's is how two renderers of one rule start disagreeing.
+    //
+    // ⚠️ This was briefly written as "the file contains no `bg-[#FEE2E2]`",
+    // which is a different and false claim: the layout uses that red in four
+    // unrelated banners. A file-wide negative is the wrong shape for a question
+    // about ONE element — the positive assertion is the one that bites.
+    /getPillStyles\(penaltyPillFor\(trip\)!\.variant\)/.test(snpLayout) &&
+    /import \{ getPillStyles \} from "@\/components\/driver\/ride-card"/.test(
+      snpLayout,
+    ),
+);
+
 
 console.log(
   failures === 0

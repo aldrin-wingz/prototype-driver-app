@@ -29,7 +29,12 @@ function getTimeAnchorStyles(type: TimeAnchorType): { bg: string; text: string }
   }
 }
 
-function getPillStyles(variant: TripPill["variant"]): string {
+/**
+ * ⛔ Exported since 2026-10-22, not copied. The request screen's chips row draws
+ * row 16's penalty pill and needs the same five colours; a second literal map
+ * beside this one is how two renderers of one rule start disagreeing.
+ */
+export function getPillStyles(variant: TripPill["variant"]): string {
   switch (variant) {
     case "success":
       return "bg-[#D1FAE5] text-[#065F46]";

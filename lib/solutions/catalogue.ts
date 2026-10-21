@@ -667,13 +667,23 @@ export const SOLUTIONS: Solution[] = [
     klass: "surface",
     buildState: "in-prototype",
     entry: {
+      /**
+       * ⛔⛔ **The request SCREEN, not the feed.** Row 16 is two things — a pill
+       * naming the price and a warning at the swipe — and both are on this one
+       * screen, which is also where a driver actually decides. ⚠️ A narrowed
+       * feed route was tried and reverted: `/requests?member=…` is row 10's
+       * pattern and only works under row 10's focus, because
+       * `applicableFilters` strips the member filter under any other. The feed
+       * card carries the same pill and is seen in the plain mirror, among the
+       * day's other twenty requests, which is how a driver meets it.
+       */
       route: "/requests/1049800443",
       label:
-        "A Verida GA request already in the top band of its market's ladder — $25 to hand back, the moment it is accepted. The card carries the amount; swiping to accept raises production's own penalty copy first. ⚠️ The warning does not block: Continue takes the trip. ⛔ Today neither exists, and the figure is first seen on the send-back screen, after the driver has committed.",
+        "A Verida GA request already in the top band of its market's ladder. The chips row says `$25 Sendback Penalty applied` in red, beside the expiry — that is what handing this trip back costs, from the moment it is accepted. Swiping to accept raises the same figure as a warning first. ⚠️ The warning does NOT block: Continue takes the trip, and a driver who wants a short-notice trip is not doing anything wrong — the complaint this answers is 'nobody told me'. ⛔ Today neither the pill nor the warning exists, and the figure is first seen on the send-back screen, after the driver has committed. ⛔ Continue closes the warning and the trip stays on the feed; there is no accept path anywhere in this app.",
       alternates: [
         {
           route: "/requests/1049800444",
-          short: "A free request — no warning at all",
+          short: "A free request — no pill, no warning",
           label:
             "The same screen on a trip outside the 48-hour band. The card carries NO pill and the accept swipe raises nothing. ⚠️ Silence is deliberate everywhere, not just here: a pill is a warning, and a card with nothing to warn about says nothing. An earlier build labelled the free band and put that label on 4 feed cards against the 1 that actually cost something. ⛔ Without this branch, a warning seen on every accept is indistinguishable from a warning that means something.",
         },

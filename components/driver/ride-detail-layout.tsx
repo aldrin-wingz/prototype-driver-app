@@ -55,9 +55,11 @@ import { shouldAskPreferredDriver } from "@/lib/driver-data/member-assignment";
 import { useSolution } from "@/lib/solutions/solution-context";
 import {
   isShortNoticeSendBack,
+  penaltyPillFor,
   sendbackPenaltyFor,
   showsShortNoticeAtTake,
 } from "@/lib/driver-data/sendback-penalty";
+import { getPillStyles } from "@/components/driver/ride-card";
 import { SwipeTooFarDialog } from "@/components/driver/swipe-too-far-dialog";
 import { ShortNoticeAcceptDialog } from "@/components/driver/short-notice-accept-dialog";
 import {
@@ -1071,6 +1073,25 @@ export function RideDetailLayout({
               <span className="inline-block rounded-full bg-[#F3F4F6] px-3 py-1 text-xs font-medium text-[#6B7280]">
                 Expires in 185 days
               </span>
+              {/* ⛔⛔ Catalogue row 16, and the reason it is HERE and not only on
+                  the feed card: the Request Feed cannot be narrowed to one trip
+                  for this row. The member filter is row 10's own proposal and
+                  `applicableFilters` strips it under any other focus — lighting
+                  it would put two proposals in one flow. So the card pill was
+                  reachable only by scrolling twenty cards, and the half of row
+                  16 that says what a trip COSTS had no screen a reviewer could
+                  be sent to. This is that screen: the price sits beside the
+                  expiry, and the swipe below raises the warning. */}
+              {warnsShortNotice && penaltyPillFor(trip) && (
+                <span
+                  className={cn(
+                    "inline-block rounded-full px-3 py-1 text-xs font-medium",
+                    getPillStyles(penaltyPillFor(trip)!.variant),
+                  )}
+                >
+                  {penaltyPillFor(trip)!.label}
+                </span>
+              )}
               {hasIncentives &&
                 activeIncentiveTypes.map((incentiveType) => (
                   <ProgramContributionIndicator
