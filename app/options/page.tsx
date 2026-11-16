@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { driverTermsActions } from "@/lib/driver-terms/session"; // FEATURE prototype/driver-terms-acceptance
 import {
   ChevronRight, History, User, IdCard, Phone, NotepadText, Map, MapPin,
   FileText, RefreshCcw, LogOut,
@@ -47,6 +49,7 @@ const ICONS: Record<OptionsRowId, typeof History> = {
 
 export default function OptionsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [notesOpen, setNotesOpen] = useState(false);
 
   return (
@@ -107,6 +110,12 @@ export default function OptionsPage() {
                 className={cls}
                 onClick={() => {
                   if (row.id === "driver-notes") { setNotesOpen(true); return; }
+                  // FEATURE prototype/driver-terms-acceptance: Logout signs the demo driver out, and
+                  // Driver Terms opens the versioned in-app page (PRD story 7; production opens
+                  // wingz.me/driver-terms). Routed here, not via OPTIONS_ROWS.href, because the base
+                  // data only wires captured destinations.
+                  if (row.id === "logout") { driverTermsActions.logOut(); router.replace("/login"); return; }
+                  if (row.id === "driver-terms") { router.push("/driver-terms"); return; }
                   toast({
                     title: row.label,
                     description: "Not wired in the prototype — this is the production action.",

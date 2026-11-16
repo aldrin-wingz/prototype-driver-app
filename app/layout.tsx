@@ -5,6 +5,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { IncentiveEarnedProvider } from "@/lib/incentive-earned-context";
 import { IncentiveEarnedPopup } from "@/components/driver/incentive-earned-popup";
+// FEATURE prototype/driver-terms-acceptance — not shipped; remove on fold-in unless the story ships.
+import { TermsGate } from "@/components/driver-terms/terms-gate";
+import { DemoControls } from "@/components/driver-terms/demo-controls";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -45,6 +48,9 @@ export default function RootLayout({
           <IncentiveEarnedProvider>
             {children}
             <IncentiveEarnedPopup />
+            {/* FEATURE prototype/driver-terms-acceptance */}
+            <TermsGate />
+            <DemoControls />
           </IncentiveEarnedProvider>
           <Toaster />
         </ThemeProvider>

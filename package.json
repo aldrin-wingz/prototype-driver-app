@@ -14,6 +14,7 @@
     "start": "next start",
     "lint": "next lint",
     "verify": "bun scripts/verify-base.ts",
+    "verify:driver-terms": "bun scripts/verify-driver-terms.ts",
     "verify:captures": "bun scripts/verify-captures.ts",
     "build:capture-index": "bun scripts/build-capture-index.ts"
   },
