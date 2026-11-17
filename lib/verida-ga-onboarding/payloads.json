@@ -12,7 +12,7 @@
   ],
   "markets": {
     "non-ga": {
-      "label": "Every other market",
+      "label": "TNC+ (every market except Georgia)",
       "template": {
         "id": 56,
         "title": "Wingz Driver Onboarding v1.0.44",
@@ -5614,7 +5614,7 @@
       }
     },
     "verida-ga": {
-      "label": "Georgia (Verida GA)",
+      "label": "Fully Credentialled (Georgia)",
       "template": {
         "id": 56,
         "title": "Wingz Driver Onboarding v1.0.44",

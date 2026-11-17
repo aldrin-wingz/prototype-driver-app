@@ -46,7 +46,7 @@ export default function VeridaGaOnboardingPage() {
         <aside className="w-full space-y-4 rounded-xl bg-white p-4 text-[14px] shadow-sm md:max-w-md" data-testid="controls">
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-wide text-gray-500">Prototype controls</div>
-            <h1 className="mt-1 text-[18px] font-semibold">Verida GA — stages appear once the market is known</h1>
+            <h1 className="mt-1 text-[18px] font-semibold">Fully Credentialled — stages appear once the market is known</h1>
             <p className="mt-1 text-gray-600">
               Before the driver gives a market, the app lists only the stages every market shares. Giving the market
               in <em>Basic Information › Getting Started</em> reveals that market&apos;s full flow in the same session.
