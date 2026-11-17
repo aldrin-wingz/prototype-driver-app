@@ -10720,6 +10720,63 @@
                     "visibility": "external",
                     "col_span": 12,
                     "content": "PDF or images, max 10 MB each."
+                  },
+                  {
+                    "id": 9226,
+                    "slug": "gentech_pass_basic_completed_at",
+                    "label": "PASS Basic Completed At",
+                    "field_type": "calendar",
+                    "help_text": null,
+                    "required": false,
+                    "is_expiration": false,
+                    "is_active": true,
+                    "display_order": 9,
+                    "category": "onboarding",
+                    "validation_rules": {
+                      "required": false
+                    },
+                    "visibility": "internal",
+                    "col_span": 6,
+                    "is_disabled": true,
+                    "content": ""
+                  },
+                  {
+                    "id": 9227,
+                    "slug": "gentech_defensive_driving_completed_at",
+                    "label": "Defensive Driving Completed At",
+                    "field_type": "calendar",
+                    "help_text": null,
+                    "required": false,
+                    "is_expiration": false,
+                    "is_active": true,
+                    "display_order": 10,
+                    "category": "onboarding",
+                    "validation_rules": {
+                      "required": false
+                    },
+                    "visibility": "internal",
+                    "col_span": 6,
+                    "is_disabled": true,
+                    "content": ""
+                  },
+                  {
+                    "id": 9228,
+                    "slug": "gentech_first_aid_completed_at",
+                    "label": "First Aid Completed At",
+                    "field_type": "calendar",
+                    "help_text": null,
+                    "required": false,
+                    "is_expiration": false,
+                    "is_active": true,
+                    "display_order": 11,
+                    "category": "onboarding",
+                    "validation_rules": {
+                      "required": false
+                    },
+                    "visibility": "internal",
+                    "col_span": 6,
+                    "is_disabled": true,
+                    "content": ""
                   }
                 ]
               },
