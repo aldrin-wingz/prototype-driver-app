@@ -95,7 +95,7 @@ export default function VeridaGaOnboardingPage() {
 
           <p className="text-[12px] text-gray-500">
             Template: {BASELINE.environment} #{BASELINE.templateId} v{BASELINE.version}, captured {BASELINE.captured}.
-            Shared stages realign when the production template is exported. Wizard rebuilt from the native app at
+            Shared stages are production&apos;s as of that date; the Georgia changes are applied on top. Wizard rebuilt from the native app at
             develop cb752e402 and production captures 11-01 / 11-03.
           </p>
         </aside>
