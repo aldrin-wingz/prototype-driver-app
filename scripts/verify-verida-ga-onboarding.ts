@@ -20,7 +20,7 @@ import {
   stagesVisibleTo,
   templateFor,
 } from "../lib/verida-ga-onboarding/market-flow";
-import { choiceOptions, isFieldVisible, isScrollAck, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
+import { choiceOptions, continueLabel, isFieldVisible, isScrollAck, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
 
 let failed = 0;
 function check(name: string, detail: string, ok: boolean) {
@@ -185,6 +185,16 @@ const drugSlugs = (drug?.field_definitions ?? []).map((f) => f.slug);
 const voucherLatch = (field("EPassport (Voucher)", "drug_screen_epassport_voucher") as unknown as { validation_rules?: Record<string, unknown> } | undefined)?.validation_rules?.unpin_driver_navigation_when_stage_field_has_value;
 check("drug screening asks for the date only; the voucher unlocks on the date", `checkbox ${drugSlugs.includes("ack_drug_screen_scheduled") ? "present" : "gone"}, date ${drugSlugs.includes("drug_screen_date") ? "present" : "missing"}, latch → ${voucherLatch}`,
   !drugSlugs.includes("ack_drug_screen_scheduled") && drugSlugs.includes("drug_screen_date") && voucherLatch === "drug_screen_date");
+}
+
+// Step button labels: production's rule, not the template's action_button_text.
+{
+  const wizardSrc = readFileSync(join(process.cwd(), "components", "verida-ga-onboarding", "onboarding-wizard.tsx"), "utf8");
+  const labels = new Set<string>();
+  const flow = stagesVisibleTo("verida-ga");
+  flow.forEach((st, si) => st.steps.forEach((_, ti) => labels.add(continueLabel(si === flow.length - 1 && ti === st.steps.length - 1))));
+  check("button says Continue, and Submit Application only at the end", `${[...labels].join(" / ")}; template text ${wizardSrc.includes("action_button_text") ? "used" : "not used"}`,
+    labels.size === 2 && labels.has("Continue") && labels.has("Submit Application") && !wizardSrc.includes("action_button_text"));
 }
 
 console.log(failed ? `\n❌ ${failed} check(s) failed` : "\n✅ verida-ga-onboarding: all checks passed");

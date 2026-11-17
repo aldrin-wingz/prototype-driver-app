@@ -18,10 +18,10 @@
  * ⚠️ Built from code, never captured: the fields of every stage after Basic Information are
  * rendered by a simplified field renderer here, not a port of App/Components/DynamicForm.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
-import { isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
+import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { Check, CircleHelp, LayoutGrid, Lock, LogOut, X } from "lucide-react";
 
 import {
@@ -76,6 +76,10 @@ export function OnboardingWizard({
   onChange: (next: WizardState) => void;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [state.cursor.stageIndex, state.cursor.stepIndex]);
   const market: MarketKey | null = marketKeyFor(state.marketState);
   const stages = useMemo(() => stagesVisibleTo(market), [market]);
   const views = useMemo(() => buildStageViews(stages, state.cursor), [stages, state.cursor]);
@@ -127,8 +131,8 @@ export function OnboardingWizard({
         <ProgressBar progress={progress} />
       </div>
 
-      {/* Step body */}
-      <div className="flex-1 overflow-y-auto bg-[#FAFAFA] p-4">
+      {/* Step body — back to the top on every step, as a new screen would be. */}
+      <div ref={bodyRef} className="flex-1 overflow-y-auto bg-[#FAFAFA] p-4">
         {currentStep ? (
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-4">
             <div className="text-[18px] font-semibold">{currentStep.title}</div>
@@ -177,7 +181,8 @@ export function OnboardingWizard({
               className="mt-6 w-full rounded-lg py-3 text-[15px] font-semibold text-white disabled:opacity-40"
               style={{ backgroundColor: GREEN }}
             >
-              {currentStep.action_button_text || "Continue"}
+              {/* Only the end of a market's flow submits; before a market the list just stops at the app download. */}
+              {continueLabel(market !== null && nextCursor(stages, state.cursor) === null)}
             </button>
           </div>
         ) : null}

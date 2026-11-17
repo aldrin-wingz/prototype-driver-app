@@ -109,3 +109,15 @@ export function toggleChoice(selected: readonly string[], option: ChoiceOption, 
 export function sampleUploadName(field: FieldDef): string {
   return `${field.slug}${field.field_type === "photo" ? ".jpg" : ".pdf"}`;
 }
+
+/**
+ * The step button's label, as production decides it — NOT the template's `action_button_text`,
+ * which neither renderer reads (real: App/Data/onboarding/onboardingStepPresentation.ts:183-206
+ * @ android prod 39b403b78; the portal only declares the field, backend-types.ts:121).
+ * Production shows "Save & Return" on steps opened from a checklist hub (stage layout `parallel`
+ * or `accordion`); this prototype walks steps in sequence with no hub screen, so it uses the
+ * sequential labels: "Continue", and "Submit Application" on the last step.
+ */
+export function continueLabel(isLastStep: boolean): string {
+  return isLastStep ? "Submit Application" : "Continue";
+}
