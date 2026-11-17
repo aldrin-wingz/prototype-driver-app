@@ -31,7 +31,12 @@ export interface FieldDef {
   visibility?: string;
   video_url?: string | null;
   metadata?: Record<string, unknown> | null;
-  items?: { text: string; image?: string; highlight?: boolean }[];
+  items?: { text: string; image?: string; highlight?: string | boolean }[];
+  list_type?: string | null;
+  sign_url?: string | null;
+  /** September Verida GA config puts some button links here (the portal adapter reads it too). */
+  url?: string | null;
+  scroll_required?: boolean | null;
 }
 
 export interface TemplateStep {
@@ -185,4 +190,41 @@ export function nextCursor(stages: TemplateStage[], c: Cursor): Cursor | null {
 /** Driver-facing fields only — the app never renders `visibility: "internal"`. */
 export function driverFields(step: TemplateStep): FieldDef[] {
   return step.field_definitions.filter((f) => f.visibility !== "internal");
+}
+
+
+/**
+ * Production market ids (CS Tool lib/nemt-market-client-mappings.ts NEMT_MARKETS). The template
+ * keys per-market links by these ids.
+ */
+const MARKET_ID_BY_STATE: Record<string, number> = {
+  Arkansas: 23,
+  Florida: 24,
+  Georgia: 20,
+  Indiana: 26,
+  Louisiana: 28,
+  Ohio: 25,
+  Oklahoma: 29,
+  Tennessee: 21,
+  Virginia: 22,
+  "West Virginia": 27,
+};
+
+export function marketIdFor(marketState: string | null): number | null {
+  return marketState ? (MARKET_ID_BY_STATE[marketState] ?? null) : null;
+}
+
+/**
+ * The link a button or video field opens for this driver. The inspection booking button carries
+ * `metadata.video_urls_by_market`, which the backend resolves per driver before serving the
+ * template (real: driver_onboarding/utils.py:1717-1728 @ backend f96b510dc); a market with no
+ * entry gets the field's own `video_url`.
+ */
+export function resolveFieldLink(field: FieldDef, marketId: number | null): string | null {
+  const byMarket = (field.metadata as { video_urls_by_market?: Record<string, string> } | null | undefined)
+    ?.video_urls_by_market;
+  const perMarket = marketId != null ? byMarket?.[String(marketId)] : undefined;
+  const link = perMarket ?? field.video_url ?? field.url ?? field.sign_url ?? null;
+  // External links, or a file this prototype serves itself (the trade dress, the signage PDF).
+  return link && (/^https?:\/\//.test(link) || link.startsWith("/dev/")) ? link : null;
 }

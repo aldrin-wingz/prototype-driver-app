@@ -19,6 +19,8 @@
  * rendered by a simplified field renderer here, not a port of App/Components/DynamicForm.
  */
 import { useMemo, useState } from "react";
+
+import { RichField } from "./rich-field";
 import { Check, CircleHelp, LayoutGrid, Lock, LogOut, X } from "lucide-react";
 
 import {
@@ -31,6 +33,7 @@ import {
   countCompletedStages,
   driverFields,
   initialCursor,
+  marketIdFor,
   marketKeyFor,
   marketOptions,
   nextCursor,
@@ -147,7 +150,7 @@ export function OnboardingWizard({
                     onChange={(v) => onChange({ ...state, heardFrom: v })}
                   />
                 ) : (
-                  <FieldPreview key={f.slug} field={f} />
+                  <RichField key={f.slug} field={f} marketId={marketIdFor(state.marketState)} />
                 ),
               )}
             </div>
@@ -240,97 +243,6 @@ function SelectField({
       ) : null}
     </label>
   );
-}
-
-/** Simplified renderer — enough to read a stage, not a port of DynamicFormRenderer. */
-function FieldPreview({ field }: { field: FieldDef }) {
-  const t = field.field_type;
-  if (field.metadata && (field.metadata as { hide_on_mobile?: boolean }).hide_on_mobile) return null;
-  if (t === "heading") return <div className="pt-2 text-[15px] font-semibold">{field.label}</div>;
-  if (t === "info" || t === "age_gate") {
-    return (
-      <div className="rounded-lg border border-dashed border-[#D9D9D9] bg-[#F7F7F8] p-3">
-        <div className="text-[14px] font-semibold">{field.label}</div>
-        {field.content ? (
-          <p className="mt-1 whitespace-pre-line text-[13px]" style={{ color: GRAY_3 }}>
-            {stripMarkdown(field.content).slice(0, 600)}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-  if (t === "info_list") {
-    const items = field.items ?? [];
-    return (
-      <div>
-        <div className="text-[14px] font-semibold">{field.label}</div>
-        {items.length ? (
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-[13px]" style={{ color: "#3A3A3A" }}>
-            {items
-              .filter((i) => i.text)
-              .slice(0, 8)
-              .map((i, n) => (
-                <li key={n}>{stripMarkdown(i.text)}</li>
-              ))}
-          </ul>
-        ) : field.content ? (
-          <p className="mt-1 whitespace-pre-line text-[13px]" style={{ color: "#3A3A3A" }}>
-            {stripMarkdown(field.content).slice(0, 600)}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-  if (t === "photo" || t === "file" || t === "additional_file") {
-    return (
-      <div>
-        <div className="text-[14px] font-medium">
-          {field.label}
-          {field.required ? <span className="text-red-500"> *</span> : null}
-        </div>
-        <div className="mt-1.5 rounded-lg border border-dashed border-[#D9D9D9] py-5 text-center text-[13px]" style={{ color: GRAY_3 }}>
-          {t === "photo" ? "Take a photo or choose one" : "Upload a file"}
-        </div>
-      </div>
-    );
-  }
-  if (t === "acknowledgment") {
-    return (
-      <label className="flex items-start gap-2 text-[14px]">
-        <input type="checkbox" className="mt-1" readOnly /> <span>{field.label}</span>
-      </label>
-    );
-  }
-  if (t === "button" || t === "video" || t === "esign_action" || t === "stripe_onboarding_action") {
-    return (
-      <div
-        className="rounded-lg border py-2.5 text-center text-[14px] font-medium"
-        style={{ borderColor: GREEN, color: GREEN }}
-      >
-        {t === "video" ? field.content || field.label : field.label}
-      </div>
-    );
-  }
-  if (t === "async_value") return null;
-  return (
-    <div>
-      <div className="text-[14px] font-medium">
-        {field.label}
-        {field.required ? <span className="text-red-500"> *</span> : null}
-      </div>
-      <div className="mt-1.5 rounded-lg border px-3 py-3 text-[14px]" style={{ borderColor: GRAY_7, color: GRAY_3 }}>
-        {field.help_text && t !== "radio" ? field.help_text : t === "radio" ? optionLabels(field).join(" / ") : ""}
-        &nbsp;
-      </div>
-    </div>
-  );
-}
-
-function stripMarkdown(s: string) {
-  return s
-    .replace(/\\n/g, "\n")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 }
 
 /** real: OnboardingStagePickerModal.tsx — full-width sheet, Progress header, stage rows. */

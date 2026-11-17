@@ -7,14 +7,16 @@
  * Each was broken on purpose once and seen to fail (see the Working Plan change log).
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
   PRE_MARKET_STAGE_TITLES,
   driverFields,
+  marketIdFor,
   marketKeyFor,
   marketOptions,
+  resolveFieldLink,
   stagesVisibleTo,
   templateFor,
 } from "../lib/verida-ga-onboarding/market-flow";
@@ -104,6 +106,38 @@ const updatedBy = updatedByValues.filter((v) => v !== "null").length;
 const stampedVideo = (text.match(/"video_url":\s*"[^"]*[?&](email|first_name|last_name)=/g) ?? []).length;
 check("no staff names in updated_by", `${updatedBy} non-null of ${updatedByValues.length}`, updatedByValues.length > 0 && updatedBy === 0);
 check("no per-driver stamped video URLs", `${stampedVideo} found`, stampedVideo === 0);
+
+// Images and links (the September prototype's assets, now rendered in the app).
+const payloadText = readFileSync(join(DIR, "payloads.json"), "utf8");
+const assetRefs = [...new Set([...payloadText.matchAll(/"(\/dev\/[^"]+)"/g)].map((m) => m[1]))];
+const missingAssets = assetRefs.filter((r) => !existsSync(join(process.cwd(), "public", r)));
+check("every image / file the stages reference is in public/", `${assetRefs.length - missingAssets.length} of ${assetRefs.length}${missingAssets.length ? ` — missing ${missingAssets.join(", ")}` : ""}`, assetRefs.length > 0 && missingAssets.length === 0);
+
+const bookButton = (market: "verida-ga" | "non-ga") => {
+  for (const st of stagesVisibleTo(market)) for (const step of st.steps) for (const f of step.field_definitions) if (f.slug === "book_vehicle_inspection_button") return f;
+  return null;
+};
+const LINK_CASES: [string, "verida-ga" | "non-ga", string, RegExp][] = [
+  ["Georgia → Bright Inspect", "verida-ga", "Georgia", /book\.brightinspect\.com\/verida/],
+  ["Florida → Rideshare Mechanic (with category)", "non-ga", "Florida", /book\.ridesharemechanic\.com\/Home\?categoryId=/],
+  ["Tennessee → RMI", "non-ga", "Tennessee", /rmi-inspections\.com/],
+  ["Louisiana → Rideshare Mechanic (no market entry)", "non-ga", "Louisiana", /book\.ridesharemechanic\.com/],
+];
+const linkMisses = LINK_CASES.filter(([, m, state, re]) => {
+  const f = bookButton(m);
+  return !f || !re.test(resolveFieldLink(f, marketIdFor(state)) ?? "");
+}).map(([n]) => n);
+check("inspection link resolves per market", `${LINK_CASES.length - linkMisses.length} of ${LINK_CASES.length}${linkMisses.length ? ` — wrong: ${linkMisses.join(", ")}` : ""}`, linkMisses.length === 0);
+
+const linkless: string[] = [];
+let buttonCount = 0;
+for (const st of stagesVisibleTo("verida-ga")) for (const step of st.steps) for (const f of driverFields(step)) {
+  if (f.field_type !== "button" && f.field_type !== "video") continue;
+  if ((f.metadata as { hide_on_mobile?: boolean } | null | undefined)?.hide_on_mobile) continue;
+  buttonCount++;
+  if (!resolveFieldLink(f, marketIdFor("Georgia"))) linkless.push(`${step.title} › ${f.slug}`);
+}
+check("every Georgia button / video opens something", `${buttonCount - linkless.length} of ${buttonCount}${linkless.length ? ` — no link: ${linkless.join(", ")}` : ""}`, buttonCount > 0 && linkless.length === 0);
 
 console.log(failed ? `\n❌ ${failed} check(s) failed` : "\n✅ verida-ga-onboarding: all checks passed");
 process.exit(failed ? 1 : 0);
