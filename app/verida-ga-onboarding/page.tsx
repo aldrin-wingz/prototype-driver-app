@@ -33,7 +33,7 @@ export default function VeridaGaOnboardingPage() {
     const list = stagesVisibleTo(marketKeyFor(marketState));
     // Giving a market finishes Getting Started; land on the stage after the app download.
     const cursor = marketState ? { stageIndex: Math.min(2, list.length - 1), stepIndex: 0 } : initialCursor(list);
-    setState({ marketState, draftMarket: marketState, heardFrom: marketState ? "Indeed" : null, cursor });
+    setState({ marketState, draftMarket: marketState, heardFrom: marketState ? "Indeed" : null, cursor, values: {} });
   };
 
   return (

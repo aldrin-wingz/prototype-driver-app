@@ -10285,35 +10285,6 @@
                     "scroll_required": null,
                     "video_url": null,
                     "external_id": null
-                  },
-                  {
-                    "id": 218,
-                    "slug": "ack_drug_screen_scheduled",
-                    "label": "I have scheduled my drug screening appointment",
-                    "field_type": "acknowledgment",
-                    "help_text": null,
-                    "options": null,
-                    "required": true,
-                    "is_expiration": false,
-                    "is_active": true,
-                    "display_order": 6,
-                    "placeholder": null,
-                    "category": "onboarding",
-                    "default_value": null,
-                    "validation_rules": {
-                      "required": true,
-                      "requiredMessage": "Please confirm you have scheduled your drug screening appointment."
-                    },
-                    "visibility": "external",
-                    "created_at": "2026-04-12T05:37:31.955464Z",
-                    "updated_at": "2026-04-12T05:37:31.955487Z",
-                    "updated_by": null,
-                    "col_span": 12,
-                    "is_disabled": false,
-                    "content": null,
-                    "scroll_required": false,
-                    "video_url": null,
-                    "external_id": null
                   }
                 ],
                 "webhooks": [],
@@ -10375,7 +10346,7 @@
                     "default_value": null,
                     "validation_rules": {
                       "pre_submit": true,
-                      "unpin_driver_navigation_when_stage_field_has_value": "ack_drug_screen_scheduled"
+                      "unpin_driver_navigation_when_stage_field_has_value": "drug_screen_date"
                     },
                     "visibility": "external",
                     "created_at": "2026-04-16T04:27:50.226698Z",
@@ -10425,45 +10396,55 @@
                     "validation_rules": null,
                     "visibility": "external",
                     "col_span": 12,
-                    "content": "1. Tell us whether you have already completed any Gentech training\n2. If you have, upload the certificates you hold — one, two or all three\n3. If you have not, select No and continue; nothing is required here"
+                    "content": "1. Tick each Gentech training you have already completed — one, two or all three\n2. Upload the certificate for each one you ticked\n3. If you have not completed any yet, tick \"I have not completed any of the above training yet\" and continue"
                   },
                   {
                     "id": 9211,
                     "slug": "gentech_trainings_completed",
-                    "label": "Have you already completed any Gentech trainings?",
-                    "field_type": "radio",
+                    "label": "Which Gentech trainings have you already completed?",
+                    "field_type": "checkboxes",
                     "required": true,
                     "is_active": true,
                     "display_order": 3,
                     "options": [
                       {
-                        "label": "Yes",
-                        "value": "yes"
+                        "label": "PASS Basic",
+                        "value": "pass_basic"
                       },
                       {
-                        "label": "No",
-                        "value": "no"
+                        "label": "Defensive Driving",
+                        "value": "defensive_driving"
+                      },
+                      {
+                        "label": "First Aid",
+                        "value": "first_aid"
+                      },
+                      {
+                        "label": "I have not completed any of the above training yet",
+                        "value": "none",
+                        "exclusive": true
                       }
                     ],
                     "validation_rules": {
                       "required": true,
-                      "requiredMessage": "Please select Yes or No to continue."
+                      "requiredMessage": "Tick the trainings you have completed, or that you have not completed any yet."
                     },
                     "visibility": "external",
                     "col_span": 12,
-                    "help_text": "Answering No is fine — you will complete these trainings later in onboarding."
+                    "help_text": "Not completed any yet? That is fine — you will complete them later in onboarding."
                   },
                   {
                     "id": 9212,
                     "slug": "gentech_pass_basic_certificate",
                     "label": "PASS Basic Certificate",
                     "field_type": "file",
-                    "required": false,
+                    "required": true,
                     "is_active": true,
                     "display_order": 4,
                     "placeholder": "Click to upload or drag and drop",
                     "validation_rules": {
-                      "required": false,
+                      "required": true,
+                      "requiredMessage": "Upload your PASS Basic Certificate, or untick the training.",
                       "fileTypes": [
                         "image/jpeg",
                         "image/png",
@@ -10473,13 +10454,13 @@
                     },
                     "visibility": "external",
                     "col_span": 12,
-                    "content": "Optional. PDF or images, max 10 MB each.",
+                    "content": "PDF or images, max 10 MB. It carries over to the Gentech Training step.",
                     "visibility_rule": {
-                      "==": [
+                      "in": [
+                        "pass_basic",
                         {
                           "var": "gentech_trainings_completed"
-                        },
-                        "yes"
+                        }
                       ]
                     }
                   },
@@ -10488,12 +10469,13 @@
                     "slug": "gentech_defensive_driving_certificate",
                     "label": "Defensive Driving Certificate",
                     "field_type": "file",
-                    "required": false,
+                    "required": true,
                     "is_active": true,
                     "display_order": 5,
                     "placeholder": "Click to upload or drag and drop",
                     "validation_rules": {
-                      "required": false,
+                      "required": true,
+                      "requiredMessage": "Upload your Defensive Driving Certificate, or untick the training.",
                       "fileTypes": [
                         "image/jpeg",
                         "image/png",
@@ -10503,13 +10485,13 @@
                     },
                     "visibility": "external",
                     "col_span": 12,
-                    "content": "Optional. PDF or images, max 10 MB each.",
+                    "content": "PDF or images, max 10 MB. It carries over to the Gentech Training step.",
                     "visibility_rule": {
-                      "==": [
+                      "in": [
+                        "defensive_driving",
                         {
                           "var": "gentech_trainings_completed"
-                        },
-                        "yes"
+                        }
                       ]
                     }
                   },
@@ -10518,12 +10500,13 @@
                     "slug": "gentech_first_aid_certificate",
                     "label": "First Aid Certificate",
                     "field_type": "file",
-                    "required": false,
+                    "required": true,
                     "is_active": true,
                     "display_order": 6,
                     "placeholder": "Click to upload or drag and drop",
                     "validation_rules": {
-                      "required": false,
+                      "required": true,
+                      "requiredMessage": "Upload your First Aid Certificate, or untick the training.",
                       "fileTypes": [
                         "image/jpeg",
                         "image/png",
@@ -10533,13 +10516,13 @@
                     },
                     "visibility": "external",
                     "col_span": 12,
-                    "content": "Optional. PDF or images, max 10 MB each.",
+                    "content": "PDF or images, max 10 MB. It carries over to the Gentech Training step.",
                     "visibility_rule": {
-                      "==": [
+                      "in": [
+                        "first_aid",
                         {
                           "var": "gentech_trainings_completed"
-                        },
-                        "yes"
+                        }
                       ]
                     }
                   }
@@ -11394,96 +11377,6 @@
                     "external_id": null
                   },
                   {
-                    "id": 9290,
-                    "slug": "vehicle_inspection_printed_materials",
-                    "label": "Printed materials to bring",
-                    "field_type": "info_list",
-                    "list_type": "bullet",
-                    "required": false,
-                    "is_active": true,
-                    "display_order": 2,
-                    "validation_rules": null,
-                    "visibility": "external",
-                    "col_span": 12,
-                    "items": [
-                      {
-                        "text": "Wingz Trade Dress, printed in colour on 8.5 x 11 paper"
-                      },
-                      {
-                        "text": "Interior Safety Rules signage, printed on letter paper"
-                      },
-                      {
-                        "text": "A penny — the inspector uses it for the tire tread test"
-                      }
-                    ]
-                  },
-                  {
-                    "id": 9291,
-                    "slug": "vehicle_inspection_vehicle_condition",
-                    "label": "Vehicle condition requirements",
-                    "field_type": "info_list",
-                    "list_type": "bullet",
-                    "required": false,
-                    "is_active": true,
-                    "display_order": 3,
-                    "validation_rules": null,
-                    "visibility": "external",
-                    "col_span": 12,
-                    "items": [
-                      {
-                        "text": "Tires pass the penny tread test"
-                      },
-                      {
-                        "text": "No cracks in the windshield"
-                      },
-                      {
-                        "text": "Air conditioning works"
-                      },
-                      {
-                        "text": "Headlights, taillights, signal lights and warning lights all work"
-                      },
-                      {
-                        "text": "No significant interior or exterior damage — dents, rust, or doors that do not open and close properly"
-                      },
-                      {
-                        "text": "No third-party advertising stickers — product, company or political"
-                      },
-                      {
-                        "text": "Interior and exterior are clean"
-                      }
-                    ]
-                  },
-                  {
-                    "id": 9292,
-                    "slug": "vehicle_inspection_reservation_hold",
-                    "label": "Reservation hold — $40",
-                    "field_type": "info_list",
-                    "list_type": "bullet",
-                    "required": false,
-                    "is_active": true,
-                    "display_order": 4,
-                    "validation_rules": null,
-                    "visibility": "external",
-                    "col_span": 12,
-                    "metadata": {
-                      "variant": "warning"
-                    },
-                    "items": [
-                      {
-                        "text": "Bright Inspect asks for a payment card to reserve your slot and places a **$40 hold**. The hold is temporary and is released if your vehicle passes."
-                      },
-                      {
-                        "text": "If your vehicle does not pass, you have **72 hours** to fix the issues and re-book at no extra charge."
-                      },
-                      {
-                        "text": "The hold **may be charged** if you do not pass within 72 hours of the first failure, or if you book and then fail to cancel or reschedule at least **3 hours** before the appointment."
-                      },
-                      {
-                        "text": "If the hold is charged, a new paid appointment is required."
-                      }
-                    ]
-                  },
-                  {
                     "id": 9293,
                     "slug": "ack_inspection_requirements",
                     "label": "I have read the inspection requirements, and I understand the $40 reservation hold and when it can be charged.",
@@ -11497,7 +11390,8 @@
                       "requiredMessage": "Please confirm you have read the inspection requirements before booking."
                     },
                     "visibility": "external",
-                    "col_span": 12
+                    "col_span": 12,
+                    "content": "PRINTED MATERIALS TO BRING\n• Wingz Trade Dress, printed in colour on 8.5 x 11 paper\n• Interior Safety Rules signage, printed on letter paper\n• A penny — the inspector uses it for the tire tread test\n\nVEHICLE CONDITION REQUIREMENTS\n• Tires pass the penny tread test\n• No cracks in the windshield\n• Air conditioning works\n• Headlights, taillights, signal lights and warning lights all work\n• No significant interior or exterior damage — dents, rust, or doors that do not open and close properly\n• No third-party advertising stickers — product, company or political\n• Interior and exterior are clean\n\nRESERVATION HOLD — $40\n• Bright Inspect asks for a payment card to reserve your slot and places a $40 hold. The hold is temporary and is released if your vehicle passes.\n• If your vehicle does not pass, you have 72 hours to fix the issues and re-book at no extra charge.\n• The hold may be charged if you do not pass within 72 hours of the first failure, or if you book and then fail to cancel or reschedule at least 3 hours before the appointment.\n• If the hold is charged, a new paid appointment is required."
                   },
                   {
                     "id": 68,

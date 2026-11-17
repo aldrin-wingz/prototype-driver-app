@@ -21,6 +21,7 @@
 import { useMemo, useState } from "react";
 
 import { RichField } from "./rich-field";
+import { isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { Check, CircleHelp, LayoutGrid, Lock, LogOut, X } from "lucide-react";
 
 import {
@@ -55,10 +56,16 @@ export interface WizardState {
   draftMarket: string | null;
   heardFrom: string | null;
   cursor: Cursor;
+  /**
+   * Every answer so far, keyed by field slug — one store for the whole application, as the backend
+   * keeps it per driver. A certificate uploaded on Pre-Gentech Training Check is therefore already
+   * there on Gentech Training (same slug). Nothing is submitted anywhere.
+   */
+  values: Values;
 }
 
 export function initialWizardState(): WizardState {
-  return { marketState: null, draftMarket: null, heardFrom: null, cursor: initialCursor(stagesVisibleTo(null)) };
+  return { marketState: null, draftMarket: null, heardFrom: null, cursor: initialCursor(stagesVisibleTo(null)), values: {} };
 }
 
 export function OnboardingWizard({
@@ -131,7 +138,7 @@ export function OnboardingWizard({
               </p>
             ) : null}
             <div className="mt-4 space-y-4">
-              {driverFields(currentStep).map((f) =>
+              {driverFields(currentStep).filter((f) => isFieldVisible(f, state.values)).map((f) =>
                 f.slug === MARKET_FIELD_SLUG ? (
                   <SelectField
                     key={f.slug}
@@ -150,7 +157,13 @@ export function OnboardingWizard({
                     onChange={(v) => onChange({ ...state, heardFrom: v })}
                   />
                 ) : (
-                  <RichField key={f.slug} field={f} marketId={marketIdFor(state.marketState)} />
+                  <RichField
+                    key={f.slug}
+                    field={f}
+                    marketId={marketIdFor(state.marketState)}
+                    value={state.values[f.slug]}
+                    onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
+                  />
                 ),
               )}
             </div>

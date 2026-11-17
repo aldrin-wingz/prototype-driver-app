@@ -20,6 +20,7 @@ import {
   stagesVisibleTo,
   templateFor,
 } from "../lib/verida-ga-onboarding/market-flow";
+import { choiceOptions, isFieldVisible, isScrollAck, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
 
 let failed = 0;
 function check(name: string, detail: string, ok: boolean) {
@@ -138,6 +139,53 @@ for (const st of stagesVisibleTo("verida-ga")) for (const step of st.steps) for 
   if (!resolveFieldLink(f, marketIdFor("Georgia"))) linkless.push(`${step.title} › ${f.slug}`);
 }
 check("every Georgia button / video opens something", `${buttonCount - linkless.length} of ${buttonCount}${linkless.length ? ` — no link: ${linkless.join(", ")}` : ""}`, buttonCount > 0 && linkless.length === 0);
+
+// Field behaviour (Luis, 2026-11-18).
+{
+const gaSteps = stagesVisibleTo("verida-ga").flatMap((st) => st.steps.map((step) => ({ stage: st.title, step })));
+const stepNamed = (title: string) => gaSteps.find((x) => x.step.title === title)?.step;
+const field = (stepTitle: string, slug: string) => stepNamed(stepTitle)?.field_definitions.find((f) => f.slug === slug);
+
+const SCROLL_ACKS = ["ack_tos", "ack_intro_aggreement", "ack_bgc_information", "ack_accident_policy", "ack_inspection_requirements"];
+const scrollAcks = gaSteps.flatMap((x) => x.step.field_definitions).filter(isScrollAck).map((f) => f.slug);
+check("scroll-to-read Yes/No on T&C, Welcome, Standards, Accident, Inspection", `${SCROLL_ACKS.filter((x) => scrollAcks.includes(x)).length} of ${SCROLL_ACKS.length} (${scrollAcks.length} scroll acks in the flow)`,
+  SCROLL_ACKS.every((x) => scrollAcks.includes(x)));
+
+const choice = field("Pre-Gentech Training Check", "gentech_trainings_completed");
+const opts = choice ? choiceOptions(choice) : [];
+const preCheck = stepNamed("Pre-Gentech Training Check");
+const shown = (values: Record<string, unknown>) =>
+  (preCheck?.field_definitions ?? []).filter((f) => f.field_type === "file" && isFieldVisible(f, values)).map((f) => f.slug);
+const CASES: [string, string[], string[]][] = [
+  ["nothing ticked", [], []],
+  ["PASS Basic", ["pass_basic"], ["gentech_pass_basic_certificate"]],
+  ["PASS Basic + First Aid", ["pass_basic", "first_aid"], ["gentech_pass_basic_certificate", "gentech_first_aid_certificate"]],
+  ["all three", ["pass_basic", "defensive_driving", "first_aid"], ["gentech_pass_basic_certificate", "gentech_defensive_driving_certificate", "gentech_first_aid_certificate"]],
+  ["none of the above", ["none"], []],
+];
+const preWrong = CASES.filter(([, ticked, want]) => shown({ gentech_trainings_completed: ticked }).join() !== want.join()).map(([n]) => n);
+check("Pre-Gentech: a checkbox list; each ticked training asks for its certificate", `type ${choice?.field_type}; ${CASES.length - preWrong.length} of ${CASES.length} cases${preWrong.length ? ` — wrong: ${preWrong.join(", ")}` : ""}`,
+  choice?.field_type === "checkboxes" && preWrong.length === 0);
+const none = opts.find((o) => o.value === "none");
+const pass = opts.find((o) => o.value === "pass_basic");
+const exclusiveOk = Boolean(none && pass) && toggleChoice(["pass_basic", "first_aid"], none!, opts).join() === "none" && toggleChoice(["none"], pass!, opts).join() === "pass_basic";
+check("\"I have not completed any\" clears the others, and vice versa", String(exclusiveOk), exclusiveOk);
+
+const preSlugs = new Set((preCheck?.field_definitions ?? []).filter((f) => f.field_type === "file").map((f) => f.slug));
+const gentechSlugs = (stepNamed("GenTech Training")?.field_definitions ?? []).filter((f) => f.field_type === "file").map((f) => f.slug);
+const carried = gentechSlugs.filter((x) => preSlugs.has(x));
+check("certificates uploaded early show on Gentech Training (same slugs)", `${carried.length} of ${gentechSlugs.length}`, gentechSlugs.length === 3 && carried.length === 3);
+
+const book = field("Vehicle Inspection", "book_vehicle_inspection_button");
+const gate = book ? [isFieldVisible(book, {}), isFieldVisible(book, { ack_inspection_requirements: false }), isFieldVisible(book, { ack_inspection_requirements: true })] : [];
+check("inspection: booking hidden until the requirements are read and answered Yes", `no answer ${gate[0]}, No ${gate[1]}, Yes ${gate[2]}`, gate.join() === "false,false,true");
+
+const drug = stepNamed("Schedule Drug Screening");
+const drugSlugs = (drug?.field_definitions ?? []).map((f) => f.slug);
+const voucherLatch = (field("EPassport (Voucher)", "drug_screen_epassport_voucher") as unknown as { validation_rules?: Record<string, unknown> } | undefined)?.validation_rules?.unpin_driver_navigation_when_stage_field_has_value;
+check("drug screening asks for the date only; the voucher unlocks on the date", `checkbox ${drugSlugs.includes("ack_drug_screen_scheduled") ? "present" : "gone"}, date ${drugSlugs.includes("drug_screen_date") ? "present" : "missing"}, latch → ${voucherLatch}`,
+  !drugSlugs.includes("ack_drug_screen_scheduled") && drugSlugs.includes("drug_screen_date") && voucherLatch === "drug_screen_date");
+}
 
 console.log(failed ? `\n❌ ${failed} check(s) failed` : "\n✅ verida-ga-onboarding: all checks passed");
 process.exit(failed ? 1 : 0);

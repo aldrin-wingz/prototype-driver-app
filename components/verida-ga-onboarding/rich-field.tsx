@@ -11,11 +11,29 @@
  * ⚠️ Images inside information lists are the PRD 2 story "Add images to information list items" —
  * proposed, not in the production app (develop cb752e402 renders info_list as text only).
  * Links open in a new tab. Nothing is submitted.
+ *
+ * Revised 2026-11-18 to production's controls (android prod 39b403b78):
+ *   - scroll ack → terms panel + "Scroll to read all terms" + Yes/No, muted until read
+ *     (ScrollAckPollField.tsx, scrollAcknowledgment.ts:57-75)
+ *   - select → dropdown with "Choose one" (DynamicFormRenderer.tsx:607-640)
+ *   - checkboxes → bordered rows with a green box (DynamicFormRenderer.tsx:707-760)
+ *   - file / photo → 140px dashed drop zone, icon, "Click to upload a photo", hint inside
+ *     (DynamicFilePhotoField.tsx:142-205, filePhotoFieldCopy.ts)
+ * Values live in the wizard keyed by slug, so a certificate uploaded on one step shows as uploaded
+ * on any later step that shares the slug.
  */
-import { Fragment, type ReactNode } from "react";
-import { ExternalLink, PlayCircle } from "lucide-react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Camera, Check, ChevronDown, ChevronsDown, ExternalLink, FileText, PlayCircle } from "lucide-react";
 
 import { resolveFieldLink, type FieldDef } from "@/lib/verida-ga-onboarding/market-flow";
+import {
+  choiceOptions,
+  isScrollAck,
+  sampleUploadName,
+  scrollAckLabels,
+  toggleChoice,
+  type Values,
+} from "@/lib/verida-ga-onboarding/field-logic";
 
 const GREEN = "#16CFA9";
 const GRAY_3 = "#9B9B9B";
@@ -202,10 +220,152 @@ function LinkButton({ field, href, video }: { field: FieldDef; href: string | nu
   );
 }
 
+const GREEN_TINT = "#E8FAF4";
+const MUTED = "#C9C9C9";
+
+type OnValue = (slug: string, value: unknown) => void;
+
+function Required({ field }: { field: FieldDef }) {
+  return field.required ? <span className="text-red-500"> *</span> : null;
+}
+
+/** real: ScrollAckPollField.tsx — terms panel, fade + bouncing chevrons, Yes/No muted until read. */
+function ScrollAck({ field, value, onChange }: { field: FieldDef; value: unknown; onChange: OnValue }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const [read, setRead] = useState(false);
+  const { yes, no } = scrollAckLabels(field.slug);
+  const question = field.help_text?.trim() || field.label;
+  useEffect(() => {
+    const el = panel.current;
+    if (el && el.scrollHeight <= el.clientHeight + 8) setRead(true); // short text fits: nothing to scroll
+  }, [field.content]);
+  return (
+    <div>
+      <div className="relative rounded-lg border border-[#ECECEC] bg-[#FAFAFA]">
+        <div
+          ref={panel}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) setRead(true);
+          }}
+          className="max-h-60 overflow-y-auto whitespace-pre-line p-3 text-[12px] leading-relaxed"
+          style={{ color: TEXT }}
+          data-testid={`terms-${field.slug}`}
+        >
+          {String(field.content ?? "").replace(/\\n/g, "\n")}
+        </div>
+        {!read ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-[72px] flex-col items-center justify-end rounded-b-lg bg-gradient-to-b from-transparent via-white/60 to-white pb-1.5">
+            <span className="text-[11px] font-semibold" style={{ color: GRAY_3 }}>
+              Scroll to read all terms
+            </span>
+            <ChevronsDown className="h-5 w-5 animate-bounce" style={{ color: GRAY_3 }} />
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-2.5 rounded-lg border p-3" style={{ borderColor: read ? GRAY_7 : "#EFEFEF" }}>
+        <div className="text-[14px] font-semibold" style={{ color: read ? undefined : MUTED }}>
+          {question}
+          <Required field={field} />
+        </div>
+        {[
+          { lbl: yes, val: true },
+          { lbl: no, val: false },
+        ].map(({ lbl, val }) => {
+          const on = value === val;
+          return (
+            <button
+              key={String(val)}
+              type="button"
+              disabled={!read}
+              data-testid={`poll-${field.slug}-${val ? "yes" : "no"}`}
+              onClick={() => onChange(field.slug, val)}
+              className="mt-2 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-[13px] disabled:cursor-not-allowed"
+              style={{ borderColor: on ? GREEN : GRAY_7, backgroundColor: on ? GREEN_TINT : "#FFF", color: read ? TEXT : MUTED }}
+            >
+              <span
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                style={{ borderColor: read ? GREEN : MUTED }}
+              >
+                {on ? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: GREEN }} /> : null}
+              </span>
+              {lbl}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** real: DynamicFilePhotoField.tsx:142-205 — dashed 140px drop zone; filled state on green tint. */
+function Upload({ field, value, onChange }: { field: FieldDef; value: unknown; onChange: OnValue }) {
+  const isPhoto = field.field_type === "photo";
+  const filled = typeof value === "string" && value.trim() !== "";
+  const Icon = isPhoto ? Camera : FileText;
+  const cta = field.placeholder?.trim() || (isPhoto ? "Click to upload a photo" : "Click to upload a file");
+  const example = (field.metadata as { example_image?: string } | null | undefined)?.example_image;
+  return (
+    <div>
+      <div className="text-[14px] font-semibold">
+        {field.label}
+        <Required field={field} />
+      </div>
+      {example ? (
+        <a href={example} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element -- template-supplied path */}
+          <img src={example} alt={`Example: ${field.label}`} className="h-24 w-24 rounded-md border border-[#E5E5E5] object-contain" />
+        </a>
+      ) : null}
+      <button
+        type="button"
+        data-testid={`upload-${field.slug}`}
+        onClick={() => onChange(field.slug, filled ? "" : sampleUploadName(field))}
+        className="mt-1.5 flex min-h-[140px] w-full flex-col items-center justify-center rounded-lg border border-dashed p-4 text-center"
+        style={{ borderColor: filled ? GREEN : GRAY_7, backgroundColor: filled ? GREEN_TINT : "#FFF" }}
+      >
+        <Icon className="h-7 w-7" style={{ color: filled ? GREEN : GRAY_3 }} />
+        {filled ? (
+          <>
+            <span className="mt-2 text-[13px] font-semibold" style={{ color: TEXT }}>
+              {String(value)}
+            </span>
+            <span className="mt-1 text-[12px]" style={{ color: GREEN }}>
+              Click to change
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="mt-2 text-[12px]" style={{ color: "#4A4A4A" }}>
+              {cta}
+            </span>
+            {field.content?.trim() ? (
+              <span className="mt-1.5 px-2 text-[12px] leading-[18px]" style={{ color: GRAY_3 }}>
+                <RichText text={field.content} />
+              </span>
+            ) : null}
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
 /** One field, as the driver reads it. `marketId` resolves per-market links (inspection booking). */
-export function RichField({ field, marketId }: { field: FieldDef; marketId: number | null }) {
+export function RichField({
+  field,
+  marketId,
+  value,
+  onChange,
+}: {
+  field: FieldDef;
+  marketId: number | null;
+  value?: unknown;
+  onChange?: OnValue;
+}) {
+  const set: OnValue = onChange ?? (() => undefined);
   const t = field.field_type;
-  const meta = (field.metadata ?? {}) as { hide_on_mobile?: boolean; example_image?: string };
+  const meta = (field.metadata ?? {}) as { hide_on_mobile?: boolean };
   if (meta.hide_on_mobile) return null;
   if (t === "async_value" || t === "hidden" || t === "northpass_webhook") return null;
 
@@ -232,58 +392,128 @@ export function RichField({ field, marketId }: { field: FieldDef; marketId: numb
   if (t === "video") return <LinkButton field={field} href={resolveFieldLink(field, marketId)} video />;
 
   if (t === "photo" || t === "file" || t === "additional_file" || t === "signature") {
-    return (
-      <div>
-        <Label field={field} />
-        {field.content ? (
-          <div className="mt-0.5 text-[12px] leading-relaxed" style={{ color: GRAY_3 }}>
-            <RichText text={field.content} />
-          </div>
-        ) : null}
-        {meta.example_image ? (
-          <a href={meta.example_image} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element -- template-supplied path */}
-            <img src={meta.example_image} alt={`Reference photo of ${field.label}`} className="h-24 w-24 rounded-md border border-[#E5E5E5] object-contain" />
-          </a>
-        ) : null}
-        <div className="mt-1.5 rounded-lg border border-dashed border-[#D9D9D9] py-5 text-center text-[13px]" style={{ color: GRAY_3 }}>
-          {t === "photo" ? "Take a photo or choose one" : t === "signature" ? "Sign here" : "Upload a file"}
-        </div>
-      </div>
-    );
+    return <Upload field={field} value={value} onChange={set} />;
   }
+
+  if (isScrollAck(field)) return <ScrollAck field={field} value={value} onChange={set} />;
 
   if (t === "acknowledgment" || t === "acknowledgement") {
+    const on = value === true;
+    return (
+      <button type="button" onClick={() => set(field.slug, !on)} className="flex w-full items-start gap-2.5 text-left text-[14px]" data-testid={`ack-${field.slug}`}>
+        <span
+          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2"
+          style={{ borderColor: GREEN, backgroundColor: on ? GREEN : "transparent" }}
+        >
+          {on ? <Check className="h-3 w-3 text-white" /> : null}
+        </span>
+        <span>
+          {field.label}
+          <Required field={field} />
+        </span>
+      </button>
+    );
+  }
+
+  if (t === "checkboxes" || t === "multi_checkbox" || t === "multi_select_checkbox") {
+    const options = choiceOptions(field);
+    const selected = Array.isArray(value) ? value.map(String) : [];
     return (
       <div>
-        {field.content ? (
-          <div
-            className="mb-2 max-h-48 overflow-y-auto rounded-lg border border-[#ECECEC] bg-[#FAFAFA] p-3 text-[13px] leading-relaxed"
-            style={{ color: TEXT }}
-          >
-            <RichText text={field.content} />
+        <div className="mb-1.5 text-[14px] font-semibold">
+          {field.label}
+          <Required field={field} />
+        </div>
+        {options.map((o) => {
+          const on = selected.includes(o.value);
+          return (
+            <button
+              key={o.value}
+              type="button"
+              data-testid={`choice-${field.slug}-${o.value}`}
+              onClick={() => set(field.slug, toggleChoice(selected, o, options))}
+              className="mb-2 flex w-full items-center gap-2.5 rounded-lg border bg-white p-3 text-left"
+              style={{ borderColor: on ? GREEN : GRAY_7 }}
+            >
+              <span
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-2"
+                style={{ borderColor: GREEN, backgroundColor: on ? GREEN : "transparent" }}
+              >
+                {on ? <Check className="h-3 w-3 text-white" /> : null}
+              </span>
+              <span className="text-[14px] font-semibold">{o.label}</span>
+            </button>
+          );
+        })}
+        {field.help_text ? (
+          <div className="text-[12px]" style={{ color: GRAY_3 }}>
+            {field.help_text}
           </div>
         ) : null}
-        <label className="flex items-start gap-2 text-[14px]">
-          <input type="checkbox" className="mt-1" readOnly />
-          <span>
-            {field.label}
-            {field.required ? <span className="text-red-500"> *</span> : null}
-          </span>
-        </label>
       </div>
     );
   }
 
-  const options = Array.isArray(field.options)
-    ? (field.options as unknown[]).map((o) => (typeof o === "string" ? o : String((o as { label?: string }).label ?? "")))
-    : [];
+  if (t === "select" || t === "dropdown" || t === "radio") {
+    const options = choiceOptions(field);
+    return (
+      <label className="block">
+        <span className="text-[14px] font-semibold">
+          {field.label}
+          <Required field={field} />
+        </span>
+        <span className="relative mt-1.5 block">
+          <select
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => set(field.slug, e.target.value)}
+            className="w-full appearance-none rounded-lg border bg-white px-3 py-2.5 pr-9 text-[14px]"
+            style={{ borderColor: GRAY_7, color: value ? TEXT : GRAY_3, minHeight: 44 }}
+          >
+            <option value="" disabled>
+              {field.placeholder?.trim() || "Choose one"}
+            </option>
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: GRAY_3 }} />
+        </span>
+        {field.help_text ? (
+          <span className="mt-1 block text-[12px]" style={{ color: GRAY_3 }}>
+            {field.help_text}
+          </span>
+        ) : null}
+      </label>
+    );
+  }
+
+  const inputType = t === "date" ? "date" : t === "time" ? "time" : t === "number" ? "number" : t === "email" ? "email" : "text";
   return (
-    <div>
-      <Label field={field} />
-      <div className="mt-1.5 rounded-lg border px-3 py-3 text-[14px]" style={{ borderColor: GRAY_7, color: GRAY_3 }}>
-        {t === "radio" || t === "select" ? options.join(" / ") || " " : field.help_text || " "}
-      </div>
-    </div>
+    <label className="block">
+      <span className="text-[14px] font-semibold">
+        {field.label}
+        <Required field={field} />
+      </span>
+      {t === "textarea" ? (
+        <textarea
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => set(field.slug, e.target.value)}
+          placeholder={field.placeholder ?? field.help_text ?? ""}
+          className="mt-1.5 min-h-[88px] w-full rounded-lg border px-3 py-2.5 text-[14px]"
+          style={{ borderColor: GRAY_7 }}
+        />
+      ) : (
+        <input
+          type={inputType}
+          value={typeof value === "string" || typeof value === "number" ? String(value) : ""}
+          onChange={(e) => set(field.slug, e.target.value)}
+          placeholder={field.placeholder ?? field.help_text ?? ""}
+          className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-[14px]"
+          style={{ borderColor: GRAY_7, minHeight: 44 }}
+        />
+      )}
+    </label>
   );
 }

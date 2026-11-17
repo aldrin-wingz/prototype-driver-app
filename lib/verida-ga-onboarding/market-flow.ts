@@ -37,6 +37,8 @@ export interface FieldDef {
   /** September Verida GA config puts some button links here (the portal adapter reads it too). */
   url?: string | null;
   scroll_required?: boolean | null;
+  visibility_rule?: unknown;
+  placeholder?: string | null;
 }
 
 export interface TemplateStep {
