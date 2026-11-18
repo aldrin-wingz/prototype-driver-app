@@ -16,7 +16,8 @@
     "verify": "bun scripts/verify-base.ts",
     "verify:captures": "bun scripts/verify-captures.ts",
     "build:capture-index": "bun scripts/build-capture-index.ts",
-    "verify:verida-ga": "bun scripts/verify-verida-ga-onboarding.ts"
+    "verify:verida-ga": "bun scripts/verify-verida-ga-onboarding.ts",
+    "verify:verida-ga-compliance": "bun scripts/verify-verida-ga-compliance.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
