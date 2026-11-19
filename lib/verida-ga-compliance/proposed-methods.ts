@@ -28,10 +28,13 @@ export function asBuildResponse(r: ComplianceExpiryResponse): ComplianceExpiryRe
 }
 
 /** The button copy for a row whose requirement uses a proposed method. */
-export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryResponse): ComplianceViewModel {
+export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryResponse, locks: Record<string, string> = {}): ComplianceViewModel {
   const patch = (row: ComplianceRow): ComplianceRow => {
+    // ⚠️ PROPOSED: a requirement waiting on an earlier step of its round has no button yet (the page shows why).
+    if (locks[row.slug] && !row.changes) row = { ...row, canUpload: false };
     const item = r.items.find((i) => i.item_slug === row.slug);
     const kind = item ? proposedKindFor(item) : row.renewKind;
+    if (row.slug === "background-check-fee" && !row.changes) return { ...row, uploadLabel: "Pay", uploadCta: "Pay the Background Check Fee" };
     if (row.changes || (kind !== "date" && kind !== "esign")) return row;
     return kind === "esign"
       ? { ...row, uploadLabel: "Sign", uploadCta: `Sign the ${row.title} consent` }

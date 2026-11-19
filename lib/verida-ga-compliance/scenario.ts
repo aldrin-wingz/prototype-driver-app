@@ -14,6 +14,8 @@ import dayjs from "dayjs";
 
 import {
   BGC_SLUG,
+  DRUG_SLUG,
+  FEE_SLUG,
   INSPECTION_SLUG,
   MVR_SLUG,
   VERIDA_CATALOG,
@@ -51,7 +53,18 @@ export interface DriverState {
   records: Record<string, RequirementRecord>;
   /** S2: the inspection's new expiry once its renewal is approved, until every photo requirement has followed. */
   inspectionRenewedTo?: string;
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): assumptions to verify — an EPassport for every drug screening renewal; the BGC fee on every renewal. */
+  assume: Assumptions;
+  /** ⚠️ PROPOSED: the date Compliance put the EPassport for this round's drug screening on file. */
+  epassportGiven?: string;
 }
+
+export interface Assumptions {
+  epassport: boolean;
+  fee: boolean;
+}
+
+export const DEFAULT_ASSUMPTIONS: Assumptions = { epassport: true, fee: true };
 
 const fmt = (d: dayjs.Dayjs) => d.format("YYYY-MM-DD");
 export const addDays = (iso: string, n: number) => fmt(dayjs(iso).add(n, "day"));
@@ -81,6 +94,7 @@ function baseRecords(today: string): Record<string, RequirementRecord> {
     "vehicle-inspection": { expires: inspection },
     hipaa: { expires: at(286) },
     "background-check": { expires: at(203) },
+    "background-check-fee": { expires: at(203) },
     mvr: { expires: at(203) },
     "drug-screening": { expires: at(218) },
     "gentech-pass-basic": { expires: at(598) },
@@ -92,16 +106,23 @@ function baseRecords(today: string): Record<string, RequirementRecord> {
   };
 }
 
-export type ScenarioKey = "inspection-round" | "dlawson-drug" | "insurance-expired" | "all-clear";
+export type ScenarioKey = "inspection-round" | "dlawson-drug" | "every-due" | "insurance-expired" | "all-clear";
 
 export const SCENARIOS: { key: ScenarioKey; label: string; story: string }[] = [
   { key: "inspection-round", label: "Inspection due in 20 days", story: "S2 — the inspection and its three photo requirements" },
-  { key: "dlawson-drug", label: "D.Lawson + drug screening due", story: "S1 — provider renewals, no Yardstik" },
+  { key: "dlawson-drug", label: "D.Lawson + drug screening due", story: "S1 — provider renewals, no Yardstik; ⚠️ fee → consent → EPassport → date" },
+  { key: "every-due", label: "Every requirement due", story: "⚠️ All of them at once, to see each renewal method" },
   { key: "insurance-expired", label: "Insurance expired", story: "S1 + GA — Requests paused" },
   { key: "all-clear", label: "Everything up to date", story: "Nothing due" },
 ];
 
-export function scenarioState(key: ScenarioKey, market: MarketState, released: Record<MarketState, boolean>, today = TODAY): DriverState {
+export function scenarioState(
+  key: ScenarioKey,
+  market: MarketState,
+  released: Record<MarketState, boolean>,
+  today = TODAY,
+  assume: Assumptions = DEFAULT_ASSUMPTIONS,
+): DriverState {
   const records = baseRecords(today);
   if (key === "inspection-round") {
     const due = addDays(today, 20);
@@ -110,13 +131,26 @@ export function scenarioState(key: ScenarioKey, market: MarketState, released: R
   if (key === "dlawson-drug") {
     records[BGC_SLUG] = { expires: addDays(today, 15) };
     records[MVR_SLUG] = { expires: addDays(today, 15) };
+    records[FEE_SLUG] = { expires: addDays(today, 15) };
     records["drug-screening"] = { expires: addDays(today, 25) };
   }
   if (key === "insurance-expired") {
     records.insurance = { expires: addDays(today, -3) };
     records["gentech-first-aid"] = { expires: addDays(today, 12) };
   }
-  return { today, market, released, records };
+  if (key === "every-due") {
+    // Spread over the 30-day window so the list has an order; the vehicle four share the inspection's date (S2).
+    VERIDA_CATALOG.forEach((c, i) => (records[c.slug] = { expires: addDays(today, 8 + i) }));
+    for (const slug of WITH_INSPECTION) records[slug] = { expires: records[INSPECTION_SLUG].expires };
+    records[MVR_SLUG] = { expires: records[BGC_SLUG].expires };
+    records[FEE_SLUG] = { expires: records[BGC_SLUG].expires };
+  }
+  return { today, market, released, records, assume };
+}
+
+/** ⚠️ PROPOSED: requirements listed in the app — never the MVR, and the fee only while it is assumed. */
+export function listedInApp(s: Pick<DriverState, "assume">) {
+  return VERIDA_CATALOG.filter((c) => c.inApp !== false && (c.assumption !== "fee" || s.assume.fee));
 }
 
 // ---------------------------------------------------------------------------------------------- the payload
@@ -129,7 +163,7 @@ export function inRelease(s: DriverState): boolean {
 /** What GET /driver/compliance-expiry/ returns for this driver. */
 export function expiryResponse(s: DriverState): ComplianceExpiryResponse {
   if (!inRelease(s)) return { in_release: false, expiration_date: null, days_until_expiration: null, banner: null, items: [] };
-  const items: ComplianceItem[] = VERIDA_CATALOG.map((c) => {
+  const items: ComplianceItem[] = listedInApp(s).map((c) => {
     const r = s.records[c.slug];
     const days = daysBetween(s.today, r.expires);
     return {
@@ -156,9 +190,49 @@ export function expiryResponse(s: DriverState): ComplianceExpiryResponse {
 
 /** The horizon: last pickup day the driver is still offered (earliest expiry on file). Same-day OK (GA TC-006). */
 export function horizon(s: DriverState): string {
-  return Object.values(s.records)
-    .map((r) => r.expires)
+  // ⚠️ PROPOSED: the fee is a step of the background check renewal, not a credential, so it never restricts trips itself.
+  return Object.entries(s.records)
+    .filter(([slug]) => slug !== FEE_SLUG)
+    .map(([, r]) => r.expires)
     .sort()[0];
+}
+
+// ---------------------------------------------------------------------------------------------- ⚠️ PROPOSED: renewal order
+
+const submitted = (r: RequirementRecord | undefined) => r?.upload?.status === "in_review" || r?.upload?.status === "pending";
+const due = (s: DriverState, slug: string) => daysBetween(s.today, s.records[slug].expires) <= 30;
+
+/**
+ * ⚠️ PROPOSED (Luis, 2026-11-20): the D.Lawson round goes in order —
+ *   1. the Background Check Fee (when charged) before the consent form;
+ *   2. the consent form before the drug screening;
+ *   3. the drug screening date only once Compliance has put the EPassport on file (when one is needed).
+ * Returns, per requirement still to renew, why it can't be started yet.
+ */
+export function renewalLocks(s: DriverState): Record<string, string> {
+  const locks: Record<string, string> = {};
+  const open = (slug: string) => due(s, slug) && !submitted(s.records[slug]) && s.records[slug].upload?.status !== "approved";
+  if (s.assume.fee && open(BGC_SLUG) && due(s, FEE_SLUG) && !submitted(s.records[FEE_SLUG]) && s.records[FEE_SLUG].upload?.status !== "approved") {
+    locks[BGC_SLUG] = "Pay the Background Check Fee first";
+  }
+  if (open(DRUG_SLUG)) {
+    if (due(s, BGC_SLUG) && !submitted(s.records[BGC_SLUG]) && s.records[BGC_SLUG].upload?.status !== "approved") {
+      locks[DRUG_SLUG] = "Sign the background check consent form first";
+    } else if (s.assume.epassport && !s.epassportGiven) {
+      locks[DRUG_SLUG] = "Waiting for your EPassport from Compliance";
+    }
+  }
+  return locks;
+}
+
+/** ⚠️ PROPOSED: Compliance can put the EPassport on file once the consent form is in (or the background check isn't due). */
+export function epassportNeeded(s: DriverState): boolean {
+  if (!s.assume.epassport || s.epassportGiven || !due(s, DRUG_SLUG) || submitted(s.records[DRUG_SLUG])) return false;
+  return !due(s, BGC_SLUG) || submitted(s.records[BGC_SLUG]) || s.records[BGC_SLUG].upload?.status === "approved";
+}
+
+export function giveEpassport(s: DriverState): DriverState {
+  return { ...s, epassportGiven: s.today };
 }
 
 // ---------------------------------------------------------------------------------------------- driver actions
@@ -260,7 +334,8 @@ export function approve(s: DriverState, slug: string, date: string): DriverState
       }
     }
   }
-  return { ...s, records, inspectionRenewedTo };
+  // ⚠️ PROPOSED: each drug screening round needs its own EPassport.
+  return { ...s, records, inspectionRenewedTo, epassportGiven: slug === DRUG_SLUG ? undefined : s.epassportGiven };
 }
 
 export function sendBack(s: DriverState, slug: string, note: string): DriverState {

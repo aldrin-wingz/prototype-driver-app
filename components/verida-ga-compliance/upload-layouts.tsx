@@ -221,10 +221,13 @@ function StepInstructions({ instructions }: { instructions: ComplianceProvider }
             className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
             style={{ background: GREEN, fontSize: 14.5 }}
           >
-            <span className="rotate-180">
-              <Icon path={COMPLIANCE_ICON_PATHS.upload} color="#fff" size={16} strokeWidth={2.2} />
-            </span>
+            {b.download ? (
+              <span className="rotate-180">
+                <Icon path={COMPLIANCE_ICON_PATHS.upload} color="#fff" size={16} strokeWidth={2.2} />
+              </span>
+            ) : null}
             {b.button_label}
+            {!b.download && <Icon path={COMPLIANCE_ICON_PATHS.chevron} color="#fff" size={13} strokeWidth={2.4} />}
           </a>
           {b.download && <div className="mt-1 text-center text-[11px] text-[#6B7280]">Downloads the file</div>}
         </div>
@@ -238,7 +241,7 @@ function StepInstructions({ instructions }: { instructions: ComplianceProvider }
             className="flex items-center justify-between pt-0.5 text-left font-bold"
             style={{ fontSize: 14, color: "#00966F" }}
           >
-            {open ? "Hide instructions" : "How to print and display it"}
+            {open ? "Hide instructions" : links.some((l) => l.download) ? "How to print and display it" : "Instructions"}
             <span className={open ? "-rotate-90" : "rotate-90"}>
               <Icon path={COMPLIANCE_ICON_PATHS.chevron} color="#00966F" size={13} strokeWidth={2.4} />
             </span>
@@ -319,12 +322,14 @@ export function ChecklistUpload({
         {!!changeNote && <div className="mb-3"><ChangeNote note={changeNote} /></div>}
         {!!instructions && <StepInstructions instructions={instructions} />}
         <div className="mb-1 font-bold" style={{ fontSize: 17, color: INK }}>
-          {total > 1 ? "Add a photo of each item" : "Add your photo"}
+          {total > 1 ? "Add a photo of each item" : fields[0]?.exampleImage ? "Add your photo" : fields[0]?.label}
         </div>
         <div className="mb-3" style={{ fontSize: 13, lineHeight: "19px", color: "#4B5452" }}>
           {total > 1
             ? `Match the guide on the left. Do them in any order, and send a few at a time if you like. We review once all ${total} are in.`
-            : "Match the guide on the left."}
+            : fields[0]?.exampleImage
+              ? "Match the guide on the left."
+              : "Follow the steps above, then add your photo."}
         </div>
         {total > 1 && (
           <div className="mb-3" data-testid="upload-count">
@@ -369,13 +374,15 @@ export function ChecklistUpload({
                     taken[f.slug] && <Icon path={COMPLIANCE_ICON_PATHS.check} color="#00966F" size={18} strokeWidth={2.6} />
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <div className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-[#00966F]">Guide</div>
-                    <div className="rounded-lg border border-[#E5E7EA] p-1">
-                      <Guide field={f} size="small" />
+                <div className={`grid gap-2.5 ${f.exampleImage ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {!!f.exampleImage && (
+                    <div>
+                      <div className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-[#00966F]">Guide</div>
+                      <div className="rounded-lg border border-[#E5E7EA] p-1">
+                        <Guide field={f} size="small" />
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div>
                     <div className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-[#6B7280]">Your photo</div>
                     {isSent ? (

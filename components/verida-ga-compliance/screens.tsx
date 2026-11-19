@@ -26,7 +26,17 @@ import { ChecklistUpload, PagerUpload, hasGuides, type UploadLayout } from "./up
 
 const sectionLabel = "px-1 text-[12px] font-bold tracking-[0.08em] text-[#9AA5A0]";
 
-function DueCard({ row, onRenew, partial }: { row: ComplianceRow; onRenew: () => void; partial?: { sent: number; total: number } }) {
+function DueCard({
+  row,
+  onRenew,
+  partial,
+  lock,
+}: {
+  row: ComplianceRow;
+  onRenew: () => void;
+  partial?: { sent: number; total: number };
+  lock?: string;
+}) {
   return (
     <div data-testid={`due-${row.slug}`} className="flex flex-col gap-3 p-3.5" style={card}>
       <div className="flex items-center gap-3">
@@ -41,6 +51,13 @@ function DueCard({ row, onRenew, partial }: { row: ComplianceRow; onRenew: () =>
           <div style={{ fontSize: 12.5, color: row.textColor, marginTop: 2 }} data-testid={`due-text-${row.slug}`}>
             {row.text}
           </div>
+          {!!lock && (
+            // ⚠️ PROPOSED (renewal order): not in #353.
+            <div className="mt-1 flex items-center gap-1.5" style={{ fontSize: 12.5, color: "#92400E", fontWeight: 600 }} data-testid={`due-lock-${row.slug}`}>
+              <Icon path={COMPLIANCE_ICON_PATHS.clock} color="#B45309" size={13} strokeWidth={2.2} />
+              {lock}
+            </div>
+          )}
           {!!partial && (
             // ⚠️ PROPOSED (checklist batches): not in #353.
             <div style={{ fontSize: 12.5, color: "#00966F", marginTop: 2, fontWeight: 600 }} data-testid={`due-partial-${row.slug}`}>
@@ -75,11 +92,13 @@ export function CompliancePage({
   onBack,
   onRenew,
   partial = {},
+  locks = {},
 }: {
   vm: ComplianceViewModel;
   onBack: () => void;
   onRenew: (row: ComplianceRow) => void;
   partial?: Record<string, { sent: number; total: number }>;
+  locks?: Record<string, string>;
 }) {
   const page = vm.page;
   return (
@@ -103,7 +122,7 @@ export function CompliancePage({
           <>
             <div className={sectionLabel}>NEEDS ATTENTION</div>
             {page.due.map((row) => (
-              <DueCard key={row.slug} row={row} onRenew={() => onRenew(row)} partial={partial[row.slug]} />
+              <DueCard key={row.slug} row={row} onRenew={() => onRenew(row)} partial={partial[row.slug]} lock={locks[row.slug]} />
             ))}
           </>
         )}
@@ -365,7 +384,7 @@ export function UploadScreen({
       />
     );
   }
-  if ((layout === "pager" || layout === "checklist") && hasGuides(fields)) {
+  if ((layout === "pager" && hasGuides(fields)) || (layout === "checklist" && (hasGuides(fields) || !!instructions))) {
     const submit = () => {
       onSubmit();
       setStep("done");

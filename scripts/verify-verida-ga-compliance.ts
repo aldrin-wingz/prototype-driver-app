@@ -11,10 +11,14 @@ import { join } from "node:path";
 
 import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
+  addDays,
   approvable,
   approve,
+  epassportNeeded,
   expiryResponse,
+  giveEpassport,
   horizon,
+  renewalLocks,
   reviewQueue,
   scenarioState,
   submitRenewal,
@@ -59,13 +63,52 @@ const sentBack = VERIDA_CATALOG.map((c) =>
 check(
   "S1 never Yardstik",
   `${[...kinds, ...sentBack].filter((k) => k === "yardstik").length} Yardstik of ${kinds.length + sentBack.length} (item × fresh/sent back)`,
-  VERIDA_CATALOG.length === 14 && ![...kinds, ...sentBack].includes("yardstik"),
+  VERIDA_CATALOG.length === 15 && ![...kinds, ...sentBack].includes("yardstik"),
 );
 const byKind = (k: string) => VERIDA_CATALOG.filter((_, i) => kinds[i] === k).map((c) => c.slug);
-check("S1 provider requirements open the provider page", byKind("attest").join(", "), byKind("attest").join() === "vehicle-inspection,hipaa");
+check("S1 provider requirements open the provider page", byKind("attest").join(", "), byKind("attest").join() === "hipaa,gentech-pass-basic,gentech-defensive-driving,gentech-first-aid");
 // ⚠️ PROPOSED (Luis, 2026-11-20): Drug Screening takes a date; the background check and MVR are a signed consent form.
 const proposed = VERIDA_CATALOG.map((c) => `${c.slug}:${proposedKindFor({ item_slug: c.slug, renewal_methods: c.renewal_methods, upload: null })}`).filter((x) => /:(date|esign)$/.test(x));
-check("Proposed methods: date for drug screening, consent form for BGC + MVR", proposed.join(", "), proposed.join() === "background-check:esign,mvr:esign,drug-screening:date");
+check(
+  "Proposed methods: provider + date for the inspection and drug screening, consent form for BGC + MVR",
+  proposed.join(", "),
+  proposed.join() === "vehicle-inspection:date,background-check:esign,mvr:esign,drug-screening:date",
+);
+// Luis 2026-11-20: only trainings can be supplied by the driver instead of the provider.
+const selfSupply = VERIDA_CATALOG.filter((c) => c.renewal_methods.includes("upload") && c.renewal_methods.length > 1).map((c) => c.slug);
+check("Only trainings offer the driver's own upload instead of the provider", selfSupply.join(", "), selfSupply.join() === "hipaa,gentech-pass-basic,gentech-defensive-driving,gentech-first-aid");
+const listed = expiryResponse(scenarioState("every-due", "Georgia", GA, today)).items.map((i) => i.item_slug);
+check("Every requirement due: all listed, never the MVR", `${listed.length} listed, MVR ${listed.includes("mvr") ? "listed" : "not listed"}`, listed.length === 14 && !listed.includes("mvr") && listed.every((sl) => sl !== "mvr"));
+const noFee = expiryResponse(scenarioState("every-due", "Georgia", GA, today, { epassport: true, fee: false })).items.map((i) => i.item_slug);
+check("Fee assumption off: no fee listed", `${noFee.length} listed`, noFee.length === 13 && !noFee.includes("background-check-fee"));
+// The D.Lawson round, in order: fee → consent → EPassport → drug screening date.
+let o: DriverState = scenarioState("dlawson-drug", "Georgia", GA, today);
+const steps: string[] = [];
+const snap = (label: string) => steps.push(`${label}: ${Object.entries(renewalLocks(o)).map(([k, v]) => `${k}=${v.split(" ")[0]}`).join(" ") || "none"}`);
+snap("start");
+const lockedAtStart = renewalLocks(o);
+o = submitRenewal(o, "background-check-fee", "upload");
+snap("fee sent");
+const afterFee = renewalLocks(o);
+o = submitRenewal(o, "background-check", "esign");
+snap("consent signed");
+const afterConsent = renewalLocks(o);
+const needed = epassportNeeded(o);
+o = giveEpassport(o);
+snap("EPassport given");
+const afterEpassport = renewalLocks(o);
+const bgcInReview = o.records["background-check"].upload?.status === "in_review" && o.records.mvr.upload?.status === "in_review";
+const drugNotYet = !o.records["drug-screening"].upload;
+o = submitRenewal(o, "drug-screening", "date", addDays(today, 10));
+check(
+  "D.Lawson round in order: fee → consent → EPassport → drug date; BGC + MVR in review on consent, drug on its date",
+  steps.join(" | "),
+  !!lockedAtStart["background-check"] && !!lockedAtStart["drug-screening"] && !afterFee["background-check"] && /consent/.test(afterFee["drug-screening"] ?? "") &&
+    /EPassport/.test(afterConsent["drug-screening"] ?? "") && needed && Object.keys(afterEpassport).length === 0 && bgcInReview && drugNotYet &&
+    o.records["drug-screening"].upload?.status === "in_review" && o.records["drug-screening"].upload?.givenDate === addDays(today, 10),
+);
+const noPassport: DriverState = submitRenewal(scenarioState("dlawson-drug", "Georgia", GA, today, { epassport: false, fee: false }), "background-check", "esign");
+check("Assumptions off: drug screening opens once the consent is signed", JSON.stringify(renewalLocks(noPassport)), Object.keys(renewalLocks(noPassport)).length === 0);
 const asBuild = asBuildResponse(expiryResponse(scenarioState("dlawson-drug", "Georgia", GA, today)));
 check("The build's view model only ever sees its own three methods", `${asBuild.items.flatMap((i) => i.renewal_methods ?? []).filter((m) => !["upload", "attest", "yardstik"].includes(m)).length} unknown`, asBuild.items.flatMap((i) => i.renewal_methods ?? []).every((m) => ["upload", "attest", "yardstik"].includes(m)));
 
@@ -138,9 +181,12 @@ check("V14 page selector / checklist apply to exactly the guided items", layoutI
 const withSteps = VERIDA_CATALOG.map((c) => ({ slug: c.slug, ins: instructionsFor(c.slug, "Georgia") })).filter((x) => x.ins);
 const downloads = withSteps.map((x) => x.ins!.blocks.filter((b) => b.kind === "link" && b.download && b.url && existsSync(join("public", b.url))).length);
 check(
-  "Trade Dress + Signage show onboarding's instructions with a working download",
+  "Fee shows its pay link; Trade Dress + Signage show onboarding's instructions with a working download",
   withSteps.map((x, n) => `${x.slug}: ${x.ins!.blocks.length} blocks, ${downloads[n]} download`).join("; "),
-  withSteps.map((x) => x.slug).join() === "trade-dress,safety-rules-signage" && downloads.every((d) => d === 1) && withSteps.every((x) => x.ins!.blocks.length >= 4),
+  withSteps.map((x) => x.slug).join() === "background-check-fee,trade-dress,safety-rules-signage" &&
+    downloads.join() === "0,1,1" &&
+    withSteps[0].ins!.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")) &&
+    withSteps.every((x) => x.ins!.blocks.length >= 3),
 );
 
 console.log(failed ? `\n${failed} failed` : "\nAll passed");

@@ -36,6 +36,7 @@ export function DateRenewScreen({
   today,
   canUploadInstead,
   untilLine,
+  epassport,
   onBack,
   onInstructions,
   onUploadInstead,
@@ -47,6 +48,8 @@ export function DateRenewScreen({
   today: string;
   canUploadInstead: boolean;
   untilLine: string;
+  /** ⚠️ PROPOSED (drug screening): the EPassport Compliance put on file for this round, with the onboarding step's text. */
+  epassport?: { url: string; info: string | null } | null;
   onBack: () => void;
   onInstructions: () => void;
   onUploadInstead: () => void;
@@ -68,6 +71,35 @@ export function DateRenewScreen({
     <>
       <ScreenHeader title={`Renew ${title}`} onBack={onBack} />
       <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid="renew-date-screen">
+        {!!epassport && (
+          <div className="flex flex-col gap-2.5 p-4" style={card} data-testid="epassport-card">
+            <div className="flex items-center justify-between">
+              <div className="font-bold" style={{ fontSize: 16, color: INK }}>
+                Your EPassport
+              </div>
+              <span className="rounded-md bg-[#E8FAF4] px-2 py-0.5 text-[11.5px] font-bold text-[#00966F]">Ready</span>
+            </div>
+            {!!epassport.info && (
+              <div className="whitespace-pre-line" style={{ fontSize: 13, lineHeight: "19px", color: "#4B5452" }}>
+                {epassport.info}
+              </div>
+            )}
+            <a
+              href={epassport.url}
+              download
+              target="_blank"
+              rel="noreferrer"
+              data-testid="epassport-download"
+              className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
+              style={{ background: GREEN, fontSize: 14.5 }}
+            >
+              <span className="rotate-180">
+                <Icon path={COMPLIANCE_ICON_PATHS.upload} color="#fff" size={16} strokeWidth={2.2} />
+              </span>
+              Download EPassport
+            </a>
+          </div>
+        )}
         <div className="flex flex-col gap-3 p-4" style={card}>
           <div className="font-bold" style={{ fontSize: 16, color: INK }}>
             Book it with the provider

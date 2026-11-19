@@ -38,6 +38,10 @@ export interface CatalogItem {
   renewal_methods: ComplianceRenewalMethod[];
   /** Field on the Verida Fully Credentialled onboarding step whose step supplies the provider page. */
   providerAnchor?: string;
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): false = not listed in the app (MVR: its date comes from the D.Lawson report). */
+  inApp?: boolean;
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): assumed charged on every renewal, to verify (the "fee" switch). */
+  assumption?: "fee";
   /** ⚠️ PROPOSED ("date"): the onboarding step's date field the driver fills instead of ticking "I've completed it". */
   dateField?: { slug: string; label: string };
   /** ⚠️ PROPOSED ("esign"): the onboarding step's consent form. */
@@ -117,14 +121,14 @@ export const VERIDA_CATALOG: CatalogItem[] = [
   {
     slug: "vehicle-inspection",
     title: "Vehicle Inspection",
-    renewsBy: "Provider (Rideshare Mechanic), or a photo of the new report",
-    kind: "provider-or-photo",
-    renewal_methods: ["attest", "upload"],
+    renewsBy: "Provider (Rideshare Mechanic) + the inspection date",
+    kind: "provider",
+    // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest", "upload"]. Provider + date; not a training, so no upload of its own.
+    renewal_methods: ["date"],
     providerAnchor: "book_vehicle_inspection_button",
-    providerDescription: "Book your inspection with Rideshare Mechanic. They send the results straight to our Compliance team.",
-    // ⚠️ The onboarding step has no driver photo of the report (the report is filed internally), so this one field is the
-    // prototype's own. The story only says "a photo of the new report".
-    uploadFields: [{ slug: "inspection_report", label: "Inspection report" }],
+    providerDescription: "Book your inspection with Rideshare Mechanic, then tell us the date. They send the results straight to our Compliance team.",
+    dateField: stepField("Vehicle Inspection", "inspection_date"),
+    uploadFields: [],
     termMonths: 6,
   },
   {
@@ -153,8 +157,9 @@ export const VERIDA_CATALOG: CatalogItem[] = [
   {
     slug: "mvr",
     title: "Motor Vehicle Record (D.Lawson)",
-    renewsBy: "Renews with the background check",
+    renewsBy: "Not listed in the app: takes the D.Lawson report's date with the background check",
     kind: "with-background-check",
+    inApp: false,
     renewal_methods: ["esign"],
     esignField: "bgc_esign_file",
     providerAnchor: "bgc_info",
@@ -165,15 +170,26 @@ export const VERIDA_CATALOG: CatalogItem[] = [
   {
     slug: "drug-screening",
     title: "Drug Screening",
-    renewsBy: "Provider + the screening date, or a photo of the result",
-    kind: "provider-or-photo",
-    // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest"]. The date replaces the tick; upload is the alternative.
-    renewal_methods: ["date", "upload"],
+    renewsBy: "Provider + the screening date, once Compliance gives the EPassport",
+    kind: "provider",
+    // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest"]. The date replaces the tick. Not a training, so no upload of its own.
+    renewal_methods: ["date"],
     providerAnchor: "schedule_drug_screening_button",
     providerDescription: "Book your drug screening, then tell us the date. The testing facility sends the result to our Compliance team.",
     dateField: stepField("Schedule Drug Screening", "drug_screen_date"),
-    // ⚠️ The onboarding step has no driver upload of a result, so this one field is the prototype's own.
-    uploadFields: [{ slug: "drug_screen_result", label: "Drug screening result" }],
+    uploadFields: [],
+    termMonths: 12,
+  },
+  {
+    // ⚠️ PROPOSED (Luis, 2026-11-20): assumed charged on every renewal, to verify. Paid before the consent form can be signed.
+    slug: "background-check-fee",
+    title: "Background Check Fee",
+    renewsBy: "Pay the fee, then upload the receipt (before the consent form)",
+    kind: "photo",
+    renewal_methods: ["upload"],
+    assumption: "fee",
+    uploadFields: stepPhotos("Background Check Fee"),
+    instructionsStep: "Background Check Fee",
     termMonths: 12,
   },
   ...(
@@ -186,9 +202,12 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     ([slug, title, field]): CatalogItem => ({
       slug,
       title,
-      renewsBy: "Photo of the new certificate",
-      kind: "photo",
-      renewal_methods: ["upload"],
+      renewsBy: "Provider (GenTech LMS), or a photo of the new certificate",
+      kind: "provider-or-photo",
+      // ⚠️ PROPOSED (Luis, 2026-11-20): was ["upload"]. A training like HIPAA: the LMS + tick, or upload the certificate.
+      renewal_methods: ["attest", "upload"],
+      providerAnchor: "gentech_training_button",
+      providerDescription: "Retake the course on the GenTech LMS. Compliance confirms your new certificate with GenTech.",
       uploadFields: stepPhotos("GenTech Training", [field]),
       termMonths: 24,
     }),
@@ -232,6 +251,8 @@ export const NEVER_DUE = [
 
 export const INSPECTION_SLUG = "vehicle-inspection";
 export const BGC_SLUG = "background-check";
+export const FEE_SLUG = "background-check-fee";
+export const DRUG_SLUG = "drug-screening";
 export const MVR_SLUG = "mvr";
 export const WITH_INSPECTION = VERIDA_CATALOG.filter((i) => i.kind === "with-inspection").map((i) => i.slug);
 /** The four reviewed together as one vehicle renewal (story 2). */
@@ -302,6 +323,11 @@ export function hasGuides(fields: UploadField[]) {
   return fields.length > 0 && fields.every((f) => !!f.exampleImage);
 }
 
+/** ⚠️ PROPOSED: the checklist upload applies where every photo has a guide, or the onboarding step has instructions to show. */
+export function usesChecklist(c: Pick<CatalogItem, "uploadFields" | "instructionsStep">) {
+  return hasGuides(c.uploadFields) || (!!c.instructionsStep && c.uploadFields.length > 0);
+}
+
 /**
  * ⚠️ PROPOSED (Luis, 2026-11-20): the onboarding step's instructions and download button, shown on the upload screen of
  * Trade Dress and Signage — the same Verida Fully Credentialled step the driver saw in onboarding, for their market.
@@ -336,3 +362,15 @@ export function consentFor(slug: string): { stepTitle: string; text: string | nu
   }
   throw new Error(`Consent field not found: ${field}`);
 }
+
+/** ⚠️ PROPOSED (Luis, 2026-11-20): the onboarding EPassport step's text, shown with the EPassport on the drug screening renewal. */
+export function epassportInfo(): string | null {
+  for (const stage of templateFor("verida-ga")) {
+    const f = stage.steps.find((s) => s.title === "EPassport (Voucher)")?.field_definitions.find((d) => d.slug === "drug_screen_epassport_info");
+    if (f) return f.content ? stripMarkdown(f.content) : null;
+  }
+  return null;
+}
+
+/** Prototype placeholder for the EPassport file Compliance puts on file (synthetic). */
+export const EPASSPORT_SAMPLE_URL = "/dev/epassport-sample.pdf";

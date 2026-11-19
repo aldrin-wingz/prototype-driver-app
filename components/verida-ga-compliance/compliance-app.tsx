@@ -13,8 +13,19 @@
 import { useEffect, useState } from "react";
 import { ClipboardCheck, ClipboardList, Calendar, Home, Menu } from "lucide-react";
 
-import { BGC_SLUG, MVR_SLUG, catalogItem, consentFor, instructionsFor, providerFor, type ProviderOptions } from "@/lib/verida-ga-compliance/catalog";
-import { addDays, type DriverState, type RenewHow } from "@/lib/verida-ga-compliance/scenario";
+import {
+  BGC_SLUG,
+  DRUG_SLUG,
+  EPASSPORT_SAMPLE_URL,
+  MVR_SLUG,
+  catalogItem,
+  consentFor,
+  epassportInfo,
+  instructionsFor,
+  providerFor,
+  type ProviderOptions,
+} from "@/lib/verida-ga-compliance/catalog";
+import { addDays, renewalLocks, type DriverState, type RenewHow } from "@/lib/verida-ga-compliance/scenario";
 import type { ComplianceExpiryResponse } from "@/lib/verida-ga-compliance/types";
 import {
   COMPLIANCE_ICON_PATHS,
@@ -68,6 +79,7 @@ function routeFor(slug: string, kind: RenewKind): Route {
 export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest }: ComplianceAppProps) {
   const [stack, setStack] = useState<Route[]>([{ name: "tabs" }]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const locks = renewalLocks(state); // ⚠️ PROPOSED
   // ⚠️ PROPOSED (checklist batches): photos sent so far per requirement; the requirement reaches review once all are in.
   const [sentPhotos, setSentPhotos] = useState<Record<string, string[]>>({});
   const partialCounts = Object.fromEntries(
@@ -87,6 +99,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
     // ⚠️ PROPOSED: the route comes from the proposed kind ("date" / "esign"), which the build's row can't carry.
     const item = itemFor(target.slug);
     const kind = item ? proposedKindFor(item) : target.renewKind;
+    if (locks[target.slug]) return; // ⚠️ PROPOSED: an earlier step of the round comes first
     if (kind === "yardstik") throw new Error("A Verida Fully Credentialled driver is never sent to Yardstik");
     push(routeFor(target.slug, kind));
   };
@@ -107,7 +120,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
 
   let screen: React.ReactNode;
   if (route.name === "compliance") {
-    screen = <CompliancePage vm={vm} onBack={pop} onRenew={renewRow} partial={uploadLayout === "checklist" ? partialCounts : {}} />;
+    screen = <CompliancePage vm={vm} onBack={pop} onRenew={renewRow} partial={uploadLayout === "checklist" ? partialCounts : {}} locks={locks} />;
   } else if (route.name === "renew") {
     const c = catalogItem(route.slug);
     screen = (
@@ -137,6 +150,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         today={state.today}
         canUploadInstead={c.renewal_methods.includes("upload")}
         untilLine={vm.untilLine}
+        epassport={route.slug === DRUG_SLUG && state.assume.epassport && state.epassportGiven ? { url: EPASSPORT_SAMPLE_URL, info: epassportInfo() } : null}
         onBack={pop}
         onInstructions={() => push({ name: "provider", slug: route.slug })}
         onUploadInstead={() => replace({ name: "upload", slug: route.slug })}
