@@ -15,8 +15,12 @@ import dayjs from "dayjs";
 import {
   BGC_SLUG,
   DRUG_SLUG,
+  FC_ONLY_SLUGS,
   FEE_SLUG,
   INSPECTION_SLUG,
+  SHARED_SLUGS,
+  TNC_ONLY_CATALOG,
+  TNC_ONLY_SLUGS,
   MVR_SLUG,
   VERIDA_CATALOG,
   WITH_INSPECTION,
@@ -41,7 +45,12 @@ export interface RequirementRecord {
   upload?: Upload;
   /** S2: this photo requirement's new photos are approved and it waits for the inspection renewal's approval. */
   photosApprovedAwaitingInspection?: boolean;
+  /** ⚠️ PROPOSED: requested by a program switch (Request Change) — nothing of the new program on file yet. */
+  requested?: boolean;
 }
+
+/** ⚠️ PROPOSED (Luis, 2026-11-20): the credential program, from the client tags (Verida → Fully Credentialled). */
+export type Program = "fc" | "tnc";
 
 export type MarketState = "Georgia" | "Tennessee";
 
@@ -59,6 +68,9 @@ export interface DriverState {
   epassportGiven?: string;
   /** ⚠️ PROPOSED (Luis, 2026-11-20): the EPassport photo field's versions, oldest first (the last is current). */
   epassports: { on: string; file: string }[];
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): the driver's credential program, and a switch still in progress. */
+  program: Program;
+  switching?: { to: Program; on: string };
 }
 
 export interface Assumptions {
@@ -105,15 +117,22 @@ function baseRecords(today: string): Record<string, RequirementRecord> {
     "safety-equipment": { expires: inspection },
     "trade-dress": { expires: inspection },
     "safety-rules-signage": { expires: inspection },
+    // TNC+ only — on file for a driver who is, or was, TNC+.
+    "ctaa-pass": { expires: at(410) },
+    "background-check-yardstik": { expires: at(190) },
+    "mvr-yardstik": { expires: at(190) },
+    "drug-screening-yardstik": { expires: at(190) },
   };
 }
 
-export type ScenarioKey = "inspection-round" | "dlawson-drug" | "every-due" | "insurance-expired" | "all-clear";
+export type ScenarioKey = "inspection-round" | "dlawson-drug" | "every-due" | "switch-to-fc" | "switch-to-tnc" | "insurance-expired" | "all-clear";
 
 export const SCENARIOS: { key: ScenarioKey; label: string; story: string }[] = [
   { key: "inspection-round", label: "Inspection due in 20 days", story: "S2 — the inspection and its three photo requirements" },
   { key: "dlawson-drug", label: "D.Lawson + drug screening due", story: "S1 — provider renewals, no Yardstik; ⚠️ fee → consent → EPassport → date" },
   { key: "every-due", label: "Every requirement due", story: "⚠️ All of them at once, to see each renewal method" },
+  { key: "switch-to-fc", label: "TN: TNC+ → Fully Credentialled", story: "⚠️ Verida tag added: FC items requested; Verida TN trips held, TCI trips on the TNC+ documents" },
+  { key: "switch-to-tnc", label: "TN: Fully Credentialled → TNC+", story: "⚠️ Verida tag removed: TNC+ items requested; every trip on the FC documents until verified" },
   { key: "insurance-expired", label: "Insurance expired", story: "S1 + GA — Requests paused" },
   { key: "all-clear", label: "Everything up to date", story: "Nothing due" },
 ];
@@ -149,12 +168,26 @@ export function scenarioState(
   }
   // The EPassport on file from onboarding: the field's first version.
   const epassports = [{ on: addDays(today, -300), file: "epassport-onboarding.svg" }];
-  return { today, market, released, records, assume, epassports };
+  if (key === "switch-to-fc" || key === "switch-to-tnc") {
+    // Tennessee only: a driver can hold both programs' clients there (Verida + TCI).
+    const to: Program = key === "switch-to-fc" ? "fc" : "tnc";
+    const on = addDays(today, -1);
+    for (const slug of to === "fc" ? FC_ONLY_SLUGS : TNC_ONLY_SLUGS) records[slug] = { expires: on, requested: true };
+    return { today, market: "Tennessee", released: { ...released, Tennessee: true }, records, assume, epassports, program: to, switching: { to, on } };
+  }
+  return { today, market, released, records, assume, epassports, program: "fc" };
 }
 
-/** ⚠️ PROPOSED: requirements listed in the app — never the MVR, and the fee only while it is assumed. */
-export function listedInApp(s: Pick<DriverState, "assume">) {
-  return VERIDA_CATALOG.filter((c) => c.inApp !== false && (c.assumption !== "fee" || s.assume.fee));
+/**
+ * ⚠️ PROPOSED: requirements listed in the app — never the MVR, the fee only while it is assumed, and only the driver's
+ * program (Luis, 2026-11-20). During a switch both programs show: the new one requested, the old one still counting
+ * (TCI trips on the TNC+ documents; every trip on the FC documents). Once the switch completes the old one is hidden.
+ */
+export function listedInApp(s: Pick<DriverState, "assume" | "program" | "switching">) {
+  const fcItems = VERIDA_CATALOG.filter((c) => c.inApp !== false && (c.assumption !== "fee" || s.assume.fee));
+  const tncItems = TNC_ONLY_CATALOG.filter((c) => c.slug !== "mvr-yardstik" || true);
+  if (s.switching) return [...fcItems, ...tncItems];
+  return s.program === "fc" ? fcItems : [...fcItems.filter((c) => SHARED_SLUGS.includes(c.slug)), ...tncItems];
 }
 
 // ---------------------------------------------------------------------------------------------- the payload
@@ -164,11 +197,30 @@ export function inRelease(s: DriverState): boolean {
   return s.released[s.market];
 }
 
+const SWITCH_NOTE: Record<Program, string> = {
+  fc: "New for Verida Fully Credentialled. Upload it to get Verida trips again.",
+  tnc: "Needed for TNC+. Until it's approved, your trips follow your Verida Fully Credentialled documents.",
+};
+
 /** What GET /driver/compliance-expiry/ returns for this driver. */
 export function expiryResponse(s: DriverState): ComplianceExpiryResponse {
   if (!inRelease(s)) return { in_release: false, expiration_date: null, days_until_expiration: null, banner: null, items: [] };
   const items: ComplianceItem[] = listedInApp(s).map((c) => {
     const r = s.records[c.slug];
+    if (r.requested) {
+      // ⚠️ PROPOSED: requested by the switch — shown as Request Change with no date of its own (no expiry banner).
+      return {
+        item_slug: c.slug,
+        item_title: c.title,
+        expiration_date: addDays(s.today, 400),
+        days_until_expiration: 400,
+        milestone: null,
+        upload: r.upload ?? { status: "change_requested", agent_note: SWITCH_NOTE[s.switching?.to ?? "fc"] },
+        renewal_methods: c.renewal_methods,
+        external_link: c.providerDescription ? { url: "", label: "", description: c.providerDescription } : null,
+        program_switch_request: s.switching?.to ?? null,
+      };
+    }
     const days = daysBetween(s.today, r.expires);
     return {
       item_slug: c.slug,
@@ -195,10 +247,37 @@ export function expiryResponse(s: DriverState): ComplianceExpiryResponse {
 /** The horizon: last pickup day the driver is still offered (earliest expiry on file). Same-day OK (GA TC-006). */
 export function horizon(s: DriverState): string {
   // ⚠️ PROPOSED: the fee is a step of the background check renewal, not a credential, so it never restricts trips itself.
-  return Object.entries(s.records)
-    .filter(([slug]) => slug !== FEE_SLUG)
-    .map(([, r]) => r.expires)
+  return earliest(s, s.program === "fc" || s.switching?.to === "tnc" ? [...SHARED_SLUGS, ...FC_ONLY_SLUGS] : [...SHARED_SLUGS, ...TNC_ONLY_SLUGS]);
+}
+
+function earliest(s: DriverState, slugs: string[]): string {
+  return slugs
+    .filter((slug) => slug !== FEE_SLUG && s.records[slug] && !s.records[slug].requested)
+    .map((slug) => s.records[slug].expires)
     .sort()[0];
+}
+
+/**
+ * ⚠️ PROPOSED (Luis, 2026-11-20): the horizon per client in Tennessee. null = that client's trips are not offered.
+ *   TNC+ → FC (in progress): Verida TN trips held until every FC item is approved; TCI trips on the TNC+ documents.
+ *   FC → TNC+ (in progress): every trip on the FC documents; Verida trips stop once the TNC+ items are verified.
+ *   Done: the program's own documents for every client it serves (FC: Verida + TCI; TNC+: TCI only).
+ */
+export function horizonsByClient(s: DriverState): { verida: string | null; tci: string | null } {
+  const fc = earliest(s, [...SHARED_SLUGS, ...FC_ONLY_SLUGS]);
+  const tnc = earliest(s, [...SHARED_SLUGS, ...TNC_ONLY_SLUGS]);
+  if (s.switching?.to === "fc") return { verida: null, tci: tnc };
+  if (s.switching?.to === "tnc") return { verida: fc, tci: fc };
+  return s.program === "fc" ? { verida: fc, tci: s.market === "Tennessee" ? fc : null } : { verida: null, tci: tnc };
+}
+
+/** ⚠️ PROPOSED: the switch completes once every requested item is approved; the old program is then hidden. */
+function completeSwitch(s: DriverState): DriverState {
+  if (!s.switching) return s;
+  const pending = (s.switching.to === "fc" ? FC_ONLY_SLUGS : TNC_ONLY_SLUGS).filter(
+    (slug) => s.records[slug].requested && (slug !== FEE_SLUG || s.assume.fee) && slug !== MVR_SLUG,
+  );
+  return pending.length ? s : { ...s, switching: undefined };
 }
 
 // ---------------------------------------------------------------------------------------------- ⚠️ PROPOSED: renewal order
@@ -279,7 +358,7 @@ export interface ReviewEntry {
 
 /** Documents for Review for this driver. MVR is folded into its background check (one approval, S1). */
 export function reviewQueue(s: DriverState): ReviewEntry[] {
-  return VERIDA_CATALOG.filter((c) => s.records[c.slug].upload?.status === "in_review" && c.slug !== MVR_SLUG).map((c) => {
+  return [...VERIDA_CATALOG, ...TNC_ONLY_CATALOG].filter((c) => s.records[c.slug]?.upload?.status === "in_review" && c.slug !== MVR_SLUG).map((c) => {
     const ownDate = c.termMonths === null;
     const photoFollower = c.kind === "with-inspection";
     return {
@@ -315,7 +394,7 @@ function newExpiry(c: CatalogItem, date: string): string {
  */
 export function approvable(s: DriverState, slug: string, date: string): boolean {
   const c = catalogItem(slug);
-  if (c.kind === "with-inspection") return true;
+  if (c.kind === "with-inspection" || s.records[slug].requested) return true;
   return dayjs(newExpiry(c, date)).isAfter(dayjs(s.records[slug].expires));
 }
 
@@ -325,6 +404,12 @@ export function approve(s: DriverState, slug: string, date: string): DriverState
   const records = { ...s.records };
   let inspectionRenewedTo = s.inspectionRenewedTo;
 
+  if (s.records[slug].requested) {
+    // ⚠️ PROPOSED: a switch-requested item takes its own new date; the inspection-linked three take the inspection's.
+    const exp = c.kind === "with-inspection" ? records[INSPECTION_SLUG].expires : newExpiry(c, date);
+    for (const sl of linked(slug)) records[sl] = { expires: exp, upload: { status: "approved" } };
+    return completeSwitch({ ...s, records });
+  }
   if (c.kind === "with-inspection") {
     if (inspectionRenewedTo && dayjs(inspectionRenewedTo).isAfter(records[slug].expires)) {
       records[slug] = { expires: inspectionRenewedTo, upload: { status: "approved" } };

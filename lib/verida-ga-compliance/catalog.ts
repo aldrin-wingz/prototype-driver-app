@@ -258,8 +258,24 @@ export const WITH_INSPECTION = VERIDA_CATALOG.filter((i) => i.kind === "with-ins
 /** The four reviewed together as one vehicle renewal (story 2). */
 export const VEHICLE_RENEWAL = [INSPECTION_SLUG, ...WITH_INSPECTION];
 
+/**
+ * ⚠️ PROPOSED (Luis, 2026-11-20): the TNC+-only requirements, for a Tennessee driver switching program. They renew as
+ * #353 renews them for TNC+ (CTAA PASS by photo, the Yardstik three in Yardstik).
+ */
+export const TNC_ONLY_CATALOG: CatalogItem[] = [
+  { slug: "ctaa-pass", title: "CTAA PASS", renewsBy: "Photo of the new certificate", kind: "photo", renewal_methods: ["upload"], uploadFields: [{ slug: "ctaa_pass_certificate", label: "CTAA PASS certificate" }], termMonths: 36 },
+  { slug: "background-check-yardstik", title: "Background Check (Yardstik)", renewsBy: "Yardstik", kind: "provider", renewal_methods: ["yardstik"], uploadFields: [], termMonths: 12 },
+  { slug: "mvr-yardstik", title: "Motor Vehicle Record (Yardstik)", renewsBy: "Yardstik", kind: "provider", renewal_methods: ["yardstik"], uploadFields: [], termMonths: 12 },
+  { slug: "drug-screening-yardstik", title: "Drug Screening (Yardstik)", renewsBy: "Yardstik", kind: "provider", renewal_methods: ["yardstik"], uploadFields: [], termMonths: 12 },
+];
+
+/** Requirements both programs share. Everything else in VERIDA_CATALOG is Verida Fully Credentialled only. */
+export const SHARED_SLUGS = ["drivers-license", "vehicle-registration", "insurance", "vehicle-inspection", "hipaa"];
+export const FC_ONLY_SLUGS = VERIDA_CATALOG.map((c) => c.slug).filter((s) => !SHARED_SLUGS.includes(s));
+export const TNC_ONLY_SLUGS = TNC_ONLY_CATALOG.map((c) => c.slug);
+
 export function catalogItem(slug: string): CatalogItem {
-  const item = VERIDA_CATALOG.find((i) => i.slug === slug);
+  const item = VERIDA_CATALOG.find((i) => i.slug === slug) ?? TNC_ONLY_CATALOG.find((i) => i.slug === slug);
   if (!item) throw new Error(`Unknown Verida requirement: ${slug}`);
   return item;
 }

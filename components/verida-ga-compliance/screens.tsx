@@ -93,18 +93,22 @@ export function CompliancePage({
   onRenew,
   partial = {},
   locks = {},
+  top,
 }: {
   vm: ComplianceViewModel;
   onBack: () => void;
   onRenew: (row: ComplianceRow) => void;
   partial?: Record<string, { sent: number; total: number }>;
   locks?: Record<string, string>;
+  /** ⚠️ PROPOSED: the program-switch banner, above the page's own card. */
+  top?: React.ReactNode;
 }) {
   const page = vm.page;
   return (
     <>
       <ScreenHeader title="Compliance" onBack={onBack} />
       <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid="compliance-page">
+        {top}
         <div className="flex items-start gap-3 p-4" style={{ background: page.theme.bg, border: `1px solid ${page.theme.border}`, borderRadius: 16 }}>
           <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full" style={{ background: page.theme.iconBg }}>
             <Icon path={page.iconPath} color={page.theme.iconFg} size={19} />

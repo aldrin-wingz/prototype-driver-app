@@ -18,6 +18,7 @@ import {
   DRUG_SLUG,
   EPASSPORT_SAMPLE_URL,
   MVR_SLUG,
+  TNC_ONLY_SLUGS,
   catalogItem,
   consentFor,
   epassportInfo,
@@ -25,7 +26,7 @@ import {
   providerFor,
   type ProviderOptions,
 } from "@/lib/verida-ga-compliance/catalog";
-import { addDays, renewalLocks, type DriverState, type RenewHow } from "@/lib/verida-ga-compliance/scenario";
+import { addDays, horizonsByClient, renewalLocks, type DriverState, type RenewHow } from "@/lib/verida-ga-compliance/scenario";
 import type { ComplianceExpiryResponse } from "@/lib/verida-ga-compliance/types";
 import {
   COMPLIANCE_ICON_PATHS,
@@ -38,7 +39,7 @@ import {
 import { Banner, INK, Icon, PAGE_BG, Sheet } from "./parts";
 import { CompliancePage, ProviderScreen, RenewScreen, RequestsPaused, UploadScreen } from "./screens";
 import type { UploadLayout } from "./upload-layouts";
-import { DateRenewScreen, EsignRenewScreen } from "./renew-proposed";
+import { DateRenewScreen, EsignRenewScreen, SwitchBanner, YardstikScreen } from "./renew-proposed";
 import { proposedKindFor, type RenewKind } from "@/lib/verida-ga-compliance/proposed-methods";
 
 export type Tab = "home" | "requests" | "options";
@@ -50,7 +51,8 @@ type Route =
   | { name: "upload"; slug: string }
   | { name: "renew-date"; slug: string } // ⚠️ PROPOSED
   | { name: "esign"; slug: string } // ⚠️ PROPOSED
-  | { name: "instructions"; slug: string }; // ⚠️ PROPOSED: an upload's onboarding instructions, on their own page
+  | { name: "instructions"; slug: string } // ⚠️ PROPOSED: an upload's onboarding instructions, on their own page
+  | { name: "yardstik"; slug: string }; // TNC+ items of a program switch
 
 export interface ComplianceAppProps {
   state: DriverState;
@@ -74,6 +76,7 @@ function routeFor(slug: string, kind: RenewKind): Route {
   if (kind === "attest") return { name: "renew", slug };
   if (kind === "date") return { name: "renew-date", slug };
   if (kind === "esign") return { name: "esign", slug };
+  if (kind === "yardstik") return { name: "yardstik", slug };
   return { name: "upload", slug };
 }
 
@@ -101,7 +104,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
     const item = itemFor(target.slug);
     const kind = item ? proposedKindFor(item) : target.renewKind;
     if (locks[target.slug]) return; // ⚠️ PROPOSED: an earlier step of the round comes first
-    if (kind === "yardstik") throw new Error("A Verida Fully Credentialled driver is never sent to Yardstik");
+    if (kind === "yardstik" && !TNC_ONLY_SLUGS.includes(target.slug)) throw new Error("A Verida Fully Credentialled driver is never sent to Yardstik");
     push(routeFor(target.slug, kind));
   };
   useEffect(() => {
@@ -116,12 +119,21 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
   const renewRow = (row: ComplianceRow) => renew({ slug: row.slug, renewKind: row.renewKind });
 
   const lastDay = vm.pickupDayLock?.lastDay ?? null;
-  const trips = TRIP_DAYS.map((d) => addDays(state.today, d));
-  const shown = lastDay ? trips.filter((t) => t <= lastDay) : trips;
+  // ⚠️ PROPOSED (Luis, 2026-11-20): in Tennessee a driver can hold Verida and TCI trips; each client has its own horizon.
+  const byClient = horizonsByClient(state);
+  const tn = state.market === "Tennessee";
+  const trips = TRIP_DAYS.map((d, i) => ({ day: addDays(state.today, d), client: tn && i % 2 === 1 ? "TCI" : "Verida" }));
+  const shown = trips.filter((t) => {
+    if (!tn) return !lastDay || t.day <= lastDay;
+    const h = t.client === "Verida" ? byClient.verida : byClient.tci;
+    return !!h && t.day <= h;
+  });
+  const switchCount = response.items.filter((i) => i.program_switch_request && i.upload?.status === "change_requested").length;
+  const switchBanner = state.switching && switchCount > 0 ? <SwitchBanner to={state.switching.to} count={switchCount} onPress={() => route.name !== "compliance" && push({ name: "compliance" })} /> : null;
 
   let screen: React.ReactNode;
   if (route.name === "compliance") {
-    screen = <CompliancePage vm={vm} onBack={pop} onRenew={renewRow} partial={uploadLayout === "checklist" ? partialCounts : {}} locks={locks} />;
+    screen = <CompliancePage vm={vm} onBack={pop} onRenew={renewRow} partial={uploadLayout === "checklist" ? partialCounts : {}} locks={locks} top={switchBanner} />;
   } else if (route.name === "renew") {
     const c = catalogItem(route.slug);
     screen = (
@@ -149,6 +161,9 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         epassport={route.slug === DRUG_SLUG && state.assume.epassport && state.epassportGiven ? { url: EPASSPORT_SAMPLE_URL, info: epassportInfo() } : null}
       />
     );
+  } else if (route.name === "yardstik") {
+    const c = catalogItem(route.slug);
+    screen = <YardstikScreen key={route.slug} title={c.title} untilLine={vm.untilLine} onBack={pop} onSubmit={() => onSubmit(route.slug, "attest")} />;
   } else if (route.name === "instructions") {
     const c = catalogItem(route.slug);
     screen = <ProviderScreen title={c.title} provider={instructionsFor(route.slug, state.market)} onBack={pop} next={route.slug === "background-check-fee" ? "receipt" : "photo"} />;
@@ -222,6 +237,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         <div className="flex flex-1 flex-col overflow-y-auto" style={{ background: PAGE_BG }}>
           {tab === "home" && (
             <div className="space-y-3 p-3" data-testid="tab-home">
+              {switchBanner}
               <Banner vm={vm} variant="home" onPress={() => setSheetOpen(true)} onDismiss={onSnooze} />
               <div className="rounded-[14px] bg-white p-4 text-[13px] text-[#6B7280]">Dashboard (unchanged by this feature)</div>
             </div>
@@ -242,12 +258,13 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
             ) : (
               <div className="space-y-2.5 p-3" data-testid="tab-requests">
                 <Banner vm={vm} variant="compact" onPress={() => setSheetOpen(true)} />
-                {shown.map((d) => (
-                  <div key={d} data-testid="trip-offer" className="flex items-center justify-between rounded-[14px] bg-white px-4 py-3 text-[13px]">
+                {switchBanner}
+                {shown.map((t) => (
+                  <div key={t.day} data-testid="trip-offer" data-client={t.client} className="flex items-center justify-between rounded-[14px] bg-white px-4 py-3 text-[13px]">
                     <span className="font-semibold" style={{ color: INK }}>
-                      Trip offer · pickup {d}
+                      Trip offer · pickup {t.day}
                     </span>
-                    <span className="text-[#6B7280]">synthetic</span>
+                    <span className="text-[#6B7280]">{tn ? t.client : "synthetic"}</span>
                   </div>
                 ))}
                 {vm.showRequestsCutoff && (

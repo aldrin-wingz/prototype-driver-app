@@ -234,3 +234,67 @@ export function EsignRenewScreen({
     </>
   );
 }
+
+/**
+ * ⚠️ PROPOSED (Luis, 2026-11-20): a credential program switch asks for the new program's requirements straight away, on
+ * Home, Requests and the Compliance page.
+ */
+export function SwitchBanner({ to, count, onPress }: { to: "fc" | "tnc"; count: number; onPress: () => void }) {
+  const title = to === "fc" ? "You're now Verida Fully Credentialled" : "Your credential program is now TNC+";
+  const body =
+    to === "fc"
+      ? `Upload ${count} new requirement${count === 1 ? "" : "s"} to get Verida trips again. Your TCI trips aren't affected.`
+      : `Complete ${count} requirement${count === 1 ? "" : "s"} for TNC+. Until they're approved, your trips follow your Verida Fully Credentialled documents.`;
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      data-testid="switch-banner"
+      className="flex w-full items-start gap-3 rounded-[14px] border border-[#FCD34D] bg-[#FFFBEB] p-3.5 text-left"
+    >
+      <Icon path={COMPLIANCE_ICON_PATHS.upload} color="#B45309" size={20} strokeWidth={2.2} />
+      <div className="min-w-0 flex-1">
+        <div className="font-bold" style={{ fontSize: 14.5, color: INK }}>
+          {title}
+        </div>
+        <div className="mt-0.5" style={{ fontSize: 13, lineHeight: "19px", color: "#92400E" }}>
+          {body}
+        </div>
+        <div className="mt-1.5 font-bold" style={{ fontSize: 13, color: "#B45309" }}>
+          Upload now ›
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/** TNC+ renews the background check, MVR and drug screening in Yardstik (#353's "yardstik" method opens its web view). */
+export function YardstikScreen({ title, untilLine, onBack, onSubmit }: { title: string; untilLine: string; onBack: () => void; onSubmit: () => void }) {
+  const [done, setDone] = useState(false);
+  if (done) {
+    return <DoneView title="Thanks, we'll take it from here" body={`Yardstik will run your ${title} again.`} note={untilLine} onDone={onBack} />;
+  }
+  return (
+    <>
+      <ScreenHeader title={`Renew ${title}`} onBack={onBack} />
+      <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid="yardstik-screen">
+        <div className="flex flex-col gap-3 p-4" style={card}>
+          <div className="font-bold" style={{ fontSize: 16, color: INK }}>
+            Complete it in Yardstik
+          </div>
+          <div style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>
+            You&apos;ll go through the same Yardstik steps as when you signed up. (Stand-in for #353&apos;s Yardstik web view.)
+          </div>
+          <PrimaryButton
+            label="I've finished in Yardstik"
+            testId="yardstik-done"
+            onClick={() => {
+              onSubmit();
+              setDone(true);
+            }}
+          />
+        </div>
+      </div>
+    </>
+  );
+}

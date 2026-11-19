@@ -22,6 +22,8 @@ import {
   giveEpassport,
   renewalLocks,
   horizon,
+  horizonsByClient,
+  listedInApp,
   reviewQueue,
   scenarioState,
   sendBack,
@@ -75,9 +77,11 @@ export default function VeridaGaCompliancePage() {
 
   const load = (key: ScenarioKey, m: MarketState, rel: Record<MarketState, boolean>) => {
     setScenario(key);
-    setMarket(m);
-    setReleased(rel);
-    setState((prev) => scenarioState(key, m, rel, undefined, prev.assume));
+    const next = scenarioState(key, m, rel, undefined, state.assume);
+    // A program switch is a Tennessee scenario: it sets the market and releases Verida TN.
+    setMarket(next.market);
+    setReleased(next.released);
+    setState(next);
     setSnoozeKey(null);
     setDates({});
     setAppKey((k) => k + 1);
@@ -409,6 +413,21 @@ export default function VeridaGaCompliancePage() {
                 {formatComplianceDate(horizon(state))} — trips picked up after it are not offered
                 {!response.in_release && " (not applied while excluded)"}
               </dd>
+              {state.market === "Tennessee" && (
+                <>
+                  <dt className="text-gray-500">By client ⚠️</dt>
+                  <dd data-testid="readout-by-client">
+                    Verida TN:{" "}
+                    {horizonsByClient(state).verida ? formatComplianceDate(horizonsByClient(state).verida!) : state.switching?.to === "fc" ? "held until the new requirements are approved" : "not offered"}
+                    {" · "}TCI: {horizonsByClient(state).tci ? formatComplianceDate(horizonsByClient(state).tci!) : "not offered"}
+                  </dd>
+                  <dt className="text-gray-500">Program</dt>
+                  <dd data-testid="readout-program">
+                    {state.program === "fc" ? "Verida Fully Credentialled" : "TNC+"}
+                    {state.switching ? ` — switch in progress since ${formatComplianceDate(state.switching.on)} (completes when every requested item is approved)` : ""}
+                  </dd>
+                </>
+              )}
             </dl>
             <table className="w-full text-[12.5px]" data-testid="catalog-table">
               <thead>
@@ -421,7 +440,7 @@ export default function VeridaGaCompliancePage() {
                 </tr>
               </thead>
               <tbody>
-                {VERIDA_CATALOG.filter((c) => c.assumption !== "fee" || state.assume.fee).map((c) => {
+                {listedInApp(state).map((c) => {
                   const item = response.items.find((i) => i.item_slug === c.slug);
                   return (
                     <tr key={c.slug} className="border-t border-gray-100 align-top" data-testid={`catalog-${c.slug}`}>

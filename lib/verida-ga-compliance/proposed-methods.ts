@@ -32,6 +32,19 @@ export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryRes
   const patch = (row: ComplianceRow): ComplianceRow => {
     // ⚠️ PROPOSED: a requirement waiting on an earlier step of its round has no button yet (the page shows why).
     if (locks[row.slug] && !row.changes) row = { ...row, canUpload: false };
+    const switchItem = r.items.find((i) => i.item_slug === row.slug)?.program_switch_request;
+    if (switchItem) {
+      // ⚠️ PROPOSED (program switch): requested, no date of its own yet.
+      row = {
+        ...row,
+        text: switchItem === "fc" ? "New for Verida Fully Credentialled" : "Needed for TNC+",
+        textColor: "#B45309",
+        isDue: true,
+        canUpload: row.canUpload && !locks[row.slug],
+        uploadCta: row.inReview ? row.uploadCta : `Upload ${row.title}`,
+      };
+      if (locks[row.slug]) return { ...row, canUpload: false };
+    }
     const item = r.items.find((i) => i.item_slug === row.slug);
     const kind = item ? proposedKindFor(item) : row.renewKind;
     if (row.slug === "background-check-fee" && !row.changes) return { ...row, uploadLabel: "Pay", uploadCta: "Pay the Background Check Fee" };

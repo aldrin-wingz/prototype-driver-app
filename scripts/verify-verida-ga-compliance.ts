@@ -9,6 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { FC_ONLY_SLUGS, TNC_ONLY_SLUGS } from "../lib/verida-ga-compliance/catalog";
 import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
   addDays,
@@ -18,6 +19,8 @@ import {
   expiryResponse,
   giveEpassport,
   horizon,
+  horizonsByClient,
+  listedInApp,
   renewalLocks,
   reviewQueue,
   scenarioState,
@@ -113,6 +116,35 @@ check(
     /EPassport/.test(afterConsent["drug-screening"] ?? "") && needed && newVersion && Object.keys(afterEpassport).length === 0 && bgcInReview && bgcSigned && drugNotYet &&
     o.records["drug-screening"].upload?.status === "in_review" && o.records["drug-screening"].upload?.givenDate === addDays(today, 10),
 );
+// ⚠️ PROPOSED (Luis, 2026-11-20): program switches in Tennessee.
+{
+  let w: DriverState = scenarioState("switch-to-fc", "Georgia", GA, today);
+  const resp = expiryResponse(w);
+  const requested = resp.items.filter((i) => i.program_switch_request === "fc").map((i) => i.item_slug);
+  const tncStillListed = resp.items.some((i) => i.item_slug === "ctaa-pass");
+  const during = horizonsByClient(w);
+  for (const slug of FC_ONLY_SLUGS) if (w.records[slug].requested) w = approve(w, slug, today);
+  const after = horizonsByClient(w);
+  const listedAfter = listedInApp(w).map((c) => c.slug);
+  check(
+    "TNC+ → FC: FC items requested; Verida TN held, TCI on the TNC+ documents; once approved the TNC+ items are hidden",
+    `${w.market} · ${requested.length} requested · CTAA listed during: ${tncStillListed} · during Verida ${during.verida ?? "held"}, TCI ${during.tci} · after Verida ${after.verida}, CTAA listed: ${listedAfter.includes("ctaa-pass")}`,
+    w.market === "Tennessee" && requested.length === FC_ONLY_SLUGS.length - 1 && tncStillListed && during.verida === null && !!during.tci && !w.switching && !!after.verida && !listedAfter.includes("ctaa-pass"),
+  );
+}
+{
+  let w: DriverState = scenarioState("switch-to-tnc", "Georgia", GA, today);
+  const during = horizonsByClient(w);
+  const fcHorizon = horizon({ ...w, switching: undefined, program: "fc" });
+  for (const slug of TNC_ONLY_SLUGS) w = approve(w, slug, today);
+  const after = horizonsByClient(w);
+  const listedAfter = listedInApp(w).map((c) => c.slug);
+  check(
+    "FC → TNC+: every trip on the FC documents until the TNC+ items are verified; then Verida trips stop and FC items are hidden",
+    `during Verida ${during.verida}, TCI ${during.tci} (FC horizon ${fcHorizon}) · after Verida ${after.verida ?? "not offered"}, TCI ${after.tci}, D.Lawson listed: ${listedAfter.includes("background-check")}`,
+    during.verida === fcHorizon && during.tci === fcHorizon && !w.switching && after.verida === null && !!after.tci && !listedAfter.includes("background-check"),
+  );
+}
 const noPassport: DriverState = submitRenewal(scenarioState("dlawson-drug", "Georgia", GA, today, { epassport: false, fee: false }), "background-check", "esign");
 check("Assumptions off: drug screening opens once the consent is signed", JSON.stringify(renewalLocks(noPassport)), Object.keys(renewalLocks(noPassport)).length === 0);
 const asBuild = asBuildResponse(expiryResponse(scenarioState("dlawson-drug", "Georgia", GA, today)));

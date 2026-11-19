@@ -64,6 +64,8 @@ export interface ComplianceItem {
   renewal_methods?: ComplianceRenewalMethod[] | null;
   /** Provider link for the `attest` method (catalog `presentation.external_link`). */
   external_link?: ComplianceExternalLink | null;
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): requested by a credential program switch — no date of its own on file yet. */
+  program_switch_request?: "fc" | "tnc" | null;
 }
 
 export interface ComplianceExpiryResponse {
