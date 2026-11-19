@@ -21,7 +21,12 @@ export type ComplianceUploadStatus = "in_review" | "pending" | "change_requested
  *   the files to Compliance — and confirms "I've completed this", which puts it in review.
  * - `yardstik`: driver restarts the Yardstik apply flow (consent + steps) in a web view; then it shows Pending.
  */
-export type ComplianceRenewalMethod = "upload" | "attest" | "yardstik";
+/**
+ * #353: "upload" | "attest" | "yardstik". ⚠️ PROPOSED (Luis, 2026-11-20): "date" — the provider, then the date from the
+ * onboarding step instead of the "I've completed it" tick (drug screening); "esign" — the onboarding consent form, signed
+ * in the app, is the submission (D.Lawson background check + MVR).
+ */
+export type ComplianceRenewalMethod = "upload" | "attest" | "yardstik" | "date" | "esign";
 
 export interface ComplianceExternalLink {
   url: string;

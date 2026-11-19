@@ -26,6 +26,9 @@ import type { ComplianceExpiryResponse, ComplianceItem, ComplianceMilestone, Com
 export interface Upload {
   status: ComplianceUploadStatus;
   attested?: boolean;
+  /** ⚠️ PROPOSED: how it was sent ("date" / "esign" are new), and the date the driver gave. */
+  how?: RenewHow;
+  givenDate?: string;
   resubmitted?: boolean;
   agent_note?: string | null;
 }
@@ -163,14 +166,16 @@ export function horizon(s: DriverState): string {
 /** S1: one D.Lawson confirmation covers the background check and the Motor Vehicle Record. */
 const linked = (slug: string) => (slug === BGC_SLUG || slug === MVR_SLUG ? [BGC_SLUG, MVR_SLUG] : [slug]);
 
-export function submitRenewal(s: DriverState, slug: string, how: "upload" | "attest"): DriverState {
+export type RenewHow = "upload" | "attest" | "date" | "esign";
+
+export function submitRenewal(s: DriverState, slug: string, how: RenewHow, givenDate?: string): DriverState {
   const records = { ...s.records };
   for (const sl of linked(slug)) {
     const prev = records[sl].upload;
     records[sl] = {
       ...records[sl],
       photosApprovedAwaitingInspection: false,
-      upload: { status: "in_review", attested: how === "attest", resubmitted: prev?.status === "change_requested" },
+      upload: { status: "in_review", attested: how !== "upload", how, givenDate, resubmitted: prev?.status === "change_requested" },
     };
   }
   return { ...s, records };
@@ -182,6 +187,8 @@ export interface ReviewEntry {
   slug: string;
   title: string;
   attested: boolean;
+  how: RenewHow;
+  givenDate: string | null;
   /** The date the agent saves before approving: the inspection / completion date, or the document's own expiry. */
   dateLabel: string;
   defaultDate: string;
@@ -198,6 +205,8 @@ export function reviewQueue(s: DriverState): ReviewEntry[] {
       slug: c.slug,
       title: c.slug === BGC_SLUG ? `${c.title} + Motor Vehicle Record` : c.title,
       attested: !!s.records[c.slug].upload?.attested,
+      how: s.records[c.slug].upload?.how ?? (s.records[c.slug].upload?.attested ? "attest" : "upload"),
+      givenDate: s.records[c.slug].upload?.givenDate ?? null,
       dateLabel: photoFollower
         ? "No date: takes the inspection's new expiry"
         : ownDate

@@ -10,11 +10,11 @@
  *   Options: Compliance row with optionsSubtitle and the tab dot
  * The trips are synthetic. Navigation is a small in-frame stack, not the app's router.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardCheck, ClipboardList, Calendar, Home, Menu } from "lucide-react";
 
-import { catalogItem, instructionsFor, providerFor, type ProviderOptions } from "@/lib/verida-ga-compliance/catalog";
-import { addDays, type DriverState } from "@/lib/verida-ga-compliance/scenario";
+import { BGC_SLUG, MVR_SLUG, catalogItem, consentFor, instructionsFor, providerFor, type ProviderOptions } from "@/lib/verida-ga-compliance/catalog";
+import { addDays, type DriverState, type RenewHow } from "@/lib/verida-ga-compliance/scenario";
 import type { ComplianceExpiryResponse } from "@/lib/verida-ga-compliance/types";
 import {
   COMPLIANCE_ICON_PATHS,
@@ -27,6 +27,8 @@ import {
 import { Banner, INK, Icon, PAGE_BG, Sheet } from "./parts";
 import { CompliancePage, ProviderScreen, RenewScreen, RequestsPaused, UploadScreen } from "./screens";
 import type { UploadLayout } from "./upload-layouts";
+import { DateRenewScreen, EsignRenewScreen } from "./renew-proposed";
+import { proposedKindFor, type RenewKind } from "@/lib/verida-ga-compliance/proposed-methods";
 
 export type Tab = "home" | "requests" | "options";
 type Route =
@@ -34,7 +36,9 @@ type Route =
   | { name: "compliance" }
   | { name: "renew"; slug: string }
   | { name: "provider"; slug: string }
-  | { name: "upload"; slug: string };
+  | { name: "upload"; slug: string }
+  | { name: "renew-date"; slug: string } // ⚠️ PROPOSED
+  | { name: "esign"; slug: string }; // ⚠️ PROPOSED
 
 export interface ComplianceAppProps {
   state: DriverState;
@@ -43,16 +47,25 @@ export interface ComplianceAppProps {
   providerOpts: ProviderOptions;
   tab: Tab;
   onTab: (t: Tab) => void;
-  onSubmit: (slug: string, how: "upload" | "attest") => void;
+  onSubmit: (slug: string, how: RenewHow, givenDate?: string) => void;
   snoozed: boolean;
   onSnooze: () => void;
   uploadLayout?: UploadLayout;
+  /** Prototype control: open this requirement's renewal directly (n changes on every click). */
+  openRequest?: { slug: string; n: number } | null;
 }
 
 /** Synthetic trip offers, by pickup day from today. */
 const TRIP_DAYS = [1, 4, 9, 16, 24, 38];
 
-export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout }: ComplianceAppProps) {
+function routeFor(slug: string, kind: RenewKind): Route {
+  if (kind === "attest") return { name: "renew", slug };
+  if (kind === "date") return { name: "renew-date", slug };
+  if (kind === "esign") return { name: "esign", slug };
+  return { name: "upload", slug };
+}
+
+export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest }: ComplianceAppProps) {
   const [stack, setStack] = useState<Route[]>([{ name: "tabs" }]);
   const [sheetOpen, setSheetOpen] = useState(false);
   // ⚠️ PROPOSED (checklist batches): photos sent so far per requirement; the requirement reaches review once all are in.
@@ -71,9 +84,21 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
   // real: openComplianceRenewal.ts — upload → upload screen, attest → renew screen, yardstik → Yardstik web view.
   const renew = (target: { slug: string; renewKind: ComplianceRenewKind }) => {
     setSheetOpen(false);
-    if (target.renewKind === "yardstik") throw new Error("A Verida Fully Credentialled driver is never sent to Yardstik");
-    push(target.renewKind === "attest" ? { name: "renew", slug: target.slug } : { name: "upload", slug: target.slug });
+    // ⚠️ PROPOSED: the route comes from the proposed kind ("date" / "esign"), which the build's row can't carry.
+    const item = itemFor(target.slug);
+    const kind = item ? proposedKindFor(item) : target.renewKind;
+    if (kind === "yardstik") throw new Error("A Verida Fully Credentialled driver is never sent to Yardstik");
+    push(routeFor(target.slug, kind));
   };
+  useEffect(() => {
+    if (!openRequest) return;
+    const item = response.items.find((i) => i.item_slug === openRequest.slug);
+    const c = catalogItem(openRequest.slug);
+    const kind = proposedKindFor({ item_slug: c.slug, renewal_methods: c.renewal_methods, upload: item?.upload ?? null });
+    setSheetOpen(false);
+    setStack([{ name: "tabs" }, { name: "compliance" }, routeFor(c.slug, kind)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reopen only when the control is clicked
+  }, [openRequest]);
   const renewRow = (row: ComplianceRow) => renew({ slug: row.slug, renewKind: row.renewKind });
 
   const lastDay = vm.pickupDayLock?.lastDay ?? null;
@@ -101,6 +126,40 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
   } else if (route.name === "provider") {
     const c = catalogItem(route.slug);
     screen = <ProviderScreen title={c.title} provider={providerFor(route.slug, state.market, providerOpts)} onBack={pop} />;
+  } else if (route.name === "renew-date") {
+    const c = catalogItem(route.slug);
+    screen = (
+      <DateRenewScreen
+        key={route.slug}
+        title={c.title}
+        description={c.providerDescription ?? "Book it with the provider, then tell us the date."}
+        dateLabel={c.dateField?.label ?? "Date"}
+        today={state.today}
+        canUploadInstead={c.renewal_methods.includes("upload")}
+        untilLine={vm.untilLine}
+        onBack={pop}
+        onInstructions={() => push({ name: "provider", slug: route.slug })}
+        onUploadInstead={() => replace({ name: "upload", slug: route.slug })}
+        onSubmit={(date) => onSubmit(route.slug, "date", date)}
+      />
+    );
+  } else if (route.name === "esign") {
+    const c = catalogItem(route.slug);
+    const consent = consentFor(route.slug);
+    const lead = c.slug === MVR_SLUG ? catalogItem(BGC_SLUG) : c;
+    const other = c.slug === MVR_SLUG ? c : c.slug === BGC_SLUG ? catalogItem(MVR_SLUG) : null;
+    screen = (
+      <EsignRenewScreen
+        key={route.slug}
+        title={lead.title}
+        text={consent?.text ?? null}
+        formLabel={consent?.formLabel ?? "Review & Sign"}
+        alsoRenews={other?.title ?? null}
+        untilLine={vm.untilLine}
+        onBack={pop}
+        onSubmit={() => onSubmit(lead.slug, "esign")}
+      />
+    );
   } else if (route.name === "upload") {
     const c = catalogItem(route.slug);
     const item = itemFor(route.slug);

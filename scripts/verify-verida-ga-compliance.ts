@@ -21,6 +21,7 @@ import {
   type DriverState,
 } from "../lib/verida-ga-compliance/scenario";
 import { buildComplianceViewModel, renewKindFor } from "../lib/verida-ga-compliance/view-model";
+import { asBuildResponse, proposedKindFor } from "../lib/verida-ga-compliance/proposed-methods";
 
 let failed = 0;
 function check(name: string, detail: string, ok: boolean) {
@@ -61,7 +62,12 @@ check(
   VERIDA_CATALOG.length === 14 && ![...kinds, ...sentBack].includes("yardstik"),
 );
 const byKind = (k: string) => VERIDA_CATALOG.filter((_, i) => kinds[i] === k).map((c) => c.slug);
-check("S1 provider requirements open the provider page", byKind("attest").join(", "), byKind("attest").join() === "vehicle-inspection,hipaa,background-check,mvr,drug-screening");
+check("S1 provider requirements open the provider page", byKind("attest").join(", "), byKind("attest").join() === "vehicle-inspection,hipaa");
+// ⚠️ PROPOSED (Luis, 2026-11-20): Drug Screening takes a date; the background check and MVR are a signed consent form.
+const proposed = VERIDA_CATALOG.map((c) => `${c.slug}:${proposedKindFor({ item_slug: c.slug, renewal_methods: c.renewal_methods, upload: null })}`).filter((x) => /:(date|esign)$/.test(x));
+check("Proposed methods: date for drug screening, consent form for BGC + MVR", proposed.join(", "), proposed.join() === "background-check:esign,mvr:esign,drug-screening:date");
+const asBuild = asBuildResponse(expiryResponse(scenarioState("dlawson-drug", "Georgia", GA, today)));
+check("The build's view model only ever sees its own three methods", `${asBuild.items.flatMap((i) => i.renewal_methods ?? []).filter((m) => !["upload", "attest", "yardstik"].includes(m)).length} unknown`, asBuild.items.flatMap((i) => i.renewal_methods ?? []).every((m) => ["upload", "attest", "yardstik"].includes(m)));
 
 // 3. S1 TC-009: Social Security and BTT never listed.
 const all = expiryResponse(scenarioState("all-clear", "Georgia", GA, today));

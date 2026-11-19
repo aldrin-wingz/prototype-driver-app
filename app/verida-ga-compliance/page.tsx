@@ -27,9 +27,10 @@ import {
   type MarketState,
   type ScenarioKey,
 } from "@/lib/verida-ga-compliance/scenario";
-import { buildComplianceViewModel, complianceSnoozeKey, formatComplianceDate, renewKindFor } from "@/lib/verida-ga-compliance/view-model";
+import { buildComplianceViewModel, complianceSnoozeKey, formatComplianceDate } from "@/lib/verida-ga-compliance/view-model";
+import { asBuildResponse, proposedKindFor, withProposedRows } from "@/lib/verida-ga-compliance/proposed-methods";
 
-const KIND_LABEL = { upload: "Photo", attest: "Provider", yardstik: "Yardstik" } as const;
+const KIND_LABEL = { upload: "Photo", attest: "Provider", yardstik: "Yardstik", date: "Provider + date ⚠️", esign: "Consent form ⚠️" } as const;
 
 export default function VeridaGaCompliancePage() {
   const [scenario, setScenario] = useState<ScenarioKey>("inspection-round");
@@ -42,10 +43,11 @@ export default function VeridaGaCompliancePage() {
   const [appKey, setAppKey] = useState(0);
   const [dates, setDates] = useState<Record<string, string>>({});
   const [uploadLayout, setUploadLayout] = useState<UploadLayout>("checklist");
+  const [openRequest, setOpenRequest] = useState<{ slug: string; n: number } | null>(null);
 
   const response = useMemo(() => expiryResponse(state), [state]);
   const snoozed = snoozeKey !== null && snoozeKey === complianceSnoozeKey(response);
-  const vm = useMemo(() => buildComplianceViewModel(response, { snoozed }), [response, snoozed]);
+  const vm = useMemo(() => withProposedRows(buildComplianceViewModel(asBuildResponse(response), { snoozed }), response), [response, snoozed]);
   const queue = reviewQueue(state);
 
   const load = (key: ScenarioKey, m: MarketState, rel: Record<MarketState, boolean>) => {
@@ -75,10 +77,11 @@ export default function VeridaGaCompliancePage() {
             providerOpts={{ tennesseeInspectionLinkSet: tnLink }}
             tab={tab}
             onTab={setTab}
-            onSubmit={(slug, how) => setState((s) => submitRenewal(s, slug, how))}
+            onSubmit={(slug, how, givenDate) => setState((s) => submitRenewal(s, slug, how, givenDate))}
             snoozed={snoozed}
             onSnooze={() => setSnoozeKey(complianceSnoozeKey(response))}
             uploadLayout={uploadLayout}
+            openRequest={openRequest}
           />
         </div>
 
@@ -215,7 +218,13 @@ export default function VeridaGaCompliancePage() {
                     return (
                       <div key={e.slug} className="mb-1.5 rounded-md bg-gray-50 p-2 text-[13px]" data-testid={`review-${e.slug}`}>
                         <div className="font-semibold">
-                          {e.title} <span className="font-normal text-gray-500">· {e.attested ? "marked complete with the provider" : "new photos"}</span>
+                          {e.title} <span className="font-normal text-gray-500">· {e.how === "date"
+                            ? `screening date ${e.givenDate ? formatComplianceDate(e.givenDate) : ""} given`
+                            : e.how === "esign"
+                              ? "consent form signed"
+                              : e.attested
+                                ? "marked complete with the provider"
+                                : "new photos"}</span>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           {needsDate ? (
@@ -261,6 +270,11 @@ export default function VeridaGaCompliancePage() {
 
           <section>
             <div className="mb-1.5 font-medium">What the backend sends</div>
+            <p className="mb-1.5 text-[12px] text-gray-500">
+              <b>Open</b> shows any requirement&apos;s renewal in the app, due or not. ⚠️ marks a proposed renewal method #353 does not
+              have: Drug Screening takes the screening date instead of the tick; the background check and MVR are a consent form
+              signed in the app.
+            </p>
             <dl className="mb-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-[13px]" data-testid="readout">
               <dt className="text-gray-500">In release</dt>
               <dd data-testid="readout-in-release">{response.in_release ? "Yes" : "No — no compliance in the app"}</dd>
@@ -276,7 +290,8 @@ export default function VeridaGaCompliancePage() {
                   <th className="py-1 pr-2 font-medium">Requirement</th>
                   <th className="py-1 pr-2 font-medium">Renews by</th>
                   <th className="py-1 pr-2 font-medium">App opens</th>
-                  <th className="py-1 font-medium">Expires</th>
+                  <th className="py-1 pr-2 font-medium">Expires</th>
+                  <th className="py-1 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -287,11 +302,22 @@ export default function VeridaGaCompliancePage() {
                       <td className="py-1 pr-2">{c.title}</td>
                       <td className="py-1 pr-2 text-gray-600">{c.renewsBy}</td>
                       <td className="py-1 pr-2" data-testid={`opens-${c.slug}`}>
-                        {KIND_LABEL[renewKindFor({ item_slug: c.slug, renewal_methods: c.renewal_methods, upload: item?.upload ?? null })]}
+                        {KIND_LABEL[proposedKindFor({ item_slug: c.slug, renewal_methods: c.renewal_methods, upload: item?.upload ?? null })]}
                       </td>
                       <td className="whitespace-nowrap py-1">
                         {formatComplianceDate(state.records[c.slug].expires)}
                         {state.records[c.slug].photosApprovedAwaitingInspection && <span className="block text-[11px] text-amber-700">photos approved · waits on the inspection</span>}
+                      </td>
+                      <td className="py-1">
+                        <button
+                          type="button"
+                          data-testid={`open-${c.slug}`}
+                          title="Open this requirement's renewal in the app, whether or not it is due"
+                          onClick={() => setOpenRequest((o) => ({ slug: c.slug, n: (o?.n ?? 0) + 1 }))}
+                          className="rounded border border-gray-300 px-2 py-0.5 text-[11.5px] hover:border-[#16CFA9]"
+                        >
+                          Open
+                        </button>
                       </td>
                     </tr>
                   );
@@ -301,7 +327,8 @@ export default function VeridaGaCompliancePage() {
                     <td className="py-1 pr-2">{n.title}</td>
                     <td className="py-1 pr-2">Never comes due ({n.why})</td>
                     <td className="py-1 pr-2">—</td>
-                    <td className="py-1">Not listed</td>
+                    <td className="py-1 pr-2">Not listed</td>
+                    <td />
                   </tr>
                 ))}
               </tbody>

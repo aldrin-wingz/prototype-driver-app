@@ -38,6 +38,10 @@ export interface CatalogItem {
   renewal_methods: ComplianceRenewalMethod[];
   /** Field on the Verida Fully Credentialled onboarding step whose step supplies the provider page. */
   providerAnchor?: string;
+  /** ⚠️ PROPOSED ("date"): the onboarding step's date field the driver fills instead of ticking "I've completed it". */
+  dateField?: { slug: string; label: string };
+  /** ⚠️ PROPOSED ("esign"): the onboarding step's consent form. */
+  esignField?: string;
   /** ⚠️ PROPOSED (Luis, 2026-11-20): onboarding step whose instructions and download button the upload screen shows. */
   instructionsStep?: string;
   /** One line above Continue on the renew screen (`external_link.description`). */
@@ -68,6 +72,15 @@ function stepPhotos(stepTitle: string, only?: string[]): UploadField[] {
       });
   }
   throw new Error(`Verida step not found: ${stepTitle}`);
+}
+
+/** One onboarding field by step title and slug (its label as the driver read it). */
+function stepField(stepTitle: string, slug: string): { slug: string; label: string } {
+  for (const stage of templateFor("verida-ga")) {
+    const f = stage.steps.find((s) => s.title === stepTitle)?.field_definitions.find((d) => d.slug === slug);
+    if (f) return { slug: f.slug, label: f.label };
+  }
+  throw new Error(`Verida field not found: ${stepTitle} › ${slug}`);
 }
 
 export const VERIDA_CATALOG: CatalogItem[] = [
@@ -127,11 +140,13 @@ export const VERIDA_CATALOG: CatalogItem[] = [
   {
     slug: "background-check",
     title: "Background Check (D.Lawson)",
-    renewsBy: "Provider (D.Lawson). Also renews the Motor Vehicle Record",
+    renewsBy: "Consent form signed in the app (D.Lawson). Also renews the Motor Vehicle Record",
     kind: "provider",
-    renewal_methods: ["attest"],
+    renewal_methods: ["esign"],
     providerAnchor: "bgc_info",
     providerDescription: "D.Lawson runs your background check and Motor Vehicle Record again. Compliance confirms both with them.",
+    // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest"]. Signing the onboarding consent form (HelloSign) is the submission.
+    esignField: "bgc_esign_file",
     uploadFields: [],
     termMonths: 12,
   },
@@ -140,7 +155,8 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     title: "Motor Vehicle Record (D.Lawson)",
     renewsBy: "Renews with the background check",
     kind: "with-background-check",
-    renewal_methods: ["attest"],
+    renewal_methods: ["esign"],
+    esignField: "bgc_esign_file",
     providerAnchor: "bgc_info",
     providerDescription: "Renews with your D.Lawson background check: one confirmation covers both.",
     uploadFields: [],
@@ -149,12 +165,15 @@ export const VERIDA_CATALOG: CatalogItem[] = [
   {
     slug: "drug-screening",
     title: "Drug Screening",
-    renewsBy: "Provider (booking link from the Pre-Verida Training Check stage)",
-    kind: "provider",
-    renewal_methods: ["attest"],
+    renewsBy: "Provider + the screening date, or a photo of the result",
+    kind: "provider-or-photo",
+    // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest"]. The date replaces the tick; upload is the alternative.
+    renewal_methods: ["date", "upload"],
     providerAnchor: "schedule_drug_screening_button",
-    providerDescription: "Book your drug screening. The testing facility sends the result straight to our Compliance team.",
-    uploadFields: [],
+    providerDescription: "Book your drug screening, then tell us the date. The testing facility sends the result to our Compliance team.",
+    dateField: stepField("Schedule Drug Screening", "drug_screen_date"),
+    // ⚠️ The onboarding step has no driver upload of a result, so this one field is the prototype's own.
+    uploadFields: [{ slug: "drug_screen_result", label: "Drug screening result" }],
     termMonths: 12,
   },
   ...(
@@ -301,4 +320,19 @@ export function instructionsFor(slug: string, marketState: string): CompliancePr
     return { title: step.title, description: step.description ?? null, blocks };
   }
   throw new Error(`Verida step not found: ${stepTitle}`);
+}
+
+/** ⚠️ PROPOSED ("esign"): the consent step's text and the form, from the Verida Fully Credentialled onboarding step. */
+export function consentFor(slug: string): { stepTitle: string; text: string | null; formLabel: string } | null {
+  const field = catalogItem(slug).esignField;
+  if (!field) return null;
+  for (const stage of templateFor("verida-ga")) {
+    for (const step of stage.steps) {
+      const form = step.field_definitions.find((f) => f.slug === field);
+      if (!form) continue;
+      const info = step.field_definitions.find((f) => f.field_type === "info" && f.visibility !== "internal");
+      return { stepTitle: step.title, text: info?.content ? stripMarkdown(info.content) : null, formLabel: form.label };
+    }
+  }
+  throw new Error(`Consent field not found: ${field}`);
 }

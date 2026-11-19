@@ -1,0 +1,45 @@
+/**
+ * ⚠️ PROPOSED (Luis, 2026-11-20): two renewal methods #353 does not have, kept out of view-model.ts so that file stays
+ * the PR's complianceViewModel.ts byte for byte (verify check 1).
+ *   "date"  — provider, then the onboarding step's date instead of the "I've completed it" tick (Drug Screening).
+ *   "esign" — the onboarding consent form signed in the app is the submission (D.Lawson background check + MVR).
+ * The build's view model is fed "attest" in their place (its nearest method), and the rows' button copy is then patched.
+ */
+import type { ComplianceExpiryResponse, ComplianceItem, ComplianceRenewalMethod } from "./types";
+import { renewKindFor, type ComplianceRenewKind, type ComplianceRow, type ComplianceViewModel } from "./view-model";
+
+export type RenewKind = ComplianceRenewKind | "date" | "esign";
+
+export function proposedKindFor(item: Pick<ComplianceItem, "item_slug" | "renewal_methods" | "upload">): RenewKind {
+  const methods = item.renewal_methods ?? [];
+  if (item.upload?.status === "change_requested" && methods.includes("upload")) return "upload";
+  if (methods.includes("esign")) return "esign";
+  if (methods.includes("date")) return "date";
+  return renewKindFor(item);
+}
+
+/** What the build understands: the proposed methods stand in as "attest". */
+export function asBuildResponse(r: ComplianceExpiryResponse): ComplianceExpiryResponse {
+  const map = (m: ComplianceRenewalMethod): ComplianceRenewalMethod => (m === "date" || m === "esign" ? "attest" : m);
+  return {
+    ...r,
+    items: r.items.map((i) => (i.renewal_methods ? { ...i, renewal_methods: [...new Set(i.renewal_methods.map(map))] } : i)),
+  };
+}
+
+/** The button copy for a row whose requirement uses a proposed method. */
+export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryResponse): ComplianceViewModel {
+  const patch = (row: ComplianceRow): ComplianceRow => {
+    const item = r.items.find((i) => i.item_slug === row.slug);
+    const kind = item ? proposedKindFor(item) : row.renewKind;
+    if (row.changes || (kind !== "date" && kind !== "esign")) return row;
+    return kind === "esign"
+      ? { ...row, uploadLabel: "Sign", uploadCta: `Sign the ${row.title} consent` }
+      : { ...row, uploadLabel: "Renew", uploadCta: `Renew ${row.title}` };
+  };
+  return {
+    ...vm,
+    page: { ...vm.page, due: vm.page.due.map(patch), ok: vm.page.ok.map(patch) },
+    sheetRows: vm.sheetRows.map(patch),
+  };
+}
