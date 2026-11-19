@@ -11,17 +11,23 @@ import { useMemo, useState } from "react";
 import { OnboardingWizard, initialWizardState, type WizardState } from "@/components/verida-ga-onboarding/onboarding-wizard";
 import {
   BASELINE,
-  MARKET_LABEL,
   PRE_MARKET_STAGE_TITLES,
   initialCursor,
   marketKeyFor,
   stagesVisibleTo,
+  type MarketKey,
 } from "@/lib/verida-ga-onboarding/market-flow";
 
-const PRESETS: { label: string; marketState: string | null }[] = [
-  { label: "No market yet", marketState: null },
-  { label: "Georgia", marketState: "Georgia" },
-  { label: "Florida", marketState: "Florida" },
+/** The flow is the credential program; the market answer only routes to it (Georgia → Verida Fully Credentialled, every other market → TNC+). */
+const PROGRAM_LABEL: Record<MarketKey, string> = {
+  "verida-ga": "Verida Fully Credentialled",
+  "non-ga": "TNC+",
+};
+
+const PRESETS: { id: string; label: string; answer: string | null; marketState: string | null }[] = [
+  { id: "none", label: "No market yet", answer: null, marketState: null },
+  { id: "verida-fc", label: PROGRAM_LABEL["verida-ga"], answer: "Georgia", marketState: "Georgia" },
+  { id: "tnc-plus", label: PROGRAM_LABEL["non-ga"], answer: "any other market, e.g. Florida", marketState: "Florida" },
 ];
 
 export default function VeridaGaOnboardingPage() {
@@ -46,7 +52,7 @@ export default function VeridaGaOnboardingPage() {
         <aside className="w-full space-y-4 rounded-xl bg-white p-4 text-[14px] shadow-sm md:max-w-md" data-testid="controls">
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-wide text-gray-500">Prototype controls</div>
-            <h1 className="mt-1 text-[18px] font-semibold">Fully Credentialled — stages appear once the market is known</h1>
+            <h1 className="mt-1 text-[18px] font-semibold">Verida Fully Credentialled vs TNC+ — stages appear once the market is known</h1>
             <p className="mt-1 text-gray-600">
               Before the driver gives a market, the app lists only the stages every market shares. Giving the market
               in <em>Basic Information › Getting Started</em> reveals that market&apos;s full flow in the same session.
@@ -54,15 +60,16 @@ export default function VeridaGaOnboardingPage() {
           </div>
 
           <div>
-            <div className="mb-1.5 font-medium">Driver&apos;s market answer</div>
+            <div className="mb-1.5 font-medium">Flow (set by the driver&apos;s market answer)</div>
             <div className="flex flex-wrap gap-2">
               {PRESETS.map((p) => {
                 const on = (state.marketState ?? null) === p.marketState;
                 return (
                   <button
-                    key={p.label}
+                    key={p.id}
                     type="button"
-                    data-testid={`preset-${p.label}`}
+                    data-testid={`preset-${p.id}`}
+                    title={p.answer ? `Market answer: ${p.answer}` : undefined}
                     onClick={() => jumpTo(p.marketState)}
                     className={`rounded-full border px-3 py-1.5 ${on ? "border-[#16CFA9] bg-[#E8FAF4] font-semibold" : "border-gray-300"}`}
                   >
@@ -75,7 +82,7 @@ export default function VeridaGaOnboardingPage() {
 
           <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1" data-testid="readout">
             <dt className="text-gray-500">Flow</dt>
-            <dd>{market ? MARKET_LABEL[market] : "None yet — pre-market stages only"}</dd>
+            <dd>{market ? `${PROGRAM_LABEL[market]} (market answer: ${state.marketState})` : "None yet — pre-market stages only"}</dd>
             <dt className="text-gray-500">Stages listed</dt>
             <dd data-testid="readout-stage-count">{stages.length}</dd>
             <dt className="text-gray-500">Pre-market</dt>
@@ -95,7 +102,7 @@ export default function VeridaGaOnboardingPage() {
 
           <p className="text-[12px] text-gray-500">
             Template: {BASELINE.environment} #{BASELINE.templateId} v{BASELINE.version}, captured {BASELINE.captured}.
-            Shared stages are production&apos;s as of that date; the Georgia changes are applied on top. Wizard rebuilt from the native app at
+            Shared stages are production&apos;s as of that date; the Verida Fully Credentialled changes are applied on top. Wizard rebuilt from the native app at
             develop cb752e402 and production captures 11-01 / 11-03.
           </p>
         </aside>
