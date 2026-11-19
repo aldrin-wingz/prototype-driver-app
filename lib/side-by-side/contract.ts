@@ -55,9 +55,19 @@ export interface SbsLogEntry {
   text: string;
 }
 
+export type SbsCheck = "bgc" | "mvr" | "drug";
+export type SbsResult = "pending" | "pass" | "fail" | "decisional";
+export type SbsLifecycle = "in_progress" | "on_hold" | "rejected" | "for_final_compliance_review" | "for_activation" | "activated";
+
 export interface SbsState {
   schema: typeof SBS_SCHEMA;
   driver: { id: number; first: string; last: string };
+  /** On: the 2026-11-20 proposals apply (proposals.ts). Off: production-based payload as is. */
+  proposalsOn: boolean;
+  /** D.Lawson results, filed by Compliance. */
+  results: Record<SbsCheck, SbsResult>;
+  lifecycle: SbsLifecycle;
+  lifecycleReason: string | null;
   /** The submitted Getting Started market answer. Null = no market yet. */
   marketState: string | null;
   /** Derived by the engine from `marketState`. */
@@ -75,7 +85,10 @@ export type SbsAction =
   | { type: "driver/open"; stepId: string }
   | { type: "agent/verify"; stepId: string }
   | { type: "agent/requestChanges"; stepId: string; fields: string[]; reason: string }
-  | { type: "agent/setValue"; stepId: string; slug: string; value: unknown };
+  | { type: "agent/setValue"; stepId: string; slug: string; value: unknown }
+  | { type: "agent/setLifecycle"; lifecycle: SbsLifecycle; reason?: string | null }
+  | { type: "system/result"; check: SbsCheck; result: SbsResult }
+  | { type: "bar/setProposals"; on: boolean };
 
 export type SbsMessage =
   | { kind: "sbs:state"; state: SbsState }

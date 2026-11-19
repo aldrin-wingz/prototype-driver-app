@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
-import { AlertCircle, Check, CircleHelp, Clock, LayoutGrid, Lock, LogOut, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
 import {
   type Cursor,
@@ -76,6 +76,10 @@ export interface WizardSbs {
   changeRequest: { fields: string[]; reason: string } | null;
   onSubmit: (stepId: string, values: Values, marketState?: string | null) => void;
   onOpen: (stepId: string) => void;
+  /** Application lifecycle: on hold and rejected replace the wizard (production LifecycleOnHoldView / LifecycleRejectionView). */
+  lifecycle?: string;
+  lifecycleReason?: string | null;
+  driverFirstName?: string;
 }
 
 export function initialWizardState(): WizardState {
@@ -127,6 +131,53 @@ export function OnboardingWizard({
     onChange({ ...merged, cursor: next ?? merged.cursor });
   };
 
+  /** One field: the two Getting Started selects, or the shared field renderer. */
+  const renderField = (f: FieldDef) => {
+    const el = renderFieldBody(f);
+    const note = (f.metadata as { proposed?: string } | null | undefined)?.proposed;
+    return sbs && note ? (
+      <div key={`p-${f.slug}`} className="rounded-lg border border-dashed border-violet-300 p-2" title={note}>
+        <div className="mb-1">
+          <ProposedTag />
+        </div>
+        {el}
+      </div>
+    ) : (
+      el
+    );
+  };
+
+  const renderFieldBody = (f: FieldDef) =>
+    f.field_type === "voucher" ? (
+      <VoucherField key={f.slug} field={f} value={state.values[f.slug]} />
+    ) :
+    f.slug === MARKET_FIELD_SLUG ? (
+      <SelectField
+        key={f.slug}
+        field={f}
+        options={marketOptions()}
+        value={state.draftMarket}
+        testId="market-select"
+        onChange={(v) => onChange({ ...state, draftMarket: v })}
+      />
+    ) : f.slug === "how_did_you_hear_about_wingz" ? (
+      <SelectField
+        key={f.slug}
+        field={f}
+        options={optionLabels(f)}
+        value={state.heardFrom}
+        onChange={(v) => onChange({ ...state, heardFrom: v })}
+      />
+    ) : (
+      <RichField
+        key={f.slug}
+        field={f}
+        marketId={marketIdFor(state.marketState)}
+        value={state.values[f.slug]}
+        onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
+      />
+    );
+
   return (
     <div className="relative flex h-full flex-col bg-white font-wingz" style={{ color: BLACK_1 }}>
       {/* Header — real: OnboardingWizardHeader.tsx */}
@@ -163,72 +214,63 @@ export function OnboardingWizard({
         <ProgressBar progress={progress} />
       </div>
 
+      {sbs && (sbs.lifecycle === "on_hold" || sbs.lifecycle === "rejected") ? (
+        <div className="flex-1 overflow-y-auto bg-[#FAFAFA] p-4">
+          <LifecycleView kind={sbs.lifecycle} name={sbs.driverFirstName ?? "there"} reason={sbs.lifecycleReason ?? null} />
+        </div>
+      ) : null}
       {/* Step body — back to the top on every step, as a new screen would be. */}
-      <div ref={bodyRef} className="flex-1 overflow-y-auto bg-[#FAFAFA] p-4">
-        {sbs && currentStatus === "change_requested" && sbs.changeRequest ? (
-          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-900" data-testid="sbs-change-request">
-            <div className="flex items-center gap-1.5 font-semibold">
-              <AlertCircle className="h-4 w-4" /> Changes requested <ProposedTag />
-            </div>
-            <p className="mt-1">{sbs.changeRequest.reason}</p>
-            <p className="mt-1 text-red-800/80">To fix: {sbs.changeRequest.fields.map((slug) => fieldLabel(currentStep?.field_definitions ?? [], slug)).join(", ")}</p>
+      <div ref={bodyRef} className={`flex-1 overflow-y-auto bg-[#FAFAFA] p-4 ${sbs && (sbs.lifecycle === "on_hold" || sbs.lifecycle === "rejected") ? "hidden" : ""}`}>
+        {sbs && current?.stage.proposed ? (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-violet-300 bg-violet-50 px-3 py-2 text-[12px] text-violet-800" data-testid="stage-proposed">
+            <ProposedTag />
+            <span>{current.stage.proposed}</span>
           </div>
         ) : null}
-        {currentStep && waiting ? (
-          <div className="rounded-xl border border-[#E8E8E8] bg-white p-5 text-center" data-testid="sbs-waiting">
-            {currentStatus === "pending_review" ? (
-              <Clock className="mx-auto h-10 w-10 text-amber-500" />
-            ) : (
-              <Check className="mx-auto h-10 w-10" style={{ color: GREEN }} />
-            )}
-            <div className="mt-3 text-[18px] font-semibold">{currentStep.title}</div>
-            <p className="mt-1 text-[14px]" style={{ color: GRAY_3 }}>
-              {currentStatus === "pending_review"
-                ? "Submitted. Our team is reviewing it — you'll be able to continue once it's approved."
-                : "Done. Nothing more is needed here."}
-            </p>
-            <div className="mt-3 flex justify-center">
-              <ProposedTag />
-            </div>
-          </div>
-        ) : currentStep ? (
+        {currentStep ? (
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-4">
+            {/* real: OnboardingWizardScreen.tsx — AwaitingReviewBanner sits above the step title. */}
+            {sbs && currentStatus === "pending_review" ? (
+              <AmberBanner
+                icon="clock"
+                title={isFinalReview(current?.stage.title) ? FINAL_REVIEW_SUBMITTED_TITLE : AWAITING_REVIEW_TITLE}
+                body={isFinalReview(current?.stage.title) ? FINAL_REVIEW_SUBMITTED_BODY : AWAITING_REVIEW_BODY}
+              />
+            ) : null}
             <div className="text-[18px] font-semibold">{currentStep.title}</div>
             {currentStep.description ? (
               <p className="mt-1 text-[14px]" style={{ color: GRAY_3 }}>
                 {currentStep.description}
               </p>
             ) : null}
-            <div className="mt-4 space-y-4">
+            {sbs && currentStatus === "change_requested" ? (
+              <div className="mt-4">
+                <AmberBanner
+                  icon="alert"
+                  title={CHANGE_REQUESTED_TITLE}
+                  body={
+                    sbs.changeRequest?.reason?.trim() ||
+                    (sbs.changeRequest?.fields.length ? CHANGE_REQUESTED_BODY_WITH_FLAGS : CHANGE_REQUESTED_BODY_GENERIC)
+                  }
+                />
+              </div>
+            ) : null}
+            <div
+              className={`mt-4 space-y-4 ${waiting ? "pointer-events-none opacity-70" : ""}`}
+              aria-disabled={waiting || undefined}
+              data-testid={waiting ? "step-read-only" : undefined}
+            >
               {driverFields(currentStep).filter((f) => isFieldVisible(f, state.values)).map((f) =>
-                f.slug === MARKET_FIELD_SLUG ? (
-                  <SelectField
-                    key={f.slug}
-                    field={f}
-                    options={marketOptions()}
-                    value={state.draftMarket}
-                    testId="market-select"
-                    onChange={(v) => onChange({ ...state, draftMarket: v })}
-                  />
-                ) : f.slug === "how_did_you_hear_about_wingz" ? (
-                  <SelectField
-                    key={f.slug}
-                    field={f}
-                    options={optionLabels(f)}
-                    value={state.heardFrom}
-                    onChange={(v) => onChange({ ...state, heardFrom: v })}
-                  />
+                sbs && currentStatus === "change_requested" && sbs.changeRequest?.fields.includes(f.slug) ? (
+                  <ChangeRequestFieldFrame key={`cr-${f.slug}`} message={sbs.changeRequest.reason}>
+                    {renderField(f)}
+                  </ChangeRequestFieldFrame>
                 ) : (
-                  <RichField
-                    key={f.slug}
-                    field={f}
-                    marketId={marketIdFor(state.marketState)}
-                    value={state.values[f.slug]}
-                    onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
-                  />
+                  renderField(f)
                 ),
               )}
             </div>
+            {waiting ? null : (
             <button
               type="button"
               data-testid="continue"
@@ -244,6 +286,7 @@ export function OnboardingWizard({
               {/* Only the end of a market's flow submits; before a market the list just stops at the app download. */}
               {continueLabel(market !== null && nextCursor(stages, state.cursor) === null)}
             </button>
+            )}
           </div>
         ) : null}
       </div>
@@ -268,6 +311,60 @@ export function OnboardingWizard({
   );
 }
 
+/*
+ * Review states — ported from production (v6.0.538-production-ios):
+ *   real: App/Data/onboarding/copy/onboardingBannerCopy.ts (copy)
+ *   real: App/Components/Onboarding/Wizard/AwaitingReviewBanner.tsx, OnboardingAmberBanner.tsx (amber strip)
+ *   real: App/Components/DynamicForm/ChangeRequestFieldFrame.tsx (flagged field frame)
+ */
+const CHANGE_REQUESTED_TITLE = "Changes Requested";
+const CHANGE_REQUESTED_BODY_WITH_FLAGS = "Please update the highlighted fields below and resubmit.";
+const CHANGE_REQUESTED_BODY_GENERIC = "Please review this step and resubmit your changes.";
+const AWAITING_REVIEW_TITLE = "Awaiting Review";
+const AWAITING_REVIEW_BODY =
+  "Your submission has been received and is currently being reviewed by a Wingz onboarding agent. You'll be notified once it has been reviewed.";
+const FINAL_REVIEW_SUBMITTED_TITLE = "Application submitted";
+const FINAL_REVIEW_SUBMITTED_BODY =
+  "Thank you for completing your application. Our onboarding team is reviewing your submission and will notify you when a decision is ready.";
+
+function isFinalReview(title: string | undefined) {
+  return (title ?? "").trim().toLowerCase() === "final review";
+}
+
+function AmberBanner({ icon, title, body }: { icon: "clock" | "alert"; title: string; body: string }) {
+  return (
+    <div
+      className="mb-4 flex items-start gap-3 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-4"
+      data-testid={icon === "clock" ? "awaiting-review" : "changes-requested"}
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FEF3C7]">
+        {icon === "clock" ? <Clock className="h-5 w-5 text-[#D97706]" /> : <AlertTriangle className="h-5 w-5 text-[#D97706]" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 text-[13px] font-semibold leading-[22px] text-[#92400E]">{title}</div>
+        <div className="text-[12px] leading-5 text-[#B45309]">{body}</div>
+      </div>
+    </div>
+  );
+}
+
+function ChangeRequestFieldFrame({ message, children }: { message: string; children: React.ReactNode }) {
+  if (!message.trim()) return <>{children}</>;
+  return (
+    <div className="rounded-lg border border-[#FCD34D] bg-[#FFFBEB] p-3" data-testid="flagged-field">
+      <div className="mb-2 flex items-center">
+        <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#D97706]" />
+        <span className="text-[12px] font-semibold text-[#D97706]">Changes requested</span>
+      </div>
+      <div className="mb-3 flex items-stretch">
+        <span className="mr-2 w-0.5 rounded bg-[#FCD34D]" />
+        <span className="flex-1 text-[12px] leading-[18px] text-[#D97706]">{message}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** Marks UI that exists only in this prototype (not in the production app yet). */
 function ProposedTag() {
   return (
@@ -277,8 +374,70 @@ function ProposedTag() {
   );
 }
 
-function fieldLabel(fields: FieldDef[], slug: string): string {
-  return fields.find((f) => f.slug === slug)?.label || slug;
+/** real: App/Components/DynamicForm/DynamicVoucherField.tsx — "Not yet available", then View / Download. */
+function VoucherField({ field, value }: { field: FieldDef; value: unknown }) {
+  const url = typeof value === "string" && value.trim() ? value : null;
+  return (
+    <div>
+      <div className="mb-1.5 text-[14px] font-semibold">{field.label}</div>
+      <div className="rounded-lg border bg-white p-3" style={{ borderColor: GRAY_7 }} data-testid="voucher-field">
+        {url ? (
+          <>
+            <p className="mb-3.5 text-[12px] leading-[18px]" style={{ color: GRAY_3 }}>
+              Your voucher is ready to view or download.
+            </p>
+            <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block w-full rounded-lg py-2.5 text-center text-[14px] font-semibold text-white" style={{ backgroundColor: GREEN }}>
+              View voucher
+            </a>
+            <a href={url} download className="mt-2 block w-full rounded-lg border py-2.5 text-center text-[14px] font-semibold" style={{ borderColor: GREEN, color: GREEN }}>
+              Download PDF
+            </a>
+          </>
+        ) : (
+          <div className="flex items-center gap-2.5 text-[14px]" style={{ color: GRAY_3 }}>
+            <FileText className="h-[18px] w-[18px]" />
+            {field.content?.trim() || "Not yet available"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** real: LifecycleOnHoldView.tsx / LifecycleRejectionView.tsx (v6.0.538-production-ios), copy verbatim. */
+function LifecycleView({ kind, name, reason }: { kind: "on_hold" | "rejected"; name: string; reason: string | null }) {
+  if (kind === "on_hold") {
+    return (
+      <div className="flex flex-col items-center px-2 pt-10 text-center" data-testid="lifecycle-on-hold">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FEF3C7]">
+          <Pause className="h-9 w-9 text-[#D97706]" />
+        </div>
+        <div className="mt-5 text-[20px] font-semibold">Application On Hold</div>
+        <p className="mt-2 text-[14px] leading-5" style={{ color: GRAY_3 }}>
+          {reason?.trim() ||
+            `Hi ${name}, your application is currently on hold. Our support team will reach out with next steps when there is an update.`}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center px-2 pt-10 text-center" data-testid="lifecycle-rejected">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
+        <XCircle className="h-9 w-9 text-[#CF1322]" />
+      </div>
+      <div className="mt-5 text-[20px] font-semibold">Application Not Approved</div>
+      <p className="mt-2 text-[14px] leading-5" style={{ color: GRAY_3 }}>
+        {`Hi ${name}, after reviewing your application, we're unable to move forward with your application at this time.`}
+      </p>
+      <div className="mt-5 w-full rounded-lg border border-[#E8E8E8] bg-white p-4 text-left">
+        <div className="text-[12px]" style={{ color: GRAY_3 }}>Reviewed on Nov 20, 2026</div>
+        <div className="mt-2 text-[14px] font-semibold">{reason?.trim() || "Reason for Decision"}</div>
+        <p className="mt-1 text-[13px]" style={{ color: GRAY_3 }}>
+          After reviewing your application, we&apos;re unable to move forward at this time.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function isGettingStarted(fields: FieldDef[]) {

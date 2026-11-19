@@ -3,6 +3,7 @@
  * repo) turned into what the wizard renders. No gate is decided here; statuses arrive ready.
  */
 import type { SbsState, SbsStepStatus } from "./contract";
+import { proposeStep, type ProposalStep } from "./proposals";
 import { templateFor, type StageView, type TemplateStage, type TemplateStep } from "@/lib/verida-ga-onboarding/market-flow";
 
 const STEP_INDEX: Map<string, TemplateStep> = (() => {
@@ -18,7 +19,11 @@ export function sbsStages(state: SbsState): TemplateStage[] {
     title: s.title,
     layout: s.layout,
     advancement: s.advancement,
-    steps: s.stepIds.map((id) => STEP_INDEX.get(id)).filter((x): x is TemplateStep => Boolean(x)),
+    proposed: s.proposed,
+    steps: s.stepIds
+      .map((id) => STEP_INDEX.get(id))
+      .filter((x): x is TemplateStep => Boolean(x))
+      .map((st) => (state.proposalsOn ? (proposeStep(st as unknown as ProposalStep) as unknown as TemplateStep) : st)),
   }));
 }
 

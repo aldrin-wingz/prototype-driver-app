@@ -57,6 +57,8 @@ export interface TemplateStage {
   driver_note?: string | null;
   layout?: string | null;
   advancement?: string | null;
+  /** Side-by-side only: set when this stage differs from the production template. */
+  proposed?: string;
   steps: TemplateStep[];
 }
 

@@ -81,6 +81,9 @@ export function SbsDriverPane() {
           onSubmit: (stepId, values, marketState) =>
             send({ type: "driver/submitStep", stepId, values, ...(marketState !== undefined ? { marketState } : {}) }),
           onOpen: (stepId) => send({ type: "driver/open", stepId }),
+          lifecycle: shared.lifecycle,
+          lifecycleReason: shared.lifecycleReason,
+          driverFirstName: shared.driver.first,
         }}
       />
     </div>
