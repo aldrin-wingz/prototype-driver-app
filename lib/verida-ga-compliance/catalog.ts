@@ -263,3 +263,8 @@ export function providerFor(slug: string, marketState: string, opts: ProviderOpt
   }
   return null;
 }
+
+/** ⚠️ PROPOSED (V14): the page-selector and checklist upload layouts apply only where every photo has a guide image. */
+export function hasGuides(fields: UploadField[]) {
+  return fields.length > 0 && fields.every((f) => !!f.exampleImage);
+}

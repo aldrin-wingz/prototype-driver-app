@@ -22,10 +22,11 @@ import {
 } from "@/lib/verida-ga-compliance/view-model";
 
 import { Banner, DoneView, GREEN, INK, Icon, PAGE_BG, PrimaryButton, ScreenHeader, StatusPill, card } from "./parts";
+import { ChecklistUpload, PagerUpload, hasGuides, type UploadLayout } from "./upload-layouts";
 
 const sectionLabel = "px-1 text-[12px] font-bold tracking-[0.08em] text-[#9AA5A0]";
 
-function DueCard({ row, onRenew }: { row: ComplianceRow; onRenew: () => void }) {
+function DueCard({ row, onRenew, partial }: { row: ComplianceRow; onRenew: () => void; partial?: { sent: number; total: number } }) {
   return (
     <div data-testid={`due-${row.slug}`} className="flex flex-col gap-3 p-3.5" style={card}>
       <div className="flex items-center gap-3">
@@ -40,6 +41,12 @@ function DueCard({ row, onRenew }: { row: ComplianceRow; onRenew: () => void }) 
           <div style={{ fontSize: 12.5, color: row.textColor, marginTop: 2 }} data-testid={`due-text-${row.slug}`}>
             {row.text}
           </div>
+          {!!partial && (
+            // ⚠️ PROPOSED (checklist batches): not in #353.
+            <div style={{ fontSize: 12.5, color: "#00966F", marginTop: 2, fontWeight: 600 }} data-testid={`due-partial-${row.slug}`}>
+              {partial.sent} of {partial.total} photos submitted · add {partial.total - partial.sent} more for review
+            </div>
+          )}
         </div>
         {row.inReview && <StatusPill kind={row.pending ? "pending" : "review"} />}
         {row.changes && <StatusPill kind="changes" />}
@@ -63,7 +70,17 @@ function DueCard({ row, onRenew }: { row: ComplianceRow; onRenew: () => void }) 
 }
 
 /** Options › Compliance — every requirement, due ones first, each with its own button. */
-export function CompliancePage({ vm, onBack, onRenew }: { vm: ComplianceViewModel; onBack: () => void; onRenew: (row: ComplianceRow) => void }) {
+export function CompliancePage({
+  vm,
+  onBack,
+  onRenew,
+  partial = {},
+}: {
+  vm: ComplianceViewModel;
+  onBack: () => void;
+  onRenew: (row: ComplianceRow) => void;
+  partial?: Record<string, { sent: number; total: number }>;
+}) {
   const page = vm.page;
   return (
     <>
@@ -86,7 +103,7 @@ export function CompliancePage({ vm, onBack, onRenew }: { vm: ComplianceViewMode
           <>
             <div className={sectionLabel}>NEEDS ATTENTION</div>
             {page.due.map((row) => (
-              <DueCard key={row.slug} row={row} onRenew={() => onRenew(row)} />
+              <DueCard key={row.slug} row={row} onRenew={() => onRenew(row)} partial={partial[row.slug]} />
             ))}
           </>
         )}
@@ -312,6 +329,9 @@ export function UploadScreen({
   fields,
   changeNote,
   untilLine,
+  layout = "guide",
+  submitted,
+  onPartialSubmit,
   onBack,
   onSubmit,
 }: {
@@ -319,6 +339,11 @@ export function UploadScreen({
   fields: UploadField[];
   changeNote: string | null;
   untilLine: string;
+  /** ⚠️ PROPOSED (V14): "built" = #353 unchanged; the others are the alternatives in upload-layouts.tsx. */
+  layout?: UploadLayout;
+  /** ⚠️ PROPOSED (checklist only): photos already sent in an earlier batch, and the batch send. */
+  submitted?: string[];
+  onPartialSubmit?: (slugs: string[]) => void;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -333,6 +358,22 @@ export function UploadScreen({
         note={untilLine}
         onDone={onBack}
       />
+    );
+  }
+  if ((layout === "pager" || layout === "checklist") && hasGuides(fields)) {
+    const submit = () => {
+      onSubmit();
+      setStep("done");
+    };
+    return (
+      <>
+        <ScreenHeader title={changeNote ? title : `Upload ${title}`} onBack={onBack} />
+        {layout === "pager" ? (
+          <PagerUpload fields={fields} changeNote={changeNote} onSubmit={submit} />
+        ) : (
+          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} />
+        )}
+      </>
     );
   }
   return (
@@ -351,7 +392,7 @@ export function UploadScreen({
         )}
         {step === "capture" && field && (
           <>
-            {field.exampleImage ? (
+            {field.exampleImage && layout !== "built" ? (
               // ⚠️ PROPOSED (Luis, V14 2026-11-19): not in #353. The build shows the icon card below for every photo; this
               // shows the onboarding field's guide image (metadata.example_image) instead, as onboarding does.
               <div

@@ -10,6 +10,7 @@
 import { useMemo, useState } from "react";
 
 import { ComplianceApp, type Tab } from "@/components/verida-ga-compliance/compliance-app";
+import { UPLOAD_LAYOUTS, type UploadLayout } from "@/components/verida-ga-compliance/upload-layouts";
 import { NEVER_DUE, VERIDA_CATALOG, VEHICLE_RENEWAL, catalogItem } from "@/lib/verida-ga-compliance/catalog";
 import {
   SCENARIOS,
@@ -40,6 +41,7 @@ export default function VeridaGaCompliancePage() {
   const [snoozeKey, setSnoozeKey] = useState<string | null>(null);
   const [appKey, setAppKey] = useState(0);
   const [dates, setDates] = useState<Record<string, string>>({});
+  const [uploadLayout, setUploadLayout] = useState<UploadLayout>("checklist");
 
   const response = useMemo(() => expiryResponse(state), [state]);
   const snoozed = snoozeKey !== null && snoozeKey === complianceSnoozeKey(response);
@@ -76,6 +78,7 @@ export default function VeridaGaCompliancePage() {
             onSubmit={(slug, how) => setState((s) => submitRenewal(s, slug, how))}
             snoozed={snoozed}
             onSnooze={() => setSnoozeKey(complianceSnoozeKey(response))}
+            uploadLayout={uploadLayout}
           />
         </div>
 
@@ -137,6 +140,30 @@ export default function VeridaGaCompliancePage() {
                 +7 days
               </button>
             </div>
+          </section>
+
+          <section data-testid="upload-layout-control">
+            <div className="mb-1.5 font-medium">
+              Photo upload layout <span className="font-normal text-amber-700">⚠️ proposed (V14), compare the feel</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {UPLOAD_LAYOUTS.map((l) => (
+                <button
+                  key={l.key}
+                  type="button"
+                  data-testid={`layout-${l.key}`}
+                  title={l.note}
+                  onClick={() => setUploadLayout(l.key)}
+                  className={`rounded-full border px-3 py-1.5 ${uploadLayout === l.key ? "border-[#16CFA9] bg-[#E8FAF4] font-semibold" : "border-gray-300"}`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[12px] text-gray-500">
+              {UPLOAD_LAYOUTS.find((l) => l.key === uploadLayout)?.note} Applies to Safety Equipment (9 photos), Trade Dress and
+              Signage, the requirements whose photos have a guide image. Try it: pick a driver with Safety Equipment due → Renew.
+            </p>
           </section>
 
           <section>
@@ -299,7 +326,8 @@ export default function VeridaGaCompliancePage() {
             </div>
             <div>
               ⚠️ Proposed (V14): equipment, trade dress and signage photos show onboarding&apos;s guide image (the field&apos;s
-              example image). #353 shows an icon card for every photo, so this is an app change, to fold into #353 before it ships.
+              example image). #353 shows an icon card for every photo and goes through them one at a time in a fixed order, so any
+              layout but &quot;#353 as built&quot; is an app change, to fold into #353 before it ships.
             </div>
           </div>
 

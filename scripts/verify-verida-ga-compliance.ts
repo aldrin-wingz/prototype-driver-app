@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, providerFor } from "../lib/verida-ga-compliance/catalog";
+import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
   approvable,
   approve,
@@ -127,6 +127,8 @@ check("Upload fields from the onboarding steps", counts.join(" "), VERIDA_CATALO
 const guided = ["safety-equipment", "trade-dress", "safety-rules-signage"].flatMap((slug) => VERIDA_CATALOG.find((c) => c.slug === slug)?.uploadFields ?? []);
 const unguided = guided.filter((f) => !f.exampleImage || !existsSync(join(__dirname, "..", "public", f.exampleImage)));
 check("V14 guide image on every equipment / trade dress / signage photo", `${guided.length - unguided.length} of ${guided.length}${unguided.length ? ` — missing: ${unguided.map((f) => f.slug).join(", ")}` : ""}`, guided.length === 11 && unguided.length === 0);
+const layoutItems = VERIDA_CATALOG.filter((c) => hasGuides(c.uploadFields)).map((c) => c.slug);
+check("V14 page selector / checklist apply to exactly the guided items", layoutItems.join(", "), layoutItems.join() === "safety-equipment,trade-dress,safety-rules-signage");
 
 console.log(failed ? `\n${failed} failed` : "\nAll passed");
 process.exit(failed ? 1 : 0);

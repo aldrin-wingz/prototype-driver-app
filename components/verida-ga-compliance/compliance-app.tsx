@@ -26,6 +26,7 @@ import {
 
 import { Banner, INK, Icon, PAGE_BG, Sheet } from "./parts";
 import { CompliancePage, ProviderScreen, RenewScreen, RequestsPaused, UploadScreen } from "./screens";
+import type { UploadLayout } from "./upload-layouts";
 
 export type Tab = "home" | "requests" | "options";
 type Route =
@@ -45,14 +46,22 @@ export interface ComplianceAppProps {
   onSubmit: (slug: string, how: "upload" | "attest") => void;
   snoozed: boolean;
   onSnooze: () => void;
+  uploadLayout?: UploadLayout;
 }
 
 /** Synthetic trip offers, by pickup day from today. */
 const TRIP_DAYS = [1, 4, 9, 16, 24, 38];
 
-export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze }: ComplianceAppProps) {
+export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout }: ComplianceAppProps) {
   const [stack, setStack] = useState<Route[]>([{ name: "tabs" }]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // ⚠️ PROPOSED (checklist batches): photos sent so far per requirement; the requirement reaches review once all are in.
+  const [sentPhotos, setSentPhotos] = useState<Record<string, string[]>>({});
+  const partialCounts = Object.fromEntries(
+    Object.entries(sentPhotos)
+      .filter(([, s]) => s.length > 0)
+      .map(([slug, s]) => [slug, { sent: s.length, total: catalogItem(slug).uploadFields.length }]),
+  );
   const route = stack[stack.length - 1];
   const push = (r: Route) => setStack((s) => [...s, r]);
   const pop = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
@@ -73,7 +82,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
 
   let screen: React.ReactNode;
   if (route.name === "compliance") {
-    screen = <CompliancePage vm={vm} onBack={pop} onRenew={renewRow} />;
+    screen = <CompliancePage vm={vm} onBack={pop} onRenew={renewRow} partial={uploadLayout === "checklist" ? partialCounts : {}} />;
   } else if (route.name === "renew") {
     const c = catalogItem(route.slug);
     screen = (
@@ -103,8 +112,14 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         fields={c.uploadFields}
         changeNote={changes ? changeRequestBody(item) : null}
         untilLine={vm.untilLine}
+        layout={uploadLayout}
+        submitted={sentPhotos[route.slug] ?? []}
+        onPartialSubmit={(slugs) => setSentPhotos((p) => ({ ...p, [route.slug]: [...(p[route.slug] ?? []), ...slugs] }))}
         onBack={pop}
-        onSubmit={() => onSubmit(route.slug, "upload")}
+        onSubmit={() => {
+          setSentPhotos((p) => ({ ...p, [route.slug]: [] }));
+          onSubmit(route.slug, "upload");
+        }}
       />
     );
   } else {
