@@ -123,5 +123,10 @@ check("GA released, expired → paused", `inRelease ${gaExpired.inRelease}, paus
 const counts = VERIDA_CATALOG.filter((c) => c.renewal_methods.includes("upload")).map((c) => `${c.slug}:${c.uploadFields.length}`);
 check("Upload fields from the onboarding steps", counts.join(" "), VERIDA_CATALOG.filter((c) => c.renewal_methods.includes("upload")).every((c) => c.uploadFields.length > 0));
 
+// 11. V14 (proposed): every equipment, trade dress and signage photo shows onboarding's guide image, and the file is served.
+const guided = ["safety-equipment", "trade-dress", "safety-rules-signage"].flatMap((slug) => VERIDA_CATALOG.find((c) => c.slug === slug)?.uploadFields ?? []);
+const unguided = guided.filter((f) => !f.exampleImage || !existsSync(join(__dirname, "..", "public", f.exampleImage)));
+check("V14 guide image on every equipment / trade dress / signage photo", `${guided.length - unguided.length} of ${guided.length}${unguided.length ? ` — missing: ${unguided.map((f) => f.slug).join(", ")}` : ""}`, guided.length === 11 && unguided.length === 0);
+
 console.log(failed ? `\n${failed} failed` : "\nAll passed");
 process.exit(failed ? 1 : 0);

@@ -22,6 +22,8 @@ export type CatalogKind = "photo" | "provider" | "provider-or-photo" | "with-bac
 export interface UploadField {
   slug: string;
   label: string;
+  /** The onboarding field's `metadata.example_image` — the same guide image the onboarding step shows. */
+  exampleImage?: string;
 }
 
 export interface CatalogItem {
@@ -50,7 +52,10 @@ function stepPhotos(stepTitle: string, only?: string[]): UploadField[] {
     return step.field_definitions
       .filter((f) => (f.field_type === "photo" || f.field_type === "file") && f.visibility !== "internal")
       .filter((f) => !only || only.includes(f.slug))
-      .map((f) => ({ slug: f.slug, label: f.label }));
+      .map((f) => {
+        const example = (f.metadata as { example_image?: string } | null | undefined)?.example_image;
+        return example ? { slug: f.slug, label: f.label, exampleImage: example } : { slug: f.slug, label: f.label };
+      });
   }
   throw new Error(`Verida step not found: ${stepTitle}`);
 }

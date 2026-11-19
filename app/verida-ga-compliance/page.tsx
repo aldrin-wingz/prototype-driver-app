@@ -297,6 +297,10 @@ export default function VeridaGaCompliancePage() {
               ⚠️ The inspection&apos;s &quot;Upload it yourself&quot; asks for one &quot;Inspection report&quot; photo. The onboarding step has no driver photo
               of the report, so that field is the prototype&apos;s own.
             </div>
+            <div>
+              ⚠️ Proposed (V14): equipment, trade dress and signage photos show onboarding&apos;s guide image (the field&apos;s
+              example image). #353 shows an icon card for every photo, so this is an app change, to fold into #353 before it ships.
+            </div>
           </div>
 
           <p className="text-[12px] text-gray-500">

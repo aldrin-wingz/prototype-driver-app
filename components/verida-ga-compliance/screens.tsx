@@ -351,12 +351,28 @@ export function UploadScreen({
         )}
         {step === "capture" && field && (
           <>
-            <div className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#9FE3D3] bg-[#F1FCF8]" style={{ aspectRatio: "1.58" }}>
-              <Icon path={`M2.5 5h19v14h-19z${COMPLIANCE_ICON_PATHS.idCard}`} color={GREEN} size={40} strokeWidth={1.6} />
-              <div className="font-semibold" style={{ fontSize: 13.5, color: "#00966F" }}>
-                Photo of your {title}
+            {field.exampleImage ? (
+              // ⚠️ PROPOSED (Luis, V14 2026-11-19): not in #353. The build shows the icon card below for every photo; this
+              // shows the onboarding field's guide image (metadata.example_image) instead, as onboarding does.
+              <div
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#9FE3D3] bg-[#F1FCF8] p-3"
+                style={{ aspectRatio: "1.58" }}
+                data-testid="upload-example"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- template-supplied path */}
+                <img src={field.exampleImage} alt={`Example: ${field.label}`} className="min-h-0 w-full flex-1 rounded-lg object-contain" />
+                <div className="font-semibold" style={{ fontSize: 12.5, color: "#00966F" }}>
+                  Example: {field.label}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-[#9FE3D3] bg-[#F1FCF8]" style={{ aspectRatio: "1.58" }}>
+                <Icon path={`M2.5 5h19v14h-19z${COMPLIANCE_ICON_PATHS.idCard}`} color={GREEN} size={40} strokeWidth={1.6} />
+                <div className="font-semibold" style={{ fontSize: 13.5, color: "#00966F" }}>
+                  Photo of your {title}
+                </div>
+              </div>
+            )}
             <div className="mt-4 font-semibold" style={{ fontSize: 13, color: "#6B7280" }} data-testid="upload-progress">
               {fields.length > 1 ? `Photo ${index + 1} of ${fields.length} · ${field.label}` : field.label}
             </div>
