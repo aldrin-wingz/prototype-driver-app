@@ -55,8 +55,10 @@ export interface DriverState {
   inspectionRenewedTo?: string;
   /** ⚠️ PROPOSED (Luis, 2026-11-20): assumptions to verify — an EPassport for every drug screening renewal; the BGC fee on every renewal. */
   assume: Assumptions;
-  /** ⚠️ PROPOSED: the date Compliance put the EPassport for this round's drug screening on file. */
+  /** ⚠️ PROPOSED: the date Compliance put this round's new EPassport on file — only then does the app show it. */
   epassportGiven?: string;
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): the EPassport photo field's versions, oldest first (the last is current). */
+  epassports: { on: string; file: string }[];
 }
 
 export interface Assumptions {
@@ -145,7 +147,9 @@ export function scenarioState(
     records[MVR_SLUG] = { expires: records[BGC_SLUG].expires };
     records[FEE_SLUG] = { expires: records[BGC_SLUG].expires };
   }
-  return { today, market, released, records, assume };
+  // The EPassport on file from onboarding: the field's first version.
+  const epassports = [{ on: addDays(today, -300), file: "epassport-onboarding.svg" }];
+  return { today, market, released, records, assume, epassports };
 }
 
 /** ⚠️ PROPOSED: requirements listed in the app — never the MVR, and the fee only while it is assumed. */
@@ -207,7 +211,8 @@ const due = (s: DriverState, slug: string) => daysBetween(s.today, s.records[slu
  *   1. the Background Check Fee (when charged) before the consent form;
  *   2. the consent form before the drug screening;
  *   3. the drug screening date only once Compliance has put the EPassport on file (when one is needed).
- * Returns, per requirement still to renew, why it can't be started yet.
+ * Returns, per requirement still to renew, why it can't be started yet. (Luis, 2026-11-20: a new EPassport is requested
+ * when the new consent form is APPROVED, and the app shows it only once Compliance uploads it in the EPassport field.)
  */
 export function renewalLocks(s: DriverState): Record<string, string> {
   const locks: Record<string, string> = {};
@@ -225,14 +230,16 @@ export function renewalLocks(s: DriverState): Record<string, string> {
   return locks;
 }
 
-/** ⚠️ PROPOSED: Compliance can put the EPassport on file once the consent form is in (or the background check isn't due). */
+/** ⚠️ PROPOSED: the EPassport field is flagged for a new upload once the new consent form is approved. */
 export function epassportNeeded(s: DriverState): boolean {
   if (!s.assume.epassport || s.epassportGiven || !due(s, DRUG_SLUG) || submitted(s.records[DRUG_SLUG])) return false;
-  return !due(s, BGC_SLUG) || submitted(s.records[BGC_SLUG]) || s.records[BGC_SLUG].upload?.status === "approved";
+  // Flagged once the new consent form is approved (or the background check isn't part of this round).
+  return s.records[BGC_SLUG].upload?.status === "approved" || !due(s, BGC_SLUG);
 }
 
+/** Compliance uploads a new version in the Drug Screening's EPassport field; the previous one moves to its history. */
 export function giveEpassport(s: DriverState): DriverState {
-  return { ...s, epassportGiven: s.today };
+  return { ...s, epassportGiven: s.today, epassports: [...s.epassports, { on: s.today, file: `epassport-${s.today}.svg` }] };
 }
 
 // ---------------------------------------------------------------------------------------------- driver actions

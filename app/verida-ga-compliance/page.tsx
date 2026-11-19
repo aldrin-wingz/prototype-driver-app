@@ -198,7 +198,7 @@ export default function VeridaGaCompliancePage() {
             </div>
             <p className="mt-1 text-[12px] text-gray-500">
               The D.Lawson round goes in order: the fee (if charged) → the consent form (background check + MVR in review the moment it is
-              signed) → Compliance uploads the EPassport (if needed) → the driver books and gives the drug screening date (in review the
+              signed) → Compliance approves the consent, which flags the Drug Screening&apos;s EPassport field → Compliance uploads a new EPassport (if needed) → the driver books and gives the drug screening date (in review the
               moment it is given). Only trainings (HIPAA, GenTech) can be supplied by the driver.
             </p>
           </section>
@@ -260,25 +260,52 @@ export default function VeridaGaCompliancePage() {
             <div className="mb-1.5 font-medium">
               Documents for Review <span className="font-normal text-gray-500">(the Compliance agent)</span>
             </div>
-            {epassportNeeded(state) && (
-              // ⚠️ PROPOSED (Luis, 2026-11-20, assumed): Compliance puts this round's EPassport on file before the driver can book.
-              <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2" data-testid="epassport-needed">
-                <div className="text-[13px] font-semibold">
-                  Drug Screening <span className="font-normal text-gray-600">· EPassport needed before the driver can book</span>
+            {state.assume.epassport && (
+              // ⚠️ PROPOSED (Luis, 2026-11-20): the EPassport is a photo field on Drug Screening (internal), with versions. A new one
+              // is requested once the new consent form is approved; the app shows it only once a new version is uploaded.
+              <div
+                className={`mb-2 rounded-lg border p-2 ${epassportNeeded(state) ? "border-amber-300 bg-amber-50" : "border-gray-200"}`}
+                data-testid="epassport-field"
+              >
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="font-semibold">
+                    Drug Screening › EPassport <span className="font-normal text-gray-500">(photo field, internal)</span>
+                  </span>
+                  {epassportNeeded(state) && (
+                    <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900" data-testid="epassport-needed">
+                      New EPassport needed
+                    </span>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  data-testid="give-epassport"
-                  onClick={() => setState((s) => giveEpassport(s))}
-                  className="mt-1.5 rounded border border-amber-400 bg-white px-2 py-0.5 text-[12px] font-semibold"
-                >
-                  Upload EPassport
-                </button>
-              </div>
-            )}
-            {state.assume.epassport && !!state.epassportGiven && (
-              <div className="mb-2 text-[12px] text-gray-500" data-testid="epassport-on-file">
-                EPassport on file since {formatComplianceDate(state.epassportGiven)}: the driver can download it and book.
+                <div className="mt-1 text-[12px] text-gray-600">
+                  Current: {state.epassports[state.epassports.length - 1].file} ·{" "}
+                  {formatComplianceDate(state.epassports[state.epassports.length - 1].on)}
+                  {state.epassportGiven ? " — shown in the driver's app" : " — not shown in the app (previous round)"}
+                </div>
+                {state.epassports.length > 1 && (
+                  <div className="mt-0.5 text-[11.5px] text-gray-500" data-testid="epassport-history">
+                    Version history:{" "}
+                    {state.epassports
+                      .slice(0, -1)
+                      .reverse()
+                      .map((v) => `${v.file} (${formatComplianceDate(v.on)})`)
+                      .join(", ")}
+                  </div>
+                )}
+                {epassportNeeded(state) ? (
+                  <button
+                    type="button"
+                    data-testid="give-epassport"
+                    onClick={() => setState((s) => giveEpassport(s))}
+                    className="mt-1.5 rounded border border-amber-400 bg-white px-2 py-0.5 text-[12px] font-semibold"
+                  >
+                    Upload new EPassport
+                  </button>
+                ) : (
+                  !state.epassportGiven && (
+                    <div className="mt-1 text-[11.5px] text-gray-500">A new EPassport is requested once the new background check consent is approved.</div>
+                  )
+                )}
               </div>
             )}
             {groups.length === 0 && !epassportNeeded(state) && (

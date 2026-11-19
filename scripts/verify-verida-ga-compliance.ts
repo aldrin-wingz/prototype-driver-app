@@ -92,19 +92,25 @@ snap("fee sent");
 const afterFee = renewalLocks(o);
 o = submitRenewal(o, "background-check", "esign");
 snap("consent signed");
+const bgcSigned = o.records["background-check"].upload?.status === "in_review" && o.records.mvr.upload?.status === "in_review";
 const afterConsent = renewalLocks(o);
-const needed = epassportNeeded(o);
+const notYet = epassportNeeded(o); // signed, not approved: no request yet
+o = approve(o, "background-check", today);
+snap("consent approved");
+const needed = epassportNeeded(o) && !notYet && /EPassport/.test(renewalLocks(o)["drug-screening"] ?? "");
+const versionsBefore = o.epassports.length;
 o = giveEpassport(o);
+const newVersion = o.epassports.length === versionsBefore + 1;
 snap("EPassport given");
 const afterEpassport = renewalLocks(o);
-const bgcInReview = o.records["background-check"].upload?.status === "in_review" && o.records.mvr.upload?.status === "in_review";
+const bgcInReview = true; // checked below on the signed state
 const drugNotYet = !o.records["drug-screening"].upload;
 o = submitRenewal(o, "drug-screening", "date", addDays(today, 10));
 check(
-  "D.Lawson round in order: fee → consent → EPassport → drug date; BGC + MVR in review on consent, drug on its date",
+  "D.Lawson round in order: fee → consent (BGC + MVR in review) → consent approved flags the EPassport → new version uploaded → drug date (in review)",
   steps.join(" | "),
   !!lockedAtStart["background-check"] && !!lockedAtStart["drug-screening"] && !afterFee["background-check"] && /consent/.test(afterFee["drug-screening"] ?? "") &&
-    /EPassport/.test(afterConsent["drug-screening"] ?? "") && needed && Object.keys(afterEpassport).length === 0 && bgcInReview && drugNotYet &&
+    /EPassport/.test(afterConsent["drug-screening"] ?? "") && needed && newVersion && Object.keys(afterEpassport).length === 0 && bgcInReview && bgcSigned && drugNotYet &&
     o.records["drug-screening"].upload?.status === "in_review" && o.records["drug-screening"].upload?.givenDate === addDays(today, 10),
 );
 const noPassport: DriverState = submitRenewal(scenarioState("dlawson-drug", "Georgia", GA, today, { epassport: false, fee: false }), "background-check", "esign");
