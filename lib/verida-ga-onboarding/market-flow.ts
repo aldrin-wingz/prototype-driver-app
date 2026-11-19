@@ -17,8 +17,9 @@ import PAYLOADS from "./payloads.json";
 
 export type MarketKey = "verida-ga" | "non-ga";
 
-export type StepStatus = "locked" | "in_progress" | "completed";
-export type StageStatus = "locked" | "in_progress" | "completed";
+/** `pending_review` / `change_requested` only occur in the side-by-side, where an agent acts too. */
+export type StepStatus = "locked" | "in_progress" | "completed" | "pending_review" | "change_requested";
+export type StageStatus = StepStatus;
 
 export interface FieldDef {
   slug: string;

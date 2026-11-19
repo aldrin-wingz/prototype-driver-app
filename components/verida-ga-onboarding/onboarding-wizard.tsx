@@ -22,13 +22,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
-import { Check, CircleHelp, LayoutGrid, Lock, LogOut, X } from "lucide-react";
+import { AlertCircle, Check, CircleHelp, Clock, LayoutGrid, Lock, LogOut, X } from "lucide-react";
 
 import {
   type Cursor,
   type FieldDef,
   type MarketKey,
   type StageView,
+  type StepStatus,
+  type TemplateStage,
   MARKET_FIELD_SLUG,
   buildStageViews,
   countCompletedStages,
@@ -64,6 +66,18 @@ export interface WizardState {
   values: Values;
 }
 
+/**
+ * PROTOTYPE — side-by-side mode. The harness decides the stage list and every status; the wizard
+ * renders them and reports what the driver did. Absent = the standalone prototype, unchanged.
+ */
+export interface WizardSbs {
+  stages: TemplateStage[];
+  views: StageView[];
+  changeRequest: { fields: string[]; reason: string } | null;
+  onSubmit: (stepId: string, values: Values, marketState?: string | null) => void;
+  onOpen: (stepId: string) => void;
+}
+
 export function initialWizardState(): WizardState {
   return { marketState: null, draftMarket: null, heardFrom: null, cursor: initialCursor(stagesVisibleTo(null)), values: {} };
 }
@@ -71,9 +85,11 @@ export function initialWizardState(): WizardState {
 export function OnboardingWizard({
   state,
   onChange,
+  sbs,
 }: {
   state: WizardState;
   onChange: (next: WizardState) => void;
+  sbs?: WizardSbs;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -81,11 +97,27 @@ export function OnboardingWizard({
     bodyRef.current?.scrollTo({ top: 0 });
   }, [state.cursor.stageIndex, state.cursor.stepIndex]);
   const market: MarketKey | null = marketKeyFor(state.marketState);
-  const stages = useMemo(() => stagesVisibleTo(market), [market]);
-  const views = useMemo(() => buildStageViews(stages, state.cursor), [stages, state.cursor]);
+  const ownStages = useMemo(() => stagesVisibleTo(market), [market]);
+  const ownViews = useMemo(() => buildStageViews(ownStages, state.cursor), [ownStages, state.cursor]);
+  const stages = sbs ? sbs.stages : ownStages;
+  const views = sbs ? sbs.views : ownViews;
   const progress = overallProgress(views);
   const current = views[state.cursor.stageIndex];
   const currentStep = current?.steps[state.cursor.stepIndex]?.step;
+  const currentStatus: StepStatus | undefined = current?.steps[state.cursor.stepIndex]?.status;
+  const waiting = Boolean(sbs) && (currentStatus === "pending_review" || currentStatus === "completed");
+
+  const submitSbs = () => {
+    if (!sbs || !currentStep) return;
+    const gettingStarted = isGettingStarted(currentStep.field_definitions);
+    const values: Values = {};
+    for (const f of driverFields(currentStep)) if (state.values[f.slug] !== undefined) values[f.slug] = state.values[f.slug];
+    if (gettingStarted) {
+      values[MARKET_FIELD_SLUG] = state.draftMarket;
+      if (state.heardFrom) values.how_did_you_hear_about_wingz = state.heardFrom;
+    }
+    sbs.onSubmit(String(currentStep.id), values, gettingStarted ? state.draftMarket : undefined);
+  };
 
   const advance = (patch: Partial<WizardState> = {}) => {
     const merged = { ...state, ...patch };
@@ -133,7 +165,33 @@ export function OnboardingWizard({
 
       {/* Step body — back to the top on every step, as a new screen would be. */}
       <div ref={bodyRef} className="flex-1 overflow-y-auto bg-[#FAFAFA] p-4">
-        {currentStep ? (
+        {sbs && currentStatus === "change_requested" && sbs.changeRequest ? (
+          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-[13px] text-red-900" data-testid="sbs-change-request">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <AlertCircle className="h-4 w-4" /> Changes requested <ProposedTag />
+            </div>
+            <p className="mt-1">{sbs.changeRequest.reason}</p>
+            <p className="mt-1 text-red-800/80">To fix: {sbs.changeRequest.fields.map((slug) => fieldLabel(currentStep?.field_definitions ?? [], slug)).join(", ")}</p>
+          </div>
+        ) : null}
+        {currentStep && waiting ? (
+          <div className="rounded-xl border border-[#E8E8E8] bg-white p-5 text-center" data-testid="sbs-waiting">
+            {currentStatus === "pending_review" ? (
+              <Clock className="mx-auto h-10 w-10 text-amber-500" />
+            ) : (
+              <Check className="mx-auto h-10 w-10" style={{ color: GREEN }} />
+            )}
+            <div className="mt-3 text-[18px] font-semibold">{currentStep.title}</div>
+            <p className="mt-1 text-[14px]" style={{ color: GRAY_3 }}>
+              {currentStatus === "pending_review"
+                ? "Submitted. Our team is reviewing it — you'll be able to continue once it's approved."
+                : "Done. Nothing more is needed here."}
+            </p>
+            <div className="mt-3 flex justify-center">
+              <ProposedTag />
+            </div>
+          </div>
+        ) : currentStep ? (
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-4">
             <div className="text-[18px] font-semibold">{currentStep.title}</div>
             {currentStep.description ? (
@@ -176,7 +234,9 @@ export function OnboardingWizard({
               data-testid="continue"
               disabled={isGettingStarted(currentStep.field_definitions) && !state.draftMarket}
               onClick={() =>
-                advance(isGettingStarted(currentStep.field_definitions) ? { marketState: state.draftMarket } : {})
+                sbs
+                  ? submitSbs()
+                  : advance(isGettingStarted(currentStep.field_definitions) ? { marketState: state.draftMarket } : {})
               }
               className="mt-6 w-full rounded-lg py-3 text-[15px] font-semibold text-white disabled:opacity-40"
               style={{ backgroundColor: GREEN }}
@@ -194,10 +254,31 @@ export function OnboardingWizard({
           cursor={state.cursor}
           progress={progress}
           onClose={() => setPanelOpen(false)}
+          onPickStep={
+            sbs
+              ? (stepId) => {
+                  sbs.onOpen(stepId);
+                  setPanelOpen(false);
+                }
+              : undefined
+          }
         />
       ) : null}
     </div>
   );
+}
+
+/** Marks UI that exists only in this prototype (not in the production app yet). */
+function ProposedTag() {
+  return (
+    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+      Proposed
+    </span>
+  );
+}
+
+function fieldLabel(fields: FieldDef[], slug: string): string {
+  return fields.find((f) => f.slug === slug)?.label || slug;
 }
 
 function isGettingStarted(fields: FieldDef[]) {
@@ -269,11 +350,14 @@ function StagePanel({
   cursor,
   progress,
   onClose,
+  onPickStep,
 }: {
   views: StageView[];
   cursor: Cursor;
   progress: number;
   onClose: () => void;
+  /** Side-by-side only: open a step the driver can see. */
+  onPickStep?: (stepId: string) => void;
 }) {
   const { done, total } = countCompletedStages(views);
   return (
@@ -328,14 +412,22 @@ function StagePanel({
                 <div className="mb-3 ml-6 border-l border-[#E8E8E8] pl-6 pr-2.5">
                   {v.steps.map((s, ti) => {
                     const stepActive = active && ti === cursor.stepIndex;
+                    const pickable = Boolean(onPickStep) && s.status !== "locked";
                     return (
                       <div
                         key={String(s.step.id)}
-                        className="mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2"
+                        className={`mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2 ${pickable ? "cursor-pointer hover:bg-[#F3F4F6]" : ""}`}
                         style={{ backgroundColor: stepActive ? STEP_ACTIVE : undefined }}
+                        onClick={pickable ? () => onPickStep?.(String(s.step.id)) : undefined}
+                        data-testid="stage-step-row"
+                        data-status={s.status}
                       >
                         {s.status === "completed" ? (
                           <Check className="h-3 w-3" style={{ color: GREEN }} />
+                        ) : s.status === "pending_review" ? (
+                          <Clock className="h-3 w-3 text-amber-500" />
+                        ) : s.status === "change_requested" ? (
+                          <AlertCircle className="h-3 w-3 text-red-500" />
                         ) : (
                           <span
                             className="h-2 w-2 rounded-full border-2"
@@ -378,6 +470,17 @@ function StageIcon({ index, status, active }: { index: number; status: string; a
     return (
       <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: GREEN }}>
         <Check className="h-3.5 w-3.5 text-white" />
+      </span>
+    );
+  }
+  if (status === "pending_review" || status === "change_requested") {
+    const red = status === "change_requested";
+    return (
+      <span
+        className={`flex h-6 w-6 items-center justify-center rounded-full border ${red ? "border-red-400" : "border-amber-400"}`}
+        title={red ? "Changes requested" : "Pending review"}
+      >
+        {red ? <AlertCircle className="h-3.5 w-3.5 text-red-500" /> : <Clock className="h-3.5 w-3.5 text-amber-500" />}
       </span>
     );
   }

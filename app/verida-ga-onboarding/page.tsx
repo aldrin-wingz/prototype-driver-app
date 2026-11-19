@@ -6,7 +6,9 @@
  * Left: the in-app onboarding wizard at phone width. Right: prototype controls that are NOT part
  * of the app — they set the driver's market answer directly so the stage list can be compared.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { SbsDriverPane } from "@/components/side-by-side/sbs-driver-pane";
 
 import { OnboardingWizard, initialWizardState, type WizardState } from "@/components/verida-ga-onboarding/onboarding-wizard";
 import {
@@ -31,6 +33,16 @@ const PRESETS: { id: string; label: string; answer: string | null; marketState: 
 ];
 
 export default function VeridaGaOnboardingPage() {
+  // PROTOTYPE (side-by-side): `?embed=sbs` renders only the phone, driven by the harness page.
+  const [embed, setEmbed] = useState(false);
+  useEffect(() => {
+    setEmbed(new URLSearchParams(window.location.search).get("embed") === "sbs");
+  }, []);
+  if (embed) return <SbsDriverPane />;
+  return <StandaloneOnboarding />;
+}
+
+function StandaloneOnboarding() {
   const [state, setState] = useState<WizardState>(initialWizardState);
   const market = marketKeyFor(state.marketState);
   const stages = useMemo(() => stagesVisibleTo(market), [market]);
