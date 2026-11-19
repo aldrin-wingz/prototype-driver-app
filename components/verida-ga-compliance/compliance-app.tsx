@@ -115,6 +115,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         layout={uploadLayout}
         submitted={sentPhotos[route.slug] ?? []}
         instructions={instructionsFor(route.slug, state.market)}
+        onReplace={(slug) => setSentPhotos((p) => ({ ...p, [route.slug]: (p[route.slug] ?? []).filter((s) => s !== slug) }))}
         onPartialSubmit={(slugs) => setSentPhotos((p) => ({ ...p, [route.slug]: [...(p[route.slug] ?? []), ...slugs] }))}
         onBack={pop}
         onSubmit={() => {

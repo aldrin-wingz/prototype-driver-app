@@ -333,6 +333,7 @@ export function UploadScreen({
   submitted,
   onPartialSubmit,
   instructions,
+  onReplace,
   onBack,
   onSubmit,
 }: {
@@ -347,6 +348,7 @@ export function UploadScreen({
   onPartialSubmit?: (slugs: string[]) => void;
   /** ⚠️ PROPOSED (checklist): the onboarding step's instructions + download (Trade Dress, Signage). */
   instructions?: ComplianceProvider | null;
+  onReplace?: (slug: string) => void;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -374,7 +376,7 @@ export function UploadScreen({
         {layout === "pager" ? (
           <PagerUpload fields={fields} changeNote={changeNote} onSubmit={submit} />
         ) : (
-          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} instructions={instructions} />
+          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} instructions={instructions} onReplace={onReplace} />
         )}
       </>
     );

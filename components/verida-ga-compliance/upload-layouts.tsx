@@ -273,7 +273,8 @@ function StepInstructions({ instructions }: { instructions: ComplianceProvider }
 /**
  * Checklist: every photo on one screen, guide image beside the driver's photo; tap a slot to add, Retake to redo one.
  * ⚠️ PROPOSED (Luis, 2026-11-20): the Submit bar floats at the bottom, and photos can be sent in batches ("Submit 2
- * photos"). Sent photos are kept; the requirement goes to Compliance for review only once every photo is in.
+ * photos"). Sent photos are kept, and can be replaced until review; the requirement goes to Compliance for review only
+ * once every photo is in.
  */
 export function ChecklistUpload({
   fields,
@@ -282,7 +283,14 @@ export function ChecklistUpload({
   submitted = [],
   onPartialSubmit,
   instructions,
-}: LayoutProps & { submitted?: string[]; onPartialSubmit?: (slugs: string[]) => void; instructions?: ComplianceProvider | null }) {
+  onReplace,
+}: LayoutProps & {
+  submitted?: string[];
+  onPartialSubmit?: (slugs: string[]) => void;
+  instructions?: ComplianceProvider | null;
+  /** Luis 2026-11-20: a sent photo can be replaced until the requirement goes to review. */
+  onReplace?: (slug: string) => void;
+}) {
   const [taken, setTaken] = useState<Record<string, boolean>>({});
   const [justSent, setJustSent] = useState<number | null>(null);
   const sent = new Set(submitted);
@@ -371,10 +379,20 @@ export function ChecklistUpload({
                   <div>
                     <div className="mb-1 text-[10.5px] font-bold uppercase tracking-wide text-[#6B7280]">Your photo</div>
                     {isSent ? (
-                      <div className="rounded-lg border border-[#E5E7EA] p-1">
+                      <button
+                        type="button"
+                        data-testid={`checklist-replace-${f.slug}`}
+                        onClick={() => {
+                          // A replacement is a new photo, ready to send; the sent one is dropped.
+                          setJustSent(null);
+                          onReplace?.(f.slug);
+                          setTaken((t) => ({ ...t, [f.slug]: true }));
+                        }}
+                        className="block w-full rounded-lg border border-[#E5E7EA] p-1 text-left"
+                      >
                         <TakenPhoto size="small" />
-                        <div className="mt-1 text-center text-[12px] font-semibold text-[#6B7280]">Sent</div>
-                      </div>
+                        <div className="mt-1 text-center text-[12px] font-bold text-[#00966F]">Replace</div>
+                      </button>
                     ) : taken[f.slug] ? (
                       <button
                         type="button"
