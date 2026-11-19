@@ -71,40 +71,17 @@ export function DateRenewScreen({
     <>
       <ScreenHeader title={`Renew ${title}`} onBack={onBack} />
       <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid="renew-date-screen">
-        {!!epassport && (
-          <div className="flex flex-col gap-2.5 p-4" style={card} data-testid="epassport-card">
-            <div className="flex items-center justify-between">
-              <div className="font-bold" style={{ fontSize: 16, color: INK }}>
-                Your EPassport
-              </div>
-              <span className="rounded-md bg-[#E8FAF4] px-2 py-0.5 text-[11.5px] font-bold text-[#00966F]">Ready</span>
-            </div>
-            {!!epassport.info && (
-              <div className="whitespace-pre-line" style={{ fontSize: 13, lineHeight: "19px", color: "#4B5452" }}>
-                {epassport.info}
-              </div>
-            )}
-            <a
-              href={epassport.url}
-              download
-              target="_blank"
-              rel="noreferrer"
-              data-testid="epassport-download"
-              className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
-              style={{ background: GREEN, fontSize: 14.5 }}
-            >
-              <span className="rotate-180">
-                <Icon path={COMPLIANCE_ICON_PATHS.upload} color="#fff" size={16} strokeWidth={2.2} />
-              </span>
-              Download EPassport
-            </a>
-          </div>
-        )}
         <div className="flex flex-col gap-3 p-4" style={card}>
           <div className="font-bold" style={{ fontSize: 16, color: INK }}>
             Book it with the provider
           </div>
           <div style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>{description}</div>
+          {!!epassport && (
+            <div className="flex items-center gap-2 rounded-lg bg-[#F1FCF8] p-2.5" style={{ fontSize: 13, color: "#00755A" }} data-testid="epassport-ready-note">
+              <Icon path={COMPLIANCE_ICON_PATHS.check} color="#00966F" size={15} strokeWidth={2.6} />
+              Your EPassport is ready — it&apos;s on the booking page.
+            </div>
+          )}
           <PrimaryButton
             label="See how to book it"
             outline

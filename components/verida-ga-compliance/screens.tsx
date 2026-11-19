@@ -283,6 +283,7 @@ function ProviderBlock({ block }: { block: ComplianceProviderBlock }) {
           target="_blank"
           rel="noreferrer"
           data-testid="provider-link"
+          download={block.download || undefined}
           className="mt-1 flex h-12 items-center justify-center gap-2 rounded-xl font-bold text-white"
           style={{ background: GREEN, fontSize: 15 }}
         >
@@ -290,12 +291,59 @@ function ProviderBlock({ block }: { block: ComplianceProviderBlock }) {
           <Icon path={COMPLIANCE_ICON_PATHS.chevron} color="#fff" size={14} strokeWidth={2.4} />
         </a>
       )}
+      {block.kind === "link" && block.download && <div className="-mt-1 text-center text-[11px] text-[#6B7280]">Downloads the file</div>}
+    </div>
+  );
+}
+
+/** ⚠️ PROPOSED (Luis, 2026-11-20): the EPassport up front on the drug screening booking page — the image, then a download. */
+function EpassportCard({ url, info }: { url: string; info: string | null }) {
+  return (
+    <div className="flex flex-col gap-2.5 p-4" style={card} data-testid="epassport-card">
+      <div className="flex items-center justify-between">
+        <div className="font-bold" style={{ fontSize: 16, color: INK }}>
+          Your EPassport
+        </div>
+        <span className="rounded-md bg-[#E8FAF4] px-2 py-0.5 text-[11.5px] font-bold text-[#00966F]">Ready</span>
+      </div>
+      <a href={url} target="_blank" rel="noreferrer" title="Open full size" data-testid="epassport-image-link">
+        {/* eslint-disable-next-line @next/next/no-img-element -- prototype placeholder */}
+        <img src={url} alt="Your EPassport" className="w-full rounded-lg border border-[#E5E7EA]" data-testid="epassport-image" />
+      </a>
+      {!!info && (
+        <div className="whitespace-pre-line" style={{ fontSize: 13, lineHeight: "19px", color: "#4B5452" }}>
+          {info}
+        </div>
+      )}
+      <a
+        href={url}
+        download
+        data-testid="epassport-download"
+        className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
+        style={{ background: GREEN, fontSize: 14.5 }}
+      >
+        Download EPassport
+      </a>
     </div>
   );
 }
 
 /** Continue: the instructions and link of the Verida Fully Credentialled onboarding step for the driver's market. */
-export function ProviderScreen({ title, provider, onBack }: { title: string; provider: ComplianceProvider | null; onBack: () => void }) {
+export function ProviderScreen({
+  title,
+  provider,
+  onBack,
+  next = "tick",
+  epassport,
+}: {
+  title: string;
+  provider: ComplianceProvider | null;
+  onBack: () => void;
+  /** ⚠️ PROPOSED: what the driver does back on the renewal screen — the build only has the tick. */
+  next?: "tick" | "date" | "photo" | "receipt";
+  /** ⚠️ PROPOSED (drug screening): the EPassport Compliance put on file, shown first with its image and a download. */
+  epassport?: { url: string; info: string | null } | null;
+}) {
   return (
     <>
       <ScreenHeader title={provider?.title || title} onBack={onBack} />
@@ -310,6 +358,7 @@ export function ProviderScreen({ title, provider, onBack }: { title: string; pro
             </div>
           </div>
         )}
+        {!!epassport && <EpassportCard url={epassport.url} info={epassport.info} />}
         {!!provider && (
           <>
             {!!provider.description && <div className="px-1" style={{ fontSize: 14, lineHeight: "21px", color: "#4B5452" }}>{provider.description}</div>}
@@ -317,7 +366,13 @@ export function ProviderScreen({ title, provider, onBack }: { title: string; pro
               <ProviderBlock key={i} block={b} />
             ))}
             <div className="px-1 font-semibold" style={{ fontSize: 13, lineHeight: "19px", color: "#6B7280" }}>
-              Finished with the provider? Go back and tick &quot;I&apos;ve completed my {title}&quot; to let Compliance know.
+              {next === "receipt"
+                ? "Paid? Go back and upload your receipt."
+                : next === "date"
+                ? `Booked? Go back and enter the date to let Compliance know.`
+                : next === "photo"
+                  ? `Ready? Go back and add your photo.`
+                  : <>Finished with the provider? Go back and tick &quot;I&apos;ve completed my {title}&quot; to let Compliance know.</>}
             </div>
           </>
         )}
@@ -352,6 +407,7 @@ export function UploadScreen({
   submitted,
   onPartialSubmit,
   instructions,
+  onInstructions,
   onReplace,
   onBack,
   onSubmit,
@@ -367,6 +423,8 @@ export function UploadScreen({
   onPartialSubmit?: (slugs: string[]) => void;
   /** ⚠️ PROPOSED (checklist): the onboarding step's instructions + download (Trade Dress, Signage). */
   instructions?: ComplianceProvider | null;
+  /** ⚠️ PROPOSED: open the onboarding step's instructions page (like a training's provider page). */
+  onInstructions?: () => void;
   onReplace?: (slug: string) => void;
   onBack: () => void;
   onSubmit: () => void;
@@ -395,7 +453,7 @@ export function UploadScreen({
         {layout === "pager" ? (
           <PagerUpload fields={fields} changeNote={changeNote} onSubmit={submit} />
         ) : (
-          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} instructions={instructions} onReplace={onReplace} />
+          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} instructions={instructions} onInstructions={onInstructions} onReplace={onReplace} />
         )}
       </>
     );

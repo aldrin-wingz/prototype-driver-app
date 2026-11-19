@@ -49,7 +49,8 @@ type Route =
   | { name: "provider"; slug: string }
   | { name: "upload"; slug: string }
   | { name: "renew-date"; slug: string } // ⚠️ PROPOSED
-  | { name: "esign"; slug: string }; // ⚠️ PROPOSED
+  | { name: "esign"; slug: string } // ⚠️ PROPOSED
+  | { name: "instructions"; slug: string }; // ⚠️ PROPOSED: an upload's onboarding instructions, on their own page
 
 export interface ComplianceAppProps {
   state: DriverState;
@@ -138,7 +139,19 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
     );
   } else if (route.name === "provider") {
     const c = catalogItem(route.slug);
-    screen = <ProviderScreen title={c.title} provider={providerFor(route.slug, state.market, providerOpts)} onBack={pop} />;
+    const kind = proposedKindFor({ item_slug: c.slug, renewal_methods: c.renewal_methods, upload: itemFor(route.slug)?.upload ?? null });
+    screen = (
+      <ProviderScreen
+        title={c.title}
+        provider={providerFor(route.slug, state.market, providerOpts)}
+        onBack={pop}
+        next={kind === "date" ? "date" : "tick"}
+        epassport={route.slug === DRUG_SLUG && state.assume.epassport && state.epassportGiven ? { url: EPASSPORT_SAMPLE_URL, info: epassportInfo() } : null}
+      />
+    );
+  } else if (route.name === "instructions") {
+    const c = catalogItem(route.slug);
+    screen = <ProviderScreen title={c.title} provider={instructionsFor(route.slug, state.market)} onBack={pop} next={route.slug === "background-check-fee" ? "receipt" : "photo"} />;
   } else if (route.name === "renew-date") {
     const c = catalogItem(route.slug);
     screen = (
@@ -188,6 +201,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         layout={uploadLayout}
         submitted={sentPhotos[route.slug] ?? []}
         instructions={instructionsFor(route.slug, state.market)}
+        onInstructions={() => push({ name: "instructions", slug: route.slug })}
         onReplace={(slug) => setSentPhotos((p) => ({ ...p, [route.slug]: (p[route.slug] ?? []).filter((s) => s !== slug) }))}
         onPartialSubmit={(slugs) => setSentPhotos((p) => ({ ...p, [route.slug]: [...(p[route.slug] ?? []), ...slugs] }))}
         onBack={pop}

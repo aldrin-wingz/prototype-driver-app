@@ -198,77 +198,29 @@ export function PagerUpload({ fields, changeNote, onSubmit }: LayoutProps) {
 }
 
 /**
- * ⚠️ PROPOSED (Luis, 2026-11-20): the onboarding step's instructions on the upload screen (Trade Dress, Signage). The
- * download button stays visible; the print / placement lists fold away, since the driver has done this once before.
+ * ⚠️ PROPOSED (Luis, 2026-11-20): Trade Dress, Signage and the Background Check Fee open the onboarding step's
+ * instructions — downloads and pay link included — on their own page, as a training opens its provider page.
  */
-function StepInstructions({ instructions }: { instructions: ComplianceProvider }) {
-  const [open, setOpen] = useState(false);
-  const links = instructions.blocks.filter((b) => b.kind === "link" && b.url);
-  const rest = instructions.blocks.filter((b) => b.kind !== "link");
+function StepInstructions({ instructions, onOpen }: { instructions: ComplianceProvider; onOpen?: () => void }) {
   return (
-    <div className="mb-3 flex flex-col gap-2.5 p-3.5" style={card} data-testid="upload-instructions">
+    <div className="mb-3 flex flex-col gap-3 p-4" style={card} data-testid="upload-instructions">
+      <div className="font-bold" style={{ fontSize: 16, color: INK }}>
+        {instructions.blocks.some((b) => b.kind === "link" && !b.download) ? "Complete it first" : "Get it ready first"}
+      </div>
       {!!instructions.description && (
         <div style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>{instructions.description}</div>
       )}
-      {links.map((b) => (
-        <div key={b.url}>
-          <a
-            href={b.url!}
-            target="_blank"
-            rel="noreferrer"
-            download={b.download || undefined}
-            data-testid="upload-download"
-            className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
-            style={{ background: GREEN, fontSize: 14.5 }}
-          >
-            {b.download ? (
-              <span className="rotate-180">
-                <Icon path={COMPLIANCE_ICON_PATHS.upload} color="#fff" size={16} strokeWidth={2.2} />
-              </span>
-            ) : null}
-            {b.button_label}
-            {!b.download && <Icon path={COMPLIANCE_ICON_PATHS.chevron} color="#fff" size={13} strokeWidth={2.4} />}
-          </a>
-          {b.download && <div className="mt-1 text-center text-[11px] text-[#6B7280]">Downloads the file</div>}
-        </div>
-      ))}
-      {rest.length > 0 && (
-        <>
-          <button
-            type="button"
-            data-testid="upload-instructions-toggle"
-            onClick={() => setOpen((o) => !o)}
-            className="flex items-center justify-between pt-0.5 text-left font-bold"
-            style={{ fontSize: 14, color: "#00966F" }}
-          >
-            {open ? "Hide instructions" : links.some((l) => l.download) ? "How to print and display it" : "Instructions"}
-            <span className={open ? "-rotate-90" : "rotate-90"}>
-              <Icon path={COMPLIANCE_ICON_PATHS.chevron} color="#00966F" size={13} strokeWidth={2.4} />
-            </span>
-          </button>
-          {open &&
-            rest.map((b, i) => (
-              <div key={i} data-testid="upload-instructions-block">
-                {!!b.label && (
-                  <div className="mb-1 font-bold" style={{ fontSize: 13.5, color: INK }}>
-                    {b.label}
-                  </div>
-                )}
-                {b.kind === "list" ? (
-                  <ul className="list-disc space-y-0.5 pl-5" style={{ fontSize: 13, lineHeight: "19px", color: "#4B5452" }}>
-                    {(b.text ?? "").split("\n").filter((l) => l.trim()).map((l) => (
-                      <li key={l}>{l.replace(/^\d+\.\s*/, "")}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="whitespace-pre-line" style={{ fontSize: 13, lineHeight: "19px", color: "#4B5452" }}>
-                    {b.text}
-                  </div>
-                )}
-              </div>
-            ))}
-        </>
-      )}
+      <PrimaryButton
+        label="See instructions"
+        outline
+        onClick={() => onOpen?.()}
+        testId="upload-instructions-open"
+        icon={
+          <span className="order-last">
+            <Icon path={COMPLIANCE_ICON_PATHS.chevron} color="#00966F" size={14} strokeWidth={2.4} />
+          </span>
+        }
+      />
     </div>
   );
 }
@@ -286,11 +238,13 @@ export function ChecklistUpload({
   submitted = [],
   onPartialSubmit,
   instructions,
+  onInstructions,
   onReplace,
 }: LayoutProps & {
   submitted?: string[];
   onPartialSubmit?: (slugs: string[]) => void;
   instructions?: ComplianceProvider | null;
+  onInstructions?: () => void;
   /** Luis 2026-11-20: a sent photo can be replaced until the requirement goes to review. */
   onReplace?: (slug: string) => void;
 }) {
@@ -320,7 +274,7 @@ export function ChecklistUpload({
     <div className="flex min-h-0 flex-1 flex-col" style={{ background: PAGE_BG }} data-testid="upload-checklist">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4" data-testid="checklist-scroll">
         {!!changeNote && <div className="mb-3"><ChangeNote note={changeNote} /></div>}
-        {!!instructions && <StepInstructions instructions={instructions} />}
+        {!!instructions && <StepInstructions instructions={instructions} onOpen={onInstructions} />}
         <div className="mb-1 font-bold" style={{ fontSize: 17, color: INK }}>
           {total > 1 ? "Add a photo of each item" : fields[0]?.exampleImage ? "Add your photo" : fields[0]?.label}
         </div>

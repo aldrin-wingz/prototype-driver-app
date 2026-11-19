@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" rx="24" fill="#ffffff" stroke="#131A1B" stroke-width="4"/>
+  <rect x="0" y="0" width="800" height="96" rx="24" fill="#16CFA9"/>
+  <rect x="0" y="60" width="800" height="36" fill="#16CFA9"/>
+  <text x="40" y="62" font-family="Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#ffffff">EPassport</text>
+  <text x="760" y="62" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">SAMPLE · PROTOTYPE</text>
+  <text x="40" y="150" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#6B7280">Donor</text>
+  <text x="40" y="184" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#131A1B">Synthetic Driver</text>
+  <text x="40" y="236" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#6B7280">Test</text>
+  <text x="40" y="270" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#131A1B">Drug screening — renewal</text>
+  <text x="40" y="322" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#6B7280">Bring this to the collection site</text>
+  <text x="40" y="356" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#131A1B">Valid until the date shown by the provider</text>
+  <rect x="560" y="140" width="200" height="200" fill="#131A1B"/>
+  <rect x="580" y="160" width="60" height="60" fill="#fff"/><rect x="680" y="160" width="60" height="60" fill="#fff"/><rect x="580" y="260" width="60" height="60" fill="#fff"/>
+  <rect x="660" y="240" width="20" height="20" fill="#fff"/><rect x="700" y="280" width="40" height="20" fill="#fff"/>
+  <text x="40" y="450" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#9AA5A0">Placeholder only — the real EPassport comes from Compliance. Not a valid voucher.</text>
+</svg>

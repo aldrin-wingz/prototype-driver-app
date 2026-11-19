@@ -373,4 +373,4 @@ export function epassportInfo(): string | null {
 }
 
 /** Prototype placeholder for the EPassport file Compliance puts on file (synthetic). */
-export const EPASSPORT_SAMPLE_URL = "/dev/epassport-sample.pdf";
+export const EPASSPORT_SAMPLE_URL = "/dev/epassport-sample.svg";
