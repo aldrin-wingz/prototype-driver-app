@@ -332,6 +332,7 @@ export function UploadScreen({
   layout = "guide",
   submitted,
   onPartialSubmit,
+  instructions,
   onBack,
   onSubmit,
 }: {
@@ -344,6 +345,8 @@ export function UploadScreen({
   /** ⚠️ PROPOSED (checklist only): photos already sent in an earlier batch, and the batch send. */
   submitted?: string[];
   onPartialSubmit?: (slugs: string[]) => void;
+  /** ⚠️ PROPOSED (checklist): the onboarding step's instructions + download (Trade Dress, Signage). */
+  instructions?: ComplianceProvider | null;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -371,7 +374,7 @@ export function UploadScreen({
         {layout === "pager" ? (
           <PagerUpload fields={fields} changeNote={changeNote} onSubmit={submit} />
         ) : (
-          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} />
+          <ChecklistUpload fields={fields} changeNote={changeNote} onSubmit={submit} submitted={submitted} onPartialSubmit={onPartialSubmit} instructions={instructions} />
         )}
       </>
     );

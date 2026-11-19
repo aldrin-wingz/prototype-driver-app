@@ -105,6 +105,8 @@ export interface ComplianceProviderBlock {
   text: string | null;
   button_label: string | null;
   url: string | null;
+  /** ⚠️ PROPOSED: a file to download (the onboarding button's `metadata.download`), e.g. the trade dress or signage. */
+  download?: boolean;
 }
 
 export interface ComplianceUploadSubmission {

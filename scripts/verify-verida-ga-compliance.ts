@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, providerFor } from "../lib/verida-ga-compliance/catalog";
+import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
   approvable,
   approve,
@@ -129,6 +129,13 @@ const unguided = guided.filter((f) => !f.exampleImage || !existsSync(join(__dirn
 check("V14 guide image on every equipment / trade dress / signage photo", `${guided.length - unguided.length} of ${guided.length}${unguided.length ? ` — missing: ${unguided.map((f) => f.slug).join(", ")}` : ""}`, guided.length === 11 && unguided.length === 0);
 const layoutItems = VERIDA_CATALOG.filter((c) => hasGuides(c.uploadFields)).map((c) => c.slug);
 check("V14 page selector / checklist apply to exactly the guided items", layoutItems.join(", "), layoutItems.join() === "safety-equipment,trade-dress,safety-rules-signage");
+const withSteps = VERIDA_CATALOG.map((c) => ({ slug: c.slug, ins: instructionsFor(c.slug, "Georgia") })).filter((x) => x.ins);
+const downloads = withSteps.map((x) => x.ins!.blocks.filter((b) => b.kind === "link" && b.download && b.url && existsSync(join("public", b.url))).length);
+check(
+  "Trade Dress + Signage show onboarding's instructions with a working download",
+  withSteps.map((x, n) => `${x.slug}: ${x.ins!.blocks.length} blocks, ${downloads[n]} download`).join("; "),
+  withSteps.map((x) => x.slug).join() === "trade-dress,safety-rules-signage" && downloads.every((d) => d === 1) && withSteps.every((x) => x.ins!.blocks.length >= 4),
+);
 
 console.log(failed ? `\n${failed} failed` : "\nAll passed");
 process.exit(failed ? 1 : 0);

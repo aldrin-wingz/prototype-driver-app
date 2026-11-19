@@ -24,6 +24,8 @@ export interface UploadField {
   label: string;
   /** The onboarding field's `metadata.example_image` — the same guide image the onboarding step shows. */
   exampleImage?: string;
+  /** ⚠️ PROPOSED (checklist): first line of the onboarding field's own text ("2 required — for back seats"). */
+  hint?: string;
 }
 
 export interface CatalogItem {
@@ -36,6 +38,8 @@ export interface CatalogItem {
   renewal_methods: ComplianceRenewalMethod[];
   /** Field on the Verida Fully Credentialled onboarding step whose step supplies the provider page. */
   providerAnchor?: string;
+  /** ⚠️ PROPOSED (Luis, 2026-11-20): onboarding step whose instructions and download button the upload screen shows. */
+  instructionsStep?: string;
   /** One line above Continue on the renew screen (`external_link.description`). */
   providerDescription?: string;
   /** Photos the driver uploads, in order (one per screen in the app). */
@@ -54,7 +58,13 @@ function stepPhotos(stepTitle: string, only?: string[]): UploadField[] {
       .filter((f) => !only || only.includes(f.slug))
       .map((f) => {
         const example = (f.metadata as { example_image?: string } | null | undefined)?.example_image;
-        return example ? { slug: f.slug, label: f.label, exampleImage: example } : { slug: f.slug, label: f.label };
+        const hint = (f.content ?? "").split(/\n|\\n/)[0]?.trim();
+        return {
+          slug: f.slug,
+          label: f.label,
+          ...(example ? { exampleImage: example } : {}),
+          ...(hint ? { hint } : {}),
+        };
       });
   }
   throw new Error(`Verida step not found: ${stepTitle}`);
@@ -180,6 +190,7 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     kind: "with-inspection",
     renewal_methods: ["upload"],
     uploadFields: stepPhotos("Wingz Trade Dress"),
+    instructionsStep: "Wingz Trade Dress",
     termMonths: 6,
   },
   {
@@ -189,6 +200,7 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     kind: "with-inspection",
     renewal_methods: ["upload"],
     uploadFields: stepPhotos("Safety Rules Signage"),
+    instructionsStep: "Safety Rules Signage",
     termMonths: 6,
   },
 ];
@@ -228,7 +240,9 @@ function blockFor(field: FieldDef, marketId: number | null): ComplianceProviderB
     case "button":
     case "video": {
       const url = resolveFieldLink(field, marketId);
-      return url ? { kind: "link", label: null, text: null, button_label: field.label || field.content || "Open", url } : null;
+      if (!url) return null;
+      const download = Boolean((field.metadata as { download?: boolean } | null | undefined)?.download);
+      return { kind: "link", label: null, text: null, button_label: field.label || field.content || "Open", url, ...(download ? { download } : {}) };
     }
     default:
       return null;
@@ -267,4 +281,24 @@ export function providerFor(slug: string, marketState: string, opts: ProviderOpt
 /** ⚠️ PROPOSED (V14): the page-selector and checklist upload layouts apply only where every photo has a guide image. */
 export function hasGuides(fields: UploadField[]) {
   return fields.length > 0 && fields.every((f) => !!f.exampleImage);
+}
+
+/**
+ * ⚠️ PROPOSED (Luis, 2026-11-20): the onboarding step's instructions and download button, shown on the upload screen of
+ * Trade Dress and Signage — the same Verida Fully Credentialled step the driver saw in onboarding, for their market.
+ */
+export function instructionsFor(slug: string, marketState: string): ComplianceProvider | null {
+  const stepTitle = catalogItem(slug).instructionsStep;
+  if (!stepTitle) return null;
+  const marketId = marketIdFor(marketState);
+  for (const stage of templateFor("verida-ga")) {
+    const step = stage.steps.find((s) => s.title === stepTitle);
+    if (!step) continue;
+    const blocks = step.field_definitions
+      .filter((f) => f.visibility !== "internal")
+      .map((f) => blockFor(f, marketId))
+      .filter((b): b is ComplianceProviderBlock => !!b);
+    return { title: step.title, description: step.description ?? null, blocks };
+  }
+  throw new Error(`Verida step not found: ${stepTitle}`);
 }

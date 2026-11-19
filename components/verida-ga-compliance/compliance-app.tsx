@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { ClipboardCheck, ClipboardList, Calendar, Home, Menu } from "lucide-react";
 
-import { catalogItem, providerFor, type ProviderOptions } from "@/lib/verida-ga-compliance/catalog";
+import { catalogItem, instructionsFor, providerFor, type ProviderOptions } from "@/lib/verida-ga-compliance/catalog";
 import { addDays, type DriverState } from "@/lib/verida-ga-compliance/scenario";
 import type { ComplianceExpiryResponse } from "@/lib/verida-ga-compliance/types";
 import {
@@ -114,6 +114,7 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         untilLine={vm.untilLine}
         layout={uploadLayout}
         submitted={sentPhotos[route.slug] ?? []}
+        instructions={instructionsFor(route.slug, state.market)}
         onPartialSubmit={(slugs) => setSentPhotos((p) => ({ ...p, [route.slug]: [...(p[route.slug] ?? []), ...slugs] }))}
         onBack={pop}
         onSubmit={() => {
