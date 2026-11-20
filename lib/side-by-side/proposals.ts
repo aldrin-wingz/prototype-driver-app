@@ -470,6 +470,7 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
         label: "I have downloaded my EPassport and will bring it to my drug screening.",
         field_type: "acknowledgment",
         required: true,
+        validation_rules: { required: true, requiredMessage: "Confirm you have downloaded your EPassport to continue." },
         visibility: "external",
         visibility_rule: HAS_VOUCHER,
         metadata: PROPOSED(note),
