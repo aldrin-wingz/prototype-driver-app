@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RichField } from "./rich-field";
 import { isBlankValue } from "@/lib/side-by-side/proposals";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
-import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
 import {
   type Cursor,
@@ -158,6 +158,58 @@ export function OnboardingWizard({
     return null;
   })();
 
+  /*
+   * real: onboardingStepPresentation.ts shouldHideSubmitButton / AwaitingReviewBanner (v6.0.538-production-ios):
+   * a manual stage whose driver work is all in is "awaiting agent review" — banner on top, Continue hidden on
+   * the checklist and on every step of the stage, only Back left in the footer.
+   */
+  const awaitingAgent = Boolean(sbs) && manualStage && current?.status === "pending_review";
+
+  /** real: OnboardingWizardScreen.tsx canFooterBack + goBack — previous step, or the previous stage (its checklist). */
+  const backTarget = (() => {
+    if (!sbs || !current) return null;
+    if (hubLayout && !showHub) return null; // a checklist item uses "Back to checklist" instead
+    const open = (x: { step: { title: string }; status: StepStatus }) => x.status !== "locked" && !SIGN_UP_TITLES.has(x.step.title);
+    if (!showHub) {
+      for (let ti = state.cursor.stepIndex - 1; ti >= 0; ti--) {
+        const x = current.steps[ti];
+        if (x && open(x)) return { id: String(x.step.id), hub: false };
+      }
+    }
+    for (let si = state.cursor.stageIndex - 1; si >= 0; si--) {
+      const v = views[si];
+      const reachable = v.steps.filter(open);
+      if (!reachable.length) continue;
+      const target = isChecklistHub(v.stage) ? reachable[0] : reachable[reachable.length - 1];
+      return { id: String(target.step.id), hub: isChecklistHub(v.stage) };
+    }
+    return null;
+  })();
+
+  /** real: onboardingNavigation.ts shouldShowChecklistHubContinueButton — a change request first, else the next stage once settled. */
+  const hubContinueTarget = (() => {
+    if (!sbs || !showHub || !current) return null;
+    const cr = current.steps.find((x) => x.status === "change_requested");
+    if (cr) return { id: String(cr.step.id), item: true };
+    if (manualStage && current.status !== "completed") return null;
+    const settled = current.steps.every((x) => x.status === "completed" || x.status === "pending_review");
+    if (current.status !== "completed" && !settled) return null;
+    for (const v of views.slice(state.cursor.stageIndex + 1)) {
+      const first = v.steps.find((x) => x.status !== "locked");
+      if (first) return { id: String(first.step.id), item: false };
+      if (v.status === "locked") return null;
+    }
+    return null;
+  })();
+
+  /** real: onboardingStepPresentation.ts resolveOnboardingContinueLabel. */
+  const submitLabel = (isLast: boolean) =>
+    currentStatus === "change_requested"
+      ? RESUBMIT_CHANGES_LABEL
+      : hubLayout
+        ? SAVE_AND_RETURN_LABEL
+        : continueLabel(isLast);
+
   const submitSbs = () => {
     if (!sbs || !currentStep) return;
     /*
@@ -270,7 +322,7 @@ export function OnboardingWizard({
             <LayoutGrid className="h-4 w-4" /> Stages
           </button>
           <div className="min-w-0 flex-1 truncate text-[13px] font-medium" data-testid="breadcrumb">
-            {current?.stage.title} · {currentStep?.title}
+            {current?.stage.title} · {showHub ? "Checklist" : currentStep?.title}
           </div>
           <div className="text-[14px] font-semibold" style={{ color: GREEN }} data-testid="percent">
             {Math.round(progress * 100)}%
@@ -293,9 +345,24 @@ export function OnboardingWizard({
           </div>
         ) : null}
         {showHub && current ? (
-          <ParallelHub view={current} onOpenStep={(id) => openStep(id, true)} />
+          <div className="rounded-xl border border-[#D9D9D9] bg-white px-5 pb-4 pt-5" data-testid="hub-card">
+            {awaitingAgent ? (
+              <AmberBanner
+                icon="clock"
+                title={isFinalReview(current.stage.title) ? FINAL_REVIEW_SUBMITTED_TITLE : AWAITING_REVIEW_TITLE}
+                body={isFinalReview(current.stage.title) ? FINAL_REVIEW_SUBMITTED_BODY : AWAITING_REVIEW_BODY}
+              />
+            ) : null}
+            <ParallelHub view={current} onOpenStep={(id) => openStep(id, true)} />
+            <StepFooter
+              onBack={backTarget ? () => openStep(backTarget.id, false) : undefined}
+              continueLabel="Continue"
+              onContinue={hubContinueTarget ? () => openStep(hubContinueTarget.id, hubContinueTarget.item) : undefined}
+              testId="continue-advance-only"
+            />
+          </div>
         ) : currentStep ? (
-          <div className="rounded-xl border border-[#E8E8E8] bg-white p-4">
+          <div className="rounded-xl border border-[#D9D9D9] bg-white px-5 pb-4 pt-5">
             {/* real: OnboardingWizardScreen.tsx — AwaitingReviewBanner sits above the step title. */}
             {hubLayout ? (
               <button
@@ -309,7 +376,7 @@ export function OnboardingWizard({
               </button>
             ) : null}
             {/* real: AwaitingReviewBanner.tsx — manual (agent) stages only. */}
-            {sbs && currentStatus === "pending_review" && manualStage ? (
+            {awaitingAgent ? (
               <AmberBanner
                 icon="clock"
                 title={isFinalReview(current?.stage.title) ? FINAL_REVIEW_SUBMITTED_TITLE : AWAITING_REVIEW_TITLE}
@@ -359,34 +426,31 @@ export function OnboardingWizard({
                 ),
               )}
             </div>
-            {waiting ? (
-              advanceOnlyTarget ? (
-                <button
-                  type="button"
-                  data-testid="continue-advance-only"
-                  onClick={() => openStep(advanceOnlyTarget.id, isChecklistHub(advanceOnlyTarget.stage) && advanceOnlyTarget.stage === current?.stage)}
-                  className="mt-6 w-full rounded-lg py-3 text-[15px] font-semibold text-white"
-                  style={{ backgroundColor: GREEN }}
-                >
-                  Continue
-                </button>
-              ) : null
+            {sbs ? (
+              <StepFooter
+                onBack={backTarget ? () => openStep(backTarget.id, false) : undefined}
+                continueLabel={waiting ? (hubLayout ? SAVE_AND_RETURN_LABEL : "Continue") : submitLabel(market !== null && nextCursor(stages, state.cursor) === null)}
+                onContinue={
+                  awaitingAgent
+                    ? undefined
+                    : waiting
+                      ? hubLayout
+                        ? () => setOpenItem(null)
+                        : advanceOnlyTarget
+                          ? () => openStep(advanceOnlyTarget.id, isChecklistHub(advanceOnlyTarget.stage) && advanceOnlyTarget.stage === current?.stage)
+                          : undefined
+                      : submitSbs
+                }
+                continueDisabled={!waiting && isGettingStarted(currentStep.field_definitions) && !state.draftMarket}
+                testId={waiting ? "continue-advance-only" : "continue"}
+              />
             ) : (
-            <button
-              type="button"
-              data-testid="continue"
-              disabled={isGettingStarted(currentStep.field_definitions) && !state.draftMarket}
-              onClick={() =>
-                sbs
-                  ? submitSbs()
-                  : advance(isGettingStarted(currentStep.field_definitions) ? { marketState: state.draftMarket } : {})
-              }
-              className="mt-6 w-full rounded-lg py-3 text-[15px] font-semibold text-white disabled:opacity-40"
-              style={{ backgroundColor: GREEN }}
-            >
-              {/* Only the end of a market's flow submits; before a market the list just stops at the app download. */}
-              {continueLabel(market !== null && nextCursor(stages, state.cursor) === null)}
-            </button>
+              <StepFooter
+                continueLabel={continueLabel(market !== null && nextCursor(stages, state.cursor) === null)}
+                onContinue={() => advance(isGettingStarted(currentStep.field_definitions) ? { marketState: state.draftMarket } : {})}
+                continueDisabled={isGettingStarted(currentStep.field_definitions) && !state.draftMarket}
+                testId="continue"
+              />
             )}
           </div>
         ) : null}
@@ -420,6 +484,11 @@ export function OnboardingWizard({
  *   real: App/Components/DynamicForm/ChangeRequestFieldFrame.tsx (flagged field frame)
  */
 const CHANGE_REQUESTED_TITLE = "Changes Requested";
+/* real: App/Data/onboarding/onboardingStepPresentation.ts */
+const RESUBMIT_CHANGES_LABEL = "Resubmit Changes";
+const SAVE_AND_RETURN_LABEL = "Save & Return";
+/** Sign-up steps the app never sends the driver back to. */
+const SIGN_UP_TITLES = new Set(["Phone Verification", "Email Verification"]);
 const CHANGE_REQUESTED_BODY_WITH_FLAGS = "Please update the highlighted fields below and resubmit.";
 const CHANGE_REQUESTED_BODY_GENERIC = "Please review this step and resubmit your changes.";
 const AWAITING_REVIEW_TITLE = "Awaiting Review";
@@ -451,6 +520,58 @@ function AmberBanner({ icon, title, body }: { icon: "clock" | "alert"; title: st
 }
 
 /** The template's own requiredMessage when it has one (production validation copy), else a plain fallback. */
+/**
+ * real: App/Components/Onboarding/Wizard/OnboardingStepFooter.tsx — divider, then outlined "← Back" on the left and
+ * the teal "Continue →" on the right (capture CAP-133). No Continue while a manual stage awaits review: Back only.
+ */
+function StepFooter({
+  onBack,
+  continueLabel: label,
+  onContinue,
+  continueDisabled = false,
+  testId,
+}: {
+  onBack?: () => void;
+  continueLabel: string;
+  onContinue?: () => void;
+  continueDisabled?: boolean;
+  testId: string;
+}) {
+  if (!onBack && !onContinue) return null;
+  return (
+    <div className="mt-4 pb-3" data-testid="step-footer">
+      <div className="mb-6 h-px" style={{ backgroundColor: GRAY_7 }} />
+      <div className="flex items-stretch justify-between gap-3">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex min-h-[44px] min-w-[80px] items-center justify-center gap-1.5 rounded-lg border bg-white px-5 text-[14px] font-medium"
+            style={{ borderColor: GRAY_7, color: BLACK_1 }}
+            data-testid="footer-back"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+        ) : (
+          <span />
+        )}
+        {onContinue ? (
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={continueDisabled}
+            className="flex min-h-[44px] min-w-[120px] items-center justify-center gap-2 rounded-lg px-5 text-[14px] font-semibold text-white disabled:opacity-40"
+            style={{ backgroundColor: GREEN }}
+            data-testid={testId}
+          >
+            {label} <ArrowRight className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function MissingNote({ field }: { field: FieldDef }) {
   const msg = (field as FieldDef & { validation_rules?: { requiredMessage?: string } | null }).validation_rules?.requiredMessage?.trim();
   return (
