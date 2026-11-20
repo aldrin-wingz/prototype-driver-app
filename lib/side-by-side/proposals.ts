@@ -64,7 +64,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-BTT-GATE", title: "Benefits Trafficking: read the browser and save-your-certificate rules and answer Yes before the instructions and Start Training appear (the Vehicle Inspection pattern)", source: "Luis, 2026-11-21" },
   { id: "P-ACK-YES-ONLY", title: "The two read-first agreements (Vehicle Inspection, Benefits Trafficking) offer Yes only: no No, no rejection. What appears after Yes (date and time, certificate) is what Submit needs", source: "Luis, 2026-11-21 (declining on one tap is too easy a rejection)" },
   { id: "P-WITHDREW", title: "No on Welcome to Wingz / About our driver standards keeps production's rejection, but the tool and reports show it as Withdrew, not Rejected", source: "Luis, 2026-11-21 (Q-ACK-1)" },
-  { id: "P-EPASSPORT-STAGE", title: "EPassport is its own stage before Pre-Verida Training Check: it waits for Onboarding's upload, then the driver downloads it and confirms before drug screening opens", source: "Luis, 2026-11-21 (replaces listing it first in the checklist)" },
+  { id: "P-EPASSPORT-STEP", title: "The EPassport sits in Schedule Drug Screening, after the instructions and before the Schedule link: shown on the card with Download and a required 'I have downloaded my EPassport'. No EPassport stage (15 stages)", source: "Luis, 2026-11-21 (D22, replaces the EPassport stage)" },
   { id: "P-EPASSPORT-CONSENT", title: "Onboarding uploads the EPassport into a required staff-only field on the D.Lawson consent (Verify waits for it); the backend copies it to the driver's EPassport step, so the stage opens ready", source: "Luis, 2026-11-21 (comment 20)" },
   { id: "P-WAIVER-COPY", title: "The fee waiver has its own photo fields (optional, at least 2); when Onboarding verifies the fee step they are copied into the matching Safety Equipment fields. Pre-Gentech certificates are copied into GenTech Training the same way (on verify)", source: "Luis, 2026-11-21 (D21, F5)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
@@ -112,18 +112,14 @@ export const FINAL_REVIEW_STAGE = "Final Review";
 export const EPASSPORT_STEP = "EPassport (Voucher)";
 export const SCHEDULE_DRUG_STEP = "Schedule Drug Screening";
 
-/* ── P-EPASSPORT-STAGE ─────────────────────────────────────────────────────── */
-export const EPASSPORT_STAGE = "EPassport";
-/** Prototype-only stage id (numeric like the template's; not in the payload). */
-export const EPASSPORT_STAGE_ID = "9950";
+/* ── P-EPASSPORT-STEP (D22) ────────────────────────────────────────────────── */
 export const EPASSPORT_VOUCHER = "drug_screen_epassport_voucher";
 export const EPASSPORT_ACK = "ack_epassport_downloaded";
 const HAS_VOUCHER = { "!!": [{ var: EPASSPORT_VOUCHER }] };
-const NO_VOUCHER = { "!": [{ var: EPASSPORT_VOUCHER }] };
 
 /** Schedule Drug Screening copy that assumed the voucher might not have arrived yet (template text, `\\n` as stored). */
 const EPASSPORT_COPY: [string, string][] = [
-  ["You can schedule your appointment now even if your EPassport (voucher) is not yet available.", "Bring the EPassport (voucher) you downloaded to your appointment."],
+  ["You can schedule your appointment now even if your EPassport (voucher) is not yet available.", "Your EPassport (voucher) is below: download it and bring it to your appointment."],
   ["1. Schedule your appointment now, even if you are still waiting for your EPassport (voucher)", "1. Schedule your appointment now"],
   ["3. If you receive your voucher on Friday,", "3. If your EPassport arrived on a Friday,"],
   ["\\n5. Return to the next step to download your EPassport once it is available", ""],
@@ -136,14 +132,6 @@ const EPASSPORT_COPY: [string, string][] = [
 export const EPASSPORT_UPLOAD = "bgc_epassport_upload";
 const CONSENT_STEP = "Background Check by D.Lawson";
 
-/**
- * Backend copy-on-upload (proposed capability: copy a saved value into another step's field). Fields can't be
- * internal in one step and driver-facing in another — visibility, required and position live on the field
- * definition — so the staff-only upload and the driver's voucher are two fields joined by this copy.
- */
-export const COPY_ON_UPLOAD: Record<string, { stepTitle: string; slug: string }> = {
-  [EPASSPORT_UPLOAD]: { stepTitle: "EPassport (Voucher)", slug: "drug_screen_epassport_voucher" },
-};
 
 /**
  * Required staff-only fields still empty — the real tool disables Verify while any is empty
@@ -156,7 +144,7 @@ export function agentVerifyBlockers(fields: ProposalField[], values: Record<stri
     .map((f) => f.label ?? f.slug);
 }
 
-/** For the EPassport step: true until Onboarding has uploaded the voucher (the engine and the app both hold the submit). */
+/** For Schedule Drug Screening: true while the step has no EPassport (fallback — the consent Verify waits for it). */
 export function epassportMissing(values: Record<string, unknown>): boolean {
   return isBlankValue(values[EPASSPORT_VOUCHER]);
 }
@@ -181,18 +169,8 @@ export function proposeStages(stages: ProposalStage[], titleOf?: (stepId: string
         proposed: "Pre-activation Training joined here, any order, no gate (P-MERGE-15)",
       });
     } else if (s.title === PASS3_STAGE) {
-      // P-EPASSPORT-STAGE — the voucher moves into its own stage, right before this one
+      // P-EPASSPORT-STEP — the voucher moves into Schedule Drug Screening; its own step goes
       const eid = titleOf ? s.stepIds.find((id) => titleOf(id) === EPASSPORT_STEP) : undefined;
-      if (eid) {
-        out.push({
-          id: EPASSPORT_STAGE_ID,
-          title: EPASSPORT_STAGE,
-          layout: "linear",
-          advancement: "auto",
-          stepIds: [eid],
-          proposed: "Waits for Onboarding to upload the EPassport; the driver downloads it and confirms before drug screening (P-EPASSPORT-STAGE)",
-        });
-      }
       out.push({ ...s, stepIds: s.stepIds.filter((id) => id !== eid), proposed: "Verida Training opens only once D.Lawson marks BGC, MVR and drug test PASS (P-PASS3)" });
     } else if (s.title === "Background Check") {
       out.push({ ...s, proposed: "Verify the signed consent; the result arrives later (P-CONSENT-GATE)" });
@@ -255,6 +233,8 @@ const GENTECH_STEP = "GenTech Training";
 export function copyOnVerify(stepTitle: string, slug: string): { stepTitle: string; slug: string } | null {
   if (stepTitle === "Background Check Fee" && isFeeWaiverPhotoSlug(slug)) return { stepTitle: SAFETY_STEP, slug: safetySlugFor(slug) };
   if (stepTitle === PRE_GENTECH_STEP && /^gentech_.+_certificate$/.test(slug)) return { stepTitle: GENTECH_STEP, slug };
+  // D22: the EPassport Onboarding uploaded on the consent reaches the driver when the consent is verified
+  if (stepTitle === CONSENT_STEP && slug === EPASSPORT_UPLOAD) return { stepTitle: SCHEDULE_DRUG_STEP, slug: EPASSPORT_VOUCHER };
   return null;
 }
 
@@ -424,10 +404,10 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
         "P-BTT-GATE",
       );
     }
-    // P-EPASSPORT-STAGE — the driver already has the EPassport when scheduling opens
+    // P-EPASSPORT-STEP — the driver gets the EPassport in this step
     if (step.title === SCHEDULE_DRUG_STEP && typeof g.content === "string") {
       const next = EPASSPORT_COPY.reduce((c, [from, to]) => c.split(from).join(to), g.content);
-      if (next !== g.content) g = withMeta({ ...g, content: next }, "P-EPASSPORT-STAGE");
+      if (next !== g.content) g = withMeta({ ...g, content: next }, "P-EPASSPORT-STEP");
     }
     // P-ACK-YES-ONLY — the inspection agreement drops its No (and with it the GA-only rejection)
     if (f.slug === "ack_inspection_requirements") {
@@ -523,51 +503,39 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
   }
   // P-LEASE-ASK — the notice and the upload stay with their question (position order would drop them among the OCR fields)
   fields = keepAfter(fields, LEASE_QUESTION, ["auto_lease_required_notice", "auto_lease_agreement"]);
-  // P-EPASSPORT-STAGE — waiting card until the upload; then the voucher, Download and a required confirmation
-  if (step.title === EPASSPORT_STEP) {
-    const note = "P-EPASSPORT-STAGE";
-    const voucher = fields.find((f) => f.slug === EPASSPORT_VOUCHER);
-    const rest = fields.filter((f) => f.slug !== EPASSPORT_VOUCHER && f.slug !== "drug_screen_epassport_info");
-    const epassport: ProposalField[] = [
+  // P-EPASSPORT-STEP (D22) — intro → instructions → the EPassport (on the card) + Download → "I have downloaded" → Schedule link → date
+  if (step.title === SCHEDULE_DRUG_STEP) {
+    const note = "P-EPASSPORT-STEP";
+    const source = (lookup?.(EPASSPORT_STEP)?.field_definitions ?? []).find((f) => f.slug === EPASSPORT_VOUCHER);
+    const voucher: ProposalField = withMeta(
       {
-        slug: "drug_screen_epassport_waiting",
-        label: "Your EPassport is being prepared",
-        field_type: "info",
-        required: false,
-        visibility: "external",
-        content: "D.Lawson issues your EPassport (voucher) after your background check consent. Onboarding will upload it here and we'll message you as soon as it's ready. You'll need it at your drug screening appointment.",
-        visibility_rule: NO_VOUCHER,
-        metadata: PROPOSED(note),
-      },
-      {
-        slug: "drug_screen_epassport_ready",
-        label: "Your EPassport is ready",
-        field_type: "info",
-        required: false,
-        visibility: "external",
-        content: "Download it now and bring it to your drug screening appointment. A printed or digital copy is accepted.",
-        visibility_rule: HAS_VOUCHER,
-        metadata: PROPOSED(note),
-      },
-      ...(voucher
-        ? [withMeta({ ...voucher, required: true, validation_rules: { ...((voucher.validation_rules as object) ?? {}), required: true, requiredMessage: "Your EPassport isn't ready yet. We'll message you as soon as Onboarding uploads it." } }, note)]
-        : []),
-      {
-        slug: EPASSPORT_ACK,
-        label: "I have downloaded my EPassport and will bring it to my drug screening.",
-        field_type: "acknowledgment",
+        ...(source ?? { slug: EPASSPORT_VOUCHER, field_type: "voucher", visibility: "external" }),
+        label: "Your EPassport",
+        help_text: "Bring it to your drug screening appointment. A printed or digital copy is accepted.",
         required: true,
-        validation_rules: { required: true, requiredMessage: "Confirm you have downloaded your EPassport to continue." },
-        visibility: "external",
-        visibility_rule: HAS_VOUCHER,
-        metadata: PROPOSED(note),
+        validation_rules: { required: true, requiredMessage: "Your EPassport isn't here yet. We'll message you as soon as Onboarding adds it." },
       },
-      ...rest,
-    ];
+      note,
+    );
+    const ack: ProposalField = {
+      slug: EPASSPORT_ACK,
+      label: "I have downloaded my EPassport and will bring it to my drug screening.",
+      field_type: "acknowledgment",
+      required: true,
+      validation_rules: { required: true, requiredMessage: "Confirm you have downloaded your EPassport to continue." },
+      visibility: "external",
+      visibility_rule: HAS_VOUCHER,
+      metadata: PROPOSED(note),
+    };
+    const by = (slug: string) => fields.find((f) => f.slug === slug);
+    const placed = new Set(["drug_screen_info", "drug_screen_schedule_steps", "drug_screen_schedule_notes"]);
+    const ordered = [by("drug_screen_info"), by("drug_screen_schedule_steps"), voucher, ack, ...fields.filter((f) => !placed.has(f.slug))].filter(
+      (f): f is ProposalField => Boolean(f),
+    );
     return {
       ...step,
-      description: "Download your EPassport and confirm you have it before you schedule your drug screening.",
-      field_definitions: inScreenOrder(epassport),
+      description: "Download your EPassport, then schedule your drug screening and enter the date.",
+      field_definitions: inScreenOrder(ordered),
     };
   }
   // P-FEE-WAIVER — rebuild the fee step in the reviewed order.

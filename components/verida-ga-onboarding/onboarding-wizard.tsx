@@ -633,6 +633,11 @@ function VoucherField({ field, value }: { field: FieldDef; value: unknown }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={url} alt={field.label} className="w-full rounded border" style={{ borderColor: GRAY_7 }} data-testid="voucher-inline" />
             )}
+            {field.help_text?.trim() ? (
+              <p className="mt-2 text-[12px] leading-[18px]" style={{ color: GRAY_3 }}>
+                {field.help_text.trim()}
+              </p>
+            ) : null}
             <a href={url} download className="mt-3 block w-full rounded-lg border py-2.5 text-center text-[14px] font-semibold" style={{ borderColor: GREEN, color: GREEN }} data-testid="voucher-download">
               Download
             </a>
