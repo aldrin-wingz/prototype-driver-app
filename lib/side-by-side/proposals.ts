@@ -63,6 +63,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-LINK-ORDER", title: "Every step that sends the driver elsewhere reads intro → warnings → instructions → link → upload → Need help (the app's field order)", source: "Luis, 2026-11-21" },
   { id: "P-BTT-GATE", title: "Benefits Trafficking: read the browser and save-your-certificate rules and answer Yes before the instructions and Start Training appear (the Vehicle Inspection pattern)", source: "Luis, 2026-11-21" },
   { id: "P-ACK-YES-ONLY", title: "The two read-first agreements (Vehicle Inspection, Benefits Trafficking) offer Yes only: no No, no rejection. What appears after Yes (date and time, certificate) is what Submit needs", source: "Luis, 2026-11-21 (declining on one tap is too easy a rejection)" },
+  { id: "P-WITHDREW", title: "No on Welcome to Wingz / About our driver standards keeps production's rejection, but the tool and reports show it as Withdrew, not Rejected", source: "Luis, 2026-11-21 (Q-ACK-1)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -419,6 +420,9 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
 
 /* ── Rules the engine applies (production behaviour, confirmed 2026-11-20) ────── */
 
+/** P-WITHDREW: the reason label for the two "Do you wish to continue?" declines (production codes declined_welcome_info, declined_bgc_info). */
+export const WITHDREW = "Withdrew";
+
 /** A driver answer that ends the application on submit, with the reason the tool records. */
 export function autoRejectReason(values: Record<string, unknown>): string | null {
   const dob = values.date_of_birth;
@@ -427,8 +431,9 @@ export function autoRejectReason(values: Record<string, unknown>): string | null
     if (age >= 14 && age < 25) return "Under 25 (age requirement)";
   }
   if (values.ack_tos === false) return "Declined the Driver Terms & Conditions";
-  if (values.ack_intro_aggreement === false) return "Chose not to continue (Welcome to Wingz)";
-  if (values.ack_bgc_information === false) return "Chose not to continue (driver standards)";
+  // P-WITHDREW — still production's auto-reject; counted and labelled as the driver withdrawing
+  if (values.ack_intro_aggreement === false) return `${WITHDREW} — chose not to continue (Welcome to Wingz)`;
+  if (values.ack_bgc_information === false) return `${WITHDREW} — chose not to continue (driver standards)`;
   return null;
 }
 
