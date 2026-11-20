@@ -66,6 +66,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-WITHDREW", title: "No on Welcome to Wingz / About our driver standards keeps production's rejection, but the tool and reports show it as Withdrew, not Rejected", source: "Luis, 2026-11-21 (Q-ACK-1)" },
   { id: "P-EPASSPORT-STAGE", title: "EPassport is its own stage before Pre-Verida Training Check: it waits for Onboarding's upload, then the driver downloads it and confirms before drug screening opens", source: "Luis, 2026-11-21 (replaces listing it first in the checklist)" },
   { id: "P-EPASSPORT-CONSENT", title: "Onboarding uploads the EPassport into a required staff-only field on the D.Lawson consent (Verify waits for it); the backend copies it to the driver's EPassport step, so the stage opens ready", source: "Luis, 2026-11-21 (comment 20)" },
+  { id: "P-WAIVER-COPY", title: "The fee waiver has its own photo fields (optional, at least 2); when Onboarding verifies the fee step they are copied into the matching Safety Equipment fields. Pre-Gentech certificates are copied into GenTech Training the same way (on verify)", source: "Luis, 2026-11-21 (D21, F5)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -226,9 +227,35 @@ export const FEE_WAIVER_MIN = 2;
 const PAY = { "==": [{ var: FEE_METHOD }, "pay"] };
 const WAIVE = { "==": [{ var: FEE_METHOD }, "waiver"] };
 
-/** The safety-equipment photo slugs (shared by the fee waiver and the Safety Equipment step). */
+/** The Safety Equipment step's photo slugs. */
 export function isSafetyPhotoSlug(slug: string): boolean {
   return /^safety_.+_photo$/.test(slug);
+}
+
+/**
+ * P-WAIVER-COPY (D21): the waiver's own photo fields. One field definition has one required / position / label in
+ * every step (backend FormFieldDefinition), and most Safety Equipment photos are required — so the waiver can't
+ * reuse them. `fee_waiver_<item>_photo` ↔ `safety_<item>_photo`.
+ */
+const WAIVER_PREFIX = "fee_waiver_";
+export function isFeeWaiverPhotoSlug(slug: string): boolean {
+  return slug.startsWith(WAIVER_PREFIX) && slug.endsWith("_photo");
+}
+export const waiverSlugFor = (safetySlug: string) => safetySlug.replace(/^safety_/, WAIVER_PREFIX);
+export const safetySlugFor = (waiverSlug: string) => waiverSlug.replace(new RegExp(`^${WAIVER_PREFIX}`), "safety_");
+
+const PRE_GENTECH_STEP = "Pre-Gentech Training Check";
+const GENTECH_STEP = "GenTech Training";
+
+/**
+ * Proposed backend capability (D20/D21): when Onboarding verifies a step, copy its accepted values into another
+ * step's field. Only a later step not yet submitted takes them, and never over something already there.
+ * Waiver photos → Safety Equipment; Pre-Gentech certificates → GenTech Training (same fields, values are per step).
+ */
+export function copyOnVerify(stepTitle: string, slug: string): { stepTitle: string; slug: string } | null {
+  if (stepTitle === "Background Check Fee" && isFeeWaiverPhotoSlug(slug)) return { stepTitle: SAFETY_STEP, slug: safetySlugFor(slug) };
+  if (stepTitle === PRE_GENTECH_STEP && /^gentech_.+_certificate$/.test(slug)) return { stepTitle: GENTECH_STEP, slug };
+  return null;
 }
 
 /** P-FLAG-DEPENDENTS: whether a field's show-rule reads one of these slugs (it depends on a flagged answer). */
@@ -243,7 +270,7 @@ export function dependsOnAny(field: { visibility_rule?: unknown }, slugs: Iterab
 /** How many more item photos a waiver needs (0 when paying or when enough are uploaded). */
 export function feeWaiverShortfall(values: Record<string, unknown>): number {
   if (values[FEE_METHOD] !== "waiver") return 0;
-  const n = Object.entries(values).filter(([k, v]) => isSafetyPhotoSlug(k) && !isBlankValue(v)).length;
+  const n = Object.entries(values).filter(([k, v]) => isFeeWaiverPhotoSlug(k) && !isBlankValue(v)).length;
   return Math.max(0, FEE_WAIVER_MIN - n);
 }
 
@@ -309,7 +336,13 @@ function proposeFeeStep(fields: ProposalField[], lookup?: StepLookup): ProposalF
       visibility_rule: WAIVE,
       metadata: { proposed: note },
     },
-    ...safety.map((f) => withMeta({ ...withLinks(f), required: false, visibility_rule: WAIVE }, note)),
+    // D21: the waiver's own fields, modelled on the Safety Equipment ones (copied there when Onboarding verifies)
+    ...safety.map((f) =>
+      withMeta(
+        { ...withLinks(f), slug: waiverSlugFor(f.slug), required: false, visibility_rule: WAIVE, metadata: { ...(f.metadata ?? {}), copies_to: f.slug } },
+        "P-WAIVER-COPY",
+      ),
+    ),
     ...fields.filter((f) => !used.has(f.slug)),
   ];
 }
