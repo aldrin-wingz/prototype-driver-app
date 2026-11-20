@@ -23,7 +23,7 @@
  * on any later step that shares the slug.
  */
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { Camera, Check, ChevronDown, ChevronsDown, ExternalLink, FileText, PlayCircle } from "lucide-react";
+import { Calendar, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Clock, ExternalLink, FileText, PlayCircle } from "lucide-react";
 
 import { resolveFieldLink, type FieldDef } from "@/lib/verida-ga-onboarding/market-flow";
 import {
@@ -357,11 +357,14 @@ export function RichField({
   marketId,
   value,
   onChange,
+  readOnly = false,
 }: {
   field: FieldDef;
   marketId: number | null;
   value?: unknown;
   onChange?: OnValue;
+  /** The step is submitted (pending review / verified): fields that have a summary form show it. */
+  readOnly?: boolean;
 }) {
   const set: OnValue = onChange ?? (() => undefined);
   const t = field.field_type;
@@ -391,6 +394,7 @@ export function RichField({
   }
   if (t === "video") return <LinkButton field={field} href={resolveFieldLink(field, marketId)} video />;
 
+  if (t === "calendar") return <CalendarField field={field} value={value} onChange={set} readOnly={readOnly} />;
   if (t === "photo" || t === "file" || t === "additional_file" || t === "signature") {
     return <Upload field={field} value={value} onChange={set} />;
   }
@@ -515,5 +519,189 @@ export function RichField({
         />
       )}
     </label>
+  );
+}
+
+/* ── Info Call calendar ─────────────────────────────────────────────────────────
+ * real: App/Components/DynamicForm/DynamicCalendarField.tsx + calendarSlots.ts (v6.0.538-production-ios):
+ * "Select a Date" with a 3-day pager, day chips (weekday, date, month, "N slots"), "Available Times for
+ * <day> (Eastern)" in a two-column grid, and a green "Info Call Scheduled" card with Change. Submitted
+ * (pending review / verified) shows the card alone. The value is the slot's ISO start (what Cal.com books).
+ * Slots are synthetic: production loads them from Cal.com availability for the market's event.
+ */
+const CAL_TZ = "America/New_York";
+const CAL_DAYS_PER_PAGE = 3;
+const CAL_GREEN_2 = "#00B692";
+const CAL_GREEN_4 = "#EEFBF5";
+const CAL_GREEN_6 = "#99E5D1";
+
+interface CalSlot {
+  id: string;
+}
+interface CalDay {
+  iso: string;
+  slots: CalSlot[];
+}
+
+/** Six business days from Mon 23 Nov 2026, Eastern (UTC-5); a different set of times each day. */
+const CAL_DAYS: CalDay[] = (() => {
+  const days = ["2026-11-23", "2026-11-24", "2026-11-25", "2026-11-27", "2026-11-30", "2026-12-01"];
+  const times = ["14:00", "14:30", "15:00", "15:30", "16:00", "18:00", "18:30", "19:00", "19:30", "20:00"];
+  return days.map((iso, i) => ({
+    iso,
+    slots: times.filter((_, k) => (k + i) % 3 !== 0 || k === 2).map((hm) => ({ id: `${iso}T${hm}:00Z` })),
+  }));
+})();
+
+function calFmt(iso: string, opts: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat("en-US", { timeZone: CAL_TZ, ...opts }).format(new Date(iso));
+}
+function calChip(dayIso: string) {
+  const noon = `${dayIso}T17:00:00Z`;
+  return { dow: calFmt(noon, { weekday: "short" }).toUpperCase(), dom: calFmt(noon, { day: "numeric" }), mon: calFmt(noon, { month: "short" }) };
+}
+function calDayHeading(dayIso: string) {
+  return calFmt(`${dayIso}T17:00:00Z`, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+function calTime(slotIso: string) {
+  return calFmt(slotIso, { hour: "numeric", minute: "2-digit" });
+}
+function calSummary(slotIso: string) {
+  const zone = calFmt(slotIso, { timeZoneName: "short" }).split(" ").pop();
+  return `${calFmt(slotIso, { month: "short", day: "numeric", year: "numeric" })}, ${calTime(slotIso)} (${zone})`;
+}
+function calDayOf(slotIso: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: CAL_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(slotIso));
+}
+
+function CalendarField({ field, value, onChange, readOnly }: { field: FieldDef; value: unknown; onChange: OnValue; readOnly: boolean }) {
+  const selected = typeof value === "string" && !Number.isNaN(new Date(value).getTime()) ? value : null;
+  const selectedDay = selected ? calDayOf(selected) : null;
+  const [activeDay, setActiveDay] = useState<string | null>(selectedDay);
+  const [start, setStart] = useState(() => {
+    const idx = CAL_DAYS.findIndex((d) => d.iso === selectedDay);
+    return idx >= 0 ? Math.min(idx, CAL_DAYS.length - CAL_DAYS_PER_PAGE) : 0;
+  });
+  useEffect(() => {
+    if (selectedDay) setActiveDay(selectedDay);
+  }, [selectedDay]);
+
+  const label = (
+    <div className="mb-2 text-[14px] font-semibold">
+      {field.label}
+      <Required field={field} />
+    </div>
+  );
+  const card = selected ? (
+    <ScheduledCard slotIso={selected} onChangePress={readOnly ? undefined : () => { onChange(field.slug, ""); setActiveDay(null); }} />
+  ) : null;
+
+  if (readOnly) {
+    return (
+      <div data-testid="calendar-field" data-mode="summary">
+        {label}
+        {card ?? <div className="text-[13px]" style={{ color: GRAY_3 }}>No time booked.</div>}
+      </div>
+    );
+  }
+
+  const visible = CAL_DAYS.slice(start, start + CAL_DAYS_PER_PAGE);
+  const day = activeDay ? CAL_DAYS.find((d) => d.iso === activeDay) : undefined;
+  const canBack = start > 0;
+  const canFwd = start + CAL_DAYS_PER_PAGE < CAL_DAYS.length;
+
+  return (
+    <div data-testid="calendar-field" data-mode="picker">
+      {label}
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[12px] font-medium" style={{ color: TEXT }}>
+          <Calendar className="h-[18px] w-[18px]" style={{ color: GRAY_3 }} /> Select a Date
+        </div>
+        <div className="flex items-center gap-1">
+          <button type="button" aria-label="Previous dates" disabled={!canBack} onClick={() => setStart((x) => Math.max(0, x - CAL_DAYS_PER_PAGE))} className="p-1 disabled:opacity-50">
+            <ChevronLeft className="h-5 w-5" style={{ color: canBack ? GRAY_3 : GRAY_7 }} />
+          </button>
+          <button type="button" aria-label="Next dates" disabled={!canFwd} onClick={() => setStart((x) => Math.min(CAL_DAYS.length - CAL_DAYS_PER_PAGE, x + CAL_DAYS_PER_PAGE))} className="p-1 disabled:opacity-50">
+            <ChevronRight className="h-5 w-5" style={{ color: canFwd ? GRAY_3 : GRAY_7 }} />
+          </button>
+        </div>
+      </div>
+      <div className="flex gap-2 pb-1">
+        {visible.map((d) => {
+          const c = calChip(d.iso);
+          const on = d.iso === activeDay;
+          return (
+            <button
+              key={d.iso}
+              type="button"
+              data-testid="calendar-day"
+              onClick={() => {
+                setActiveDay(d.iso);
+                if (selected && selectedDay !== d.iso) onChange(field.slug, "");
+              }}
+              className="flex min-h-[100px] min-w-0 flex-1 flex-col items-center justify-center rounded-lg bg-white px-1 py-3"
+              style={{ border: on ? `2px solid ${GREEN}` : `1px solid ${GRAY_7}`, backgroundColor: on ? CAL_GREEN_4 : "#FFF" }}
+            >
+              <span className="text-[11px] tracking-[0.3px]" style={{ color: on ? CAL_GREEN_2 : GRAY_3 }}>{c.dow}</span>
+              <span className="text-[18px] font-medium" style={{ color: on ? CAL_GREEN_2 : TEXT }}>{c.dom}</span>
+              <span className="text-[11px]" style={{ color: GRAY_3 }}>{c.mon}</span>
+              <span className="mt-1.5 text-[12px] font-medium" style={{ color: on ? CAL_GREEN_2 : GREEN }}>
+                {d.slots.length} slot{d.slots.length === 1 ? "" : "s"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {!day ? (
+        <p className="mt-4 text-center text-[12px] leading-[18px]" style={{ color: GRAY_3 }}>
+          Select a date above to see available info call times.
+        </p>
+      ) : (
+        <div className="mt-4">
+          <div className="mb-2.5 flex items-start gap-2 text-[12px] font-medium leading-[18px]" style={{ color: TEXT }}>
+            <Clock className="h-[18px] w-[18px] shrink-0" style={{ color: GRAY_3 }} />
+            Available Times for {calDayHeading(day.iso)} (Eastern)
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {day.slots.map((slot) => {
+              const on = slot.id === selected;
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  data-testid="calendar-slot"
+                  onClick={() => onChange(field.slug, slot.id)}
+                  className="flex min-h-[44px] items-center justify-center rounded-lg px-2 py-2.5 text-[14px] font-medium"
+                  style={{ border: `1px solid ${on ? GREEN : GRAY_7}`, backgroundColor: on ? GREEN : "#FFF", color: on ? "#FFF" : TEXT }}
+                >
+                  {calTime(slot.id)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {card ? <div className="mt-6">{card}</div> : null}
+    </div>
+  );
+}
+
+function ScheduledCard({ slotIso, onChangePress }: { slotIso: string; onChangePress?: () => void }) {
+  return (
+    <div className="rounded-lg border p-3.5" style={{ borderColor: CAL_GREEN_6, backgroundColor: CAL_GREEN_4 }} data-testid="calendar-scheduled">
+      <div className="flex items-center gap-3">
+        <Check className="h-5 w-5 shrink-0" style={{ color: GREEN }} />
+        <div className="min-w-0 flex-1 text-[12px]">
+          <div className="mb-1 font-medium" style={{ color: TEXT }}>Info Call Scheduled</div>
+          <div className="mb-1 font-medium" style={{ color: TEXT }}>{calSummary(slotIso)}</div>
+          <div className="leading-[18px]" style={{ color: GRAY_3 }}>You&apos;ll receive a Google Meet invite by email.</div>
+        </div>
+        {onChangePress ? (
+          <button type="button" onClick={onChangePress} className="self-center pl-1 text-[12px] font-semibold" style={{ color: GREEN }} data-testid="calendar-change">
+            Change
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }

@@ -292,6 +292,7 @@ export function OnboardingWizard({
         marketId={marketIdFor(state.marketState)}
         value={state.values[f.slug]}
         onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
+        readOnly={waiting}
       />
     );
 
