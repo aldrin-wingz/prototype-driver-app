@@ -68,6 +68,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-EPASSPORT-CONSENT", title: "Onboarding uploads the EPassport into a required staff-only field on the D.Lawson consent (Verify waits for it); the backend copies it to the driver's EPassport step, so the stage opens ready", source: "Luis, 2026-11-21 (comment 20)" },
   { id: "P-WAIVER-COPY", title: "The fee waiver has its own photo fields (optional, at least 2); when Onboarding verifies the fee step they are copied into the matching Safety Equipment fields. Pre-Gentech certificates are copied into GenTech Training the same way (on verify)", source: "Luis, 2026-11-21 (D21, F5)" },
   { id: "P-BGC-RESULTS-COMPLIANCE", title: "The D.Lawson results (result upload, External Results, Reason, Wingz Background Check Decision) leave the onboarding consent step; the compliance team records them in the Compliance Tool's Background Check / MVR / Drug Screening requirements", source: "Luis, 2026-11-21 (D23)" },
+  { id: "P-VERIDA-ITEMS", title: "Onboarding can't verify Schedule Drug Screening until D.Lawson's Background Check & MVR Report and Drug Screen Result are uploaded (staff-only, required); verifying Pre-Verida Training Check opens Verida Training — no separate PASS switch. On verify the reports are copied to the Compliance Tool", source: "Luis, 2026-11-21 (D25, replaces P-PASS3's gate)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -227,6 +228,8 @@ export const waiverSlugFor = (safetySlug: string) => safetySlug.replace(/^safety
 export const safetySlugFor = (waiverSlug: string) => waiverSlug.replace(new RegExp(`^${WAIVER_PREFIX}`), "safety_");
 
 const PRE_GENTECH_STEP = "Pre-Gentech Training Check";
+/** Copy target meaning "the Compliance Tool's requirement record", not an onboarding step. */
+export const COMPLIANCE_TOOL = "Compliance Tool";
 const GENTECH_STEP = "GenTech Training";
 
 /**
@@ -239,6 +242,8 @@ export function copyOnVerify(stepTitle: string, slug: string): { stepTitle: stri
   if (stepTitle === PRE_GENTECH_STEP && /^gentech_.+_certificate$/.test(slug)) return { stepTitle: GENTECH_STEP, slug };
   // D22: the EPassport Onboarding uploaded on the consent reaches the driver when the consent is verified
   if (stepTitle === CONSENT_STEP && slug === EPASSPORT_UPLOAD) return { stepTitle: SCHEDULE_DRUG_STEP, slug: EPASSPORT_VOUCHER };
+  // D25: the D.Lawson reports go to the Compliance Tool's D.Lawson requirements (outside the onboarding steps)
+  if (stepTitle === SCHEDULE_DRUG_STEP && (slug === "bgc_result_file" || slug === "drug_screen_result")) return { stepTitle: COMPLIANCE_TOOL, slug };
   return null;
 }
 
@@ -525,9 +530,31 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
     const by = (slug: string) => fields.find((f) => f.slug === slug);
     const placed = new Set(["drug_screen_info", "drug_screen_schedule_steps", "drug_screen_schedule_notes"]);
     // No "I have downloaded" box (Luis, 2026-11-21): the required appointment date is what gates the step
+    // P-VERIDA-ITEMS (D25): the Verida items we don't have yet — D.Lawson's reports — staff-only, required for Verify
+    const consentResult = (lookup?.(CONSENT_STEP)?.field_definitions ?? []).find((f) => f.slug === "bgc_result_file");
+    const reports: ProposalField[] = [
+      {
+        ...(consentResult ?? { slug: "bgc_result_file", field_type: "file" }),
+        label: "Background Check & MVR Report (D.Lawson)",
+        content: "Upload D.Lawson's background check and MVR report. Verify waits for it; it goes to Verida and the Compliance Tool.",
+        required: true,
+        visibility: "internal",
+        visibility_rule: undefined,
+        metadata: { ...PROPOSED("P-VERIDA-ITEMS"), agent_verify_required: true },
+      },
+      {
+        slug: "drug_screen_result",
+        label: "Drug Screen Result (D.Lawson)",
+        field_type: "file",
+        content: "Upload D.Lawson's drug screen result. Verify waits for it; it goes to Verida and the Compliance Tool.",
+        required: true,
+        visibility: "internal",
+        metadata: { ...PROPOSED("P-VERIDA-ITEMS"), agent_verify_required: true },
+      },
+    ];
     // The date is the gate: marked so the app checks it (the prototype checks only the fields this review touched)
     const rest = fields.filter((f) => !placed.has(f.slug)).map((f) => (f.slug === "drug_screen_date" ? withMeta({ ...f, required: true }, note) : f));
-    const ordered = [by("drug_screen_info"), by("drug_screen_schedule_steps"), voucher, ...rest].filter(
+    const ordered = [by("drug_screen_info"), by("drug_screen_schedule_steps"), voucher, ...rest, ...reports].filter(
       (f): f is ProposalField => Boolean(f),
     );
     return {
