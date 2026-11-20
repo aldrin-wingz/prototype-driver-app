@@ -58,6 +58,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-LINKS", title: "Amazon / Walmart link per safety item", source: "Onboarding review C7 + Luis's links" },
   { id: "P-LEASE-ASK", title: "Vehicle Insurance & Registration asks whether the driver's name is on both documents; No makes the auto-lease agreement required", source: "Luis, 2026-11-20" },
   { id: "P-FLAG-EMPTY", title: "The tool lists every driver-facing field, empty optional uploads too, and can request changes on them; the driver must upload a flagged field to resubmit", source: "Luis, 2026-11-20 (production cannot flag an empty field)" },
+  { id: "P-FLAG-DEPENDENTS", title: "When the agent flags a question, the fields its answer shows (instructions, link, upload) can be used during the change request — production disables every unflagged field", source: "Luis, 2026-11-20 (waiver → pay instead)" },
   { id: "P-RSM", title: "Inspection copy names Rideshare Mechanic", source: "Luis, 2026-11-20 (C8)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
@@ -158,6 +159,15 @@ const WAIVE = { "==": [{ var: FEE_METHOD }, "waiver"] };
 /** The safety-equipment photo slugs (shared by the fee waiver and the Safety Equipment step). */
 export function isSafetyPhotoSlug(slug: string): boolean {
   return /^safety_.+_photo$/.test(slug);
+}
+
+/** P-FLAG-DEPENDENTS: whether a field's show-rule reads one of these slugs (it depends on a flagged answer). */
+export function dependsOnAny(field: { visibility_rule?: unknown }, slugs: Iterable<string>): boolean {
+  const rule = field.visibility_rule;
+  if (!rule || typeof rule !== "object") return false;
+  const text = JSON.stringify(rule);
+  for (const slug of slugs) if (text.includes(`{"var":"${slug}"}`)) return true;
+  return false;
 }
 
 /** How many more item photos a waiver needs (0 when paying or when enough are uploaded). */

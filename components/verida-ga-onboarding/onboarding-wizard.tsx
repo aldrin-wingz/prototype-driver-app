@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
-import { FEE_WAIVER_MIN, feeWaiverShortfall, isBlankValue } from "@/lib/side-by-side/proposals";
+import { FEE_WAIVER_MIN, dependsOnAny, feeWaiverShortfall, isBlankValue } from "@/lib/side-by-side/proposals";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
@@ -123,6 +123,8 @@ export function OnboardingWizard({
   const flagged: Set<string> | null =
     sbs && currentStatus === "change_requested" ? new Set(sbs.changeRequest?.fields ?? []) : null;
   const shown = (f: FieldDef) => isFieldVisible(f, state.values) || Boolean(flagged?.has(f.slug));
+  /** P-FLAG-DEPENDENTS: a field shown by a flagged answer can be used too (production disables it). */
+  const unlockedByFlag = (f: FieldDef) => Boolean(flagged && !flagged.has(f.slug) && dependsOnAny(f as FieldDef & { visibility_rule?: unknown }, flagged));
   const [missing, setMissing] = useState<string[]>([]);
   const [stepError, setStepError] = useState<string | null>(null);
   useEffect(() => {
@@ -404,6 +406,11 @@ export function OnboardingWizard({
                     {renderField(f)}
                     {missing.includes(f.slug) ? <MissingNote field={f} /> : null}
                   </ChangeRequestFieldFrame>
+                ) : flagged && unlockedByFlag(f) ? (
+                  <div key={`dep-${f.slug}`} data-testid="unlocked-by-flag">
+                    {renderField(f)}
+                    {missing.includes(f.slug) ? <MissingNote field={f} /> : null}
+                  </div>
                 ) : flagged ? (
                   <div key={`ro-${f.slug}`} className="pointer-events-none opacity-60" aria-disabled data-testid="not-flagged-read-only">
                     {renderField(f)}
