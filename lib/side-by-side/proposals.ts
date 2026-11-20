@@ -51,7 +51,7 @@ export interface Proposal {
 export const PROPOSALS: Proposal[] = [
   { id: "P-SS-CARD", title: "\"SSN Document\" becomes \"Social Security Card\"; the SSA document is not accepted", source: "Onboarding review C1" },
   { id: "P-PD-VERIFY", title: "Profile & Documents is verified before the Info Call opens", source: "Anj, 2026-11-20 (replaces C2's fee auto-advance; the fee keeps production's verification)" },
-  { id: "P-FEE-WAIVER", title: "Fee step: the $15 fee, then the waiver option, then one choice — pay (instructions, link, receipt) or waive (photos of at least 2 safety items, the same fields as the Safety Equipment step)", source: "Onboarding review C3 (Mae); layout Luis, 2026-11-20" },
+  { id: "P-FEE-WAIVER", title: "Fee step: the choice at the top, then the $15 fee, then the waiver option — pay (instructions, link, receipt) or waive (photos of at least 2 safety items, the same fields as the Safety Equipment step)", source: "Onboarding review C3 (Mae); layout Luis, 2026-11-20" },
   { id: "P-CONSENT-GATE", title: "Background Check verifies the signed consent; the result is not awaited", source: "Onboarding review C4" },
   { id: "P-PASS3", title: "Verida Training opens once D.Lawson marks BGC, MVR and drug test PASS", source: "Onboarding review C5" },
   { id: "P-EPASSPORT", title: "Onboarding uploads the EPassport; the driver views it", source: "Onboarding review C6" },
@@ -183,8 +183,8 @@ function withLinks(f: ProposalField): ProposalField {
 
 /**
  * The fee step, in the order reviewed with Luis on 2026-11-20:
- *   1. the fee ($15, what it covers)          2. the waiver option (2 safety items)
- *   3. the choice                             4a. pay: instructions → link → receipt
+ *   1. the choice (at the top)                2. the fee ($15, what it covers)
+ *   3. the waiver option (2 safety items)     4a. pay: instructions → link → receipt
  *                                             4b. waive: how-to → the Safety Equipment photo fields
  * The waiver photos ARE the Safety Equipment fields (same slugs), so they are already on file there.
  */
@@ -202,17 +202,6 @@ function proposeFeeStep(fields: ProposalField[], lookup?: StepLookup): ProposalF
     .trim();
   const used = new Set(["bgc_fee_info", "bgc_fee_payment_steps", "pay_background_check_fee_button", "background_check_fee_receipt"]);
   return [
-    withMeta({ ...intro, content: introText }, note),
-    {
-      slug: "bgc_fee_waiver_info",
-      label: "Already have 2 safety equipment items?",
-      field_type: "info",
-      required: false,
-      visibility: "external",
-      content:
-        "If you already have at least 2 of the safety equipment items required for your vehicle, the $15 fee is waived. Choose that option below and upload a photo of each item. Those photos also count for your Safety Equipment step later, so you won't upload them twice.",
-      metadata: { proposed: note },
-    },
     {
       slug: FEE_METHOD,
       label: "How are you covering the background check fee?",
@@ -223,6 +212,17 @@ function proposeFeeStep(fields: ProposalField[], lookup?: StepLookup): ProposalF
         { label: "I'll pay the $15 fee", value: "pay" },
         { label: "I already have 2 safety equipment items (fee waived)", value: "waiver" },
       ],
+      metadata: { proposed: note },
+    },
+    withMeta({ ...intro, content: introText }, note),
+    {
+      slug: "bgc_fee_waiver_info",
+      label: "Already have 2 safety equipment items?",
+      field_type: "info",
+      required: false,
+      visibility: "external",
+      content:
+        "If you already have at least 2 of the safety equipment items required for your vehicle, the $15 fee is waived. Choose that option below and upload a photo of each item. Those photos also count for your Safety Equipment step later, so you won't upload them twice.",
       metadata: { proposed: note },
     },
     withMeta({ ...steps, visibility_rule: PAY }, note),
