@@ -126,6 +126,8 @@ const EPASSPORT_COPY: [string, string][] = [
   ["3. If you receive your voucher on Friday,", "3. If your EPassport arrived on a Friday,"],
   ["\\n5. Return to the next step to download your EPassport once it is available", ""],
   ["to your appointment once it becomes available", "to your appointment"],
+  // GA uploads no Donor Completion Form at onboarding (date only) — Luis, 2026-11-21 (F4)
+  ["\\n• The clinic will give you a Donor Completion Form after your test\\n• You will upload that form in the final step", ""],
 ];
 
 /** For the EPassport step: true until Onboarding has uploaded the voucher (the engine and the app both hold the submit). */
