@@ -12,6 +12,12 @@ const STEP_INDEX: Map<string, TemplateStep> = (() => {
   return m;
 })();
 
+/** A Verida GA step by title — the fee waiver borrows the Safety Equipment step's photo fields. */
+function gaStepByTitle(title: string): ProposalStep | undefined {
+  for (const s of templateFor("verida-ga")) for (const st of s.steps) if (st.title === title) return st as unknown as ProposalStep;
+  return undefined;
+}
+
 /** The template's own stage fields (driver note, description) by stage id. */
 const STAGE_INDEX: Map<string, TemplateStage> = (() => {
   const m = new Map<string, TemplateStage>();
@@ -32,7 +38,7 @@ export function sbsStages(state: SbsState): TemplateStage[] {
     steps: s.stepIds
       .map((id) => STEP_INDEX.get(id))
       .filter((x): x is TemplateStep => Boolean(x))
-      .map((st) => (state.proposalsOn ? (proposeStep(st as unknown as ProposalStep) as unknown as TemplateStep) : st)),
+      .map((st) => (state.proposalsOn ? (proposeStep(st as unknown as ProposalStep, gaStepByTitle) as unknown as TemplateStep) : st)),
   }));
 }
 

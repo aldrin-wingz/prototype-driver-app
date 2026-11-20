@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
-import { isBlankValue } from "@/lib/side-by-side/proposals";
+import { FEE_WAIVER_MIN, feeWaiverShortfall, isBlankValue } from "@/lib/side-by-side/proposals";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
@@ -124,7 +124,11 @@ export function OnboardingWizard({
     sbs && currentStatus === "change_requested" ? new Set(sbs.changeRequest?.fields ?? []) : null;
   const shown = (f: FieldDef) => isFieldVisible(f, state.values) || Boolean(flagged?.has(f.slug));
   const [missing, setMissing] = useState<string[]>([]);
-  useEffect(() => setMissing([]), [currentStep?.id, currentStatus]);
+  const [stepError, setStepError] = useState<string | null>(null);
+  useEffect(() => {
+    setMissing([]);
+    setStepError(null);
+  }, [currentStep?.id, currentStatus]);
 
   /*
    * Side-by-side: a stage done in any order opens on its checklist hub (real: OnboardingParallelHub.tsx);
@@ -227,6 +231,12 @@ export function OnboardingWizard({
     });
     if (blocking.length) {
       setMissing(blocking.map((f) => f.slug));
+      return;
+    }
+    // P-FEE-WAIVER: at least 2 item photos on this step.
+    const stepValues = Object.fromEntries(driverFields(currentStep).map((f) => [f.slug, state.values[f.slug]]));
+    if (feeWaiverShortfall(stepValues) > 0) {
+      setStepError(`Upload photos of at least ${FEE_WAIVER_MIN} safety equipment items to have the fee waived.`);
       return;
     }
     const gettingStarted = isGettingStarted(currentStep.field_definitions);
@@ -408,6 +418,11 @@ export function OnboardingWizard({
                 ),
               )}
             </div>
+            {stepError ? (
+              <div className="mt-4 flex items-start gap-2 text-[13px] text-[#CF1322]" data-testid="step-error">
+                <AlertCircle className="mt-0.5 h-[18px] w-[18px] shrink-0" /> {stepError}
+              </div>
+            ) : null}
             {sbs ? (
               <StepFooter
                 onBack={backTarget ? () => openStep(backTarget.id, false) : undefined}

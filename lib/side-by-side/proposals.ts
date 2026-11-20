@@ -1,7 +1,7 @@
 /**
- * PROTOTYPE — side-by-side: the PROPOSED changes from the 2026-11-20 reviews, applied on top of
+ * PROTOTYPE — side-by-side: the Verida GA changes since the 2026-11-20 reviews, applied on top of
  * the production-based payload. Nothing here is approved story text; every change is listed in
- * `PROPOSALS` and tagged "Proposed" wherever it renders.
+ * `PROPOSALS` (the Coverage panel). The app shows them untagged (Luis, 2026-11-20).
  *
  * Sources (vault, Project - Driver Onboarding/Verida GA/References/):
  *   Onboarding Team Review 2026-11-20 - Verida GA In-App Onboarding.md (C1–C9, §6 Luis's decisions)
@@ -51,7 +51,7 @@ export interface Proposal {
 export const PROPOSALS: Proposal[] = [
   { id: "P-SS-CARD", title: "\"SSN Document\" becomes \"Social Security Card\"; the SSA document is not accepted", source: "Onboarding review C1" },
   { id: "P-PD-VERIFY", title: "Profile & Documents is verified before the Info Call opens", source: "Anj, 2026-11-20 (replaces C2's fee auto-advance; the fee keeps production's verification)" },
-  { id: "P-FEE-WAIVER", title: "Fee waiver: a photo of 2 safety-equipment items instead of the receipt", source: "Onboarding review C3 (Mae)" },
+  { id: "P-FEE-WAIVER", title: "Fee step: the $15 fee, then the waiver option, then one choice — pay (instructions, link, receipt) or waive (photos of at least 2 safety items, the same fields as the Safety Equipment step)", source: "Onboarding review C3 (Mae); layout Luis, 2026-11-20" },
   { id: "P-CONSENT-GATE", title: "Background Check verifies the signed consent; the result is not awaited", source: "Onboarding review C4" },
   { id: "P-PASS3", title: "Verida Training opens once D.Lawson marks BGC, MVR and drug test PASS", source: "Onboarding review C5" },
   { id: "P-EPASSPORT", title: "Onboarding uploads the EPassport; the driver views it", source: "Onboarding review C6" },
@@ -145,6 +145,95 @@ function rsm(text: string | null | undefined): string | null | undefined {
 
 const LEASE_QUESTION = "auto_lease_name_on_both";
 
+/** Another step of the same flow, by title (the fee step borrows the Safety Equipment step's photo fields). */
+export type StepLookup = (title: string) => ProposalStep | undefined;
+
+export const FEE_METHOD = "bgc_fee_method";
+export const SAFETY_STEP = "Safety Equipment";
+/** A waiver needs photos of at least this many safety-equipment items. */
+export const FEE_WAIVER_MIN = 2;
+const PAY = { "==": [{ var: FEE_METHOD }, "pay"] };
+const WAIVE = { "==": [{ var: FEE_METHOD }, "waiver"] };
+
+/** The safety-equipment photo slugs (shared by the fee waiver and the Safety Equipment step). */
+export function isSafetyPhotoSlug(slug: string): boolean {
+  return /^safety_.+_photo$/.test(slug);
+}
+
+/** How many more item photos a waiver needs (0 when paying or when enough are uploaded). */
+export function feeWaiverShortfall(values: Record<string, unknown>): number {
+  if (values[FEE_METHOD] !== "waiver") return 0;
+  const n = Object.entries(values).filter(([k, v]) => isSafetyPhotoSlug(k) && !isBlankValue(v)).length;
+  return Math.max(0, FEE_WAIVER_MIN - n);
+}
+
+function withLinks(f: ProposalField): ProposalField {
+  return SHOPPING_LINKS[f.slug] ? { ...f, content: `${f.content ?? ""}\n\nWhere to buy: ${SHOPPING_LINKS[f.slug]}`.trim() } : f;
+}
+
+/**
+ * The fee step, in the order reviewed with Luis on 2026-11-20:
+ *   1. the fee ($15, what it covers)          2. the waiver option (2 safety items)
+ *   3. the choice                             4a. pay: instructions → link → receipt
+ *                                             4b. waive: how-to → the Safety Equipment photo fields
+ * The waiver photos ARE the Safety Equipment fields (same slugs), so they are already on file there.
+ */
+function proposeFeeStep(fields: ProposalField[], lookup?: StepLookup): ProposalField[] | null {
+  const by = new Map(fields.map((f) => [f.slug, f]));
+  const intro = by.get("bgc_fee_info");
+  const steps = by.get("bgc_fee_payment_steps");
+  const button = by.get("pay_background_check_fee_button");
+  const receipt = by.get("background_check_fee_receipt");
+  if (!intro || !steps || !button || !receipt) return null;
+  const note = "P-FEE-WAIVER";
+  const safety = (lookup?.(SAFETY_STEP)?.field_definitions ?? []).filter((f) => isSafetyPhotoSlug(f.slug));
+  const introText = (intro.content ?? "")
+    .replace("Process the Background Check fee payment that we discussed during the Info Call. Please follow the link below.", "")
+    .trim();
+  const used = new Set(["bgc_fee_info", "bgc_fee_payment_steps", "pay_background_check_fee_button", "background_check_fee_receipt"]);
+  return [
+    withMeta({ ...intro, content: introText }, note),
+    {
+      slug: "bgc_fee_waiver_info",
+      label: "Already have 2 safety equipment items?",
+      field_type: "info",
+      required: false,
+      visibility: "external",
+      content:
+        "If you already have at least 2 of the safety equipment items required for your vehicle, the $15 fee is waived. Choose that option below and upload a photo of each item. Those photos also count for your Safety Equipment step later, so you won't upload them twice.",
+      metadata: { proposed: note },
+    },
+    {
+      slug: FEE_METHOD,
+      label: "How are you covering the background check fee?",
+      field_type: "radio",
+      required: true,
+      visibility: "external",
+      options: [
+        { label: "I'll pay the $15 fee", value: "pay" },
+        { label: "I already have 2 safety equipment items (fee waived)", value: "waiver" },
+      ],
+      metadata: { proposed: note },
+    },
+    withMeta({ ...steps, visibility_rule: PAY }, note),
+    withMeta({ ...button, visibility_rule: PAY }, note),
+    withMeta({ ...receipt, visibility_rule: PAY }, note),
+    {
+      slug: "bgc_fee_waiver_steps",
+      label: "Fee waiver: upload at least 2 items",
+      field_type: "info_list",
+      required: false,
+      visibility: "external",
+      content:
+        "1. Pick any 2 or more items from the list below\n2. Photograph each one clearly — the whole item in frame\n3. Upload one photo per item\n4. Onboarding checks the photos before your Initial Training opens",
+      visibility_rule: WAIVE,
+      metadata: { proposed: note },
+    },
+    ...safety.map((f) => withMeta({ ...withLinks(f), required: false, visibility_rule: WAIVE }, note)),
+    ...fields.filter((f) => !used.has(f.slug)),
+  ];
+}
+
 /** Empty the way the app treats an answer: nothing, blank text, an empty list (app formUtils isEmpty / isEmptyFileValue). */
 export function isBlankValue(v: unknown): boolean {
   if (v === undefined || v === null) return true;
@@ -154,7 +243,7 @@ export function isBlankValue(v: unknown): boolean {
 }
 
 /** Field-level proposals for one step. Returns the step unchanged when nothing applies. */
-export function proposeStep<T extends ProposalStep>(step: T): T {
+export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup): T {
   let changed = false;
   const fields: ProposalField[] = [];
   for (const f of step.field_definitions) {
@@ -203,11 +292,10 @@ export function proposeStep<T extends ProposalStep>(step: T): T {
       g = withMeta({ ...g, visibility_rule: { "==": [{ var: LEASE_QUESTION }, "no"] } }, "P-LEASE-ASK");
     }
     if (f.slug === "auto_lease_agreement") {
-      g = withMeta({ ...g, required: true, visibility_rule: { "==": [{ var: LEASE_QUESTION }, "no"] } }, "P-LEASE-ASK");
-    }
-    // P-FEE-WAIVER — the receipt shows only when paying
-    if (f.slug === "background_check_fee_receipt") {
-      g = withMeta({ ...g, visibility_rule: { "==": [{ var: "bgc_fee_method" }, "pay"] } }, "P-FEE-WAIVER");
+      g = withMeta(
+        { ...g, required: true, visibility_rule: { "==": [{ var: LEASE_QUESTION }, "no"] }, metadata: { ...(g.metadata ?? {}), agent_can_flag_when_hidden: true } },
+        "P-LEASE-ASK",
+      );
     }
     if (g !== f) changed = true;
     fields.push(g);
@@ -227,35 +315,10 @@ export function proposeStep<T extends ProposalStep>(step: T): T {
         metadata: PROPOSED("P-LEASE-ASK"),
       });
     }
-    // P-FEE-WAIVER — the choice goes right before the receipt
-    if (f.slug === "bgc_fee_payment_steps") {
-      changed = true;
-      fields.push({
-        slug: "bgc_fee_method",
-        label: "How are you covering the background check fee?",
-        field_type: "radio",
-        required: true,
-        visibility: "external",
-        options: [
-          { label: "I'll pay the $15 fee", value: "pay" },
-          { label: "I already have 2 safety equipment items (fee waived)", value: "waiver" },
-        ],
-        metadata: PROPOSED("P-FEE-WAIVER"),
-      });
-    }
-    if (f.slug === "background_check_fee_receipt") {
-      fields.push({
-        slug: "bgc_fee_waiver_photo",
-        label: "Photo of your 2 safety equipment items",
-        field_type: "photo",
-        required: true,
-        visibility: "external",
-        content: "Any 2 items from the required safety equipment list, together in one clear photo.",
-        visibility_rule: { "==": [{ var: "bgc_fee_method" }, "waiver"] },
-        metadata: PROPOSED("P-FEE-WAIVER"),
-      });
-    }
   }
+  // P-FEE-WAIVER — rebuild the fee step in the reviewed order.
+  const fee = proposeFeeStep(fields, lookup);
+  if (fee) return { ...step, field_definitions: fee };
   return changed ? { ...step, field_definitions: fields } : step;
 }
 
