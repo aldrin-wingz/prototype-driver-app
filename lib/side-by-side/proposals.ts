@@ -62,6 +62,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-RSM", title: "Inspection copy names Rideshare Mechanic", source: "Luis, 2026-11-20 (C8)" },
   { id: "P-LINK-ORDER", title: "Every step that sends the driver elsewhere reads intro → warnings → instructions → link → upload → Need help (the app's field order)", source: "Luis, 2026-11-21" },
   { id: "P-BTT-GATE", title: "Benefits Trafficking: read the browser and save-your-certificate rules and answer Yes before the instructions and Start Training appear (the Vehicle Inspection pattern)", source: "Luis, 2026-11-21" },
+  { id: "P-ACK-YES-ONLY", title: "The two read-first agreements (Vehicle Inspection, Benefits Trafficking) offer Yes only: no No, no rejection. What appears after Yes (date and time, certificate) is what Submit needs", source: "Luis, 2026-11-21 (declining on one tap is too easy a rejection)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -276,7 +277,10 @@ function keepAfter(fields: ProposalField[], anchor: string, slugs: string[]): Pr
 const BTT_STEP = "Benefits Trafficking Training";
 export const BTT_ACK = "ack_btt_requirements";
 const BTT_WARNINGS = ["benefits_trafficking_browser_warning", "benefits_trafficking_save_warning"];
-const BTT_GATED = ["benefits_trafficking_steps", "benefits_trafficking_training_button"];
+const BTT_GATED = ["benefits_trafficking_steps", "benefits_trafficking_training_button", "benefits_trafficking_certificate"];
+
+/** P-ACK-YES-ONLY: a scroll-to-read agreement that only offers Yes (`metadata.yes_only`). */
+export const YES_ONLY_ACKS = ["ack_inspection_requirements", "ack_btt_requirements"];
 
 function bttAck(fields: ProposalField[]): ProposalField {
   const text = (slug: string) => (fields.find((f) => f.slug === slug)?.content ?? "").split(/\n\n+/).map((p) => `• ${p.trim()}`).join("\n");
@@ -288,7 +292,7 @@ function bttAck(fields: ProposalField[]): ProposalField {
     visibility: "external",
     scroll_required: true,
     content: `BEFORE YOU START — CHECK YOUR BROWSER\n${text(BTT_WARNINGS[0])}\n\nSAVE YOUR CERTIFICATE BEFORE CLOSING THE PAGE\n${text(BTT_WARNINGS[1])}`,
-    metadata: PROPOSED("P-BTT-GATE"),
+    metadata: { ...PROPOSED("P-BTT-GATE"), yes_only: true },
   };
 }
 
@@ -319,6 +323,10 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
         { ...g, content: (g.content ?? "").replace("Follow the instructions below to complete the course and upload your certificate.", "Read the requirements below and answer Yes to see the training instructions. Then complete the course and upload your certificate.") },
         "P-BTT-GATE",
       );
+    }
+    // P-ACK-YES-ONLY — the inspection agreement drops its No (and with it the GA-only rejection)
+    if (f.slug === "ack_inspection_requirements") {
+      g = withMeta({ ...g, metadata: { ...(g.metadata ?? {}), yes_only: true } }, "P-ACK-YES-ONLY");
     }
     if (btt && BTT_GATED.includes(f.slug)) {
       g = withMeta({ ...g, visibility_rule: { "==": [{ var: BTT_ACK }, true] } }, "P-BTT-GATE");
@@ -421,7 +429,6 @@ export function autoRejectReason(values: Record<string, unknown>): string | null
   if (values.ack_tos === false) return "Declined the Driver Terms & Conditions";
   if (values.ack_intro_aggreement === false) return "Chose not to continue (Welcome to Wingz)";
   if (values.ack_bgc_information === false) return "Chose not to continue (driver standards)";
-  if (values.ack_inspection_requirements === false) return "Declined vehicle inspection requirements";
   return null;
 }
 

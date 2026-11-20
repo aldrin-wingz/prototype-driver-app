@@ -270,7 +270,8 @@ function ScrollAck({ field, value, onChange }: { field: FieldDef; value: unknown
         </div>
         {[
           { lbl: yes, val: true },
-          { lbl: no, val: false },
+          // `metadata.yes_only` (Verida GA read-first agreements): no No, so no decline / rejection
+          ...(field.metadata?.yes_only ? [] : [{ lbl: no, val: false }]),
         ].map(({ lbl, val }) => {
           const on = value === val;
           return (
