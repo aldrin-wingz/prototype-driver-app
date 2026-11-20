@@ -64,6 +64,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-BTT-GATE", title: "Benefits Trafficking: read the browser and save-your-certificate rules and answer Yes before the instructions and Start Training appear (the Vehicle Inspection pattern)", source: "Luis, 2026-11-21" },
   { id: "P-ACK-YES-ONLY", title: "The two read-first agreements (Vehicle Inspection, Benefits Trafficking) offer Yes only: no No, no rejection. What appears after Yes (date and time, certificate) is what Submit needs", source: "Luis, 2026-11-21 (declining on one tap is too easy a rejection)" },
   { id: "P-WITHDREW", title: "No on Welcome to Wingz / About our driver standards keeps production's rejection, but the tool and reports show it as Withdrew, not Rejected", source: "Luis, 2026-11-21 (Q-ACK-1)" },
+  { id: "P-EPASSPORT-FIRST", title: "EPassport (Voucher) is its own step, listed before Schedule Drug Screening (production voucher hooks need it as its own form)", source: "Luis, 2026-11-21" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -106,8 +107,21 @@ const PRE_ACTIVATION_STAGE = "Pre-activation Training";
 export const PASS3_STAGE = "Pre-Verida Training Check";
 export const FINAL_REVIEW_STAGE = "Final Review";
 
+export const EPASSPORT_STEP = "EPassport (Voucher)";
+export const SCHEDULE_DRUG_STEP = "Schedule Drug Screening";
+
+/** `stepIds` with the step titled `move` placed right before the step titled `before` (unchanged if either is missing). */
+function moveBefore(ids: string[], titleOf: (id: string) => string | undefined, move: string, before: string): string[] {
+  const m = ids.find((id) => titleOf(id) === move);
+  const b = ids.find((id) => titleOf(id) === before);
+  if (!m || !b) return ids;
+  const rest = ids.filter((id) => id !== m);
+  rest.splice(rest.indexOf(b), 0, m);
+  return rest;
+}
+
 /** Stage-list proposals. Only the Verida Fully Credentialled list changes (it is the only one with these stages). */
-export function proposeStages(stages: ProposalStage[]): ProposalStage[] {
+export function proposeStages(stages: ProposalStage[], titleOf?: (stepId: string) => string | undefined): ProposalStage[] {
   const pre = stages.find((s) => s.title === PRE_ACTIVATION_STAGE);
   const out: ProposalStage[] = [];
   for (const s of stages) {
@@ -126,7 +140,9 @@ export function proposeStages(stages: ProposalStage[]): ProposalStage[] {
         proposed: "Pre-activation Training joined here, any order, no gate (P-MERGE-15)",
       });
     } else if (s.title === PASS3_STAGE) {
-      out.push({ ...s, proposed: "Verida Training opens only once D.Lawson marks BGC, MVR and drug test PASS (P-PASS3)" });
+      // P-EPASSPORT-FIRST — the voucher card comes first in the checklist, still its own step
+      const stepIds = titleOf ? moveBefore(s.stepIds, titleOf, EPASSPORT_STEP, SCHEDULE_DRUG_STEP) : s.stepIds;
+      out.push({ ...s, stepIds, proposed: "Verida Training opens only once D.Lawson marks BGC, MVR and drug test PASS (P-PASS3)" });
     } else if (s.title === "Background Check") {
       out.push({ ...s, proposed: "Verify the signed consent; the result arrives later (P-CONSENT-GATE)" });
     } else {
@@ -406,6 +422,11 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
   }
   // P-LEASE-ASK — the notice and the upload stay with their question (position order would drop them among the OCR fields)
   fields = keepAfter(fields, LEASE_QUESTION, ["auto_lease_required_notice", "auto_lease_agreement"]);
+  // P-EPASSPORT-FIRST — step positions agree with the checklist order
+  if (step.title === EPASSPORT_STEP || step.title === SCHEDULE_DRUG_STEP) {
+    const display_order = step.title === EPASSPORT_STEP ? 1 : 2;
+    if (step.display_order !== display_order) return { ...step, display_order, field_definitions: changed ? inScreenOrder(fields) : step.field_definitions };
+  }
   // P-FEE-WAIVER — rebuild the fee step in the reviewed order.
   const fee = proposeFeeStep(fields, lookup);
   if (fee) {
