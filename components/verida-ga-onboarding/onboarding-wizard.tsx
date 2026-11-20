@@ -161,15 +161,17 @@ export function OnboardingWizard({
   const submitSbs = () => {
     if (!sbs || !currentStep) return;
     /*
-     * Production holds a resubmit while a flagged field is empty (the flag stays open), and validates a
-     * required field once an answer reveals it (P-LEASE-ASK). Other required fields are not checked here so
-     * the review can click through; the scripted steps fill them.
+     * Production holds a resubmit while a flagged field is empty (the flag stays open), and validates every
+     * required field. Here that check covers the fields under review: a required field an answer reveals
+     * (P-LEASE-ASK) and any required Proposed field (the questions themselves). Other required fields are
+     * not checked so the review can click through; the scripted steps fill them.
      */
     const blocking = driverFields(currentStep).filter((f) => {
       if (!shown(f)) return false;
       if (flagged?.has(f.slug)) return isBlankValue(state.values[f.slug]);
       const rule = (f as FieldDef & { visibility_rule?: unknown }).visibility_rule;
-      return Boolean(f.required) && rule != null && isBlankValue(state.values[f.slug]);
+      const proposed = Boolean((f.metadata as { proposed?: string } | null | undefined)?.proposed);
+      return Boolean(f.required) && (rule != null || proposed) && isBlankValue(state.values[f.slug]);
     });
     if (blocking.length) {
       setMissing(blocking.map((f) => f.slug));
