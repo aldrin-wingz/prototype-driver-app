@@ -533,7 +533,7 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
     ];
     return {
       ...step,
-      description: "Download your EPassport once Onboarding uploads it, and confirm you have it before you schedule your drug screening.",
+      description: "Download your EPassport and confirm you have it before you schedule your drug screening.",
       field_definitions: inScreenOrder(epassport),
     };
   }
