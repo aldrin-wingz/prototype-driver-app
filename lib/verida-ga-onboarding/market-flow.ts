@@ -151,14 +151,27 @@ export function buildStageViews(stages: TemplateStage[], cursor: Cursor): StageV
   });
 }
 
-/** real: OnboardingWizardScreen.tsx:54 — completed steps over ALL listed steps. */
+/** Manual stage: an agent must verify it before the driver moves on (production normalises `manual` to `agent`). */
+export function isManualStage(stage: Pick<TemplateStage, "advancement">): boolean {
+  return stage.advancement === "manual" || stage.advancement === "agent";
+}
+
+/**
+ * real: stageAdvancementHydration.ts isStepDoneForStageProgress (v6.0.538-production-ios) — a manual
+ * stage's step counts once an agent verified it; any other stage's once the driver submitted it.
+ */
+export function isStepDoneForProgress(stage: TemplateStage, status: StepStatus): boolean {
+  return isManualStage(stage) ? status === "completed" : status === "completed" || status === "pending_review";
+}
+
+/** real: OnboardingWizardScreen.tsx:54 computeOverallProgress — done steps over ALL listed steps. */
 export function overallProgress(views: StageView[]): number {
   let total = 0;
   let done = 0;
   for (const v of views) {
     for (const s of v.steps) {
       total += 1;
-      if (s.status === "completed") done += 1;
+      if (isStepDoneForProgress(v.stage, s.status)) done += 1;
     }
   }
   return total === 0 ? 0 : done / total;
@@ -167,7 +180,7 @@ export function overallProgress(views: StageView[]): number {
 /** real: stageSidebarNav.ts countCompletedStages */
 export function countCompletedStages(views: StageView[]): { done: number; total: number } {
   return {
-    done: views.filter((v) => v.steps.length > 0 && v.steps.every((s) => s.status === "completed")).length,
+    done: views.filter((v) => v.status === "completed" || (v.steps.length > 0 && v.steps.every((s) => s.status === "completed"))).length,
     total: views.length,
   };
 }

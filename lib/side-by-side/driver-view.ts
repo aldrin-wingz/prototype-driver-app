@@ -4,11 +4,18 @@
  */
 import type { SbsState, SbsStepStatus } from "./contract";
 import { proposeStep, type ProposalStep } from "./proposals";
-import { templateFor, type StageView, type TemplateStage, type TemplateStep } from "@/lib/verida-ga-onboarding/market-flow";
+import { isManualStage, templateFor, type StageView, type TemplateStage, type TemplateStep } from "@/lib/verida-ga-onboarding/market-flow";
 
 const STEP_INDEX: Map<string, TemplateStep> = (() => {
   const m = new Map<string, TemplateStep>();
   for (const key of ["non-ga", "verida-ga"] as const) for (const s of templateFor(key)) for (const st of s.steps) m.set(String(st.id), st);
+  return m;
+})();
+
+/** The template's own stage fields (driver note, description) by stage id. */
+const STAGE_INDEX: Map<string, TemplateStage> = (() => {
+  const m = new Map<string, TemplateStage>();
+  for (const key of ["non-ga", "verida-ga"] as const) for (const s of templateFor(key)) m.set(String(s.id), s);
   return m;
 })();
 
@@ -17,6 +24,8 @@ export function sbsStages(state: SbsState): TemplateStage[] {
   return state.stages.map((s) => ({
     id: s.id,
     title: s.title,
+    description: STAGE_INDEX.get(String(s.id))?.description ?? null,
+    driver_note: STAGE_INDEX.get(String(s.id))?.driver_note ?? null,
     layout: s.layout,
     advancement: s.advancement,
     proposed: s.proposed,
@@ -27,18 +36,26 @@ export function sbsStages(state: SbsState): TemplateStage[] {
   }));
 }
 
-function rollUp(sts: SbsStepStatus[]): SbsStepStatus {
+/**
+ * real: stageAdvancementHydration.ts hydrateStageStatusFromSteps + onboardingNavigation.ts
+ * markAutoStageCompletedInConfig (v6.0.538-production-ios):
+ *   - a change request anywhere in the stage makes it active again;
+ *   - every step verified → completed;
+ *   - every step submitted: a manual stage waits (pending_review), any other stage is done for the
+ *     driver (completed) even while agents still verify it.
+ */
+function rollUp(stage: TemplateStage, sts: SbsStepStatus[]): SbsStepStatus {
   if (sts.every((s) => s === "locked")) return "locked";
-  if (sts.includes("change_requested")) return "change_requested";
+  if (sts.includes("change_requested")) return "in_progress";
   if (sts.every((s) => s === "completed")) return "completed";
-  if (sts.includes("in_progress") || sts.includes("locked")) return "in_progress";
-  return "pending_review";
+  if (sts.every((s) => s === "completed" || s === "pending_review")) return isManualStage(stage) ? "pending_review" : "completed";
+  return "in_progress";
 }
 
 export function sbsViews(stages: TemplateStage[], state: SbsState): StageView[] {
   return stages.map((stage) => {
     const steps = stage.steps.map((step) => ({ step, status: state.status[String(step.id)] ?? "locked" }));
-    return { stage, status: rollUp(steps.map((x) => x.status)), steps };
+    return { stage, status: rollUp(stage, steps.map((x) => x.status)), steps };
   });
 }
 

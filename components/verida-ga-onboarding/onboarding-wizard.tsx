@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
-import { AlertCircle, AlertTriangle, Check, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
 import {
   type Cursor,
@@ -36,6 +36,8 @@ import {
   countCompletedStages,
   driverFields,
   initialCursor,
+  isManualStage,
+  isStepDoneForProgress,
   marketIdFor,
   marketKeyFor,
   marketOptions,
@@ -110,6 +112,38 @@ export function OnboardingWizard({
   const currentStep = current?.steps[state.cursor.stepIndex]?.step;
   const currentStatus: StepStatus | undefined = current?.steps[state.cursor.stepIndex]?.status;
   const waiting = Boolean(sbs) && (currentStatus === "pending_review" || currentStatus === "completed");
+  const manualStage = current ? isManualStage(current.stage) : false;
+
+  /*
+   * Side-by-side: a stage done in any order opens on its checklist hub (real: OnboardingParallelHub.tsx);
+   * tapping an item opens it, and submitting it returns to the hub (production "Save & Return").
+   */
+  const [openItem, setOpenItem] = useState<string | null>(null);
+  const hubLayout = Boolean(sbs) && current ? isChecklistHub(current.stage) : false;
+  const showHub = hubLayout && openItem !== (currentStep ? String(currentStep.id) : null);
+  const openStep = (stepId: string, inHub: boolean) => {
+    setOpenItem(inHub ? stepId : null);
+    sbs?.onOpen(stepId);
+  };
+
+  /**
+   * real: onboardingNavigation.ts resolveAdvanceOnlyContinueNav — Continue on a step already submitted
+   * is navigation only: an outstanding change request first, else the next step the driver can open.
+   */
+  const advanceOnlyTarget = (() => {
+    if (!sbs || !currentStep) return null;
+    const flat = views.flatMap((v) => v.steps.map((x) => ({ id: String(x.step.id), status: x.status, stage: v.stage })));
+    const here = flat.findIndex((x) => x.id === String(currentStep.id));
+    const cr = flat.find((x) => x.status === "change_requested" && x.id !== String(currentStep.id));
+    if (cr) return cr;
+    // A manual stage awaiting verification: production keeps the driver here (canAutoAdvancePastLinearStep).
+    for (const x of flat.slice(here + 1)) {
+      if (x.status === "locked") continue;
+      if (x.stage !== current?.stage && manualStage && current?.status !== "completed") return null;
+      return x;
+    }
+    return null;
+  })();
 
   const submitSbs = () => {
     if (!sbs || !currentStep) return;
@@ -121,6 +155,7 @@ export function OnboardingWizard({
       if (state.heardFrom) values.how_did_you_hear_about_wingz = state.heardFrom;
     }
     sbs.onSubmit(String(currentStep.id), values, gettingStarted ? state.draftMarket : undefined);
+    setOpenItem(null);
   };
 
   const advance = (patch: Partial<WizardState> = {}) => {
@@ -227,10 +262,24 @@ export function OnboardingWizard({
             <span>{current.stage.proposed}</span>
           </div>
         ) : null}
-        {currentStep ? (
+        {showHub && current ? (
+          <ParallelHub view={current} onOpenStep={(id) => openStep(id, true)} />
+        ) : currentStep ? (
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-4">
             {/* real: OnboardingWizardScreen.tsx — AwaitingReviewBanner sits above the step title. */}
-            {sbs && currentStatus === "pending_review" ? (
+            {hubLayout ? (
+              <button
+                type="button"
+                onClick={() => setOpenItem(null)}
+                className="mb-3 flex items-center gap-1 text-[13px] font-medium"
+                style={{ color: GREEN }}
+                data-testid="back-to-checklist"
+              >
+                <ChevronLeft className="h-4 w-4" /> Back to checklist
+              </button>
+            ) : null}
+            {/* real: AwaitingReviewBanner.tsx — manual (agent) stages only. */}
+            {sbs && currentStatus === "pending_review" && manualStage ? (
               <AmberBanner
                 icon="clock"
                 title={isFinalReview(current?.stage.title) ? FINAL_REVIEW_SUBMITTED_TITLE : AWAITING_REVIEW_TITLE}
@@ -270,7 +319,19 @@ export function OnboardingWizard({
                 ),
               )}
             </div>
-            {waiting ? null : (
+            {waiting ? (
+              advanceOnlyTarget ? (
+                <button
+                  type="button"
+                  data-testid="continue-advance-only"
+                  onClick={() => openStep(advanceOnlyTarget.id, isChecklistHub(advanceOnlyTarget.stage) && advanceOnlyTarget.stage === current?.stage)}
+                  className="mt-6 w-full rounded-lg py-3 text-[15px] font-semibold text-white"
+                  style={{ backgroundColor: GREEN }}
+                >
+                  Continue
+                </button>
+              ) : null
+            ) : (
             <button
               type="button"
               data-testid="continue"
@@ -300,7 +361,8 @@ export function OnboardingWizard({
           onPickStep={
             sbs
               ? (stepId) => {
-                  sbs.onOpen(stepId);
+                  const inHub = views.some((v) => isChecklistHub(v.stage) && v.steps.some((x) => String(x.step.id) === stepId));
+                  openStep(stepId, inHub);
                   setPanelOpen(false);
                 }
               : undefined
@@ -500,6 +562,101 @@ function SelectField({
         </span>
       ) : null}
     </label>
+  );
+}
+
+function isChecklistHub(stage: TemplateStage) {
+  return stage.layout === "accordion" || stage.layout === "parallel";
+}
+
+/* real: App/Data/onboarding/copy/onboardingBannerCopy.ts (v6.0.538-production-ios) */
+const HUB_DEFAULT_SUBTITLE = "Complete all items below in any order.";
+const CHANGE_REQUESTED_HUB_HINT = "Open this step to see feedback on each highlighted field.";
+const MANUAL_AGENT_HUB_HINT = "You've submitted all items in this section. A Wingz agent will review them before you can continue.";
+
+/**
+ * real: App/Components/Onboarding/Wizard/OnboardingParallelHub.tsx (v6.0.538-production-ios) — title,
+ * subtitle, driver note, hint, progress row, one row per item (done = submitted or verified).
+ */
+function ParallelHub({ view, onOpenStep }: { view: StageView; onOpenStep: (stepId: string) => void }) {
+  const { stage, steps } = view;
+  const total = steps.length;
+  const completed = steps.filter((x) => isStepDoneForProgress(stage, x.status)).length;
+  const progress = total === 0 ? 0 : completed / total;
+  const driverNote = stage.layout === "accordion" ? stage.driver_note?.trim() || null : null;
+  const hint = steps.some((x) => x.status === "change_requested")
+    ? CHANGE_REQUESTED_HUB_HINT
+    : isManualStage(stage) && view.status === "pending_review"
+      ? MANUAL_AGENT_HUB_HINT
+      : null;
+  return (
+    <div data-testid="parallel-hub">
+      <div className="mb-2 text-[16px] font-medium">{stage.title}</div>
+      <div className="mb-4 text-[14px] leading-5" style={{ color: GRAY_3 }}>
+        {HUB_DEFAULT_SUBTITLE}
+      </div>
+      {[driverNote, hint].filter(Boolean).map((m) => (
+        <div key={m} className="mb-4 rounded-lg bg-[#E6F7F5] px-3 py-2.5 text-[13px] leading-[18px] text-[#2B2B2B]" data-testid="hub-note">
+          {m}
+        </div>
+      ))}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-[3px] bg-[#E8E8E8]">
+          <div className="h-full rounded-[3px]" style={{ width: `${progress * 100}%`, backgroundColor: GREEN }} />
+        </div>
+        <div className="min-w-9 text-right text-[14px] font-semibold" style={{ color: GRAY_3 }}>
+          {completed} / {total}
+        </div>
+      </div>
+      <div className="space-y-2.5">
+        {steps.map(({ step, status }) => {
+          const locked = status === "locked";
+          const done = status === "completed" || status === "pending_review";
+          const description = step.description?.trim() || step.field_definitions.find((f) => f.help_text?.trim())?.help_text?.trim() || "";
+          return (
+            <button
+              key={String(step.id)}
+              type="button"
+              disabled={locked}
+              onClick={() => onOpenStep(String(step.id))}
+              className="flex w-full items-center gap-3 rounded-[10px] border px-3.5 py-3.5 text-left"
+              style={{
+                borderColor: done ? "rgba(0, 236, 175, 0.2)" : GRAY_7,
+                backgroundColor: done ? "#EEFBF5" : "#fff",
+                opacity: locked ? 0.55 : 1,
+              }}
+              data-testid="hub-row"
+              data-status={status}
+            >
+              {done ? (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: GREEN }}>
+                  <Check className="h-3.5 w-3.5 text-white" />
+                </span>
+              ) : status === "change_requested" ? (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[#D48806] bg-white">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#FFE7BA]" />
+                </span>
+              ) : (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 bg-white" style={{ borderColor: GRAY_7 }}>
+                  <span className="h-2.5 w-2.5 rounded-full border border-[#838383]" />
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-medium" style={{ color: done ? GREEN : BLACK_1 }}>
+                  {step.title}
+                </span>
+                {description ? (
+                  <span className="mt-1 line-clamp-2 block text-[13px] leading-[18px]" style={{ color: GRAY_3 }}>
+                    {description}
+                  </span>
+                ) : null}
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0" style={{ color: done ? GREEN : GRAY_3 }} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
