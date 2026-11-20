@@ -297,7 +297,11 @@ export function OnboardingWizard({
         marketId={marketIdFor(state.marketState)}
         value={state.values[f.slug]}
         onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
-        onPatch={(patch) => onChange({ ...state, values: { ...state.values, ...patch } })}
+        onPatch={(patch) => {
+          // The signature arriving clears its "must sign" note, as the portal's revalidation does.
+          setMissing((m) => m.filter((slug) => !(slug in patch)));
+          onChange({ ...state, values: { ...state.values, ...patch } });
+        }}
         readOnly={waiting}
       />
     );
