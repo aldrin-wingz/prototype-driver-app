@@ -248,21 +248,8 @@ export function OnboardingWizard({
     onChange({ ...merged, cursor: next ?? merged.cursor });
   };
 
-  /** One field: the two Getting Started selects, or the shared field renderer. */
-  const renderField = (f: FieldDef) => {
-    const el = renderFieldBody(f);
-    const note = (f.metadata as { proposed?: string } | null | undefined)?.proposed;
-    return sbs && note ? (
-      <div key={`p-${f.slug}`} className="rounded-lg border border-dashed border-violet-300 p-2" title={note}>
-        <div className="mb-1">
-          <ProposedTag />
-        </div>
-        {el}
-      </div>
-    ) : (
-      el
-    );
-  };
+  /** One field: the two Getting Started selects, or the shared field renderer. The app shows no design labels. */
+  const renderField = (f: FieldDef) => renderFieldBody(f);
 
   const renderFieldBody = (f: FieldDef) =>
     f.field_type === "voucher" ? (
@@ -339,12 +326,6 @@ export function OnboardingWizard({
       ) : null}
       {/* Step body — back to the top on every step, as a new screen would be. */}
       <div ref={bodyRef} className={`flex-1 overflow-y-auto bg-[#FAFAFA] p-4 ${sbs && (sbs.lifecycle === "on_hold" || sbs.lifecycle === "rejected") ? "hidden" : ""}`}>
-        {sbs && current?.stage.proposed ? (
-          <div className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-violet-300 bg-violet-50 px-3 py-2 text-[12px] text-violet-800" data-testid="stage-proposed">
-            <ProposedTag />
-            <span>{current.stage.proposed}</span>
-          </div>
-        ) : null}
         {showHub && current ? (
           <div className="rounded-xl border border-[#D9D9D9] bg-white px-5 pb-4 pt-5" data-testid="hub-card">
             {awaitingAgent ? (
@@ -596,15 +577,6 @@ function ChangeRequestFieldFrame({ message, children }: { message: string; child
       </div>
       {children}
     </div>
-  );
-}
-
-/** Marks UI that exists only in this prototype (not in the production app yet). */
-function ProposedTag() {
-  return (
-    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
-      Proposed
-    </span>
   );
 }
 
