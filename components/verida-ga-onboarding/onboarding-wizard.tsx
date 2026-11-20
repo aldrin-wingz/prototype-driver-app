@@ -613,23 +613,28 @@ function ChangeRequestFieldFrame({ message, children }: { message: string; child
   );
 }
 
-/** real: App/Components/DynamicForm/DynamicVoucherField.tsx — "Not yet available", then View / Download. */
+/**
+ * real: App/Components/DynamicForm/DynamicVoucherField.tsx — "Not yet available", then View voucher / Download PDF.
+ * Verida GA (Luis, 2026-11-21): the voucher shows on the card itself (no View button); Download stays.
+ * A PDF shows in an embedded viewer, an image as the image. ⛔ Production app change (the app opens it externally today).
+ */
 function VoucherField({ field, value }: { field: FieldDef; value: unknown }) {
   const url = typeof value === "string" && value.trim() ? value : null;
+  const isPdf = Boolean(url && /\.pdf($|\?)|^data:application\/pdf/i.test(url));
   return (
     <div>
       <div className="mb-1.5 text-[14px] font-semibold">{field.label}</div>
       <div className="rounded-lg border bg-white p-3" style={{ borderColor: GRAY_7 }} data-testid="voucher-field">
         {url ? (
           <>
-            <p className="mb-3.5 text-[12px] leading-[18px]" style={{ color: GRAY_3 }}>
-              Your voucher is ready to view or download.
-            </p>
-            <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block w-full rounded-lg py-2.5 text-center text-[14px] font-semibold text-white" style={{ backgroundColor: GREEN }}>
-              View voucher
-            </a>
-            <a href={url} download className="mt-2 block w-full rounded-lg border py-2.5 text-center text-[14px] font-semibold" style={{ borderColor: GREEN, color: GREEN }}>
-              Download PDF
+            {isPdf ? (
+              <iframe src={url} title={field.label} className="h-[420px] w-full rounded border" style={{ borderColor: GRAY_7 }} data-testid="voucher-inline" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={url} alt={field.label} className="w-full rounded border" style={{ borderColor: GRAY_7 }} data-testid="voucher-inline" />
+            )}
+            <a href={url} download className="mt-3 block w-full rounded-lg border py-2.5 text-center text-[14px] font-semibold" style={{ borderColor: GREEN, color: GREEN }} data-testid="voucher-download">
+              Download
             </a>
           </>
         ) : (
