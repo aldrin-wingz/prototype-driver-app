@@ -120,7 +120,8 @@ export function OnboardingWizard({
    */
   const [openItem, setOpenItem] = useState<string | null>(null);
   const hubLayout = Boolean(sbs) && current ? isChecklistHub(current.stage) : false;
-  const showHub = hubLayout && openItem !== (currentStep ? String(currentStep.id) : null);
+  // real: onboardingNavigation.ts — an outstanding change request opens its step directly, not the hub.
+  const showHub = hubLayout && currentStatus !== "change_requested" && openItem !== (currentStep ? String(currentStep.id) : null);
   const openStep = (stepId: string, inHub: boolean) => {
     setOpenItem(inHub ? stepId : null);
     sbs?.onOpen(stepId);
