@@ -328,7 +328,13 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
   }
   // P-FEE-WAIVER — rebuild the fee step in the reviewed order.
   const fee = proposeFeeStep(fields, lookup);
-  if (fee) return { ...step, field_definitions: fee };
+  if (fee) {
+    return {
+      ...step,
+      description: "Pay the one-time $15 background check fee, or have it waived if you already have 2 of the required safety equipment items.",
+      field_definitions: fee,
+    };
+  }
   return changed ? { ...step, field_definitions: fields } : step;
 }
 
