@@ -56,6 +56,8 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-PASS3", title: "Verida Training opens once D.Lawson marks BGC, MVR and drug test PASS", source: "Onboarding review C5" },
   { id: "P-EPASSPORT", title: "Onboarding uploads the EPassport; the driver views it", source: "Onboarding review C6" },
   { id: "P-LINKS", title: "Amazon / Walmart link per safety item", source: "Onboarding review C7 + Luis's links" },
+  { id: "P-LEASE-ASK", title: "Vehicle Insurance & Registration asks whether the driver's name is on both documents; No makes the auto-lease agreement required", source: "Luis, 2026-11-20" },
+  { id: "P-FLAG-EMPTY", title: "The tool lists every driver-facing field, empty optional uploads too, and can request changes on them; the driver must upload a flagged field to resubmit", source: "Luis, 2026-11-20 (production cannot flag an empty field)" },
   { id: "P-RSM", title: "Inspection copy names Rideshare Mechanic", source: "Luis, 2026-11-20 (C8)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
@@ -141,6 +143,16 @@ function rsm(text: string | null | undefined): string | null | undefined {
   return typeof text === "string" ? text.replace(/Bright Inspect/g, "Rideshare Mechanic") : text;
 }
 
+const LEASE_QUESTION = "auto_lease_name_on_both";
+
+/** Empty the way the app treats an answer: nothing, blank text, an empty list (app formUtils isEmpty / isEmptyFileValue). */
+export function isBlankValue(v: unknown): boolean {
+  if (v === undefined || v === null) return true;
+  if (typeof v === "string") return v.trim() === "";
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
+
 /** Field-level proposals for one step. Returns the step unchanged when nothing applies. */
 export function proposeStep<T extends ProposalStep>(step: T): T {
   let changed = false;
@@ -186,12 +198,35 @@ export function proposeStep<T extends ProposalStep>(step: T): T {
     if (["bgc_result_file", "bgc_results", "bgc_results_reason", "bgc_decision"].includes(f.slug)) {
       g = withMeta({ ...g, required: false }, "P-CONSENT-GATE");
     }
+    // P-LEASE-ASK — the notice and the upload follow the driver's answer; the upload is required on No
+    if (f.slug === "auto_lease_required_notice") {
+      g = withMeta({ ...g, visibility_rule: { "==": [{ var: LEASE_QUESTION }, "no"] } }, "P-LEASE-ASK");
+    }
+    if (f.slug === "auto_lease_agreement") {
+      g = withMeta({ ...g, required: true, visibility_rule: { "==": [{ var: LEASE_QUESTION }, "no"] } }, "P-LEASE-ASK");
+    }
     // P-FEE-WAIVER — the receipt shows only when paying
     if (f.slug === "background_check_fee_receipt") {
       g = withMeta({ ...g, visibility_rule: { "==": [{ var: "bgc_fee_method" }, "pay"] } }, "P-FEE-WAIVER");
     }
     if (g !== f) changed = true;
     fields.push(g);
+    // P-LEASE-ASK — the question goes right under the Auto-Lease heading
+    if (f.slug === "auto_lease_heading") {
+      changed = true;
+      fields.push({
+        slug: LEASE_QUESTION,
+        label: "Is your name on both your vehicle registration and your insurance card?",
+        field_type: "radio",
+        required: true,
+        visibility: "external",
+        options: [
+          { label: "Yes", value: "yes" },
+          { label: "No", value: "no" },
+        ],
+        metadata: PROPOSED("P-LEASE-ASK"),
+      });
+    }
     // P-FEE-WAIVER — the choice goes right before the receipt
     if (f.slug === "bgc_fee_payment_steps") {
       changed = true;

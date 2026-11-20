@@ -21,6 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
+import { isBlankValue } from "@/lib/side-by-side/proposals";
 import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { AlertCircle, AlertTriangle, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
@@ -115,6 +116,17 @@ export function OnboardingWizard({
   const manualStage = current ? isManualStage(current.stage) : false;
 
   /*
+   * Change requested: only the flagged fields can be edited (real: onboardingStepPresentation.ts, non-flagged
+   * fields disabled), and a flagged field always shows even if an answer would hide it (P-FLAG-EMPTY: the
+   * agent may flag an upload the driver's answer hid).
+   */
+  const flagged: Set<string> | null =
+    sbs && currentStatus === "change_requested" ? new Set(sbs.changeRequest?.fields ?? []) : null;
+  const shown = (f: FieldDef) => isFieldVisible(f, state.values) || Boolean(flagged?.has(f.slug));
+  const [missing, setMissing] = useState<string[]>([]);
+  useEffect(() => setMissing([]), [currentStep?.id, currentStatus]);
+
+  /*
    * Side-by-side: a stage done in any order opens on its checklist hub (real: OnboardingParallelHub.tsx);
    * tapping an item opens it, and submitting it returns to the hub (production "Save & Return").
    */
@@ -148,6 +160,21 @@ export function OnboardingWizard({
 
   const submitSbs = () => {
     if (!sbs || !currentStep) return;
+    /*
+     * Production holds a resubmit while a flagged field is empty (the flag stays open), and validates a
+     * required field once an answer reveals it (P-LEASE-ASK). Other required fields are not checked here so
+     * the review can click through; the scripted steps fill them.
+     */
+    const blocking = driverFields(currentStep).filter((f) => {
+      if (!shown(f)) return false;
+      if (flagged?.has(f.slug)) return isBlankValue(state.values[f.slug]);
+      const rule = (f as FieldDef & { visibility_rule?: unknown }).visibility_rule;
+      return Boolean(f.required) && rule != null && isBlankValue(state.values[f.slug]);
+    });
+    if (blocking.length) {
+      setMissing(blocking.map((f) => f.slug));
+      return;
+    }
     const gettingStarted = isGettingStarted(currentStep.field_definitions);
     const values: Values = {};
     for (const f of driverFields(currentStep)) if (state.values[f.slug] !== undefined) values[f.slug] = state.values[f.slug];
@@ -310,11 +337,21 @@ export function OnboardingWizard({
               aria-disabled={waiting || undefined}
               data-testid={waiting ? "step-read-only" : undefined}
             >
-              {driverFields(currentStep).filter((f) => isFieldVisible(f, state.values)).map((f) =>
-                sbs && currentStatus === "change_requested" && sbs.changeRequest?.fields.includes(f.slug) ? (
-                  <ChangeRequestFieldFrame key={`cr-${f.slug}`} message={sbs.changeRequest.reason}>
+              {driverFields(currentStep).filter(shown).map((f) =>
+                flagged?.has(f.slug) ? (
+                  <ChangeRequestFieldFrame key={`cr-${f.slug}`} message={sbs?.changeRequest?.reason ?? ""}>
                     {renderField(f)}
+                    {missing.includes(f.slug) ? <MissingNote field={f} /> : null}
                   </ChangeRequestFieldFrame>
+                ) : flagged ? (
+                  <div key={`ro-${f.slug}`} className="pointer-events-none opacity-60" aria-disabled data-testid="not-flagged-read-only">
+                    {renderField(f)}
+                  </div>
+                ) : missing.includes(f.slug) ? (
+                  <div key={`m-${f.slug}`}>
+                    {renderField(f)}
+                    <MissingNote field={f} />
+                  </div>
                 ) : (
                   renderField(f)
                 ),
@@ -407,6 +444,16 @@ function AmberBanner({ icon, title, body }: { icon: "clock" | "alert"; title: st
         <div className="mb-1 text-[13px] font-semibold leading-[22px] text-[#92400E]">{title}</div>
         <div className="text-[12px] leading-5 text-[#B45309]">{body}</div>
       </div>
+    </div>
+  );
+}
+
+/** The template's own requiredMessage when it has one (production validation copy), else a plain fallback. */
+function MissingNote({ field }: { field: FieldDef }) {
+  const msg = (field as FieldDef & { validation_rules?: { requiredMessage?: string } | null }).validation_rules?.requiredMessage?.trim();
+  return (
+    <div className="mt-1.5 text-[12px] font-medium text-[#CF1322]" data-testid="field-missing">
+      {msg || "This field is required."}
     </div>
   );
 }
