@@ -67,6 +67,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-EPASSPORT-STEP", title: "The EPassport sits in Schedule Drug Screening, after the instructions and before the Schedule link: shown on the card with Download and a required 'I have downloaded my EPassport'. No EPassport stage (15 stages)", source: "Luis, 2026-11-21 (D22, replaces the EPassport stage)" },
   { id: "P-EPASSPORT-CONSENT", title: "Onboarding uploads the EPassport into a required staff-only field on the D.Lawson consent (Verify waits for it); the backend copies it to the driver's EPassport step, so the stage opens ready", source: "Luis, 2026-11-21 (comment 20)" },
   { id: "P-WAIVER-COPY", title: "The fee waiver has its own photo fields (optional, at least 2); when Onboarding verifies the fee step they are copied into the matching Safety Equipment fields. Pre-Gentech certificates are copied into GenTech Training the same way (on verify)", source: "Luis, 2026-11-21 (D21, F5)" },
+  { id: "P-BGC-RESULTS-COMPLIANCE", title: "The D.Lawson results (result upload, External Results, Reason, Wingz Background Check Decision) leave the onboarding consent step; the compliance team records them in the Compliance Tool's Background Check / MVR / Drug Screening requirements", source: "Luis, 2026-11-21 (D23)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -451,9 +452,10 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
         "P-LINKS",
       );
     }
-    // P-CONSENT-GATE — results are filed later, so they cannot block the consent verify
+    // P-BGC-RESULTS-COMPLIANCE (D23) — the results belong to the Compliance Tool, not the consent step
     if (["bgc_result_file", "bgc_results", "bgc_results_reason", "bgc_decision"].includes(f.slug)) {
-      g = withMeta({ ...g, required: false }, "P-CONSENT-GATE");
+      changed = true;
+      continue;
     }
     // P-LEASE-ASK — the notice and the upload follow the driver's answer; the upload is required on No
     if (f.slug === "auto_lease_required_notice") {
