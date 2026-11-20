@@ -50,7 +50,7 @@ export interface Proposal {
 
 export const PROPOSALS: Proposal[] = [
   { id: "P-SS-CARD", title: "\"SSN Document\" becomes \"Social Security Card\"; the SSA document is not accepted", source: "Onboarding review C1" },
-  { id: "P-FEE-AUTO", title: "Background Check Fee advances on upload; reviewed later", source: "Onboarding review C2" },
+  { id: "P-PD-VERIFY", title: "Profile & Documents is verified before the Info Call opens", source: "Anj, 2026-11-20 (replaces C2's fee auto-advance; the fee keeps production's verification)" },
   { id: "P-FEE-WAIVER", title: "Fee waiver: a photo of 2 safety-equipment items instead of the receipt", source: "Onboarding review C3 (Mae)" },
   { id: "P-CONSENT-GATE", title: "Background Check verifies the signed consent; the result is not awaited", source: "Onboarding review C4" },
   { id: "P-PASS3", title: "Verida Training opens once D.Lawson marks BGC, MVR and drug test PASS", source: "Onboarding review C5" },
@@ -93,6 +93,7 @@ const ITEM_TO_SLUG: [RegExp, string][] = [
 /* ── Stages ─────────────────────────────────────────────────────────────────── */
 
 const FEE_STAGE = "Background Check Fee";
+const PROFILE_DOCS_STAGE = "Profile & Documents";
 const PAYMENT_STAGE = "Payment & Tax Setup";
 const PRE_ACTIVATION_STAGE = "Pre-activation Training";
 export const PASS3_STAGE = "Pre-Verida Training Check";
@@ -105,7 +106,10 @@ export function proposeStages(stages: ProposalStage[]): ProposalStage[] {
   for (const s of stages) {
     if (s.title === PRE_ACTIVATION_STAGE) continue; // P-MERGE-15
     if (s.title === FEE_STAGE) {
-      out.push({ ...s, advancement: "auto", proposed: "Advances on upload; a waiver photo can replace the receipt (P-FEE-AUTO, P-FEE-WAIVER)" });
+      // Anj, 2026-11-20: the fee is verified before the driver moves on (production's setting, kept).
+      out.push({ ...s, advancement: "manual", proposed: "A waiver photo can replace the receipt; verified before Initial Training opens (P-FEE-WAIVER)" });
+    } else if (s.title === PROFILE_DOCS_STAGE) {
+      out.push({ ...s, advancement: "manual", proposed: "All four verified before the Info Call opens (P-PD-VERIFY)" });
     } else if (s.title === PAYMENT_STAGE && pre) {
       out.push({
         ...s,
