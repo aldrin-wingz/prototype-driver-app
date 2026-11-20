@@ -27,6 +27,11 @@ import { Calendar, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Chevro
 
 import { resolveFieldLink, type FieldDef } from "@/lib/verida-ga-onboarding/market-flow";
 import {
+  ESIGN_ACK_SLUG,
+  ESIGN_SIGNATURE_SLUG,
+  ESIGN_SIGNED_BODY,
+  ESIGN_SIGNED_TITLE,
+  PROTOTYPE_SIGNATURE_ID,
   choiceOptions,
   isScrollAck,
   sampleUploadName,
@@ -224,6 +229,51 @@ const GREEN_TINT = "#E8FAF4";
 const MUTED = "#C9C9C9";
 
 type OnValue = (slug: string, value: unknown) => void;
+type OnPatch = (patch: Record<string, unknown>) => void;
+
+/**
+ * real: DynamicFormRenderer.tsx:1006 (esign_action) + ActionSuccessCard.tsx. Before signing: the sign button.
+ * After: a disabled success card. The prototype signs instantly instead of opening HelloSign, and records what the
+ * backend webhook records (signature id + the internal consent box). It never submits the step.
+ */
+function EsignField({ field, value, onPatch, readOnly }: { field: FieldDef; value: unknown; onPatch: OnPatch; readOnly: boolean }) {
+  const signed = typeof value === "string" ? value.trim() !== "" : value != null && value !== false;
+  if (signed) {
+    return (
+      <div className="flex items-start gap-2.5 rounded-lg border p-3" style={{ borderColor: GREEN, backgroundColor: GREEN_TINT }} data-testid="esign-signed">
+        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: GREEN }}>
+          <Check className="h-3 w-3 text-white" />
+        </span>
+        <div>
+          <div className="text-[14px] font-semibold">{ESIGN_SIGNED_TITLE}</div>
+          <div className="text-[12px]" style={{ color: GRAY_3 }}>
+            {ESIGN_SIGNED_BODY}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={readOnly}
+        data-testid="esign-sign"
+        onClick={() => onPatch({ [field.slug]: PROTOTYPE_SIGNATURE_ID, [ESIGN_SIGNATURE_SLUG]: PROTOTYPE_SIGNATURE_ID, [ESIGN_ACK_SLUG]: true })}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] font-semibold text-white disabled:opacity-60"
+        style={{ backgroundColor: GREEN }}
+      >
+        <FileText className="h-4 w-4" />
+        {field.content?.trim() || field.label || "Review & sign"}
+      </button>
+      {field.help_text?.trim() ? (
+        <div className="mt-1 text-[11px]" style={{ color: GRAY_3 }}>
+          {field.help_text.trim()}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function Required({ field }: { field: FieldDef }) {
   return field.required ? <span className="text-red-500"> *</span> : null;
@@ -358,12 +408,15 @@ export function RichField({
   marketId,
   value,
   onChange,
+  onPatch,
   readOnly = false,
 }: {
   field: FieldDef;
   marketId: number | null;
   value?: unknown;
   onChange?: OnValue;
+  /** Several values at once (the e-sign webhook's writes). Falls back to one onChange per value. */
+  onPatch?: OnPatch;
   /** The step is submitted (pending review / verified): fields that have a summary form show it. */
   readOnly?: boolean;
 }) {
@@ -390,7 +443,11 @@ export function RichField({
 
   if (t === "info_list") return <InfoList field={field} />;
 
-  if (t === "button" || t === "esign_action" || t === "stripe_onboarding_action") {
+  if (t === "esign_action") {
+    const patch: OnPatch = onPatch ?? ((p) => Object.entries(p).forEach(([k, v]) => set(k, v)));
+    return <EsignField field={field} value={value} onPatch={patch} readOnly={readOnly} />;
+  }
+  if (t === "button" || t === "stripe_onboarding_action") {
     return <LinkButton field={field} href={resolveFieldLink(field, marketId)} />;
   }
   if (t === "video") return <LinkButton field={field} href={resolveFieldLink(field, marketId)} video />;

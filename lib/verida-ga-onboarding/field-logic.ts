@@ -13,6 +13,25 @@ import type { FieldDef } from "./market-flow";
 export type Values = Record<string, unknown>;
 
 /**
+ * D.Lawson consent (HelloSign / Dropbox Sign). Production: signing does NOT submit the step. The signed webhook
+ * saves the signature id and ticks the internal consent box (backend driver_onboarding/utils.py:970–1027 @ prod_19.5.32),
+ * the sign button turns into a disabled "signed" card (api/serializers/driver_onboarding.py:493, macros :397–398),
+ * and Submit stays blocked until the required signature id is there (app formUtils.ts:217; portal step-form.tsx:660).
+ */
+export const ESIGN_SIGNATURE_SLUG = "bgc_esign_signature_id";
+export const ESIGN_ACK_SLUG = "ack_bgc_consent";
+export const ESIGN_SIGNED_TITLE = "Consent Form Signed";
+export const ESIGN_SIGNED_BODY = "Your consent form has been signed successfully.";
+/** Synthetic signature request id the prototype records on "signing". */
+export const PROTOTYPE_SIGNATURE_ID = "prototype-signature-request";
+
+/** Required async values still empty (e.g. the signature id before the webhook) — each one blocks Submit. */
+export function missingAsyncValues(fields: FieldDef[], values: Values): string[] {
+  const blank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
+  return fields.filter((f) => f.field_type === "async_value" && f.required && blank(values[f.slug])).map((f) => f.slug);
+}
+
+/**
  * The JSON Logic subset the templates use (`var`, `==`, `===`, `!=`, `!`, `in`, `and`, `or`).
  * Production runs json-logic-js; anything outside this subset is treated as visible, which is
  * also what the app does when a rule throws.

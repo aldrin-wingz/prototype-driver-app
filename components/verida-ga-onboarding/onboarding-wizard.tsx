@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
 import { FEE_WAIVER_MIN, dependsOnAny, feeWaiverShortfall, isBlankValue } from "@/lib/side-by-side/proposals";
-import { continueLabel, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
+import { ESIGN_ACK_SLUG, continueLabel, missingAsyncValues, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
 import {
@@ -227,6 +227,8 @@ export function OnboardingWizard({
     const blocking = driverFields(currentStep).filter((f) => {
       if (!shown(f)) return false;
       if (flagged?.has(f.slug)) return isBlankValue(state.values[f.slug]);
+      // A required async value (the D.Lawson signature id) blocks Submit until it arrives — production rule.
+      if (f.field_type === "async_value") return missingAsyncValues([f], state.values).length > 0;
       const rule = (f as FieldDef & { visibility_rule?: unknown }).visibility_rule;
       const proposed = Boolean((f.metadata as { proposed?: string } | null | undefined)?.proposed);
       return Boolean(f.required) && (rule != null || proposed) && isBlankValue(state.values[f.slug]);
@@ -244,6 +246,10 @@ export function OnboardingWizard({
     const gettingStarted = isGettingStarted(currentStep.field_definitions);
     const values: Values = {};
     for (const f of driverFields(currentStep)) if (state.values[f.slug] !== undefined) values[f.slug] = state.values[f.slug];
+    // The e-sign webhook also ticks the internal consent box (backend utils.py:1005–1020).
+    if (currentStep.field_definitions.some((f) => f.slug === ESIGN_ACK_SLUG) && state.values[ESIGN_ACK_SLUG] !== undefined) {
+      values[ESIGN_ACK_SLUG] = state.values[ESIGN_ACK_SLUG];
+    }
     if (gettingStarted) {
       values[MARKET_FIELD_SLUG] = state.draftMarket;
       if (state.heardFrom) values.how_did_you_hear_about_wingz = state.heardFrom;
@@ -291,6 +297,7 @@ export function OnboardingWizard({
         marketId={marketIdFor(state.marketState)}
         value={state.values[f.slug]}
         onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
+        onPatch={(patch) => onChange({ ...state, values: { ...state.values, ...patch } })}
         readOnly={waiting}
       />
     );

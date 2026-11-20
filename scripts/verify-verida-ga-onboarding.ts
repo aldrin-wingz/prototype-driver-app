@@ -20,7 +20,7 @@ import {
   stagesVisibleTo,
   templateFor,
 } from "../lib/verida-ga-onboarding/market-flow";
-import { choiceOptions, continueLabel, isFieldVisible, isScrollAck, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
+import { ESIGN_SIGNATURE_SLUG, PROTOTYPE_SIGNATURE_ID, choiceOptions, continueLabel, isFieldVisible, isScrollAck, missingAsyncValues, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
 
 let failed = 0;
 function check(name: string, detail: string, ok: boolean) {
@@ -201,6 +201,15 @@ check("drug screening asks for the date only; the voucher unlocks on the date", 
   // Break test: the stored (array) order is what used to render — it must fail the same rule.
   const stored = stepsWithLink.filter(({ step }) => textAfterLink(step.field_definitions.filter((f) => f.visibility !== "internal")).length > 0).length;
   check("…and the check can fail: stored order puts links first", `${stored} steps would fail without the sort`, stored >= 5);
+}
+
+// D.Lawson consent: signing does not submit; Submit waits for the signature id (production).
+{
+  const lawson = stagesVisibleTo("verida-ga").flatMap((st) => st.steps).find((s) => s.field_definitions.some((f) => f.field_type === "esign_action"));
+  const fields = lawson ? driverFields(lawson) : [];
+  const before = missingAsyncValues(fields, {});
+  const after = missingAsyncValues(fields, { [ESIGN_SIGNATURE_SLUG]: PROTOTYPE_SIGNATURE_ID });
+  check("D.Lawson: Submit blocked until the signature id arrives, then free", `before ${before.join(",") || "none"}, after ${after.join(",") || "none"}`, before.join() === ESIGN_SIGNATURE_SLUG && after.length === 0);
 }
 
 // Step button labels: production's rule, not the template's action_button_text.
