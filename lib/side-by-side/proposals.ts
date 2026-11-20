@@ -64,7 +64,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-BTT-GATE", title: "Benefits Trafficking: read the browser and save-your-certificate rules and answer Yes before the instructions and Start Training appear (the Vehicle Inspection pattern)", source: "Luis, 2026-11-21" },
   { id: "P-ACK-YES-ONLY", title: "The two read-first agreements (Vehicle Inspection, Benefits Trafficking) offer Yes only: no No, no rejection. What appears after Yes (date and time, certificate) is what Submit needs", source: "Luis, 2026-11-21 (declining on one tap is too easy a rejection)" },
   { id: "P-WITHDREW", title: "No on Welcome to Wingz / About our driver standards keeps production's rejection, but the tool and reports show it as Withdrew, not Rejected", source: "Luis, 2026-11-21 (Q-ACK-1)" },
-  { id: "P-EPASSPORT-FIRST", title: "EPassport (Voucher) is its own step, listed before Schedule Drug Screening (production voucher hooks need it as its own form)", source: "Luis, 2026-11-21" },
+  { id: "P-EPASSPORT-STAGE", title: "EPassport is its own stage before Pre-Verida Training Check: it waits for Onboarding's upload, then the driver downloads it and confirms before drug screening opens", source: "Luis, 2026-11-21 (replaces listing it first in the checklist)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -110,14 +110,18 @@ export const FINAL_REVIEW_STAGE = "Final Review";
 export const EPASSPORT_STEP = "EPassport (Voucher)";
 export const SCHEDULE_DRUG_STEP = "Schedule Drug Screening";
 
-/** `stepIds` with the step titled `move` placed right before the step titled `before` (unchanged if either is missing). */
-function moveBefore(ids: string[], titleOf: (id: string) => string | undefined, move: string, before: string): string[] {
-  const m = ids.find((id) => titleOf(id) === move);
-  const b = ids.find((id) => titleOf(id) === before);
-  if (!m || !b) return ids;
-  const rest = ids.filter((id) => id !== m);
-  rest.splice(rest.indexOf(b), 0, m);
-  return rest;
+/* ── P-EPASSPORT-STAGE ─────────────────────────────────────────────────────── */
+export const EPASSPORT_STAGE = "EPassport";
+/** Prototype-only stage id (numeric like the template's; not in the payload). */
+export const EPASSPORT_STAGE_ID = "9950";
+export const EPASSPORT_VOUCHER = "drug_screen_epassport_voucher";
+export const EPASSPORT_ACK = "ack_epassport_downloaded";
+const HAS_VOUCHER = { "!!": [{ var: EPASSPORT_VOUCHER }] };
+const NO_VOUCHER = { "!": [{ var: EPASSPORT_VOUCHER }] };
+
+/** For the EPassport step: true until Onboarding has uploaded the voucher (the engine and the app both hold the submit). */
+export function epassportMissing(values: Record<string, unknown>): boolean {
+  return isBlankValue(values[EPASSPORT_VOUCHER]);
 }
 
 /** Stage-list proposals. Only the Verida Fully Credentialled list changes (it is the only one with these stages). */
@@ -140,9 +144,19 @@ export function proposeStages(stages: ProposalStage[], titleOf?: (stepId: string
         proposed: "Pre-activation Training joined here, any order, no gate (P-MERGE-15)",
       });
     } else if (s.title === PASS3_STAGE) {
-      // P-EPASSPORT-FIRST — the voucher card comes first in the checklist, still its own step
-      const stepIds = titleOf ? moveBefore(s.stepIds, titleOf, EPASSPORT_STEP, SCHEDULE_DRUG_STEP) : s.stepIds;
-      out.push({ ...s, stepIds, proposed: "Verida Training opens only once D.Lawson marks BGC, MVR and drug test PASS (P-PASS3)" });
+      // P-EPASSPORT-STAGE — the voucher moves into its own stage, right before this one
+      const eid = titleOf ? s.stepIds.find((id) => titleOf(id) === EPASSPORT_STEP) : undefined;
+      if (eid) {
+        out.push({
+          id: EPASSPORT_STAGE_ID,
+          title: EPASSPORT_STAGE,
+          layout: "linear",
+          advancement: "auto",
+          stepIds: [eid],
+          proposed: "Waits for Onboarding to upload the EPassport; the driver downloads it and confirms before drug screening (P-EPASSPORT-STAGE)",
+        });
+      }
+      out.push({ ...s, stepIds: s.stepIds.filter((id) => id !== eid), proposed: "Verida Training opens only once D.Lawson marks BGC, MVR and drug test PASS (P-PASS3)" });
     } else if (s.title === "Background Check") {
       out.push({ ...s, proposed: "Verify the signed consent; the result arrives later (P-CONSENT-GATE)" });
     } else {
@@ -422,10 +436,51 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
   }
   // P-LEASE-ASK — the notice and the upload stay with their question (position order would drop them among the OCR fields)
   fields = keepAfter(fields, LEASE_QUESTION, ["auto_lease_required_notice", "auto_lease_agreement"]);
-  // P-EPASSPORT-FIRST — step positions agree with the checklist order
-  if (step.title === EPASSPORT_STEP || step.title === SCHEDULE_DRUG_STEP) {
-    const display_order = step.title === EPASSPORT_STEP ? 1 : 2;
-    if (step.display_order !== display_order) return { ...step, display_order, field_definitions: changed ? inScreenOrder(fields) : step.field_definitions };
+  // P-EPASSPORT-STAGE — waiting card until the upload; then the voucher, Download and a required confirmation
+  if (step.title === EPASSPORT_STEP) {
+    const note = "P-EPASSPORT-STAGE";
+    const voucher = fields.find((f) => f.slug === EPASSPORT_VOUCHER);
+    const rest = fields.filter((f) => f.slug !== EPASSPORT_VOUCHER && f.slug !== "drug_screen_epassport_info");
+    const epassport: ProposalField[] = [
+      {
+        slug: "drug_screen_epassport_waiting",
+        label: "Your EPassport is being prepared",
+        field_type: "info",
+        required: false,
+        visibility: "external",
+        content: "D.Lawson issues your EPassport (voucher) after your background check consent. Onboarding will upload it here and we'll message you as soon as it's ready. You'll need it at your drug screening appointment.",
+        visibility_rule: NO_VOUCHER,
+        metadata: PROPOSED(note),
+      },
+      {
+        slug: "drug_screen_epassport_ready",
+        label: "Your EPassport is ready",
+        field_type: "info",
+        required: false,
+        visibility: "external",
+        content: "Download it now and bring it to your drug screening appointment. A printed or digital copy is accepted.",
+        visibility_rule: HAS_VOUCHER,
+        metadata: PROPOSED(note),
+      },
+      ...(voucher
+        ? [withMeta({ ...voucher, required: true, validation_rules: { ...((voucher.validation_rules as object) ?? {}), required: true, requiredMessage: "Your EPassport isn't ready yet. We'll message you as soon as Onboarding uploads it." } }, note)]
+        : []),
+      {
+        slug: EPASSPORT_ACK,
+        label: "I have downloaded my EPassport and will bring it to my drug screening.",
+        field_type: "acknowledgment",
+        required: true,
+        visibility: "external",
+        visibility_rule: HAS_VOUCHER,
+        metadata: PROPOSED(note),
+      },
+      ...rest,
+    ];
+    return {
+      ...step,
+      description: "Download your EPassport once Onboarding uploads it, and confirm you have it before you schedule your drug screening.",
+      field_definitions: inScreenOrder(epassport),
+    };
   }
   // P-FEE-WAIVER — rebuild the fee step in the reviewed order.
   const fee = proposeFeeStep(fields, lookup);

@@ -36,6 +36,14 @@ export function missingAsyncValues(fields: FieldDef[], values: Values): string[]
  * Production runs json-logic-js; anything outside this subset is treated as visible, which is
  * also what the app does when a rule throws.
  */
+/** json-logic truthiness, with an empty string, empty list or empty object counting as empty (a voucher not uploaded). */
+function truthy(v: unknown): boolean {
+  if (v == null || v === false || v === "" || v === 0) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === "object") return Object.keys(v as object).length > 0;
+  return true;
+}
+
 export function evaluateRule(rule: unknown, values: Values): unknown {
   if (rule === null || typeof rule !== "object" || Array.isArray(rule)) return rule;
   const [op, rawArgs] = Object.entries(rule as Record<string, unknown>)[0] ?? [];
@@ -56,7 +64,9 @@ export function evaluateRule(rule: unknown, values: Values): unknown {
       // eslint-disable-next-line eqeqeq
       return ev(args[0]) != ev(args[1]);
     case "!":
-      return !ev(args[0]);
+      return !truthy(ev(args[0]));
+    case "!!":
+      return truthy(ev(args[0]));
     case "in": {
       const needle = ev(args[0]);
       const hay = ev(args[1]);
