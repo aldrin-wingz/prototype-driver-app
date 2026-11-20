@@ -21,7 +21,7 @@ import {
   stagesVisibleTo,
   templateFor,
 } from "../lib/verida-ga-onboarding/market-flow";
-import { ESIGN_SIGNATURE_SLUG, PROTOTYPE_SIGNATURE_ID, choiceOptions, continueLabel, isFieldVisible, isScrollAck, missingAsyncValues, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
+import { ESIGN_SIGNATURE_SLUG, PROTOTYPE_SIGNATURE_ID, STRIPE_SYNC_SLUG, stripeCompletion, choiceOptions, continueLabel, isFieldVisible, isScrollAck, missingAsyncValues, toggleChoice } from "../lib/verida-ga-onboarding/field-logic";
 
 let failed = 0;
 function check(name: string, detail: string, ok: boolean) {
@@ -211,6 +211,15 @@ check("drug screening asks for the date only; the voucher unlocks on the date", 
   const before = missingAsyncValues(fields, {});
   const after = missingAsyncValues(fields, { [ESIGN_SIGNATURE_SLUG]: PROTOTYPE_SIGNATURE_ID });
   check("D.Lawson: Submit blocked until the signature id arrives, then free", `before ${before.join(",") || "none"}, after ${after.join(",") || "none"}`, before.join() === ESIGN_SIGNATURE_SLUG && after.length === 0);
+}
+
+// Stripe: Submit waits for Stripe's confirmation; the button (simulated) records it.
+{
+  const stripe = stagesVisibleTo("verida-ga").flatMap((st) => st.steps).find((s) => s.field_definitions.some((f) => f.field_type === "stripe_onboarding_action"));
+  const fields = stripe ? driverFields(stripe) : [];
+  const before = missingAsyncValues(fields, {});
+  const after = missingAsyncValues(fields, stripeCompletion("2026-11-21T10:00:00Z"));
+  check("Stripe: Submit blocked until the payout & tax setup is confirmed, then free", `before ${before.join(",") || "none"}, after ${after.join(",") || "none"}`, before.join() === STRIPE_SYNC_SLUG && after.length === 0);
 }
 
 // Checklist rows: a submitted step in a stage that waits for verification reads "awaiting", not done.

@@ -32,6 +32,10 @@ import {
   ESIGN_SIGNED_BODY,
   ESIGN_SIGNED_TITLE,
   PROTOTYPE_SIGNATURE_ID,
+  STRIPE_SIGNED_BODY,
+  STRIPE_SIGNED_TITLE,
+  STRIPE_SYNC_SLUG,
+  stripeCompletion,
   choiceOptions,
   isScrollAck,
   sampleUploadName,
@@ -236,23 +240,51 @@ type OnPatch = (patch: Record<string, unknown>) => void;
  * After: a disabled success card. The prototype signs instantly instead of opening HelloSign, and records what the
  * backend webhook records (signature id + the internal consent box). It never submits the step.
  */
-function EsignField({ field, value, onPatch, readOnly }: { field: FieldDef; value: unknown; onPatch: OnPatch; readOnly: boolean }) {
-  const signed = typeof value === "string" ? value.trim() !== "" : value != null && value !== false;
-  if (signed) {
-    return (
-      <div className="flex items-start gap-2.5 rounded-lg border p-3" style={{ borderColor: GREEN, backgroundColor: GREEN_TINT }} data-testid="esign-signed">
-        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: GREEN }}>
-          <Check className="h-3 w-3 text-white" />
-        </span>
-        <div>
-          <div className="text-[14px] font-semibold">{ESIGN_SIGNED_TITLE}</div>
-          <div className="text-[12px]" style={{ color: GRAY_3 }}>
-            {ESIGN_SIGNED_BODY}
-          </div>
+/** real: ActionSuccessCard.tsx — the disabled "done" card an e-sign / Stripe button turns into. */
+function ActionDoneCard({ title, body, testId }: { title: string; body: string; testId: string }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border p-3" style={{ borderColor: GREEN, backgroundColor: GREEN_TINT }} data-testid={testId}>
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: GREEN }}>
+        <Check className="h-3 w-3 text-white" />
+      </span>
+      <div>
+        <div className="text-[14px] font-semibold">{title}</div>
+        <div className="text-[12px]" style={{ color: GRAY_3 }}>
+          {body}
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+/**
+ * real: DynamicFormRenderer.tsx (stripe_onboarding_action) + the backend's completed override. The prototype completes
+ * Stripe instantly instead of opening it, writing what Stripe's confirmation writes. It never submits the step.
+ */
+function StripeField({ field, synced, onPatch, readOnly }: { field: FieldDef; synced: boolean; onPatch: OnPatch; readOnly: boolean }) {
+  if (synced) return <ActionDoneCard title={STRIPE_SIGNED_TITLE} body={STRIPE_SIGNED_BODY} testId="stripe-done" />;
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={readOnly}
+        data-testid="stripe-setup"
+        onClick={() => onPatch(stripeCompletion(new Date().toISOString()))}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] font-semibold text-white disabled:opacity-60"
+        style={{ backgroundColor: GREEN }}
+      >
+        {field.label || "Set up with Stripe"}
+      </button>
+      <div className="mt-1 text-[11px]" style={{ color: GRAY_3 }}>
+        Opens Stripe to add your bank and tax details. Prototype: completes instantly.
+      </div>
+    </div>
+  );
+}
+
+function EsignField({ field, value, onPatch, readOnly }: { field: FieldDef; value: unknown; onPatch: OnPatch; readOnly: boolean }) {
+  const signed = typeof value === "string" ? value.trim() !== "" : value != null && value !== false;
+  if (signed) return <ActionDoneCard title={ESIGN_SIGNED_TITLE} body={ESIGN_SIGNED_BODY} testId="esign-signed" />;
   return (
     <div>
       <button
@@ -409,11 +441,14 @@ export function RichField({
   value,
   onChange,
   onPatch,
+  values,
   readOnly = false,
 }: {
   field: FieldDef;
   marketId: number | null;
   value?: unknown;
+  /** The step's other values (the Stripe card reads the sync value Stripe's confirmation writes). */
+  values?: Record<string, unknown>;
   onChange?: OnValue;
   /** Several values at once (the e-sign webhook's writes). Falls back to one onChange per value. */
   onPatch?: OnPatch;
@@ -447,7 +482,11 @@ export function RichField({
     const patch: OnPatch = onPatch ?? ((p) => Object.entries(p).forEach(([k, v]) => set(k, v)));
     return <EsignField field={field} value={value} onPatch={patch} readOnly={readOnly} />;
   }
-  if (t === "button" || t === "stripe_onboarding_action") {
+  if (t === "stripe_onboarding_action") {
+    const patch: OnPatch = onPatch ?? ((p) => Object.entries(p).forEach(([k, v]) => set(k, v)));
+    return <StripeField field={field} synced={Boolean(values?.[STRIPE_SYNC_SLUG])} onPatch={patch} readOnly={readOnly} />;
+  }
+  if (t === "button") {
     return <LinkButton field={field} href={resolveFieldLink(field, marketId)} />;
   }
   if (t === "video") return <LinkButton field={field} href={resolveFieldLink(field, marketId)} video />;

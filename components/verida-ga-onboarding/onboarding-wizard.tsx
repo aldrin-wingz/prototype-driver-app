@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichField } from "./rich-field";
 import { FEE_WAIVER_MIN, dependsOnAny, feeWaiverShortfall, isBlankValue } from "@/lib/side-by-side/proposals";
-import { ESIGN_ACK_SLUG, continueLabel, missingAsyncValues, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
+import { CALLBACK_INTERNAL_SLUGS, continueLabel, missingAsyncValues, isFieldVisible, type Values } from "@/lib/verida-ga-onboarding/field-logic";
 import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, FileText, LayoutGrid, Lock, LogOut, Pause, X, XCircle } from "lucide-react";
 
 import {
@@ -247,9 +247,9 @@ export function OnboardingWizard({
     const gettingStarted = isGettingStarted(currentStep.field_definitions);
     const values: Values = {};
     for (const f of driverFields(currentStep)) if (state.values[f.slug] !== undefined) values[f.slug] = state.values[f.slug];
-    // The e-sign webhook also ticks the internal consent box (backend utils.py:1005–1020).
-    if (currentStep.field_definitions.some((f) => f.slug === ESIGN_ACK_SLUG) && state.values[ESIGN_ACK_SLUG] !== undefined) {
-      values[ESIGN_ACK_SLUG] = state.values[ESIGN_ACK_SLUG];
+    // What the e-sign / Stripe callbacks record on staff-only fields (backend utils.py:1005–1020; Stripe completion).
+    for (const slug of CALLBACK_INTERNAL_SLUGS) {
+      if (currentStep.field_definitions.some((f) => f.slug === slug) && state.values[slug] !== undefined) values[slug] = state.values[slug];
     }
     if (gettingStarted) {
       values[MARKET_FIELD_SLUG] = state.draftMarket;
@@ -297,6 +297,7 @@ export function OnboardingWizard({
         field={f}
         marketId={marketIdFor(state.marketState)}
         value={state.values[f.slug]}
+        values={state.values}
         onChange={(slug, v) => onChange({ ...state, values: { ...state.values, [slug]: v } })}
         onPatch={(patch) => {
           // The signature arriving clears its "must sign" note, as the portal's revalidation does.

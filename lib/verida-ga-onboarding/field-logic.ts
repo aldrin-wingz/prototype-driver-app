@@ -25,6 +25,21 @@ export const ESIGN_SIGNED_BODY = "Your consent form has been signed successfully
 /** Synthetic signature request id the prototype records on "signing". */
 export const PROTOTYPE_SIGNATURE_ID = "prototype-signature-request";
 
+/**
+ * Stripe payout & tax setup. Production: Stripe confirms bank + tax to the backend (bank_details_completed_at,
+ * tax_information_completed_at, stripe_sync_completed_at); the button becomes a disabled "Stripe Setup Completed" card
+ * (api/serializers/driver_onboarding.py:513 @ prod_19.5.32); the driver still presses Submit, which needs the sync value.
+ */
+export const STRIPE_SYNC_SLUG = "stripe_sync_completed_at";
+export const STRIPE_SIGNED_TITLE = "Stripe Setup Completed";
+export const STRIPE_SIGNED_BODY = "Your payout and tax setup has been completed successfully.";
+/** What Stripe's confirmation writes (the prototype writes it when the driver taps the button). */
+export function stripeCompletion(now: string): Record<string, unknown> {
+  return { [STRIPE_SYNC_SLUG]: now, bank_details_completed_at: now, tax_information_completed_at: now, stripe_verified: true };
+}
+/** Staff-only values the e-sign / Stripe callbacks write, sent with the step like the backend records them. */
+export const CALLBACK_INTERNAL_SLUGS = [ESIGN_ACK_SLUG, "bank_details_completed_at", "tax_information_completed_at", "stripe_verified"];
+
 /** Required async values still empty (e.g. the signature id before the webhook) — each one blocks Submit. */
 export function missingAsyncValues(fields: FieldDef[], values: Values): string[] {
   const blank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
