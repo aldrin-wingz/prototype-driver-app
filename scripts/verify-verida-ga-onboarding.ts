@@ -187,6 +187,22 @@ check("drug screening asks for the date only; the voucher unlocks on the date", 
   !drugSlugs.includes("ack_drug_screen_scheduled") && drugSlugs.includes("drug_screen_date") && voucherLatch === "drug_screen_date");
 }
 
+// Field order: production sorts by display_order, so a link never sits above its own instructions.
+{
+  const LINKS = new Set(["button", "esign_action", "stripe_onboarding_action", "video"]);
+  const TEXT = new Set(["info", "info_list", "heading"]);
+  const textAfterLink = (fields: { slug: string; field_type: string }[]) => {
+    const at = fields.findIndex((f) => LINKS.has(f.field_type));
+    return at < 0 ? [] : fields.slice(at + 1).filter((f) => TEXT.has(f.field_type) && !f.slug.endsWith("_support")).map((f) => f.slug);
+  };
+  const stepsWithLink = stagesVisibleTo("verida-ga").flatMap((st) => st.steps.map((step) => ({ step }))).filter(({ step }) => step.field_definitions.some((f) => LINKS.has(f.field_type)));
+  const bad = stepsWithLink.flatMap(({ step }) => textAfterLink(driverFields(step)).map((s) => `${step.title}: ${s}`));
+  check("link after its instructions in every Georgia step (only Need help? below it)", bad.length ? bad.join("; ") : `${stepsWithLink.length} of ${stepsWithLink.length} steps`, stepsWithLink.length >= 10 && bad.length === 0);
+  // Break test: the stored (array) order is what used to render — it must fail the same rule.
+  const stored = stepsWithLink.filter(({ step }) => textAfterLink(step.field_definitions.filter((f) => f.visibility !== "internal")).length > 0).length;
+  check("…and the check can fail: stored order puts links first", `${stored} steps would fail without the sort`, stored >= 5);
+}
+
 // Step button labels: production's rule, not the template's action_button_text.
 {
   const wizardSrc = readFileSync(join(process.cwd(), "components", "verida-ga-onboarding", "onboarding-wizard.tsx"), "utf8");

@@ -40,6 +40,7 @@ export interface FieldDef {
   scroll_required?: boolean | null;
   visibility_rule?: unknown;
   placeholder?: string | null;
+  display_order?: number | null;
 }
 
 export interface TemplateStep {
@@ -205,9 +206,18 @@ export function nextCursor(stages: TemplateStage[], c: Cursor): Cursor | null {
   return c.stageIndex + 1 < stages.length ? { stageIndex: c.stageIndex + 1, stepIndex: 0 } : null;
 }
 
-/** Driver-facing fields only — the app never renders `visibility: "internal"`. */
+/**
+ * Driver-facing fields only — the app never renders `visibility: "internal"` — in `display_order`
+ * (real: App/Data/onboarding/backendConfigAdapter.ts:209 @ v6.0.538-production-ios — missing = 0, stable sort).
+ * The payload stores some steps out of that order, so array order would put a link above its instructions.
+ */
 export function driverFields(step: TemplateStep): FieldDef[] {
-  return step.field_definitions.filter((f) => f.visibility !== "internal");
+  const pos = (f: FieldDef) => (typeof f.display_order === "number" ? f.display_order : 0);
+  return step.field_definitions
+    .filter((f) => f.visibility !== "internal")
+    .map((f, i) => [f, i] as const)
+    .sort((x, y) => pos(x[0]) - pos(y[0]) || x[1] - y[1])
+    .map(([f]) => f);
 }
 
 

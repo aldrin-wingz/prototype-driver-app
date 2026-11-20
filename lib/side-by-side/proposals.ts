@@ -60,6 +60,8 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-FLAG-EMPTY", title: "The tool lists every driver-facing field, empty optional uploads too, and can request changes on them; the driver must upload a flagged field to resubmit", source: "Luis, 2026-11-20 (production cannot flag an empty field)" },
   { id: "P-FLAG-DEPENDENTS", title: "When the agent flags a question, the fields its answer shows (instructions, link, upload) can be used during the change request — production disables every unflagged field", source: "Luis, 2026-11-20 (waiver → pay instead)" },
   { id: "P-RSM", title: "Inspection copy names Rideshare Mechanic", source: "Luis, 2026-11-20 (C8)" },
+  { id: "P-LINK-ORDER", title: "Every step that sends the driver elsewhere reads intro → warnings → instructions → link → upload → Need help (the app's field order)", source: "Luis, 2026-11-21" },
+  { id: "P-BTT-GATE", title: "Benefits Trafficking: read the browser and save-your-certificate rules and answer Yes before the instructions and Start Training appear (the Vehicle Inspection pattern)", source: "Luis, 2026-11-21" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -253,6 +255,44 @@ export function isBlankValue(v: unknown): boolean {
 }
 
 /**
+ * The app shows a step's fields by `display_order` (production App/Data/onboarding/backendConfigAdapter.ts:209,
+ * missing = 0; the sort is stable). The payload stores some GA steps out of that order (the link second), so every
+ * step is put in position order before anything else happens.
+ */
+function byPosition(fields: ProposalField[]): ProposalField[] {
+  const pos = (f: ProposalField) => (typeof f.display_order === "number" ? f.display_order : 0);
+  return fields.map((f, i) => [f, i] as const).sort((a, b) => pos(a[0]) - pos(b[0]) || a[1] - b[1]).map(([f]) => f);
+}
+
+/** Moves `slugs` (in that order) to right after `anchor`. */
+function keepAfter(fields: ProposalField[], anchor: string, slugs: string[]): ProposalField[] {
+  const moving = slugs.map((s) => fields.find((f) => f.slug === s)).filter((f): f is ProposalField => Boolean(f));
+  const rest = fields.filter((f) => !slugs.includes(f.slug));
+  const at = rest.findIndex((f) => f.slug === anchor);
+  return at < 0 ? fields : [...rest.slice(0, at + 1), ...moving, ...rest.slice(at + 1)];
+}
+
+/* ── P-BTT-GATE: the Vehicle Inspection pattern on Benefits Trafficking ───────── */
+const BTT_STEP = "Benefits Trafficking Training";
+export const BTT_ACK = "ack_btt_requirements";
+const BTT_WARNINGS = ["benefits_trafficking_browser_warning", "benefits_trafficking_save_warning"];
+const BTT_GATED = ["benefits_trafficking_steps", "benefits_trafficking_training_button"];
+
+function bttAck(fields: ProposalField[]): ProposalField {
+  const text = (slug: string) => (fields.find((f) => f.slug === slug)?.content ?? "").split(/\n\n+/).map((p) => `• ${p.trim()}`).join("\n");
+  return {
+    slug: BTT_ACK,
+    label: "I have read the training requirements, and I understand I must save my certificate before closing the course page.",
+    field_type: "acknowledgment",
+    required: true,
+    visibility: "external",
+    scroll_required: true,
+    content: `BEFORE YOU START — CHECK YOUR BROWSER\n${text(BTT_WARNINGS[0])}\n\nSAVE YOUR CERTIFICATE BEFORE CLOSING THE PAGE\n${text(BTT_WARNINGS[1])}`,
+    metadata: PROPOSED("P-BTT-GATE"),
+  };
+}
+
+/**
  * The Onboarding Tool lists a step's fields by `display_order` (missing = last). Added and borrowed fields
  * would land out of place, so a changed step is renumbered in the order the app shows it.
  */
@@ -262,10 +302,21 @@ function inScreenOrder(fields: ProposalField[]): ProposalField[] {
 
 /** Field-level proposals for one step. Returns the step unchanged when nothing applies. */
 export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup): T {
-  let changed = false;
-  const fields: ProposalField[] = [];
-  for (const f of step.field_definitions) {
+  // P-LINK-ORDER — the app's order first, so the link sits after its instructions
+  const ordered = byPosition(step.field_definitions);
+  let changed = ordered.some((f, i) => f !== step.field_definitions[i]);
+  let fields: ProposalField[] = [];
+  const btt = step.title === BTT_STEP;
+  for (const f of ordered) {
     let g = f;
+    // P-BTT-GATE — the two warnings move into the scroll-to-read agreement; instructions and link wait for Yes
+    if (btt && BTT_WARNINGS.includes(f.slug)) {
+      changed = true;
+      continue;
+    }
+    if (btt && BTT_GATED.includes(f.slug)) {
+      g = withMeta({ ...g, visibility_rule: { "==": [{ var: BTT_ACK }, true] } }, "P-BTT-GATE");
+    }
     // P-SS-CARD
     if (f.slug === "ssn_upload") {
       g = withMeta(
@@ -317,6 +368,10 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
     }
     if (g !== f) changed = true;
     fields.push(g);
+    if (btt && f.slug === "benefits_trafficking_info") {
+      changed = true;
+      fields.push(bttAck(ordered));
+    }
     // P-LEASE-ASK — the question goes right under the Auto-Lease heading
     if (f.slug === "auto_lease_heading") {
       changed = true;
@@ -334,6 +389,8 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
       });
     }
   }
+  // P-LEASE-ASK — the notice and the upload stay with their question (position order would drop them among the OCR fields)
+  fields = keepAfter(fields, LEASE_QUESTION, ["auto_lease_required_notice", "auto_lease_agreement"]);
   // P-FEE-WAIVER — rebuild the fee step in the reviewed order.
   const fee = proposeFeeStep(fields, lookup);
   if (fee) {
