@@ -119,6 +119,15 @@ export const EPASSPORT_ACK = "ack_epassport_downloaded";
 const HAS_VOUCHER = { "!!": [{ var: EPASSPORT_VOUCHER }] };
 const NO_VOUCHER = { "!": [{ var: EPASSPORT_VOUCHER }] };
 
+/** Schedule Drug Screening copy that assumed the voucher might not have arrived yet (template text, `\\n` as stored). */
+const EPASSPORT_COPY: [string, string][] = [
+  ["You can schedule your appointment now even if your EPassport (voucher) is not yet available.", "Bring the EPassport (voucher) you downloaded to your appointment."],
+  ["1. Schedule your appointment now, even if you are still waiting for your EPassport (voucher)", "1. Schedule your appointment now"],
+  ["3. If you receive your voucher on Friday,", "3. If your EPassport arrived on a Friday,"],
+  ["\\n5. Return to the next step to download your EPassport once it is available", ""],
+  ["to your appointment once it becomes available", "to your appointment"],
+];
+
 /** For the EPassport step: true until Onboarding has uploaded the voucher (the engine and the app both hold the submit). */
 export function epassportMissing(values: Record<string, unknown>): boolean {
   return isBlankValue(values[EPASSPORT_VOUCHER]);
@@ -354,6 +363,11 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
         { ...g, content: (g.content ?? "").replace("Follow the instructions below to complete the course and upload your certificate.", "Read the requirements below and answer Yes to see the training instructions. Then complete the course and upload your certificate.") },
         "P-BTT-GATE",
       );
+    }
+    // P-EPASSPORT-STAGE — the driver already has the EPassport when scheduling opens
+    if (step.title === SCHEDULE_DRUG_STEP && typeof g.content === "string") {
+      const next = EPASSPORT_COPY.reduce((c, [from, to]) => c.split(from).join(to), g.content);
+      if (next !== g.content) g = withMeta({ ...g, content: next }, "P-EPASSPORT-STAGE");
     }
     // P-ACK-YES-ONLY — the inspection agreement drops its No (and with it the GA-only rejection)
     if (f.slug === "ack_inspection_requirements") {
