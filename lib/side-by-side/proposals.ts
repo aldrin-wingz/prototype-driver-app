@@ -65,6 +65,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-ACK-YES-ONLY", title: "The two read-first agreements (Vehicle Inspection, Benefits Trafficking) offer Yes only: no No, no rejection. What appears after Yes (date and time, certificate) is what Submit needs", source: "Luis, 2026-11-21 (declining on one tap is too easy a rejection)" },
   { id: "P-WITHDREW", title: "No on Welcome to Wingz / About our driver standards keeps production's rejection, but the tool and reports show it as Withdrew, not Rejected", source: "Luis, 2026-11-21 (Q-ACK-1)" },
   { id: "P-EPASSPORT-STAGE", title: "EPassport is its own stage before Pre-Verida Training Check: it waits for Onboarding's upload, then the driver downloads it and confirms before drug screening opens", source: "Luis, 2026-11-21 (replaces listing it first in the checklist)" },
+  { id: "P-EPASSPORT-CONSENT", title: "Onboarding uploads the EPassport into a required staff-only field on the D.Lawson consent (Verify waits for it); the backend copies it to the driver's EPassport step, so the stage opens ready", source: "Luis, 2026-11-21 (comment 20)" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -129,6 +130,30 @@ const EPASSPORT_COPY: [string, string][] = [
   // GA uploads no Donor Completion Form at onboarding (date only) — Luis, 2026-11-21 (F4)
   ["\\n• The clinic will give you a Donor Completion Form after your test\\n• You will upload that form in the final step", ""],
 ];
+
+/** P-EPASSPORT-CONSENT: the staff-only upload on the D.Lawson consent. */
+export const EPASSPORT_UPLOAD = "bgc_epassport_upload";
+const CONSENT_STEP = "Background Check by D.Lawson";
+
+/**
+ * Backend copy-on-upload (proposed capability: copy a saved value into another step's field). Fields can't be
+ * internal in one step and driver-facing in another — visibility, required and position live on the field
+ * definition — so the staff-only upload and the driver's voucher are two fields joined by this copy.
+ */
+export const COPY_ON_UPLOAD: Record<string, { stepTitle: string; slug: string }> = {
+  [EPASSPORT_UPLOAD]: { stepTitle: "EPassport (Voucher)", slug: "drug_screen_epassport_voucher" },
+};
+
+/**
+ * Required staff-only fields still empty — the real tool disables Verify while any is empty
+ * ("Required staff-only fields are not finished yet", cs-tool driver-detail-content.tsx:2762). The prototype applies
+ * it to the fields this review added (`metadata.agent_verify_required`).
+ */
+export function agentVerifyBlockers(fields: ProposalField[], values: Record<string, unknown>): string[] {
+  return fields
+    .filter((f) => (f.metadata as { agent_verify_required?: boolean } | null | undefined)?.agent_verify_required && isBlankValue(values[f.slug]))
+    .map((f) => f.label ?? f.slug);
+}
 
 /** For the EPassport step: true until Onboarding has uploaded the voucher (the engine and the app both hold the submit). */
 export function epassportMissing(values: Record<string, unknown>): boolean {
@@ -429,6 +454,19 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
     }
     if (g !== f) changed = true;
     fields.push(g);
+    // P-EPASSPORT-CONSENT — the staff-only EPassport upload sits with the consent's other staff fields
+    if (step.title === CONSENT_STEP && f.slug === "bgc_esign_signature_id") {
+      changed = true;
+      fields.push({
+        slug: EPASSPORT_UPLOAD,
+        label: "EPassport (from D.Lawson)",
+        field_type: "file",
+        required: true,
+        visibility: "internal",
+        content: "Upload the EPassport D.Lawson issued for this driver. It is copied to the driver's EPassport step; Verify waits for it.",
+        metadata: { ...PROPOSED("P-EPASSPORT-CONSENT"), agent_verify_required: true },
+      });
+    }
     if (btt && f.slug === "benefits_trafficking_info") {
       changed = true;
       fields.push(bttAck(ordered));
