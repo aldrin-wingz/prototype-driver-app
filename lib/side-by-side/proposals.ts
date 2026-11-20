@@ -143,6 +143,11 @@ export function agentVerifyBlockers(fields: ProposalField[], values: Record<stri
     .map((f) => f.label ?? f.slug);
 }
 
+/** For Schedule Drug Screening: true while no appointment date is entered (the field that gates the step). */
+export function drugScreenDateMissing(values: Record<string, unknown>): boolean {
+  return isBlankValue(values.drug_screen_date);
+}
+
 /** For Schedule Drug Screening: true while the step has no EPassport (fallback — the consent Verify waits for it). */
 export function epassportMissing(values: Record<string, unknown>): boolean {
   return isBlankValue(values[EPASSPORT_VOUCHER]);
@@ -520,7 +525,9 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
     const by = (slug: string) => fields.find((f) => f.slug === slug);
     const placed = new Set(["drug_screen_info", "drug_screen_schedule_steps", "drug_screen_schedule_notes"]);
     // No "I have downloaded" box (Luis, 2026-11-21): the required appointment date is what gates the step
-    const ordered = [by("drug_screen_info"), by("drug_screen_schedule_steps"), voucher, ...fields.filter((f) => !placed.has(f.slug))].filter(
+    // The date is the gate: marked so the app checks it (the prototype checks only the fields this review touched)
+    const rest = fields.filter((f) => !placed.has(f.slug)).map((f) => (f.slug === "drug_screen_date" ? withMeta({ ...f, required: true }, note) : f));
+    const ordered = [by("drug_screen_info"), by("drug_screen_schedule_steps"), voucher, ...rest].filter(
       (f): f is ProposalField => Boolean(f),
     );
     return {
