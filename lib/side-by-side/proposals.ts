@@ -314,6 +314,12 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
       changed = true;
       continue;
     }
+    if (btt && f.slug === "benefits_trafficking_info") {
+      g = withMeta(
+        { ...g, content: (g.content ?? "").replace("Follow the instructions below to complete the course and upload your certificate.", "Read the requirements below and answer Yes to see the training instructions. Then complete the course and upload your certificate.") },
+        "P-BTT-GATE",
+      );
+    }
     if (btt && BTT_GATED.includes(f.slug)) {
       g = withMeta({ ...g, visibility_rule: { "==": [{ var: BTT_ACK }, true] } }, "P-BTT-GATE");
     }
