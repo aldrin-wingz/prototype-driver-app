@@ -69,6 +69,7 @@ export const PROPOSALS: Proposal[] = [
   { id: "P-WAIVER-COPY", title: "The fee waiver has its own photo fields (optional, at least 2); when Onboarding verifies the fee step they are copied into the matching Safety Equipment fields. Pre-Gentech certificates are copied into GenTech Training the same way (on verify)", source: "Luis, 2026-11-21 (D21, F5)" },
   { id: "P-BGC-RESULTS-COMPLIANCE", title: "The D.Lawson results (result upload, External Results, Reason, Wingz Background Check Decision) leave the onboarding consent step; the compliance team records them in the Compliance Tool's Background Check / MVR / Drug Screening requirements", source: "Luis, 2026-11-21 (D23)" },
   { id: "P-VERIDA-ITEMS", title: "Onboarding can't verify Schedule Drug Screening until D.Lawson's Background Check & MVR Report and Drug Screen Result are uploaded (staff-only, required); verifying Pre-Verida Training Check opens Verida Training — no separate PASS switch. On verify the reports are copied to the Compliance Tool", source: "Luis, 2026-11-21 (D25, replaces P-PASS3's gate)" },
+  { id: "P-INSPECTION-GATE", title: "Vehicle Inspection: 'What to Expect' and 'Important' are hidden until the requirements are read and answered Yes, with the instructions, the booking link and the date and time", source: "Luis, 2026-11-21" },
   { id: "P-MERGE-15", title: "Pre-activation Training joins Payment & Tax Setup; 15 stages", source: "Luis, 2026-11-20 (C9)" },
 ];
 
@@ -417,6 +418,10 @@ export function proposeStep<T extends ProposalStep>(step: T, lookup?: StepLookup
     if (step.title === SCHEDULE_DRUG_STEP && typeof g.content === "string") {
       const next = EPASSPORT_COPY.reduce((c, [from, to]) => c.split(from).join(to), g.content);
       if (next !== g.content) g = withMeta({ ...g, content: next }, "P-EPASSPORT-STEP");
+    }
+    // P-INSPECTION-GATE — "What to Expect" and "Important" wait for the Yes too, like the instructions and the link
+    if (step.title === "Vehicle Inspection" && (f.slug === "vehicle_inspection_what_to_expect" || f.slug === "vehicle_inspection_important_note")) {
+      g = withMeta({ ...g, visibility_rule: { "==": [{ var: "ack_inspection_requirements" }, true] } }, "P-INSPECTION-GATE");
     }
     // P-ACK-YES-ONLY — the inspection agreement drops its No (and with it the GA-only rejection)
     if (f.slug === "ack_inspection_requirements") {
