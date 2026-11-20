@@ -37,6 +37,7 @@ import {
   countCompletedStages,
   driverFields,
   initialCursor,
+  checklistRowState,
   isManualStage,
   isStepDoneForProgress,
   marketIdFor,
@@ -798,7 +799,10 @@ function ParallelHub({ view, onOpenStep }: { view: StageView; onOpenStep: (stepI
       <div className="space-y-2.5">
         {steps.map(({ step, status }) => {
           const locked = status === "locked";
-          const done = status === "completed" || status === "pending_review";
+          // ⛔ App change (Luis, 2026-11-21): "Awaiting review" instead of the green check in a stage that waits — see checklistRowState
+          const row = checklistRowState(stage, status);
+          const waiting = row === "awaiting";
+          const done = row === "done";
           const description = step.description?.trim() || step.field_definitions.find((f) => f.help_text?.trim())?.help_text?.trim() || "";
           return (
             <button
@@ -808,8 +812,8 @@ function ParallelHub({ view, onOpenStep }: { view: StageView; onOpenStep: (stepI
               onClick={() => onOpenStep(String(step.id))}
               className="flex w-full items-center gap-3 rounded-[10px] border px-3.5 py-3.5 text-left"
               style={{
-                borderColor: done ? "rgba(0, 236, 175, 0.2)" : GRAY_7,
-                backgroundColor: done ? "#EEFBF5" : "#fff",
+                borderColor: done ? "rgba(0, 236, 175, 0.2)" : waiting ? "#FDE68A" : GRAY_7,
+                backgroundColor: done ? "#EEFBF5" : waiting ? "#FFFBEB" : "#fff",
                 opacity: locked ? 0.55 : 1,
               }}
               data-testid="hub-row"
@@ -818,6 +822,10 @@ function ParallelHub({ view, onOpenStep }: { view: StageView; onOpenStep: (stepI
               {done ? (
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: GREEN }}>
                   <Check className="h-3.5 w-3.5 text-white" />
+                </span>
+              ) : waiting ? (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FEF3C7]" data-testid="hub-row-awaiting">
+                  <Clock className="h-3.5 w-3.5 text-[#D97706]" />
                 </span>
               ) : status === "change_requested" ? (
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[#D48806] bg-white">
@@ -832,13 +840,14 @@ function ParallelHub({ view, onOpenStep }: { view: StageView; onOpenStep: (stepI
                 <span className="block truncate text-[15px] font-medium" style={{ color: done ? GREEN : BLACK_1 }}>
                   {step.title}
                 </span>
+                {waiting ? <span className="mt-0.5 block text-[12px] font-semibold text-[#B45309]">Awaiting review</span> : null}
                 {description ? (
                   <span className="mt-1 line-clamp-2 block text-[13px] leading-[18px]" style={{ color: GRAY_3 }}>
                     {description}
                   </span>
                 ) : null}
               </span>
-              <ChevronRight className="h-5 w-5 shrink-0" style={{ color: done ? GREEN : GRAY_3 }} />
+              <ChevronRight className="h-5 w-5 shrink-0" style={{ color: done ? GREEN : waiting ? "#D97706" : GRAY_3 }} />
             </button>
           );
         })}

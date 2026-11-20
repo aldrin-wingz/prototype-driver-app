@@ -158,6 +158,19 @@ export function isManualStage(stage: Pick<TemplateStage, "advancement">): boolea
 }
 
 /**
+ * How a checklist row reads. Production (OnboardingParallelHub.tsx:20) draws a submitted step like a verified one;
+ * Verida GA (Luis, 2026-11-21): in a stage that waits for verification a submitted step reads "awaiting" and only
+ * a verified step is "done". In a stage that moves on, a submitted step is done for the driver (production, D3).
+ */
+export function checklistRowState(stage: Pick<TemplateStage, "advancement">, status: string): "done" | "awaiting" | "changes" | "locked" | "open" {
+  if (status === "completed") return "done";
+  if (status === "pending_review") return isManualStage(stage) ? "awaiting" : "done";
+  if (status === "change_requested") return "changes";
+  if (status === "locked") return "locked";
+  return "open";
+}
+
+/**
  * real: stageAdvancementHydration.ts isStepDoneForStageProgress (v6.0.538-production-ios) — a manual
  * stage's step counts once an agent verified it; any other stage's once the driver submitted it.
  */

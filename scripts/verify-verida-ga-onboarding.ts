@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 import {
   PRE_MARKET_STAGE_TITLES,
+  checklistRowState,
   driverFields,
   marketIdFor,
   marketKeyFor,
@@ -210,6 +211,13 @@ check("drug screening asks for the date only; the voucher unlocks on the date", 
   const before = missingAsyncValues(fields, {});
   const after = missingAsyncValues(fields, { [ESIGN_SIGNATURE_SLUG]: PROTOTYPE_SIGNATURE_ID });
   check("D.Lawson: Submit blocked until the signature id arrives, then free", `before ${before.join(",") || "none"}, after ${after.join(",") || "none"}`, before.join() === ESIGN_SIGNATURE_SLUG && after.length === 0);
+}
+
+// Checklist rows: a submitted step in a stage that waits for verification reads "awaiting", not done.
+{
+  const manual = { advancement: "manual" as const }, auto = { advancement: "auto" as const };
+  const got = [checklistRowState(manual, "pending_review"), checklistRowState(manual, "completed"), checklistRowState(auto, "pending_review")];
+  check("checklist row: waits-for-verify stage → submitted = awaiting, verified = done; moves-on stage → submitted = done", got.join(", "), got.join() === "awaiting,done,done");
 }
 
 // Step button labels: production's rule, not the template's action_button_text.
