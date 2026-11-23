@@ -163,6 +163,11 @@ export interface SbsState {
   today: string;
   /** 2026-11-24 (Nov 20 meeting): the driver's last completed trip. More than 60 days ago = the renewal fee is due. Null = none. */
   lastTripOn: string | null;
+  /**
+   * D26 / D50: the "Verida requirements complete" flag the daily Verida email reads. "flagged" when the last D.Lawson
+   * report was saved with Confirm; "skipped" when saved with "Save, don't add to the Verida email". Null = not yet.
+   */
+  veridaEmail?: "flagged" | "skipped" | null;
   compliance: SbsCompliance;
   log: SbsLogEntry[];
 }
@@ -172,7 +177,8 @@ export type SbsAction =
   | { type: "driver/open"; stepId: string }
   | { type: "agent/verify"; stepId: string }
   | { type: "agent/requestChanges"; stepId: string; fields: string[]; reason: string }
-  | { type: "agent/setValue"; stepId: string; slug: string; value: unknown }
+  /** `veridaEmail: "skip"` (D50): the last D.Lawson report is saved without adding the driver to the Verida email. */
+  | { type: "agent/setValue"; stepId: string; slug: string; value: unknown; veridaEmail?: "skip" }
   | { type: "agent/setLifecycle"; lifecycle: SbsLifecycle; reason?: string | null }
   | { type: "system/result"; check: SbsCheck; result: SbsResult }
   | { type: "bar/setProposals"; on: boolean }
