@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { FC_ONLY_SLUGS, TNC_ONLY_SLUGS } from "../lib/verida-ga-compliance/catalog";
-import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, agreementFor, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, inspectionBringPages, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
+import { BGC_SLUG, INSPECTION_SLUG, MARKET_RENEWAL_SETTINGS, MVR_SLUG, NEVER_DUE, agreementFor, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, inspectionBringPages, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
   addDays,
   approvable,
@@ -302,10 +302,18 @@ check(
   const page = instructionsFor("background-check-fee", "Georgia");
   const fee = VERIDA_CATALOG.find((c) => c.slug === "background-check-fee")!;
   check(
-    "Fee: the onboarding Background Check Fee step's own instructions and Stripe link, and its receipt field",
+    "Fee: the onboarding Background Check Fee section's layout, instructions and receipt field, with the market's renewal link",
     `${page?.title} · ${page?.blocks.map((b) => b.kind).join(", ")} · ${fee.uploadFields.map((f) => f.slug).join(", ")}`,
-    page?.title === "Background Check Fee" && page.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")) && fee.uploadFields.map((f) => f.slug).join() === "background_check_fee_receipt",
+    !!page && page.blocks.some((b) => b.kind === "link" && b.url === MARKET_RENEWAL_SETTINGS.Georgia.renewal_fee_link) && fee.uploadFields.map((f) => f.slug).join() === "background_check_fee_receipt",
   );
+  const allText = (page?.blocks ?? []).map((b) => `${b.text ?? ""} ${b.button_label ?? ""}`).join(" ");
+  check(
+    "Fee: the market's renewal amount ($71) and link, not onboarding's $15 / link / refund line",
+    allText.slice(0, 160),
+    /\$71/.test(allText) && !/\$15/.test(allText) && !/refund/i.test(allText) && !(page?.blocks ?? []).some((b) => /bJeaEHfMt5tI2d20Vv7Vm03/.test(b.url ?? "")),
+  );
+  const onboardingCopy = JSON.stringify(readFileSync(join("lib", "verida-ga-onboarding", "payloads.json"), "utf8").match(/The fee is \$15[^"]*/)?.[0] ?? "");
+  check("Onboarding's own fee step is untouched: still $15 with its own Stripe link", onboardingCopy.slice(0, 60), /\$15/.test(onboardingCopy) && readFileSync(join("lib", "verida-ga-onboarding", "payloads.json"), "utf8").includes("bJeaEHfMt5tI2d20Vv7Vm03"));
 }
 
 // 14. Luis 2026-11-24 (#3): the inspection renewal starts with 3 "bring these to your inspection" pages.

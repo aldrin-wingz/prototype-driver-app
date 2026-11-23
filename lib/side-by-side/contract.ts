@@ -108,6 +108,8 @@ export interface SbsRenewalUpload {
   givenDate?: string;
   /** 2026-11-24: the date this round's Approve saves — read by OCR from its document, or edited by Compliance on the card. */
   ocrDate?: string;
+  /** Who set `ocrDate`: "ai" (OCR read) or "agent" (Compliance corrected it) — the card's AI-Input / Agent-Input. */
+  dateSource?: "ai" | "agent";
   /** 2026-11-24 (D.Lawson round): Compliance approved the signed consent; the checks stay Pending Review until the report. */
   consentApproved?: boolean;
   resubmitted?: boolean;

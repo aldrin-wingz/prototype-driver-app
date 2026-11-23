@@ -352,6 +352,40 @@ export function usesChecklist(c: Pick<CatalogItem, "uploadFields" | "instruction
  * ⚠️ PROPOSED (Luis, 2026-11-20): the onboarding step's instructions and download button, shown on the upload screen of
  * Trade Dress and Signage — the same Verida Fully Credentialled step the driver saw in onboarding, for their market.
  */
+/**
+ * Luis 2026-11-24: the renewal fee is a market setting. The renewal fee item uses the onboarding Background Check Fee
+ * section's layout and instructions with the RENEWAL amount and link; the onboarding fee stays $15 with its own link.
+ * (Backend: a per-market renewal setting, like the per-market inspection link.)
+ */
+export interface MarketRenewalSettings {
+  renewal_fee_amount: string;
+  renewal_fee_link: string;
+}
+export const MARKET_RENEWAL_SETTINGS: Record<string, MarketRenewalSettings> = {
+  Georgia: {
+    renewal_fee_amount: "$71",
+    // ⚠️ Placeholder: Georgia's renewal Stripe link is not set yet (it may differ from onboarding's $15 link).
+    renewal_fee_link: "https://buy.stripe.com/renewal-fee-ga-placeholder",
+  },
+};
+
+/** The onboarding fee section rewritten for a renewal: the market's renewal amount and link; onboarding-only lines go. */
+function asRenewalFee(blocks: ComplianceProviderBlock[], settings: MarketRenewalSettings): ComplianceProviderBlock[] {
+  const text = (t: string | null) =>
+    t
+      ?.replace(/ that we discussed during the Info Call/g, "")
+      // The onboarding fee is refunded after the first trip; the renewal fee is not.
+      .replace(/ ?[^.\n]*refunded[^.\n]*\./g, "")
+      .replace(/ which partially covers the background check process\./g, " for your background check, Motor Vehicle Record and drug test renewal.")
+      .replace(/\$15\b/g, settings.renewal_fee_amount)
+      .trim() ?? null;
+  return blocks.map((b) =>
+    b.kind === "link" && /stripe\.com/.test(b.url ?? "")
+      ? { ...b, url: settings.renewal_fee_link }
+      : { ...b, text: text(b.text) },
+  );
+}
+
 export function instructionsFor(slug: string, marketState: string): ComplianceProvider | null {
   const stepTitle = catalogItem(slug).instructionsStep;
   if (!stepTitle) return null;
@@ -363,7 +397,13 @@ export function instructionsFor(slug: string, marketState: string): CompliancePr
       .filter((f) => f.visibility !== "internal")
       .map((f) => blockFor(f, marketId))
       .filter((b): b is ComplianceProviderBlock => !!b);
-    return { title: step.title, description: step.description ?? null, blocks };
+    const renewal = slug === FEE_SLUG ? MARKET_RENEWAL_SETTINGS[marketState] : undefined;
+    if (slug === FEE_SLUG && !renewal) return null; // no renewal fee set for this market: nothing to pay in the app
+    return {
+      title: renewal ? "BGC Check Fee" : step.title,
+      description: renewal ? "Pay the renewal fee, then upload your receipt as proof of payment." : (step.description ?? null),
+      blocks: renewal ? asRenewalFee(blocks, renewal) : blocks,
+    };
   }
   throw new Error(`Verida step not found: ${stepTitle}`);
 }
