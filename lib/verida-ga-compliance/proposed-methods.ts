@@ -56,7 +56,8 @@ export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryRes
       return { ...row, canUpload: true, text: "Booked · upload the facility receipt after your screening", uploadLabel: "Upload receipt", uploadCta: "Upload your drug screening receipt" };
     }
     const kind = item ? proposedKindFor(item) : row.renewKind;
-    if (row.slug === "background-check-fee" && !row.changes) return { ...row, uploadLabel: "Pay", uploadCta: "Pay the renewal fee" };
+    // #4′: requested by Compliance (Request Changes on the BGC Check Fee card) — the action is always to pay.
+    if (row.slug === "background-check-fee") return { ...row, uploadLabel: "Pay", uploadCta: "Pay the BGC Check Fee" };
     if (row.changes || (kind !== "date" && kind !== "esign")) return row;
     return kind === "esign"
       ? { ...row, uploadLabel: "Sign", uploadCta: `Sign the ${row.title} consent` }
