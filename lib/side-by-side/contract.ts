@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — side-by-side contract, schema 1 (Verida GA, 2026-11-20).
+ * PROTOTYPE — side-by-side contract, schema 2 (Verida GA, 2026-11-20; compliance + clock 2026-11-23).
  *
  * ⛔ This file exists twice, byte for byte:
  *   wingz-cs-tool            lib/prototype/side-by-side/contract.ts   (the harness and the engine live here)
@@ -11,7 +11,7 @@
  * app only renders what it is given and reports what the driver did. No data leaves the browser.
  */
 
-export const SBS_SCHEMA = 1 as const;
+export const SBS_SCHEMA = 2 as const;
 
 /** The one synthetic driver the side-by-side shows. Not a real record. */
 export const SBS_DRIVER_ID = 700901;
@@ -59,6 +59,43 @@ export type SbsCheck = "bgc" | "mvr" | "drug";
 export type SbsResult = "pending" | "pass" | "fail" | "decisional";
 export type SbsLifecycle = "in_progress" | "on_hold" | "rejected" | "for_final_compliance_review" | "for_activation" | "activated";
 
+/** A value on a Compliance requirement card: copied from onboarding (D20/D21/D25/D30) or entered by Compliance. */
+export interface SbsComplianceValue {
+  value: unknown;
+  source: SbsValueSource;
+  /** The onboarding step it was copied from (Request Changes before activation flags that step). Null = Compliance entered it. */
+  fromStepId: string | null;
+  /** The prototype day it arrived. */
+  on: string;
+}
+
+/** Compliance's decision on one requirement. It holds only while the card's data is what was reviewed (`sig`). */
+export interface SbsReview {
+  state: "approved" | "change_requested";
+  sig: string;
+  on: string;
+}
+
+/** D28–D31: one pre-adverse case per driver, started from a D.Lawson card. */
+export interface SbsPreAdverse {
+  slug: string;
+  startedOn: string;
+  /** 5 business days after the start (D31). */
+  rejectFrom: string;
+  /** The lifecycle the hold replaced, restored on Lift. */
+  heldFrom: SbsLifecycle;
+}
+
+export interface SbsCompliance {
+  /** Field slug → value. Requirements read their fields from here (one value can show on two cards, e.g. the D.Lawson report). */
+  fields: Record<string, SbsComplianceValue>;
+  /** Requirement slug → Compliance's decision. */
+  reviews: Record<string, SbsReview>;
+  /** "Send to Onboarding For Activation" done. */
+  sentForActivation: boolean;
+  preAdverse: SbsPreAdverse | null;
+}
+
 export interface SbsState {
   schema: typeof SBS_SCHEMA;
   driver: { id: number; first: string; last: string };
@@ -77,6 +114,9 @@ export interface SbsState {
   status: Record<string, SbsStepStatus>;
   /** The step the driver app shows. */
   cursorStepId: string | null;
+  /** The prototype's today (YYYY-MM-DD); the bar moves it forward. */
+  today: string;
+  compliance: SbsCompliance;
   log: SbsLogEntry[];
 }
 
@@ -88,7 +128,16 @@ export type SbsAction =
   | { type: "agent/setValue"; stepId: string; slug: string; value: unknown }
   | { type: "agent/setLifecycle"; lifecycle: SbsLifecycle; reason?: string | null }
   | { type: "system/result"; check: SbsCheck; result: SbsResult }
-  | { type: "bar/setProposals"; on: boolean };
+  | { type: "bar/setProposals"; on: boolean }
+  | { type: "bar/advanceDays"; days: number }
+  | { type: "compliance/approve"; slug: string }
+  | { type: "compliance/requestChanges"; slug: string }
+  | { type: "compliance/clear"; slug: string }
+  | { type: "compliance/setValue"; slug: string; field: string; value: unknown }
+  | { type: "compliance/sendForActivation" }
+  | { type: "compliance/startPreAdverse"; slug: string }
+  | { type: "compliance/liftPreAdverse" }
+  | { type: "compliance/rejectFailedBackgroundCheck" };
 
 export type SbsMessage =
   | { kind: "sbs:state"; state: SbsState }
