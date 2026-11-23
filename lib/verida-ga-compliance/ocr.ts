@@ -1,9 +1,10 @@
 /**
  * PROTOTYPE — the OCR stand-in (Luis, 2026-11-24: "No manual dates in the Compliance Tool: OCR or derived").
  *
- * Nobody types a date. Each dated document fills its date the moment it is uploaded, as an OCR read; the other dates
- * are derived (MVR takes the D.Lawson report date; Safety Equipment, Trade Dress and Signage take the inspection's
- * expiry; terms add months to a completion date). Compliance still reviews and approves.
+ * As production does (backend driver_onboarding.py:1580 enqueues document understanding on a document save; the CS
+ * Tool card keeps the date editable and labels the read "AI-Input"): each dated document fills its date the moment it is
+ * uploaded, as an OCR read, and Compliance or Onboarding can still edit it. Other dates are derived (MVR takes the
+ * D.Lawson report date; Safety Equipment, Trade Dress and Signage take the inspection's expiry; terms add months).
  *
  * The prototype has no OCR, so a read is a fixture:
  *   - onboarding: each sample file has its own plausible date (`sample`);
@@ -68,7 +69,7 @@ export function ocrFor(slug: string): OcrRead | undefined {
   return OCR_READS.find((r) => r.doc === slug || r.also?.includes(slug));
 }
 
-/** The date fields only OCR (or a derivation) fills: never an input. */
+/** The date fields OCR fills on upload (editable afterwards). */
 export const OCR_DATE_FIELDS: ReadonlySet<string> = new Set(OCR_READS.map((r) => r.date));
 
 /** An in-app renewal upload → the dated document it carries (requirements renewed by a photo of the document). */

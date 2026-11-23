@@ -300,7 +300,12 @@ check(
     signed.records[MVR_SLUG].upload?.status === "in_review" && bgcOnly.records[BGC_SLUG].upload?.status === "approved" && bgcOnly.records[MVR_SLUG].upload?.status === "in_review",
   );
   const page = instructionsFor("background-check-fee", "Georgia");
-  check("Fee page: $71 copy, a Stripe link, then the payment image upload", page?.blocks.map((b) => b.kind).join(", ") ?? "none", !!page && page.blocks.some((b) => /\$71/.test(b.text ?? "")) && page.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")));
+  const fee = VERIDA_CATALOG.find((c) => c.slug === "background-check-fee")!;
+  check(
+    "Fee: the onboarding Background Check Fee step's own instructions and Stripe link, and its receipt field",
+    `${page?.title} · ${page?.blocks.map((b) => b.kind).join(", ")} · ${fee.uploadFields.map((f) => f.slug).join(", ")}`,
+    page?.title === "Background Check Fee" && page.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")) && fee.uploadFields.map((f) => f.slug).join() === "background_check_fee_receipt",
+  );
 }
 
 // 14. Luis 2026-11-24 (#3): the inspection renewal starts with 3 "bring these to your inspection" pages.

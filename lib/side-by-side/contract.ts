@@ -106,7 +106,7 @@ export interface SbsRenewalUpload {
   how?: "upload" | "attest" | "date" | "esign";
   attested?: boolean;
   givenDate?: string;
-  /** 2026-11-24: the date OCR read from this round's document (the driver's upload, or the one Compliance attached). */
+  /** 2026-11-24: the date this round's Approve saves — read by OCR from its document, or edited by Compliance on the card. */
   ocrDate?: string;
   /** 2026-11-24 (D.Lawson round): Compliance approved the signed consent; the checks stay Pending Review until the report. */
   consentApproved?: boolean;
@@ -178,7 +178,8 @@ export type SbsAction =
   /** #3 (Luis 2026-11-24): a confirm on the way to a renewal — a "bring these" page, the read-first Yes. Logged only. */
   | { type: "driver/renewStep"; slug: string; step: string }
   | { type: "compliance/approve"; slug: string }
-  | { type: "compliance/requestChanges"; slug: string; note?: string }
+  /** `fields`: the card fields Compliance selected (e.g. the BGC Check Fee's payment receipt). */
+  | { type: "compliance/requestChanges"; slug: string; note?: string; fields?: string[] }
   | { type: "compliance/clear"; slug: string }
   | { type: "compliance/setValue"; slug: string; field: string; value: unknown }
   | { type: "compliance/sendForActivation" }

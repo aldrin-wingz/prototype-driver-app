@@ -187,11 +187,12 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     // otherwise Wingz covers the renewal. Paid and approved before the consent form can be signed.
     slug: "background-check-fee",
     title: "BGC Check Fee",
-    renewsBy: "Requested by Compliance when the last trip was 60+ days ago: pay (Stripe), upload the payment image; approved before the consent",
+    renewsBy: "Requested by Compliance (Request Changes on the receipt) when the last trip was 60+ days ago: onboarding's Background Check Fee step — pay, upload a new receipt; approved before the consent",
     kind: "photo",
     renewal_methods: ["upload"],
     assumption: "fee",
-    uploadFields: stepPhotos("Background Check Fee", ["background_check_fee_receipt"]).map((f) => ({ ...f, label: "Payment image", hint: "A screenshot or the emailed Stripe receipt" })),
+    // Luis 2026-11-24: the same section as onboarding — its receipt field, Stripe link and instructions.
+    uploadFields: stepPhotos("Background Check Fee", ["background_check_fee_receipt"]),
     instructionsStep: "Background Check Fee",
     termMonths: 12,
   },
@@ -351,40 +352,7 @@ export function usesChecklist(c: Pick<CatalogItem, "uploadFields" | "instruction
  * ⚠️ PROPOSED (Luis, 2026-11-20): the onboarding step's instructions and download button, shown on the upload screen of
  * Trade Dress and Signage — the same Verida Fully Credentialled step the driver saw in onboarding, for their market.
  */
-/**
- * The renewal fee (Nov 20 meeting): about $71 in Georgia for the renewal background check, MVR and drug test, paid by a
- * driver with no completed trip in more than 60 days.
- * ⚠️ PENDING Dylan / Randy: the amount ("$71" is the meeting's figure) and the Stripe payment link (placeholder below).
- */
-export const RENEWAL_FEE_AMOUNT = "$71";
-const RENEWAL_FEE_STRIPE_URL = "https://buy.stripe.com/"; // ⚠️ placeholder until the renewal fee's Stripe link is set
-
-export function renewalFeePage(): ComplianceProvider {
-  return {
-    title: "BGC Check Fee",
-    description: null,
-    blocks: [
-      {
-        kind: "text",
-        label: "Why there is a fee",
-        text: `You haven't completed a trip in more than 60 days, so this year's background check, Motor Vehicle Record and drug test are on you: ${RENEWAL_FEE_AMOUNT} for all three in Georgia. Drivers who keep driving have them covered by Wingz.`,
-        button_label: null,
-        url: null,
-      },
-      {
-        kind: "list",
-        label: "How to pay",
-        text: [`Pay ${RENEWAL_FEE_AMOUNT} with the Stripe link below (card or digital wallet)`, "Save the receipt Stripe shows or emails you", "Upload it here", "Compliance approves your payment, then you can sign the D.Lawson consent"].join("\n"),
-        button_label: null,
-        url: null,
-      },
-      { kind: "link", label: null, text: null, button_label: `Pay ${RENEWAL_FEE_AMOUNT} with Stripe`, url: RENEWAL_FEE_STRIPE_URL },
-    ],
-  };
-}
-
 export function instructionsFor(slug: string, marketState: string): ComplianceProvider | null {
-  if (slug === FEE_SLUG) return renewalFeePage();
   const stepTitle = catalogItem(slug).instructionsStep;
   if (!stepTitle) return null;
   const marketId = marketIdFor(marketState);
