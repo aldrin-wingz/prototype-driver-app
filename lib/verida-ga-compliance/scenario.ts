@@ -74,6 +74,24 @@ export interface DriverState {
   /** ⚠️ PROPOSED (Luis, 2026-11-20): the driver's credential program, and a switch still in progress. */
   program: Program;
   switching?: { to: Program; on: string };
+  /**
+   * Nov 20 meeting (Luis 2026-11-24): the driver's last completed trip. Wingz covers the renewal BGC + MVR + drug test
+   * unless it is more than 60 days ago — then the driver pays the renewal fee first. Absent = no trip on record.
+   */
+  lastTripOn?: string;
+}
+
+/** Days without a completed trip after which the renewal fee is due (Nov 20 meeting). */
+export const INACTIVE_DAYS = 60;
+
+/** The renewal fee is due: the last completed trip is more than 60 days before today. */
+export function feeDue(s: Pick<DriverState, "today" | "lastTripOn">): boolean {
+  return !!s.lastTripOn && daysBetween(s.lastTripOn, s.today) > INACTIVE_DAYS;
+}
+
+/** The fee is part of this driver's renewal: the old "every renewal" assumption, or the 60-day rule. */
+export function feeApplies(s: Pick<DriverState, "assume" | "today" | "lastTripOn">): boolean {
+  return s.assume.fee || feeDue(s);
 }
 
 export interface Assumptions {
@@ -194,9 +212,9 @@ export function scenarioState(
  * program (Luis, 2026-11-20). During a switch both programs show: the new one requested, the old one still counting
  * (TCI trips on the TNC+ documents; every trip on the FC documents). Once the switch completes the old one is hidden.
  */
-export function listedInApp(s: Pick<DriverState, "assume" | "program" | "switching">) {
+export function listedInApp(s: Pick<DriverState, "assume" | "program" | "switching" | "today" | "lastTripOn">) {
   const fcItems = VERIDA_CATALOG.filter(
-    (c) => c.inApp !== false && (c.assumption !== "fee" || s.assume.fee) && (c.kind !== "with-inspection" || s.assume.photosWithInspection !== false),
+    (c) => c.inApp !== false && (c.assumption !== "fee" || feeApplies(s)) && (c.kind !== "with-inspection" || s.assume.photosWithInspection !== false),
   );
   const tncItems = TNC_ONLY_CATALOG.filter((c) => c.slug !== "mvr-yardstik" || true);
   if (s.switching) return [...fcItems, ...tncItems];
@@ -309,7 +327,11 @@ const due = (s: DriverState, slug: string) => daysBetween(s.today, s.records[slu
 export function renewalLocks(s: DriverState): Record<string, string> {
   const locks: Record<string, string> = {};
   const open = (slug: string) => due(s, slug) && !submitted(s.records[slug]) && s.records[slug].upload?.status !== "approved";
-  if (s.assume.fee && open(BGC_SLUG) && due(s, FEE_SLUG) && !submitted(s.records[FEE_SLUG]) && s.records[FEE_SLUG].upload?.status !== "approved") {
+  const feeApproved = s.records[FEE_SLUG].upload?.status === "approved";
+  if (feeDue(s) && open(BGC_SLUG) && due(s, FEE_SLUG) && !feeApproved) {
+    // Nov 20 meeting: inactive 60+ days — pay, upload the receipt, and only Compliance's approval unlocks the consent.
+    locks[BGC_SLUG] = submitted(s.records[FEE_SLUG]) ? "Waiting for Compliance to approve your payment" : "Pay the renewal fee first";
+  } else if (s.assume.fee && open(BGC_SLUG) && due(s, FEE_SLUG) && !submitted(s.records[FEE_SLUG]) && !feeApproved) {
     locks[BGC_SLUG] = "Pay the Background Check Fee first";
   }
   if (open(DRUG_SLUG)) {
