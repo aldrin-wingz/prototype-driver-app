@@ -70,6 +70,25 @@ export interface ComplianceAppProps {
   uploadLayout?: UploadLayout;
   /** Prototype control: open this requirement's renewal directly (n changes on every click). */
   openRequest?: { slug: string; n: number } | null;
+  /**
+   * PROTOTYPE (side-by-side, Luis 2026-11-24): a distribution restriction set by Compliance (an active driver in a
+   * pre-adverse case, or after post-adverse) — no trip offers, and the app says so. Never a deactivation.
+   */
+  restriction?: { title: string; body: string } | null;
+}
+
+/** PROTOTYPE (2026-11-24): Compliance has restricted the driver's trips (pre-adverse / post-adverse). */
+function RestrictionCard({ r }: { r: { title: string; body: string } }) {
+  return (
+    <div className="rounded-[14px] border border-[#FCA5A5] bg-[#FEF2F2] p-3.5" data-testid="restriction-banner">
+      <div className="font-bold" style={{ fontSize: 14.5, color: "#991B1B" }}>
+        {r.title}
+      </div>
+      <div className="mt-0.5" style={{ fontSize: 13, lineHeight: "19px", color: "#7F1D1D" }}>
+        {r.body}
+      </div>
+    </div>
+  );
 }
 
 /** Synthetic trip offers, by pickup day from today. */
@@ -83,7 +102,7 @@ function routeFor(slug: string, kind: RenewKind): Route {
   return { name: "upload", slug };
 }
 
-export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest }: ComplianceAppProps) {
+export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest, restriction }: ComplianceAppProps) {
   const [stack, setStack] = useState<Route[]>([{ name: "tabs" }]);
   const [sheetOpen, setSheetOpen] = useState(false);
   /** #8: why Renew can't start yet (e.g. awaiting a new consent form from Compliance). */
@@ -258,13 +277,19 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         <div className="flex flex-1 flex-col overflow-y-auto" style={{ background: PAGE_BG }}>
           {tab === "home" && (
             <div className="space-y-3 p-3" data-testid="tab-home">
+              {restriction ? <RestrictionCard r={restriction} /> : null}
               {switchBanner}
               <Banner vm={vm} variant="home" onPress={() => setSheetOpen(true)} onDismiss={onSnooze} />
               <div className="rounded-[14px] bg-white p-4 text-[13px] text-[#6B7280]">Dashboard (unchanged by this feature)</div>
             </div>
           )}
           {tab === "requests" &&
-            (vm.requestsPaused ? (
+            (restriction ? (
+              <div className="space-y-3 p-3" data-testid="tab-requests-restricted">
+                <RestrictionCard r={restriction} />
+                <div className="rounded-[14px] bg-white px-4 py-6 text-center text-[13px] text-[#6B7280]">No trip offers while this is in place.</div>
+              </div>
+            ) : vm.requestsPaused ? (
               <RequestsPaused
                 vm={vm}
                 onBanner={() => setSheetOpen(true)}

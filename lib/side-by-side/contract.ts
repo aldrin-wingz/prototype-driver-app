@@ -82,7 +82,7 @@ export interface SbsReview {
   on: string;
 }
 
-/** D28–D31: one pre-adverse case per driver, started from a D.Lawson card. */
+/** D28–D31: one pre-adverse case per driver, started from a D.Lawson card (applicant: on hold; active driver: trips restricted). */
 export interface SbsPreAdverse {
   slug: string;
   startedOn: string;
@@ -90,6 +90,12 @@ export interface SbsPreAdverse {
   rejectFrom: string;
   /** Luis 2026-11-24: the driver disputes — the clock stops; Compliance then rejects (with a reason) or removes the hold. */
   disputedOn?: string | null;
+  /**
+   * Active driver (Luis 2026-11-24): post-adverse sent (or a dispute rejected). Never a deactivation: the trip
+   * restriction that started with the case stays, recorded with `outcomeReason`.
+   */
+  postAdverseOn?: string | null;
+  outcomeReason?: string | null;
   /** The lifecycle the hold replaced, restored on Remove from hold. An activated driver stays activated (no hold). */
   heldFrom: SbsLifecycle;
 }
