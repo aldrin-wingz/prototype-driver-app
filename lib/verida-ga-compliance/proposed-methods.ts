@@ -5,6 +5,7 @@
  *   "esign" — the onboarding consent form signed in the app is the submission (D.Lawson background check + MVR).
  * The build's view model is fed "attest" in their place (its nearest method), and the rows' button copy is then patched.
  */
+import { FEE_SLUG } from "./catalog";
 import { CONSENT_LOCK } from "./scenario";
 import type { ComplianceExpiryResponse, ComplianceItem, ComplianceRenewalMethod } from "./types";
 import { renewKindFor, type ComplianceRenewKind, type ComplianceRow, type ComplianceViewModel } from "./view-model";
@@ -59,6 +60,8 @@ export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryRes
     // Luis 2026-11-24: a renewal Compliance requested (the consent, the BGC Check Fee) reads Renew like any renewal —
     // never "Fix", which stays for a send-back of something the driver submitted this round.
     if (item?.renewal_request != null && !row.changes && !row.inReview) {
+      // Luis 2026-11-24: the fee row reads "Pay the BGC Check Fee" (everything else Renew).
+      if (row.slug === FEE_SLUG) return { ...row, isDue: true, canUpload: true, uploadLabel: "Pay", uploadCta: "Pay the BGC Check Fee" };
       return { ...row, isDue: true, canUpload: true, uploadLabel: "Renew", uploadCta: `Renew ${row.title}` };
     }
     if (row.changes || (kind !== "date" && kind !== "esign")) return row;

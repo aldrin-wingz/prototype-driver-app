@@ -302,9 +302,9 @@ check(
   const reqLabels = askedRows.filter((r) => ["background-check", "mvr", "background-check-fee"].includes(r.slug)).map((r) => `${r.slug}:${r.uploadLabel}`);
   const sentBackRow = rowsOf(sendBack(submitRenewal(asked, BGC_SLUG, "esign"), BGC_SLUG, "Signature missing")).find((r) => r.slug === BGC_SLUG);
   check(
-    "Requested renewals (consent, fee) read Renew, never Fix; a send-back of a signed consent reads Fix",
+    "Requested renewals read Renew (the fee reads Pay), never Fix; a send-back of a signed consent reads Fix",
     `${reqLabels.join(", ")} · sent back: ${sentBackRow?.uploadLabel}`,
-    reqLabels.length >= 3 && reqLabels.every((l) => l.endsWith(":Renew")) && askedRows.every((r) => !r.changes) && sentBackRow?.uploadLabel === "Fix",
+    reqLabels.length >= 3 && reqLabels.every((l) => (l.startsWith("background-check-fee:") ? l.endsWith(":Pay") : l.endsWith(":Renew"))) && askedRows.every((r) => !r.changes) && sentBackRow?.uploadLabel === "Fix",
   );
   const signed = submitRenewal(asked, BGC_SLUG, "esign");
   const bgcOnly = approve(signed, BGC_SLUG, today);
