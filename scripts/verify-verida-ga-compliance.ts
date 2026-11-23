@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { FC_ONLY_SLUGS, TNC_ONLY_SLUGS } from "../lib/verida-ga-compliance/catalog";
-import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, agreementFor, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
+import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, agreementFor, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, inspectionBringPages, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
   addDays,
   approvable,
@@ -301,6 +301,19 @@ check(
   );
   const page = instructionsFor("background-check-fee", "Georgia");
   check("Fee page: $71 copy, a Stripe link, then the payment image upload", page?.blocks.map((b) => b.kind).join(", ") ?? "none", !!page && page.blocks.some((b) => /\$71/.test(b.text ?? "")) && page.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")));
+}
+
+// 14. Luis 2026-11-24 (#3): the inspection renewal starts with 3 "bring these to your inspection" pages.
+{
+  const pages = inspectionBringPages("Georgia");
+  const printable = pages.filter((p) => p.print && existsSync(join("public", p.print.url)));
+  check(
+    "#3 three pages before the requirements: Safety Equipment (9 items), Signage, Trade Dress — guide images, print links on the last two, a confirm each",
+    pages.map((p) => `${p.key}:${p.items.length}${p.print ? "+print" : ""}`).join(", "),
+    pages.map((p) => p.key).join() === "safety-equipment,safety-rules-signage,trade-dress" &&
+      pages[0].items.length === 9 && pages.every((p) => p.items.length > 0 && p.items.every((i) => !!i.image) && !!p.confirm) &&
+      !pages[0].print && printable.map((p) => p.key).join() === "safety-rules-signage,trade-dress",
+  );
 }
 
 console.log(failed ? `\n${failed} failed` : "\nAll passed");

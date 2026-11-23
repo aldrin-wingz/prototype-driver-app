@@ -175,6 +175,8 @@ export type SbsAction =
   /** Prototype setup only: put a card's date where a scenario needs it (stands in for time passing). Never Compliance. */
   | { type: "bar/setDate"; field: string; value: string }
   | { type: "driver/renew"; slug: string; how: "upload" | "attest" | "date" | "esign"; givenDate?: string }
+  /** #3 (Luis 2026-11-24): a confirm on the way to a renewal — a "bring these" page, the read-first Yes. Logged only. */
+  | { type: "driver/renewStep"; slug: string; step: string }
   | { type: "compliance/approve"; slug: string }
   | { type: "compliance/requestChanges"; slug: string; note?: string }
   | { type: "compliance/clear"; slug: string }

@@ -10,6 +10,7 @@
  */
 import { useState } from "react";
 
+import type { BringPage } from "@/lib/verida-ga-compliance/catalog";
 import { COMPLIANCE_ICON_PATHS } from "@/lib/verida-ga-compliance/view-model";
 
 import { DoneView, GREEN, INK, Icon, PAGE_BG, PrimaryButton, ScreenHeader, card } from "./parts";
@@ -38,6 +39,8 @@ export function DateRenewScreen({
   untilLine,
   epassport,
   agreement,
+  bringPages,
+  onConfirmStep,
   doneBody,
   onBack,
   onInstructions,
@@ -54,6 +57,10 @@ export function DateRenewScreen({
   epassport?: { url: string; info: string | null } | null;
   /** D15 at renewal: read-first requirements answered with a single Yes before the link and the date appear. */
   agreement?: string | null;
+  /** Luis 2026-11-24 (#3): what to bring, one page each, before the read-first requirements (vehicle inspection). */
+  bringPages?: BringPage[];
+  /** Each confirm on the way (a bring page, the Yes), reported to the side-by-side. */
+  onConfirmStep?: (key: string) => void;
   /** What the done screen says after the date (D32: the drug screening asks for the receipt next). */
   doneBody?: (date: string) => string;
   onBack: () => void;
@@ -64,6 +71,8 @@ export function DateRenewScreen({
   const [date, setDate] = useState("");
   const [done, setDone] = useState(false);
   const [agreed, setAgreed] = useState(!agreement);
+  const [pageAt, setPageAt] = useState(0);
+  const pages = bringPages ?? [];
   if (done) {
     return (
       <DoneView
@@ -74,10 +83,62 @@ export function DateRenewScreen({
       />
     );
   }
+  if (pageAt < pages.length) {
+    const p = pages[pageAt];
+    return (
+      <>
+        <ScreenHeader title={`Renew ${title}`} onBack={pageAt === 0 ? onBack : () => setPageAt(pageAt - 1)} />
+        <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid={`bring-page-${p.key}`}>
+          <div className="flex flex-col gap-3 p-4" style={card}>
+            <div className="font-semibold uppercase tracking-wide" style={{ fontSize: 11.5, color: "#6B7280" }}>
+              Bring to your inspection · {pageAt + 1} of {pages.length}
+            </div>
+            <div className="font-bold" style={{ fontSize: 17, color: INK }}>
+              {p.title}
+            </div>
+            {!!p.intro && (
+              <div className="whitespace-pre-line" style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>
+                {p.intro}
+              </div>
+            )}
+            <div className="flex flex-col gap-2.5" data-testid="bring-items">
+              {p.items.map((it) => (
+                <div key={it.label} className="flex items-center gap-3 rounded-lg border border-[#E3E7E5] p-2">
+                  {it.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- onboarding guide image
+                    <img src={it.image} alt={it.label} className="h-14 w-14 shrink-0 rounded-md border border-[#E3E7E5] bg-white object-contain" />
+                  ) : null}
+                  <div className="min-w-0">
+                    <div className="font-semibold" style={{ fontSize: 13.5, color: INK }}>
+                      {it.label}
+                    </div>
+                    {!!it.hint && <div style={{ fontSize: 12, color: "#6B7280" }}>{it.hint}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {p.print && (
+              <a href={p.print.url} download target="_blank" rel="noopener noreferrer" className="text-center font-semibold underline" style={{ fontSize: 13.5, color: "#00755A" }} data-testid={`bring-print-${p.key}`}>
+                {p.print.label}
+              </a>
+            )}
+            <PrimaryButton
+              label={p.confirm}
+              testId={`bring-confirm-${p.key}`}
+              onClick={() => {
+                onConfirmStep?.(p.key);
+                setPageAt(pageAt + 1);
+              }}
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
   if (!agreed) {
     return (
       <>
-        <ScreenHeader title={`Renew ${title}`} onBack={onBack} />
+        <ScreenHeader title={`Renew ${title}`} onBack={pages.length ? () => setPageAt(pages.length - 1) : onBack} />
         <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid="renew-agreement">
           <div className="flex flex-col gap-3 p-4" style={card}>
             <div className="font-bold" style={{ fontSize: 16, color: INK }}>
@@ -86,7 +147,14 @@ export function DateRenewScreen({
             <div className="max-h-[320px] overflow-y-auto whitespace-pre-line rounded-lg bg-[#F7F9F8] p-3" style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>
               {agreement}
             </div>
-            <PrimaryButton label="Yes" testId="renew-agree" onClick={() => setAgreed(true)} />
+            <PrimaryButton
+              label="Yes"
+              testId="renew-agree"
+              onClick={() => {
+                onConfirmStep?.("agreement");
+                setAgreed(true);
+              }}
+            />
           </div>
         </div>
       </>

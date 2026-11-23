@@ -19,8 +19,10 @@ import {
   EPASSPORT_SAMPLE_URL,
   MVR_SLUG,
   TNC_ONLY_SLUGS,
+  INSPECTION_SLUG,
   agreementFor,
   catalogItem,
+  inspectionBringPages,
   consentFor,
   epassportInfo,
   instructionsFor,
@@ -75,6 +77,8 @@ export interface ComplianceAppProps {
    * pre-adverse case, or after post-adverse) — no trip offers, and the app says so. Never a deactivation.
    */
   restriction?: { title: string; body: string } | null;
+  /** PROTOTYPE (side-by-side, #3): a confirm on the way to the renewal (a bring page, the read-first Yes). */
+  onRenewStep?: (slug: string, step: string) => void;
 }
 
 /** PROTOTYPE (2026-11-24): Compliance has restricted the driver's trips (pre-adverse / post-adverse). */
@@ -102,7 +106,7 @@ function routeFor(slug: string, kind: RenewKind): Route {
   return { name: "upload", slug };
 }
 
-export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest, restriction }: ComplianceAppProps) {
+export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest, restriction, onRenewStep }: ComplianceAppProps) {
   const [stack, setStack] = useState<Route[]>([{ name: "tabs" }]);
   const [sheetOpen, setSheetOpen] = useState(false);
   /** #8: why Renew can't start yet (e.g. awaiting a new consent form from Compliance). */
@@ -208,6 +212,8 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         untilLine={vm.untilLine}
         epassport={route.slug === DRUG_SLUG && state.assume.epassport && state.epassportGiven ? { url: EPASSPORT_SAMPLE_URL, info: epassportInfo() } : null}
         agreement={agreementFor(route.slug)}
+        bringPages={route.slug === INSPECTION_SLUG ? inspectionBringPages(state.market) : undefined}
+        onConfirmStep={(key) => onRenewStep?.(route.slug, key)}
         doneBody={
           route.slug === DRUG_SLUG
             ? (d) => `Your drug screening is booked for ${formatComplianceDate(d)}. After your screening, come back here and upload the receipt the facility gives you.`

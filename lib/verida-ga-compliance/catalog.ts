@@ -439,3 +439,48 @@ export function agreementFor(slug: string): string | null {
 }
 
 export const EPASSPORT_SAMPLE_URL = "/dev/epassport-sample.svg";
+
+/**
+ * Luis 2026-11-24 (#3): before the inspection's read-first requirements and Book link, the driver goes through three short
+ * pages of what to bring — Safety Equipment, Safety Rules Signage, Wingz Trade Dress — built from the same onboarding
+ * steps (their intro, the item list with its guide images, and the signage / trade dress print link Jovita asked for).
+ */
+export interface BringPage {
+  key: "safety-equipment" | "safety-rules-signage" | "trade-dress";
+  title: string;
+  intro: string | null;
+  items: { label: string; image: string | null; hint: string | null }[];
+  print: { label: string; url: string } | null;
+  confirm: string;
+}
+
+export function inspectionBringPages(marketState: string): BringPage[] {
+  const marketId = marketIdFor(marketState);
+  const step = (title: string) => {
+    for (const stage of templateFor("verida-ga")) {
+      const st = stage.steps.find((s) => s.title === title);
+      if (st) return st;
+    }
+    throw new Error(`Verida step not found: ${title}`);
+  };
+  const page = (key: BringPage["key"], title: string, stepTitle: string, confirm: string): BringPage => {
+    const st = step(stepTitle);
+    const fields = st.field_definitions.filter((f) => f.visibility !== "internal");
+    const info = fields.find((f) => f.field_type === "info");
+    const button = fields.find((f) => f.field_type === "button" && (f.metadata as { download?: boolean } | null | undefined)?.download);
+    const url = button ? resolveFieldLink(button, marketId) : null;
+    return {
+      key,
+      title,
+      intro: info?.content ? stripMarkdown(info.content) : null,
+      items: stepPhotos(stepTitle).map((f) => ({ label: f.label, image: f.exampleImage ?? null, hint: f.hint ?? null })),
+      print: button && url ? { label: `Print / download: ${button.label}`, url } : null,
+      confirm,
+    };
+  };
+  return [
+    page("safety-equipment", "Safety Equipment", "Safety Equipment", "I'll bring these to my inspection"),
+    page("safety-rules-signage", "Safety Rules Signage", "Safety Rules Signage", "I'll have the sign in my vehicle"),
+    page("trade-dress", "Wingz Trade Dress", "Wingz Trade Dress", "I'll have the trade dress on my vehicle"),
+  ];
+}
