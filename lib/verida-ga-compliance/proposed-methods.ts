@@ -12,6 +12,8 @@ export type RenewKind = ComplianceRenewKind | "date" | "esign";
 
 export function proposedKindFor(item: Pick<ComplianceItem, "item_slug" | "renewal_methods" | "upload">): RenewKind {
   const methods = item.renewal_methods ?? [];
+  // D32: a booked drug screening (date given) renews by uploading the facility receipt.
+  if (item.item_slug === "drug-screening" && item.upload?.status === "pending") return "upload";
   if (item.upload?.status === "change_requested" && methods.includes("upload")) return "upload";
   if (methods.includes("esign")) return "esign";
   if (methods.includes("date")) return "date";
@@ -46,6 +48,10 @@ export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryRes
       if (locks[row.slug]) return { ...row, canUpload: false };
     }
     const item = r.items.find((i) => i.item_slug === row.slug);
+    // D32: booked → the receipt is the next thing to send (the build would show it as "pending" with no button).
+    if (row.slug === "drug-screening" && item?.upload?.status === "pending" && !row.changes) {
+      return { ...row, canUpload: true, text: "Booked · upload the facility receipt after your screening", uploadLabel: "Upload receipt", uploadCta: "Upload your drug screening receipt" };
+    }
     const kind = item ? proposedKindFor(item) : row.renewKind;
     if (row.slug === "background-check-fee" && !row.changes) return { ...row, uploadLabel: "Pay", uploadCta: "Pay the Background Check Fee" };
     if (row.changes || (kind !== "date" && kind !== "esign")) return row;

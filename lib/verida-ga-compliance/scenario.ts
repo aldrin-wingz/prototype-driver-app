@@ -76,9 +76,17 @@ export interface DriverState {
 export interface Assumptions {
   epassport: boolean;
   fee: boolean;
+  /**
+   * The approved S2 story: Safety Equipment, Trade Dress and Signage are re-photographed with each inspection. The
+   * 2026-11-20 compliance meeting dropped that (CR L22, CP §3; gap CG-6): they're not listed in the app and take the
+   * inspection's new date when it's approved — the inspection booking says to have them ready. Off = the 11-20 way.
+   */
+  photosWithInspection: boolean;
 }
 
-export const DEFAULT_ASSUMPTIONS: Assumptions = { epassport: true, fee: true };
+export const DEFAULT_ASSUMPTIONS: Assumptions = { epassport: true, fee: true, photosWithInspection: true };
+/** The side-by-side (2026-11-23): the onboarding round's decisions — fee open (CG-9), photos follow the inspection (11-20). */
+export const GA_ALIGNED_ASSUMPTIONS: Assumptions = { epassport: true, fee: false, photosWithInspection: false };
 
 const fmt = (d: dayjs.Dayjs) => d.format("YYYY-MM-DD");
 export const addDays = (iso: string, n: number) => fmt(dayjs(iso).add(n, "day"));
@@ -184,7 +192,9 @@ export function scenarioState(
  * (TCI trips on the TNC+ documents; every trip on the FC documents). Once the switch completes the old one is hidden.
  */
 export function listedInApp(s: Pick<DriverState, "assume" | "program" | "switching">) {
-  const fcItems = VERIDA_CATALOG.filter((c) => c.inApp !== false && (c.assumption !== "fee" || s.assume.fee));
+  const fcItems = VERIDA_CATALOG.filter(
+    (c) => c.inApp !== false && (c.assumption !== "fee" || s.assume.fee) && (c.kind !== "with-inspection" || s.assume.photosWithInspection !== false),
+  );
   const tncItems = TNC_ONLY_CATALOG.filter((c) => c.slug !== "mvr-yardstik" || true);
   if (s.switching) return [...fcItems, ...tncItems];
   return s.program === "fc" ? fcItems : [...fcItems.filter((c) => SHARED_SLUGS.includes(c.slug)), ...tncItems];
@@ -332,13 +342,28 @@ export function submitRenewal(s: DriverState, slug: string, how: RenewHow, given
   const records = { ...s.records };
   for (const sl of linked(slug)) {
     const prev = records[sl].upload;
+    // D32 (Luis, 2026-11-23): the drug screening date books it ("pending"); the facility receipt, uploaded after the
+    // screening, is what sends it to Compliance — who then uploads the result and approves.
+    const booked = sl === DRUG_SLUG && how === "date";
     records[sl] = {
       ...records[sl],
       photosApprovedAwaitingInspection: false,
-      upload: { status: "in_review", attested: how !== "upload", how, givenDate, resubmitted: prev?.status === "change_requested" },
+      upload: {
+        status: booked ? "pending" : "in_review",
+        attested: how !== "upload",
+        how,
+        givenDate: givenDate ?? (sl === DRUG_SLUG ? prev?.givenDate : undefined),
+        resubmitted: prev?.status === "change_requested",
+      },
     };
   }
   return { ...s, records };
+}
+
+/** D32: the drug screening is booked and waits for the facility receipt. */
+export function awaitingReceipt(s: Pick<DriverState, "records">): boolean {
+  const u = s.records[DRUG_SLUG]?.upload;
+  return u?.status === "pending" && u.how === "date";
 }
 
 // ---------------------------------------------------------------------------------------------- Compliance actions
@@ -422,7 +447,8 @@ export function approve(s: DriverState, slug: string, date: string): DriverState
     if (slug === INSPECTION_SLUG) {
       inspectionRenewedTo = exp;
       for (const sl of WITH_INSPECTION) {
-        if (records[sl].photosApprovedAwaitingInspection) records[sl] = { expires: exp, upload: { status: "approved" } };
+        // 11-20: not re-photographed — they simply take the inspection's new date.
+        if (records[sl].photosApprovedAwaitingInspection || s.assume.photosWithInspection === false) records[sl] = { expires: exp, upload: { status: "approved" } };
       }
     }
   }

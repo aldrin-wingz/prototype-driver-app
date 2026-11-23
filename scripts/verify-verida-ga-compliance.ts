@@ -10,11 +10,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { FC_ONLY_SLUGS, TNC_ONLY_SLUGS } from "../lib/verida-ga-compliance/catalog";
-import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
+import { BGC_SLUG, INSPECTION_SLUG, MVR_SLUG, NEVER_DUE, agreementFor, VERIDA_CATALOG, WITH_INSPECTION, hasGuides, instructionsFor, providerFor } from "../lib/verida-ga-compliance/catalog";
 import {
   addDays,
   approvable,
   approve,
+  awaitingReceipt,
+  GA_ALIGNED_ASSUMPTIONS,
   epassportNeeded,
   expiryResponse,
   giveEpassport,
@@ -82,7 +84,7 @@ const selfSupply = VERIDA_CATALOG.filter((c) => c.renewal_methods.includes("uplo
 check("Only trainings offer the driver's own upload instead of the provider", selfSupply.join(", "), selfSupply.join() === "hipaa,gentech-pass-basic,gentech-defensive-driving,gentech-first-aid");
 const listed = expiryResponse(scenarioState("every-due", "Georgia", GA, today)).items.map((i) => i.item_slug);
 check("Every requirement due: all listed, never the MVR", `${listed.length} listed, MVR ${listed.includes("mvr") ? "listed" : "not listed"}`, listed.length === 14 && !listed.includes("mvr") && listed.every((sl) => sl !== "mvr"));
-const noFee = expiryResponse(scenarioState("every-due", "Georgia", GA, today, { epassport: true, fee: false })).items.map((i) => i.item_slug);
+const noFee = expiryResponse(scenarioState("every-due", "Georgia", GA, today, { epassport: true, fee: false, photosWithInspection: true })).items.map((i) => i.item_slug);
 check("Fee assumption off: no fee listed", `${noFee.length} listed`, noFee.length === 13 && !noFee.includes("background-check-fee"));
 // The D.Lawson round, in order: fee → consent → EPassport → drug screening date.
 let o: DriverState = scenarioState("dlawson-drug", "Georgia", GA, today);
@@ -109,13 +111,35 @@ const afterEpassport = renewalLocks(o);
 const bgcInReview = true; // checked below on the signed state
 const drugNotYet = !o.records["drug-screening"].upload;
 o = submitRenewal(o, "drug-screening", "date", addDays(today, 10));
+// D32: the date books it (pending, waiting for the receipt); the receipt sends it to Compliance.
+const booked = o.records["drug-screening"].upload?.status === "pending" && awaitingReceipt(o) && !reviewQueue(o).some((e) => e.slug === "drug-screening");
+const bookedKind = proposedKindFor({ item_slug: "drug-screening", renewal_methods: ["date"], upload: { status: "pending" } });
+o = submitRenewal(o, "drug-screening", "upload");
 check(
-  "D.Lawson round in order: fee → consent (BGC + MVR in review) → consent approved flags the EPassport → new version uploaded → drug date (in review)",
+  "D32 drug screening: date → booked (pending, not in Compliance's queue, the app asks for the receipt) → receipt → in review",
+  `booked ${booked}, next ${bookedKind}, after receipt ${o.records["drug-screening"].upload?.status}`,
+  booked && bookedKind === "upload" && o.records["drug-screening"].upload?.status === "in_review" && reviewQueue(o).some((e) => e.slug === "drug-screening"),
+);
+check(
+  "D.Lawson round in order: fee → consent (BGC + MVR in review) → consent approved flags the EPassport → new version uploaded → drug date → receipt (in review)",
   steps.join(" | "),
   !!lockedAtStart["background-check"] && !!lockedAtStart["drug-screening"] && !afterFee["background-check"] && /consent/.test(afterFee["drug-screening"] ?? "") &&
     /EPassport/.test(afterConsent["drug-screening"] ?? "") && needed && newVersion && Object.keys(afterEpassport).length === 0 && bgcInReview && bgcSigned && drugNotYet &&
     o.records["drug-screening"].upload?.status === "in_review" && o.records["drug-screening"].upload?.givenDate === addDays(today, 10),
 );
+// 2026-11-23 — aligned with the onboarding round (the side-by-side uses GA_ALIGNED_ASSUMPTIONS).
+{
+  const a = scenarioState("every-due", "Georgia", GA, today, GA_ALIGNED_ASSUMPTIONS);
+  const listedA = expiryResponse(a).items.map((i) => i.item_slug);
+  const hidden = WITH_INSPECTION.filter((sl) => listedA.includes(sl));
+  check("11-20: safety equipment, trade dress and signage are not listed; nor the fee (CG-9 open)", `${listedA.length} listed; hidden still listed: ${hidden.join(", ") || "none"}`, hidden.length === 0 && !listedA.includes("background-check-fee") && !listedA.includes(MVR_SLUG));
+  let b = submitRenewal(a, INSPECTION_SLUG, "date", addDays(today, 3));
+  b = approve(b, INSPECTION_SLUG, addDays(today, 3));
+  const follow = WITH_INSPECTION.every((sl) => b.records[sl].expires === b.records[INSPECTION_SLUG].expires);
+  check("11-20: approving the inspection moves the three photo requirements to its new date (no upload)", `${b.records[INSPECTION_SLUG].expires}`, follow);
+  const ag = agreementFor(INSPECTION_SLUG);
+  check("D15 at renewal: the inspection asks the onboarding step's read-first requirements first", `${ag?.length ?? 0} chars`, !!ag && ag.length > 40);
+}
 // ⚠️ PROPOSED (Luis, 2026-11-20): program switches in Tennessee.
 {
   let w: DriverState = scenarioState("switch-to-fc", "Georgia", GA, today);
@@ -145,7 +169,7 @@ check(
     during.verida === fcHorizon && during.tci === fcHorizon && !w.switching && after.verida === null && !!after.tci && !listedAfter.includes("background-check"),
   );
 }
-const noPassport: DriverState = submitRenewal(scenarioState("dlawson-drug", "Georgia", GA, today, { epassport: false, fee: false }), "background-check", "esign");
+const noPassport: DriverState = submitRenewal(scenarioState("dlawson-drug", "Georgia", GA, today, { epassport: false, fee: false, photosWithInspection: true }), "background-check", "esign");
 check("Assumptions off: drug screening opens once the consent is signed", JSON.stringify(renewalLocks(noPassport)), Object.keys(renewalLocks(noPassport)).length === 0);
 const asBuild = asBuildResponse(expiryResponse(scenarioState("dlawson-drug", "Georgia", GA, today)));
 check("The build's view model only ever sees its own three methods", `${asBuild.items.flatMap((i) => i.renewal_methods ?? []).filter((m) => !["upload", "attest", "yardstik"].includes(m)).length} unknown`, asBuild.items.flatMap((i) => i.renewal_methods ?? []).every((m) => ["upload", "attest", "yardstik"].includes(m)));

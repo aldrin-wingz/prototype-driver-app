@@ -126,7 +126,8 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest", "upload"]. Provider + date; not a training, so no upload of its own.
     renewal_methods: ["date"],
     providerAnchor: "book_vehicle_inspection_button",
-    providerDescription: "Book your inspection with Rideshare Mechanic, then tell us the date. They send the results straight to our Compliance team.",
+    providerDescription:
+      "Book your inspection with Rideshare Mechanic, then tell us the date. Have your safety equipment, Wingz trade dress and safety rules signage in the vehicle: the inspector checks them. They send the results straight to our Compliance team.",
     dateField: stepField("Vehicle Inspection", "inspection_date"),
     uploadFields: [],
     termMonths: 6,
@@ -175,9 +176,10 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     // ⚠️ PROPOSED (Luis, 2026-11-20): was ["attest"]. The date replaces the tick. Not a training, so no upload of its own.
     renewal_methods: ["date"],
     providerAnchor: "schedule_drug_screening_button",
-    providerDescription: "Book your drug screening, then tell us the date. The testing facility sends the result to our Compliance team.",
+    providerDescription: "Book your drug screening, then tell us the date. After your screening, upload the receipt the facility gives you. The facility sends the result to our Compliance team.",
     dateField: stepField("Schedule Drug Screening", "drug_screen_date"),
-    uploadFields: [],
+    // D32 (Luis, 2026-11-23): after the screening the driver uploads the facility receipt.
+    uploadFields: [{ slug: "drug_screen_receipt", label: "Facility receipt" }],
     termMonths: 12,
   },
   {
@@ -389,4 +391,17 @@ export function epassportInfo(): string | null {
 }
 
 /** Prototype placeholder for the EPassport file Compliance puts on file (synthetic). */
+/**
+ * D15 (2026-11-21) at renewal: the inspection's read-first requirements, from the onboarding step, answered with a
+ * single Yes before the booking link and date appear.
+ */
+export function agreementFor(slug: string): string | null {
+  if (slug !== INSPECTION_SLUG) return null;
+  for (const stage of templateFor("verida-ga")) {
+    const f = stage.steps.find((s) => s.title === "Vehicle Inspection")?.field_definitions.find((d) => d.slug === "ack_inspection_requirements");
+    if (f) return stripMarkdown(String(f.content ?? f.label ?? ""));
+  }
+  return null;
+}
+
 export const EPASSPORT_SAMPLE_URL = "/dev/epassport-sample.svg";

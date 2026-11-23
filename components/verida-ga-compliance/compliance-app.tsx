@@ -19,6 +19,7 @@ import {
   EPASSPORT_SAMPLE_URL,
   MVR_SLUG,
   TNC_ONLY_SLUGS,
+  agreementFor,
   catalogItem,
   consentFor,
   epassportInfo,
@@ -31,6 +32,7 @@ import type { ComplianceExpiryResponse } from "@/lib/verida-ga-compliance/types"
 import {
   COMPLIANCE_ICON_PATHS,
   changeRequestBody,
+  formatComplianceDate,
   type ComplianceRenewKind,
   type ComplianceRow,
   type ComplianceViewModel,
@@ -179,6 +181,12 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         canUploadInstead={c.renewal_methods.includes("upload")}
         untilLine={vm.untilLine}
         epassport={route.slug === DRUG_SLUG && state.assume.epassport && state.epassportGiven ? { url: EPASSPORT_SAMPLE_URL, info: epassportInfo() } : null}
+        agreement={agreementFor(route.slug)}
+        doneBody={
+          route.slug === DRUG_SLUG
+            ? (d) => `Your drug screening is booked for ${formatComplianceDate(d)}. After your screening, come back here and upload the receipt the facility gives you.`
+            : undefined
+        }
         onBack={pop}
         onInstructions={() => push({ name: "provider", slug: route.slug })}
         onUploadInstead={() => replace({ name: "upload", slug: route.slug })}

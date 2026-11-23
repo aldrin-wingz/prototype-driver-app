@@ -37,6 +37,8 @@ export function DateRenewScreen({
   canUploadInstead,
   untilLine,
   epassport,
+  agreement,
+  doneBody,
   onBack,
   onInstructions,
   onUploadInstead,
@@ -50,6 +52,10 @@ export function DateRenewScreen({
   untilLine: string;
   /** ⚠️ PROPOSED (drug screening): the EPassport Compliance put on file for this round, with the onboarding step's text. */
   epassport?: { url: string; info: string | null } | null;
+  /** D15 at renewal: read-first requirements answered with a single Yes before the link and the date appear. */
+  agreement?: string | null;
+  /** What the done screen says after the date (D32: the drug screening asks for the receipt next). */
+  doneBody?: (date: string) => string;
   onBack: () => void;
   onInstructions: () => void;
   onUploadInstead: () => void;
@@ -57,14 +63,33 @@ export function DateRenewScreen({
 }) {
   const [date, setDate] = useState("");
   const [done, setDone] = useState(false);
+  const [agreed, setAgreed] = useState(!agreement);
   if (done) {
     return (
       <DoneView
         title="Thanks, we'll take it from here"
-        body={`Your ${title} is booked for ${fmt(date)}. Compliance will confirm the result with the provider after that.`}
+        body={doneBody ? doneBody(date) : `Your ${title} is booked for ${fmt(date)}. Compliance will confirm the result with the provider after that.`}
         note={untilLine}
         onDone={onBack}
       />
+    );
+  }
+  if (!agreed) {
+    return (
+      <>
+        <ScreenHeader title={`Renew ${title}`} onBack={onBack} />
+        <div className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-4 pb-8" style={{ background: PAGE_BG }} data-testid="renew-agreement">
+          <div className="flex flex-col gap-3 p-4" style={card}>
+            <div className="font-bold" style={{ fontSize: 16, color: INK }}>
+              Before you book
+            </div>
+            <div className="max-h-[320px] overflow-y-auto whitespace-pre-line rounded-lg bg-[#F7F9F8] p-3" style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>
+              {agreement}
+            </div>
+            <PrimaryButton label="Yes" testId="renew-agree" onClick={() => setAgreed(true)} />
+          </div>
+        </div>
+      </>
     );
   }
   return (
@@ -77,9 +102,17 @@ export function DateRenewScreen({
           </div>
           <div style={{ fontSize: 13.5, lineHeight: "20px", color: "#4B5452" }}>{description}</div>
           {!!epassport && (
-            <div className="flex items-center gap-2 rounded-lg bg-[#F1FCF8] p-2.5" style={{ fontSize: 13, color: "#00755A" }} data-testid="epassport-ready-note">
-              <Icon path={COMPLIANCE_ICON_PATHS.check} color="#00966F" size={15} strokeWidth={2.6} />
-              Your EPassport is ready — it&apos;s on the booking page.
+            // D22: the EPassport shown on the card itself (no View voucher button), with Download.
+            <div className="flex flex-col gap-2 rounded-lg bg-[#F1FCF8] p-2.5" data-testid="epassport-inline">
+              <div className="flex items-center gap-2 font-semibold" style={{ fontSize: 13, color: "#00755A" }}>
+                <Icon path={COMPLIANCE_ICON_PATHS.check} color="#00966F" size={15} strokeWidth={2.6} />
+                Your EPassport
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={epassport.url} alt="Your EPassport" className="w-full rounded-md border border-[#DDE3E1] bg-white" />
+              <a href={epassport.url} download className="text-center font-semibold underline" style={{ fontSize: 13, color: "#00755A" }}>
+                Download
+              </a>
             </div>
           )}
           <PrimaryButton
