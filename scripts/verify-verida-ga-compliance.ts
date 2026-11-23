@@ -20,6 +20,8 @@ import {
   epassportNeeded,
   expiryResponse,
   feeDue,
+  sendBack,
+  CONSENT_LOCK,
   giveEpassport,
   horizon,
   horizonsByClient,
@@ -134,7 +136,7 @@ check(
   const a = scenarioState("every-due", "Georgia", GA, today, GA_ALIGNED_ASSUMPTIONS);
   const listedA = expiryResponse(a).items.map((i) => i.item_slug);
   const hidden = WITH_INSPECTION.filter((sl) => listedA.includes(sl));
-  check("11-20: safety equipment, trade dress and signage are not listed; nor the fee (no 60-day trip gap on record)", `${listedA.length} listed; hidden still listed: ${hidden.join(", ") || "none"}`, hidden.length === 0 && !listedA.includes("background-check-fee") && !listedA.includes(MVR_SLUG));
+  check("11-20: safety equipment, trade dress and signage are not listed; nor the fee until Compliance requests it; the MVR is listed (11-24 #8)", `${listedA.length} listed; hidden still listed: ${hidden.join(", ") || "none"}`, hidden.length === 0 && !listedA.includes("background-check-fee") && listedA.includes(MVR_SLUG));
   let b = submitRenewal(a, INSPECTION_SLUG, "date", addDays(today, 3));
   b = approve(b, INSPECTION_SLUG, addDays(today, 3));
   const follow = WITH_INSPECTION.every((sl) => b.records[sl].expires === b.records[INSPECTION_SLUG].expires);
@@ -270,25 +272,35 @@ check(
   check("OCR: every sample file reads a plausible date (expiry after today, completion on or before)", bad.map((r) => r.doc).join(", ") || `${OCR_READS.length} reads`, bad.length === 0);
 }
 
-// 13. Nov 20 meeting (Luis 2026-11-24): the renewal fee only for a driver with no completed trip in more than 60 days.
+// 13. Luis 2026-11-24 (#4′, #8): the BGC Check Fee and the consent are requested by Compliance; BGC and MVR separate.
 {
   const base = scenarioState("dlawson-drug", "Georgia", GA, today, GA_ALIGNED_ASSUMPTIONS);
   const at = (daysAgo: number | null): DriverState => ({ ...base, lastTripOn: daysAgo == null ? undefined : addDays(today, -daysAgo) });
-  check("Fee rule: due only after more than 60 days without a trip", `30: ${feeDue(at(30))}, 60: ${feeDue(at(60))}, 61: ${feeDue(at(61))}, none: ${feeDue(at(null))}`, !feeDue(at(30)) && !feeDue(at(60)) && feeDue(at(61)) && !feeDue(at(null)));
-  const active = at(30);
-  const activeListed = listedInApp(active).map((c) => c.slug);
-  check("Active driver (last trip 30 days ago): no fee listed, the consent is open", `${activeListed.includes("background-check-fee") ? "fee listed" : "no fee"}; BGC lock ${renewalLocks(active)[BGC_SLUG] ?? "none"}`, !activeListed.includes("background-check-fee") && !renewalLocks(active)[BGC_SLUG]);
+  check("Fee rule: required only after more than 60 days without a trip", `30: ${feeDue(at(30))}, 60: ${feeDue(at(60))}, 61: ${feeDue(at(61))}, none: ${feeDue(at(null))}`, !feeDue(at(30)) && !feeDue(at(60)) && feeDue(at(61)) && !feeDue(at(null)));
   const idle = at(61);
-  const paid = submitRenewal(idle, "background-check-fee", "upload");
-  const approved = approve(paid, "background-check-fee", today);
-  const steps = [renewalLocks(idle)[BGC_SLUG], renewalLocks(paid)[BGC_SLUG], renewalLocks(approved)[BGC_SLUG] ?? "open"];
+  const requested = sendBack(idle, "background-check-fee", "Pay the BGC Check Fee");
+  const paid = submitRenewal(requested, "background-check-fee", "upload");
   check(
-    "Inactive 61 days: fee listed → pay + receipt → consent waits for Compliance's approval → approved → consent opens",
-    steps.join(" → "),
-    listedInApp(idle).some((c) => c.slug === "background-check-fee") && steps[0] === "Pay the renewal fee first" && /Compliance to approve your payment/.test(steps[1] ?? "") && steps[2] === "open",
+    "#4′: the fee is listed only once Compliance requests it; the payment image goes to Pending Review",
+    `before ${listedInApp(idle).some((c) => c.slug === "background-check-fee")}, after ${listedInApp(requested).some((c) => c.slug === "background-check-fee")}, sent ${paid.records["background-check-fee"].upload?.status}`,
+    !listedInApp(idle).some((c) => c.slug === "background-check-fee") && listedInApp(requested).some((c) => c.slug === "background-check-fee") && paid.records["background-check-fee"].upload?.status === "in_review",
+  );
+  const locks0 = renewalLocks(idle);
+  const asked = sendBack(idle, BGC_SLUG, "Sign the new consent form");
+  check(
+    "#8: Renew on BGC or MVR waits for Compliance's consent request; the request opens the consent (both)",
+    `before ${locks0[BGC_SLUG]} / ${locks0[MVR_SLUG]}; after ${renewalLocks(asked)[BGC_SLUG] ?? "open"}`,
+    locks0[BGC_SLUG] === CONSENT_LOCK && locks0[MVR_SLUG] === CONSENT_LOCK && !renewalLocks(asked)[BGC_SLUG] && !renewalLocks(asked)[MVR_SLUG] && asked.records[MVR_SLUG].upload?.status === "change_requested",
+  );
+  const signed = submitRenewal(asked, BGC_SLUG, "esign");
+  const bgcOnly = approve(signed, BGC_SLUG, today);
+  check(
+    "#8: one signature → BGC and MVR Pending Review; each is approved on its own",
+    `BGC ${bgcOnly.records[BGC_SLUG].upload?.status}, MVR ${bgcOnly.records[MVR_SLUG].upload?.status}`,
+    signed.records[MVR_SLUG].upload?.status === "in_review" && bgcOnly.records[BGC_SLUG].upload?.status === "approved" && bgcOnly.records[MVR_SLUG].upload?.status === "in_review",
   );
   const page = instructionsFor("background-check-fee", "Georgia");
-  check("Fee page: $71 copy, a Stripe link, then the receipt upload", page?.blocks.map((b) => b.kind).join(", ") ?? "none", !!page && page.blocks.some((b) => /\$71/.test(b.text ?? "")) && page.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")));
+  check("Fee page: $71 copy, a Stripe link, then the payment image upload", page?.blocks.map((b) => b.kind).join(", ") ?? "none", !!page && page.blocks.some((b) => /\$71/.test(b.text ?? "")) && page.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")));
 }
 
 console.log(failed ? `\n${failed} failed` : "\nAll passed");

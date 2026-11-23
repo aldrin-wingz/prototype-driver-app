@@ -1,6 +1,6 @@
 /**
- * PROTOTYPE — side-by-side contract, schema 3 (Verida GA, 2026-11-20; compliance + clock 2026-11-23;
- * OCR dates, staff change requests, last trip + renewal fee 2026-11-24).
+ * PROTOTYPE — side-by-side contract, schema 4 (Verida GA, 2026-11-20; compliance + clock 2026-11-23;
+ * OCR dates, staff change requests, last trip + BGC Check Fee, consent rounds, pre-adverse dispute 2026-11-24).
  *
  * ⛔ This file exists twice, byte for byte:
  *   wingz-cs-tool            lib/prototype/side-by-side/contract.ts   (the harness and the engine live here)
@@ -12,7 +12,7 @@
  * app only renders what it is given and reports what the driver did. No data leaves the browser.
  */
 
-export const SBS_SCHEMA = 3 as const;
+export const SBS_SCHEMA = 4 as const;
 
 /** The one synthetic driver the side-by-side shows. Not a real record. */
 export const SBS_DRIVER_ID = 700901;
@@ -86,9 +86,11 @@ export interface SbsReview {
 export interface SbsPreAdverse {
   slug: string;
   startedOn: string;
-  /** 5 business days after the start (D31). */
+  /** 5 business days after the start (D31): Send post-adverse unlocks then. */
   rejectFrom: string;
-  /** The lifecycle the hold replaced, restored on Lift. */
+  /** Luis 2026-11-24: the driver disputes — the clock stops; Compliance then rejects (with a reason) or removes the hold. */
+  disputedOn?: string | null;
+  /** The lifecycle the hold replaced, restored on Remove from hold. An activated driver stays activated (no hold). */
   heldFrom: SbsLifecycle;
 }
 
@@ -100,6 +102,8 @@ export interface SbsRenewalUpload {
   givenDate?: string;
   /** 2026-11-24: the date OCR read from this round's document (the driver's upload, or the one Compliance attached). */
   ocrDate?: string;
+  /** 2026-11-24 (D.Lawson round): Compliance approved the signed consent; the checks stay Pending Review until the report. */
+  consentApproved?: boolean;
   resubmitted?: boolean;
   agent_note?: string | null;
   /** The prototype day it was sent. */
@@ -171,8 +175,13 @@ export type SbsAction =
   | { type: "compliance/setValue"; slug: string; field: string; value: unknown }
   | { type: "compliance/sendForActivation" }
   | { type: "compliance/startPreAdverse"; slug: string }
+  /** Remove from hold: closes the case (from a dispute). */
   | { type: "compliance/liftPreAdverse" }
-  | { type: "compliance/rejectFailedBackgroundCheck" };
+  /** Send post-adverse: reject, reason "Failed background check", post-adverse email (from 5 business days). */
+  | { type: "compliance/rejectFailedBackgroundCheck" }
+  | { type: "compliance/disputePreAdverse" }
+  /** From a dispute: reject with Compliance's reason. */
+  | { type: "compliance/rejectDisputed"; reason: string };
 
 export type SbsMessage =
   | { kind: "sbs:state"; state: SbsState }

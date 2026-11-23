@@ -89,10 +89,16 @@ export function feeDue(s: Pick<DriverState, "today" | "lastTripOn">): boolean {
   return !!s.lastTripOn && daysBetween(s.lastTripOn, s.today) > INACTIVE_DAYS;
 }
 
-/** The fee is part of this driver's renewal: the old "every renewal" assumption, or the 60-day rule. */
-export function feeApplies(s: Pick<DriverState, "assume" | "today" | "lastTripOn">): boolean {
-  return s.assume.fee || feeDue(s);
+/**
+ * The fee is listed in the app: the old "every renewal" assumption, or (Luis 2026-11-24, 4′) once Compliance has
+ * requested it from the BGC Check Fee card — the CS Tool decides it is required (feeDue), the app shows the request.
+ */
+export function feeListed(s: Pick<DriverState, "assume" | "records">): boolean {
+  return s.assume.fee || (!!s.assume.consentOnRequest && !!s.records[FEE_SLUG]?.upload);
 }
+
+/** Luis 2026-11-24 (#8): the message on Renew for the background check / MVR before Compliance requests a new consent. */
+export const CONSENT_LOCK = "Awaiting a new consent form from the compliance team.";
 
 export interface Assumptions {
   epassport: boolean;
@@ -103,11 +109,16 @@ export interface Assumptions {
    * inspection's new date when it's approved — the inspection booking says to have them ready. Off = the 11-20 way.
    */
   photosWithInspection: boolean;
+  /**
+   * Luis 2026-11-24 (#8): the D.Lawson round starts when Compliance requests a new consent (Request Changes on the
+   * consent form). Background check and MVR are listed separately and approved separately, each from the report.
+   */
+  consentOnRequest?: boolean;
 }
 
 export const DEFAULT_ASSUMPTIONS: Assumptions = { epassport: true, fee: true, photosWithInspection: true };
 /** The side-by-side (2026-11-23): the onboarding round's decisions — fee open (CG-9), photos follow the inspection (11-20). */
-export const GA_ALIGNED_ASSUMPTIONS: Assumptions = { epassport: true, fee: false, photosWithInspection: false };
+export const GA_ALIGNED_ASSUMPTIONS: Assumptions = { epassport: true, fee: false, photosWithInspection: false, consentOnRequest: true };
 
 const fmt = (d: dayjs.Dayjs) => d.format("YYYY-MM-DD");
 export const addDays = (iso: string, n: number) => fmt(dayjs(iso).add(n, "day"));
@@ -212,9 +223,12 @@ export function scenarioState(
  * program (Luis, 2026-11-20). During a switch both programs show: the new one requested, the old one still counting
  * (TCI trips on the TNC+ documents; every trip on the FC documents). Once the switch completes the old one is hidden.
  */
-export function listedInApp(s: Pick<DriverState, "assume" | "program" | "switching" | "today" | "lastTripOn">) {
+export function listedInApp(s: Pick<DriverState, "assume" | "program" | "switching" | "records">) {
   const fcItems = VERIDA_CATALOG.filter(
-    (c) => c.inApp !== false && (c.assumption !== "fee" || feeApplies(s)) && (c.kind !== "with-inspection" || s.assume.photosWithInspection !== false),
+    (c) =>
+      (c.inApp !== false || (c.slug === MVR_SLUG && !!s.assume.consentOnRequest)) &&
+      (c.assumption !== "fee" || feeListed(s)) &&
+      (c.kind !== "with-inspection" || s.assume.photosWithInspection !== false),
   );
   const tncItems = TNC_ONLY_CATALOG.filter((c) => c.slug !== "mvr-yardstik" || true);
   if (s.switching) return [...fcItems, ...tncItems];
@@ -328,9 +342,9 @@ export function renewalLocks(s: DriverState): Record<string, string> {
   const locks: Record<string, string> = {};
   const open = (slug: string) => due(s, slug) && !submitted(s.records[slug]) && s.records[slug].upload?.status !== "approved";
   const feeApproved = s.records[FEE_SLUG].upload?.status === "approved";
-  if (feeDue(s) && open(BGC_SLUG) && due(s, FEE_SLUG) && !feeApproved) {
-    // Nov 20 meeting: inactive 60+ days — pay, upload the receipt, and only Compliance's approval unlocks the consent.
-    locks[BGC_SLUG] = submitted(s.records[FEE_SLUG]) ? "Waiting for Compliance to approve your payment" : "Pay the renewal fee first";
+  if (s.assume.consentOnRequest) {
+    // #8: nothing to sign until Compliance requests a new consent (which needs the BGC Check Fee approved when required).
+    for (const sl of [BGC_SLUG, MVR_SLUG]) if (due(s, sl) && !s.records[sl].upload) locks[sl] = CONSENT_LOCK;
   } else if (s.assume.fee && open(BGC_SLUG) && due(s, FEE_SLUG) && !submitted(s.records[FEE_SLUG]) && !feeApproved) {
     locks[BGC_SLUG] = "Pay the Background Check Fee first";
   }
@@ -411,13 +425,13 @@ export interface ReviewEntry {
 
 /** Documents for Review for this driver. MVR is folded into its background check (one approval, S1). */
 export function reviewQueue(s: DriverState): ReviewEntry[] {
-  return [...VERIDA_CATALOG, ...TNC_ONLY_CATALOG].filter((c) => s.records[c.slug]?.upload?.status === "in_review" && c.slug !== MVR_SLUG).map((c) => {
+  return [...VERIDA_CATALOG, ...TNC_ONLY_CATALOG].filter((c) => s.records[c.slug]?.upload?.status === "in_review" && (c.slug !== MVR_SLUG || !!s.assume.consentOnRequest)).map((c) => {
     const ownDate = c.termMonths === null;
     const photoFollower = c.kind === "with-inspection";
     const ocrDate = s.records[c.slug].upload?.ocrDate;
     return {
       slug: c.slug,
-      title: c.slug === BGC_SLUG ? `${c.title} + Motor Vehicle Record` : c.title,
+      title: c.slug === BGC_SLUG && !s.assume.consentOnRequest ? `${c.title} + Motor Vehicle Record` : c.title,
       attested: !!s.records[c.slug].upload?.attested,
       how: s.records[c.slug].upload?.how ?? (s.records[c.slug].upload?.attested ? "attest" : "upload"),
       givenDate: s.records[c.slug].upload?.givenDate ?? null,
@@ -474,7 +488,8 @@ export function approve(s: DriverState, slug: string, date: string): DriverState
     }
   } else {
     const exp = newExpiry(c, date);
-    for (const sl of linked(slug)) records[sl] = { expires: exp, upload: { status: "approved" } };
+    // #8 (Luis 2026-11-24): the background check and the MVR are approved one by one, each from the D.Lawson report.
+    for (const sl of s.assume.consentOnRequest ? [slug] : linked(slug)) records[sl] = { expires: exp, upload: { status: "approved" } };
     if (slug === INSPECTION_SLUG) {
       inspectionRenewedTo = exp;
       for (const sl of WITH_INSPECTION) {

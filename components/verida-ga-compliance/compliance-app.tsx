@@ -86,6 +86,8 @@ function routeFor(slug: string, kind: RenewKind): Route {
 export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, onSubmit, onSnooze, uploadLayout, openRequest }: ComplianceAppProps) {
   const [stack, setStack] = useState<Route[]>([{ name: "tabs" }]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  /** #8: why Renew can't start yet (e.g. awaiting a new consent form from Compliance). */
+  const [notice, setNotice] = useState<string | null>(null);
   const locks = renewalLocks(state); // ⚠️ PROPOSED
   // ⚠️ PROPOSED (checklist batches): photos sent so far per requirement; the requirement reaches review once all are in.
   const [sentPhotos, setSentPhotos] = useState<Record<string, string[]>>({});
@@ -106,7 +108,11 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
     // ⚠️ PROPOSED: the route comes from the proposed kind ("date" / "esign"), which the build's row can't carry.
     const item = itemFor(target.slug);
     const kind = item ? proposedKindFor(item) : target.renewKind;
-    if (locks[target.slug]) return; // ⚠️ PROPOSED: an earlier step of the round comes first
+    if (locks[target.slug]) {
+      // ⚠️ PROPOSED: an earlier step of the round comes first — say what it is waiting for.
+      setNotice(locks[target.slug]);
+      return;
+    }
     if (kind === "yardstik" && !TNC_ONLY_SLUGS.includes(target.slug)) throw new Error("A Verida Fully Credentialled driver is never sent to Yardstik");
     push(routeFor(target.slug, kind));
   };
@@ -357,6 +363,21 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
   return (
     <div className="relative flex h-full flex-col font-wingz">
       {screen}
+      {notice && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6" data-testid="renew-notice">
+          <div className="w-full rounded-2xl bg-white p-5 text-center">
+            <div className="font-bold" style={{ fontSize: 16, color: INK }}>
+              Not yet
+            </div>
+            <div className="mt-2" style={{ fontSize: 14, lineHeight: "20px", color: "#4B5452" }} data-testid="renew-notice-text">
+              {notice}
+            </div>
+            <button type="button" className="mt-4 h-11 w-full rounded-xl font-bold text-white" style={{ background: "#00966F" }} onClick={() => setNotice(null)} data-testid="renew-notice-ok">
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <Sheet
         vm={vm}
         open={sheetOpen}

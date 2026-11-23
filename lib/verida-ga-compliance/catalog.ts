@@ -158,7 +158,7 @@ export const VERIDA_CATALOG: CatalogItem[] = [
   {
     slug: "mvr",
     title: "Motor Vehicle Record (D.Lawson)",
-    renewsBy: "Not listed in the app: takes the D.Lawson report's date with the background check",
+    renewsBy: "Listed on its own (11-24): signed with the background check's consent, approved on its own from the D.Lawson report",
     kind: "with-background-check",
     inApp: false,
     renewal_methods: ["esign"],
@@ -186,12 +186,12 @@ export const VERIDA_CATALOG: CatalogItem[] = [
     // Nov 20 meeting (Luis, 2026-11-24): due only when the driver has completed no trip in more than 60 days (`feeDue`);
     // otherwise Wingz covers the renewal. Paid and approved before the consent form can be signed.
     slug: "background-check-fee",
-    title: "Background Check Renewal Fee",
-    renewsBy: "No trip in 60+ days: pay the fee (Stripe), upload the receipt; Compliance approves it before the consent",
+    title: "BGC Check Fee",
+    renewsBy: "Requested by Compliance when the last trip was 60+ days ago: pay (Stripe), upload the payment image; approved before the consent",
     kind: "photo",
     renewal_methods: ["upload"],
     assumption: "fee",
-    uploadFields: stepPhotos("Background Check Fee", ["background_check_fee_receipt"]).map((f) => ({ ...f, label: "Payment receipt", hint: "A screenshot or the emailed receipt" })),
+    uploadFields: stepPhotos("Background Check Fee", ["background_check_fee_receipt"]).map((f) => ({ ...f, label: "Payment image", hint: "A screenshot or the emailed Stripe receipt" })),
     instructionsStep: "Background Check Fee",
     termMonths: 12,
   },
@@ -361,7 +361,7 @@ const RENEWAL_FEE_STRIPE_URL = "https://buy.stripe.com/"; // ⚠️ placeholder 
 
 export function renewalFeePage(): ComplianceProvider {
   return {
-    title: "Background Check Renewal Fee",
+    title: "BGC Check Fee",
     description: null,
     blocks: [
       {

@@ -5,6 +5,7 @@
  *   "esign" — the onboarding consent form signed in the app is the submission (D.Lawson background check + MVR).
  * The build's view model is fed "attest" in their place (its nearest method), and the rows' button copy is then patched.
  */
+import { CONSENT_LOCK } from "./scenario";
 import type { ComplianceExpiryResponse, ComplianceItem, ComplianceRenewalMethod } from "./types";
 import { renewKindFor, type ComplianceRenewKind, type ComplianceRow, type ComplianceViewModel } from "./view-model";
 
@@ -33,7 +34,9 @@ export function asBuildResponse(r: ComplianceExpiryResponse): ComplianceExpiryRe
 export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryResponse, locks: Record<string, string> = {}): ComplianceViewModel {
   const patch = (row: ComplianceRow): ComplianceRow => {
     // ⚠️ PROPOSED: a requirement waiting on an earlier step of its round has no button yet (the page shows why).
-    if (locks[row.slug] && !row.changes) row = { ...row, canUpload: false };
+    // #8 (Luis 2026-11-24): the background check / MVR keep Renew; pressing it says a new consent is awaited.
+    if (locks[row.slug] && !row.changes && locks[row.slug] !== CONSENT_LOCK) row = { ...row, canUpload: false };
+    if (locks[row.slug] === CONSENT_LOCK && !row.changes) return { ...row, canUpload: true, uploadLabel: "Renew", uploadCta: `Renew ${row.title}` };
     const switchItem = r.items.find((i) => i.item_slug === row.slug)?.program_switch_request;
     if (switchItem) {
       // ⚠️ PROPOSED (program switch): requested, no date of its own yet.
