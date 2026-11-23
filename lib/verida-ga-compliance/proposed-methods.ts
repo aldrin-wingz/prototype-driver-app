@@ -56,8 +56,11 @@ export function withProposedRows(vm: ComplianceViewModel, r: ComplianceExpiryRes
       return { ...row, canUpload: true, text: "Booked · upload the facility receipt after your screening", uploadLabel: "Upload receipt", uploadCta: "Upload your drug screening receipt" };
     }
     const kind = item ? proposedKindFor(item) : row.renewKind;
-    // #4′: requested by Compliance (Request Changes on the BGC Check Fee card) — the action is always to pay.
-    if (row.slug === "background-check-fee") return { ...row, uploadLabel: "Pay", uploadCta: "Pay the BGC Check Fee" };
+    // Luis 2026-11-24: a renewal Compliance requested (the consent, the BGC Check Fee) reads Renew like any renewal —
+    // never "Fix", which stays for a send-back of something the driver submitted this round.
+    if (item?.renewal_request != null && !row.changes && !row.inReview) {
+      return { ...row, isDue: true, canUpload: true, uploadLabel: "Renew", uploadCta: `Renew ${row.title}` };
+    }
     if (row.changes || (kind !== "date" && kind !== "esign")) return row;
     return kind === "esign"
       ? { ...row, uploadLabel: "Sign", uploadCta: `Sign the ${row.title} consent` }

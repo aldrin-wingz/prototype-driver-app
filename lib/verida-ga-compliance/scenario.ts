@@ -50,6 +50,11 @@ export interface RequirementRecord {
   photosApprovedAwaitingInspection?: boolean;
   /** ⚠️ PROPOSED: requested by a program switch (Request Change) — nothing of the new program on file yet. */
   requested?: boolean;
+  /**
+   * Luis 2026-11-24: Compliance requested this renewal (Request Changes on the consent card / the fee's receipt) with
+   * nothing submitted this round — a normal Renew in the app. A send-back of something submitted stays change_requested.
+   */
+  renewalRequested?: string;
 }
 
 /** ⚠️ PROPOSED (Luis, 2026-11-20): the credential program, from the client tags (Verida → Fully Credentialled). */
@@ -94,7 +99,8 @@ export function feeDue(s: Pick<DriverState, "today" | "lastTripOn">): boolean {
  * requested it from the BGC Check Fee card — the CS Tool decides it is required (feeDue), the app shows the request.
  */
 export function feeListed(s: Pick<DriverState, "assume" | "records">): boolean {
-  return s.assume.fee || (!!s.assume.consentOnRequest && !!s.records[FEE_SLUG]?.upload);
+  const r = s.records[FEE_SLUG];
+  return s.assume.fee || (!!s.assume.consentOnRequest && (!!r?.upload || r?.renewalRequested !== undefined));
 }
 
 /** Luis 2026-11-24 (#8): the message on Renew for the background check / MVR before Compliance requests a new consent. */
@@ -276,6 +282,7 @@ export function expiryResponse(s: DriverState): ComplianceExpiryResponse {
       upload: r.upload ? { status: r.upload.status, attested: r.upload.attested, resubmitted: r.upload.resubmitted, agent_note: r.upload.agent_note } : null,
       renewal_methods: c.renewal_methods,
       external_link: c.providerDescription ? { url: "", label: "", description: c.providerDescription } : null,
+      ...(r.renewalRequested !== undefined && !r.upload ? { renewal_request: r.renewalRequested } : {}),
     };
   });
   const dated = items.filter((i) => i.milestone).sort((a, b) => a.days_until_expiration - b.days_until_expiration);
@@ -344,7 +351,7 @@ export function renewalLocks(s: DriverState): Record<string, string> {
   const feeApproved = s.records[FEE_SLUG].upload?.status === "approved";
   if (s.assume.consentOnRequest) {
     // #8: nothing to sign until Compliance requests a new consent (which needs the BGC Check Fee approved when required).
-    for (const sl of [BGC_SLUG, MVR_SLUG]) if (due(s, sl) && !s.records[sl].upload) locks[sl] = CONSENT_LOCK;
+    for (const sl of [BGC_SLUG, MVR_SLUG]) if (due(s, sl) && !s.records[sl].upload && s.records[sl].renewalRequested === undefined) locks[sl] = CONSENT_LOCK;
   } else if (s.assume.fee && open(BGC_SLUG) && due(s, FEE_SLUG) && !submitted(s.records[FEE_SLUG]) && !feeApproved) {
     locks[BGC_SLUG] = "Pay the Background Check Fee first";
   }
@@ -389,6 +396,7 @@ export function submitRenewal(s: DriverState, slug: string, how: RenewHow, given
     records[sl] = {
       ...records[sl],
       photosApprovedAwaitingInspection: false,
+      renewalRequested: undefined,
       upload: {
         status: booked ? "pending" : "in_review",
         attested: how !== "upload",
@@ -500,6 +508,16 @@ export function approve(s: DriverState, slug: string, date: string): DriverState
   }
   // ⚠️ PROPOSED: each drug screening round needs its own EPassport.
   return { ...s, records, inspectionRenewedTo, epassportGiven: slug === DRUG_SLUG ? undefined : s.epassportGiven };
+}
+
+/**
+ * Luis 2026-11-24: Compliance requests a renewal (the D.Lawson consent — one for BGC + MVR — or the BGC Check Fee) with
+ * nothing submitted this round: the app shows a normal Renew. Use `sendBack` only for something the driver submitted.
+ */
+export function requestRenewal(s: DriverState, slug: string, note: string): DriverState {
+  const records = { ...s.records };
+  for (const sl of linked(slug)) records[sl] = { ...records[sl], upload: undefined, renewalRequested: note };
+  return { ...s, records };
 }
 
 export function sendBack(s: DriverState, slug: string, note: string): DriverState {

@@ -66,6 +66,11 @@ export interface ComplianceItem {
   external_link?: ComplianceExternalLink | null;
   /** ⚠️ PROPOSED (Luis, 2026-11-20): requested by a credential program switch — no date of its own on file yet. */
   program_switch_request?: "fc" | "tnc" | null;
+  /**
+   * ⚠️ PROPOSED (Luis 2026-11-24): Compliance requested this renewal (the D.Lawson consent, the BGC Check Fee) — nothing
+   * the driver sent is being sent back, so the row reads Renew like any renewal, never "Fix".
+   */
+  renewal_request?: string | null;
 }
 
 export interface ComplianceExpiryResponse {

@@ -21,6 +21,7 @@ import {
   expiryResponse,
   feeDue,
   sendBack,
+  requestRenewal,
   CONSENT_LOCK,
   giveEpassport,
   horizon,
@@ -33,7 +34,7 @@ import {
   type DriverState,
 } from "../lib/verida-ga-compliance/scenario";
 import { buildComplianceViewModel, renewKindFor } from "../lib/verida-ga-compliance/view-model";
-import { asBuildResponse, proposedKindFor } from "../lib/verida-ga-compliance/proposed-methods";
+import { asBuildResponse, proposedKindFor, withProposedRows } from "../lib/verida-ga-compliance/proposed-methods";
 import { OCR_READS, renewalOcrDate } from "../lib/verida-ga-compliance/ocr";
 
 let failed = 0;
@@ -278,7 +279,7 @@ check(
   const at = (daysAgo: number | null): DriverState => ({ ...base, lastTripOn: daysAgo == null ? undefined : addDays(today, -daysAgo) });
   check("Fee rule: required only after more than 60 days without a trip", `30: ${feeDue(at(30))}, 60: ${feeDue(at(60))}, 61: ${feeDue(at(61))}, none: ${feeDue(at(null))}`, !feeDue(at(30)) && !feeDue(at(60)) && feeDue(at(61)) && !feeDue(at(null)));
   const idle = at(61);
-  const requested = sendBack(idle, "background-check-fee", "Pay the BGC Check Fee");
+  const requested = requestRenewal(idle, "background-check-fee", "Pay the BGC Check Fee");
   const paid = submitRenewal(requested, "background-check-fee", "upload");
   check(
     "#4′: the fee is listed only once Compliance requests it; the payment image goes to Pending Review",
@@ -286,11 +287,24 @@ check(
     !listedInApp(idle).some((c) => c.slug === "background-check-fee") && listedInApp(requested).some((c) => c.slug === "background-check-fee") && paid.records["background-check-fee"].upload?.status === "in_review",
   );
   const locks0 = renewalLocks(idle);
-  const asked = sendBack(idle, BGC_SLUG, "Sign the new consent form");
+  const asked = requestRenewal(idle, BGC_SLUG, "Sign the new consent form");
   check(
     "#8: Renew on BGC or MVR waits for Compliance's consent request; the request opens the consent (both)",
     `before ${locks0[BGC_SLUG]} / ${locks0[MVR_SLUG]}; after ${renewalLocks(asked)[BGC_SLUG] ?? "open"}`,
-    locks0[BGC_SLUG] === CONSENT_LOCK && locks0[MVR_SLUG] === CONSENT_LOCK && !renewalLocks(asked)[BGC_SLUG] && !renewalLocks(asked)[MVR_SLUG] && asked.records[MVR_SLUG].upload?.status === "change_requested",
+    locks0[BGC_SLUG] === CONSENT_LOCK && locks0[MVR_SLUG] === CONSENT_LOCK && !renewalLocks(asked)[BGC_SLUG] && !renewalLocks(asked)[MVR_SLUG] && asked.records[MVR_SLUG].renewalRequested !== undefined,
+  );
+  // Luis 2026-11-24: a renewal Compliance requested reads Renew (never "Fix"); "Fix" stays for a real send-back.
+  const rowsOf = (st: DriverState) => {
+    const resp = expiryResponse(st);
+    return withProposedRows(buildComplianceViewModel(asBuildResponse(resp)), resp, renewalLocks(st)).page.due;
+  };
+  const askedRows = rowsOf(requested).concat(rowsOf(asked));
+  const reqLabels = askedRows.filter((r) => ["background-check", "mvr", "background-check-fee"].includes(r.slug)).map((r) => `${r.slug}:${r.uploadLabel}`);
+  const sentBackRow = rowsOf(sendBack(submitRenewal(asked, BGC_SLUG, "esign"), BGC_SLUG, "Signature missing")).find((r) => r.slug === BGC_SLUG);
+  check(
+    "Requested renewals (consent, fee) read Renew, never Fix; a send-back of a signed consent reads Fix",
+    `${reqLabels.join(", ")} · sent back: ${sentBackRow?.uploadLabel}`,
+    reqLabels.length >= 3 && reqLabels.every((l) => l.endsWith(":Renew")) && askedRows.every((r) => !r.changes) && sentBackRow?.uploadLabel === "Fix",
   );
   const signed = submitRenewal(asked, BGC_SLUG, "esign");
   const bgcOnly = approve(signed, BGC_SLUG, today);

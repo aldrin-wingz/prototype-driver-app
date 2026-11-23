@@ -102,7 +102,11 @@ export interface SbsPreAdverse {
 
 /** Phase C, activated driver: one renewal the driver sent from the app (the In-App Compliance build's upload status). */
 export interface SbsRenewalUpload {
-  status: "in_review" | "pending" | "change_requested" | "approved";
+  /**
+   * "requested" (Luis 2026-11-24): Compliance asked for this renewal (the consent, the BGC Check Fee) with nothing
+   * submitted this round — the app shows Renew. "change_requested" is a send-back of something the driver submitted.
+   */
+  status: "requested" | "in_review" | "pending" | "change_requested" | "approved";
   how?: "upload" | "attest" | "date" | "esign";
   attested?: boolean;
   givenDate?: string;
