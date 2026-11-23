@@ -27,6 +27,7 @@ import {
   catalogItem,
   type CatalogItem,
 } from "./catalog";
+import { renewalOcrDate } from "./ocr";
 import type { ComplianceExpiryResponse, ComplianceItem, ComplianceMilestone, ComplianceUploadStatus } from "./types";
 
 export interface Upload {
@@ -35,6 +36,8 @@ export interface Upload {
   /** ⚠️ PROPOSED: how it was sent ("date" / "esign" are new), and the date the driver gave. */
   how?: RenewHow;
   givenDate?: string;
+  /** 2026-11-24: the date OCR read from the uploaded document (ocr.ts). Compliance approves with it; nobody types it. */
+  ocrDate?: string;
   resubmitted?: boolean;
   agent_note?: string | null;
 }
@@ -345,6 +348,8 @@ export function submitRenewal(s: DriverState, slug: string, how: RenewHow, given
     // D32 (Luis, 2026-11-23): the drug screening date books it ("pending"); the facility receipt, uploaded after the
     // screening, is what sends it to Compliance — who then uploads the result and approves.
     const booked = sl === DRUG_SLUG && how === "date";
+    // 2026-11-24: a photo of a dated document fills its date at once, as an OCR read.
+    const ocrDate = how === "upload" ? renewalOcrDate(sl, s.today) : undefined;
     records[sl] = {
       ...records[sl],
       photosApprovedAwaitingInspection: false,
@@ -353,6 +358,7 @@ export function submitRenewal(s: DriverState, slug: string, how: RenewHow, given
         attested: how !== "upload",
         how,
         givenDate: givenDate ?? (sl === DRUG_SLUG ? prev?.givenDate : undefined),
+        ...(ocrDate ? { ocrDate } : {}),
         resubmitted: prev?.status === "change_requested",
       },
     };
@@ -374,7 +380,7 @@ export interface ReviewEntry {
   attested: boolean;
   how: RenewHow;
   givenDate: string | null;
-  /** The date the agent saves before approving: the inspection / completion date, or the document's own expiry. */
+  /** The date saved on approval: read from the document (OCR), or the inspection / completion date. */
   dateLabel: string;
   defaultDate: string;
   /** "Vehicle renewal" when the four inspection requirements are reviewed together (S2). */
@@ -386,6 +392,7 @@ export function reviewQueue(s: DriverState): ReviewEntry[] {
   return [...VERIDA_CATALOG, ...TNC_ONLY_CATALOG].filter((c) => s.records[c.slug]?.upload?.status === "in_review" && c.slug !== MVR_SLUG).map((c) => {
     const ownDate = c.termMonths === null;
     const photoFollower = c.kind === "with-inspection";
+    const ocrDate = s.records[c.slug].upload?.ocrDate;
     return {
       slug: c.slug,
       title: c.slug === BGC_SLUG ? `${c.title} + Motor Vehicle Record` : c.title,
@@ -394,14 +401,16 @@ export function reviewQueue(s: DriverState): ReviewEntry[] {
       givenDate: s.records[c.slug].upload?.givenDate ?? null,
       dateLabel: photoFollower
         ? "No date: takes the inspection's new expiry"
-        : ownDate
+        : ocrDate
+          ? "Read from the document (OCR)"
+          : ownDate
           ? "Expiry read from the photo"
           : c.slug === INSPECTION_SLUG
             ? "Inspection date"
             : c.slug === BGC_SLUG
               ? "D.Lawson report date"
               : "Completion date",
-      defaultDate: ownDate ? addMonths(s.today, 12) : s.today,
+      defaultDate: ocrDate ?? (ownDate ? addMonths(s.today, 12) : s.today),
       group: [INSPECTION_SLUG, ...WITH_INSPECTION].includes(c.slug) ? "Vehicle renewal" : null,
     };
   });

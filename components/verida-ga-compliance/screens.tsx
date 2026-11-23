@@ -415,10 +415,13 @@ export function UploadScreen({
   onReplace,
   onBack,
   onSubmit,
+  ocrRead,
 }: {
   title: string;
   fields: UploadField[];
   changeNote: string | null;
+  /** PROTOTYPE (2026-11-24): the date OCR reads from the uploaded document, shown as soon as it is sent. */
+  ocrRead?: string | null;
   untilLine: string;
   /** ⚠️ PROPOSED (V14): "built" = #353 unchanged; the others are the alternatives in upload-layouts.tsx. */
   layout?: UploadLayout;
@@ -440,7 +443,7 @@ export function UploadScreen({
     return (
       <DoneView
         title="Submitted for review"
-        body={`We'll review your ${title}, usually within 1 business day.`}
+        body={`${ocrRead ? `${ocrRead}, read from your document. ` : ""}We'll review your ${title}, usually within 1 business day.`}
         note={untilLine}
         onDone={onBack}
       />

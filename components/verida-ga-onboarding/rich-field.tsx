@@ -26,6 +26,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Calendar, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Clock, ExternalLink, FileText, PlayCircle } from "lucide-react";
 
 import { resolveFieldLink, type FieldDef } from "@/lib/verida-ga-onboarding/market-flow";
+import { OCR_NOTE, ocrFor, ocrLine } from "@/lib/verida-ga-compliance/ocr";
 import {
   ESIGN_ACK_SLUG,
   ESIGN_SIGNATURE_SLUG,
@@ -388,6 +389,8 @@ function Upload({ field, value, onChange }: { field: FieldDef; value: unknown; o
   const Icon = isPhoto ? Camera : FileText;
   const cta = field.placeholder?.trim() || (isPhoto ? "Click to upload a photo" : "Click to upload a file");
   const example = (field.metadata as { example_image?: string } | null | undefined)?.example_image;
+  // PROTOTYPE (Luis 2026-11-24): a dated document fills its date on upload, as an OCR read (lib/verida-ga-compliance/ocr.ts).
+  const ocr = filled ? ocrFor(field.slug) : undefined;
   return (
     <div>
       <div className="text-[14px] font-semibold">
@@ -430,6 +433,14 @@ function Upload({ field, value, onChange }: { field: FieldDef; value: unknown; o
           </>
         )}
       </button>
+      {ocr ? (
+        <div className="mt-1.5 flex items-center justify-between rounded-md bg-[#F2FBF8] px-3 py-2 text-[12.5px]" data-testid={`ocr-${field.slug}`}>
+          <span className="font-semibold" style={{ color: TEXT }}>
+            {ocrLine(ocr, ocr.sample)}
+          </span>
+          <span style={{ color: GRAY_3 }}>{OCR_NOTE}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

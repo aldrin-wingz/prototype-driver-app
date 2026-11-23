@@ -43,6 +43,7 @@ import { CompliancePage, ProviderScreen, RenewScreen, RequestsPaused, UploadScre
 import type { UploadLayout } from "./upload-layouts";
 import { DateRenewScreen, EsignRenewScreen, SwitchBanner, YardstikScreen } from "./renew-proposed";
 import { proposedKindFor, type RenewKind } from "@/lib/verida-ga-compliance/proposed-methods";
+import { OCR_DOC_BY_APP, ocrFor, ocrLine, renewalOcrDate } from "@/lib/verida-ga-compliance/ocr";
 
 export type Tab = "home" | "requests" | "options";
 type Route =
@@ -220,6 +221,12 @@ export function ComplianceApp({ state, response, vm, providerOpts, tab, onTab, o
         title={c.title}
         fields={c.uploadFields}
         changeNote={changes ? changeRequestBody(item) : null}
+        ocrRead={(() => {
+          // PROTOTYPE (2026-11-24): the new document's date, read on upload (OCR) — the same read Compliance approves.
+          const read = ocrFor(OCR_DOC_BY_APP[route.slug] ?? "");
+          const date = renewalOcrDate(route.slug, state.today);
+          return read && date ? ocrLine(read, date) : null;
+        })()}
         untilLine={vm.untilLine}
         layout={uploadLayout}
         submitted={sentPhotos[route.slug] ?? []}

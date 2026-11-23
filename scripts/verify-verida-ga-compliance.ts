@@ -31,6 +31,7 @@ import {
 } from "../lib/verida-ga-compliance/scenario";
 import { buildComplianceViewModel, renewKindFor } from "../lib/verida-ga-compliance/view-model";
 import { asBuildResponse, proposedKindFor } from "../lib/verida-ga-compliance/proposed-methods";
+import { OCR_READS, renewalOcrDate } from "../lib/verida-ga-compliance/ocr";
 
 let failed = 0;
 function check(name: string, detail: string, ok: boolean) {
@@ -250,6 +251,23 @@ check(
     withSteps[0].ins!.blocks.some((b) => b.kind === "link" && /stripe\.com/.test(b.url ?? "")) &&
     withSteps.every((x) => x.ins!.blocks.length >= 3),
 );
+
+// 12. Luis 2026-11-24: no manual dates — a dated document's date is read on upload (OCR), never typed.
+{
+  const lic = submitRenewal(scenarioState("every-due", "Georgia", GA, today, GA_ALIGNED_ASSUMPTIONS), "drivers-license", "upload");
+  const read = lic.records["drivers-license"].upload?.ocrDate;
+  const entry = reviewQueue(lic).find((e) => e.slug === "drivers-license");
+  check(
+    "OCR: a licence photo renewal carries the date read from it; Compliance approves with that read",
+    `read ${read}, review ${entry?.defaultDate} (${entry?.dateLabel})`,
+    !!read && read === renewalOcrDate("drivers-license", today) && entry?.defaultDate === read && /OCR/.test(entry?.dateLabel ?? ""),
+  );
+  const attest = submitRenewal(scenarioState("every-due", "Georgia", GA, today, GA_ALIGNED_ASSUMPTIONS), "hipaa", "attest");
+  check("OCR: an attest (provider) renewal carries no read date — Compliance attaches the certificate", String(attest.records.hipaa.upload?.ocrDate), attest.records.hipaa.upload?.ocrDate === undefined);
+  const T0 = "2026-11-23";
+  const bad = OCR_READS.filter((r) => (r.kind === "expiry" ? !(r.sample > T0 && r.renewal(T0) > T0) : !(r.sample <= T0 && r.renewal(T0) <= T0)));
+  check("OCR: every sample file reads a plausible date (expiry after today, completion on or before)", bad.map((r) => r.doc).join(", ") || `${OCR_READS.length} reads`, bad.length === 0);
+}
 
 console.log(failed ? `\n${failed} failed` : "\nAll passed");
 process.exit(failed ? 1 : 0);
