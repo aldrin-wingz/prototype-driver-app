@@ -86,6 +86,25 @@ export interface SbsPreAdverse {
   heldFrom: SbsLifecycle;
 }
 
+/** Phase C, activated driver: one renewal the driver sent from the app (the In-App Compliance build's upload status). */
+export interface SbsRenewalUpload {
+  status: "in_review" | "pending" | "change_requested" | "approved";
+  how?: "upload" | "attest" | "date" | "esign";
+  attested?: boolean;
+  givenDate?: string;
+  resubmitted?: boolean;
+  agent_note?: string | null;
+  /** The prototype day it was sent. */
+  on: string;
+}
+
+export interface SbsRenewal {
+  /** The app's requirement slug → its latest renewal this round. */
+  uploads: Record<string, SbsRenewalUpload>;
+  /** D20/D22: the day Compliance uploaded this round's EPassport (the app shows it only then). */
+  epassportGivenOn: string | null;
+}
+
 export interface SbsCompliance {
   /** Field slug → value. Requirements read their fields from here (one value can show on two cards, e.g. the D.Lawson report). */
   fields: Record<string, SbsComplianceValue>;
@@ -94,6 +113,8 @@ export interface SbsCompliance {
   /** "Send to Onboarding For Activation" done. */
   sentForActivation: boolean;
   preAdverse: SbsPreAdverse | null;
+  /** Activated: In-App Compliance renewals. */
+  renewal: SbsRenewal;
 }
 
 export interface SbsState {
@@ -130,6 +151,7 @@ export type SbsAction =
   | { type: "system/result"; check: SbsCheck; result: SbsResult }
   | { type: "bar/setProposals"; on: boolean }
   | { type: "bar/advanceDays"; days: number }
+  | { type: "driver/renew"; slug: string; how: "upload" | "attest" | "date" | "esign"; givenDate?: string }
   | { type: "compliance/approve"; slug: string }
   | { type: "compliance/requestChanges"; slug: string }
   | { type: "compliance/clear"; slug: string }
