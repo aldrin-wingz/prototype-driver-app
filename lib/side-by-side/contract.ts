@@ -1,5 +1,6 @@
 /**
- * PROTOTYPE — side-by-side contract, schema 2 (Verida GA, 2026-11-20; compliance + clock 2026-11-23).
+ * PROTOTYPE — side-by-side contract, schema 3 (Verida GA, 2026-11-20; compliance + clock 2026-11-23;
+ * OCR dates, staff change requests, last trip + renewal fee 2026-11-24).
  *
  * ⛔ This file exists twice, byte for byte:
  *   wingz-cs-tool            lib/prototype/side-by-side/contract.ts   (the harness and the engine live here)
@@ -11,7 +12,7 @@
  * app only renders what it is given and reports what the driver did. No data leaves the browser.
  */
 
-export const SBS_SCHEMA = 2 as const;
+export const SBS_SCHEMA = 3 as const;
 
 /** The one synthetic driver the side-by-side shows. Not a real record. */
 export const SBS_DRIVER_ID = 700901;
@@ -28,6 +29,11 @@ export interface SbsValue {
 export interface SbsChangeRequest {
   fields: string[];
   reason: string;
+  /**
+   * 2026-11-24: the flagged fields are staff uploads (e.g. D.Lawson's report): the request goes to Onboarding, who
+   * replaces the file. The driver has nothing to change, so the app does not show the step as Change Requested.
+   */
+  forStaff?: boolean;
 }
 
 /** What has happened to one template step (form). */
@@ -92,6 +98,8 @@ export interface SbsRenewalUpload {
   how?: "upload" | "attest" | "date" | "esign";
   attested?: boolean;
   givenDate?: string;
+  /** 2026-11-24: the date OCR read from this round's document (the driver's upload, or the one Compliance attached). */
+  ocrDate?: string;
   resubmitted?: boolean;
   agent_note?: string | null;
   /** The prototype day it was sent. */
@@ -137,6 +145,8 @@ export interface SbsState {
   cursorStepId: string | null;
   /** The prototype's today (YYYY-MM-DD); the bar moves it forward. */
   today: string;
+  /** 2026-11-24 (Nov 20 meeting): the driver's last completed trip. More than 60 days ago = the renewal fee is due. Null = none. */
+  lastTripOn: string | null;
   compliance: SbsCompliance;
   log: SbsLogEntry[];
 }
@@ -151,9 +161,12 @@ export type SbsAction =
   | { type: "system/result"; check: SbsCheck; result: SbsResult }
   | { type: "bar/setProposals"; on: boolean }
   | { type: "bar/advanceDays"; days: number }
+  | { type: "bar/setLastTrip"; on: string | null }
+  /** Prototype setup only: put a card's date where a scenario needs it (stands in for time passing). Never Compliance. */
+  | { type: "bar/setDate"; field: string; value: string }
   | { type: "driver/renew"; slug: string; how: "upload" | "attest" | "date" | "esign"; givenDate?: string }
   | { type: "compliance/approve"; slug: string }
-  | { type: "compliance/requestChanges"; slug: string }
+  | { type: "compliance/requestChanges"; slug: string; note?: string }
   | { type: "compliance/clear"; slug: string }
   | { type: "compliance/setValue"; slug: string; field: string; value: unknown }
   | { type: "compliance/sendForActivation" }
